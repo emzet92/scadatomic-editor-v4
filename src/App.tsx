@@ -1,15 +1,25 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
 import './App.css'
-import { type ComponentRegistry, type UiTree, RenderNode } from './uiframework/Renderer';
+
+import {
+  type ComponentRegistry,
+  type UiTree,
+  RenderNode
+} from './uiframework/Renderer';
+
 import { Container } from './uiframework/Container';
 import { EditorControls } from './uiframework/EditorControls';
 import { PropertyPanel } from './uiframework/PropertyPanel';
 import { useEditorStore } from './uiframework/editor-store';
 
 const registry: ComponentRegistry = {
-  Container: Container,
+  Container,
 
-  Text: ({ value, ...props }) => <span {...props}>{String(value ?? "")}</span>,
+  Text: ({ value, ...props }) => (
+    <span {...props}>
+      {String(value ?? "")}
+    </span>
+  ),
 
   Button: ({ label, ...props }) => (
     <button {...props}>
@@ -18,16 +28,17 @@ const registry: ComponentRegistry = {
   ),
 };
 
-const nodes: UiTree = {
+console.log("sram ci na matke");
+
+const initialNodes: UiTree = {
   root: {
     id: "root",
     type: "Container",
     props: {
-      style: {
-        display: "flex",
-        gap: 12,
-        padding: 16,
-      },
+      display: "flex",
+      gap: 12,
+      padding: 16,
+      row: 1,
     },
     children: ["title", "button"],
   },
@@ -58,29 +69,49 @@ function RendererRoot({
   nodes: UiTree;
   registry: ComponentRegistry;
 }) {
-  return <RenderNode id={rootId} nodes={nodes} registry={registry} />;
+  return (
+    <RenderNode
+      id={rootId}
+      nodes={nodes}
+      registry={registry}
+    />
+  );
 }
 
-
 function App() {
-  const selectedId = useEditorStore(
-    (s) => s.selectedNodeId
+  const nodes = useEditorStore(
+    (s) => s.nodes
   );
 
-  const setSelectedId =
-    useEditorStore(
-      (s) => s.setSelectedNodeId
-    );
+  const setNodes = useEditorStore(
+    (s) => s.setNodes
+  );
+
+  useEffect(() => {
+    if (Object.keys(nodes).length === 0) {
+      setNodes(initialNodes);
+    }
+  }, [nodes, setNodes]);
+
+  if (!nodes.root) {
+    return null;
+  }
 
   return (
     <>
-      <RendererRoot rootId="root" nodes={nodes} registry={registry} />
-      <EditorControls onSelect={setSelectedId} />
-      <PropertyPanel
+      <RendererRoot
+        rootId="root"
         nodes={nodes}
+        registry={registry}
       />
+
+      <EditorControls />
+
+        <PropertyPanel
+          nodes={nodes}
+        />
     </>
-  )
+  );
 }
 
-export default App
+export default App;

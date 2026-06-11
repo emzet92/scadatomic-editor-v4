@@ -3,43 +3,56 @@ import { useEditorStore } from "./editor-store";
 
 type Props = {
     nodes: UiTree;
-    selectedNodeId: string | null;
 };
 
-export function PropertyPanel({
-    nodes,
-}: Props) {
-    const selectedNodeId =
-        useEditorStore(
-            (s) => s.selectedNodeId
-        );
+export function PropertyPanel({ nodes }: Props) {
+    const selectedNodeId = useEditorStore(
+        (s) => s.selectedNodeId
+    );
+
+    const updateNode = useEditorStore(
+        (s) => s.updateNode
+    );
+
     if (!selectedNodeId) {
-        return <div>No selection</div>;
+        return <div data-editor-ignore>No selection</div>;
     }
 
     const node = nodes[selectedNodeId];
 
-    const propsToRender =
-        node.type === "Container"
-            ? (node.props.style ?? {})
-            : (node.props ?? {});
+    if (!node) {
+        return <div data-editor-ignore>Node not found</div>;
+    }
+
+    const propsToRender = node.props ?? {};
 
     return (
-        <>
-            <h3>{node.type}</h3>
+        <div data-editor-ignore>
+            <h3>
+                {node.type} / {node.id}
+            </h3>
 
-            {Object.entries(propsToRender).map(
-                ([key, value]) => (
-                    <div key={key}>
-                        <label>{key}</label>
+            {Object.entries(propsToRender).map(([key, value]) => (
+                <div key={key}>
+                    <label>{key}</label>
 
-                        <input
-                            value={String(value)}
-                            readOnly
-                        />
-                    </div>
-                )
-            )}
-        </>
+                    <input
+                        data-editor-ignore
+                        value={String(value)}
+                        onChange={(e) => {
+                            const nextValue = e.target.value;
+
+                            updateNode(node.id, (currentNode) => ({
+                                ...currentNode,
+                                props: {
+                                    ...currentNode.props,
+                                    [key]: nextValue,
+                                },
+                            }));
+                        }}
+                    />
+                </div>
+            ))}
+        </div>
     );
 }

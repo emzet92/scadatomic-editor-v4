@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useEditorStore } from "./editor-store";
 
 type RectInfo = {
   id: string;
@@ -8,10 +9,6 @@ type RectInfo = {
   height: number;
   right: number;
   bottom: number;
-};
-
-type Props = {
-  onSelect?: (id: string | null) => void;
 };
 
 function Handle({
@@ -39,11 +36,16 @@ function Handle({
   );
 }
 
-export function EditorControls({
-  onSelect,
-}: Props) {
+export function EditorControls() {
   const [rects, setRects] = useState<RectInfo[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const selectedId = useEditorStore(
+    (s) => s.selectedNodeId
+  );
+
+  const setSelectedNodeId = useEditorStore(
+    (s) => s.setSelectedNodeId
+  );
 
   function collectRects() {
     const next: RectInfo[] = [];
@@ -83,22 +85,30 @@ export function EditorControls({
         return;
       }
 
-      const node = target.closest("[data-node-id]");
-
-      if (!node) {
-        setSelectedId(null);
-        onSelect?.(null);
+      // ignorujemy PropertyPanel, Toolbar itd.
+      if (
+        target.closest("[data-editor-ignore]")
+      ) {
         return;
       }
 
-      const id = node.getAttribute("data-node-id");
+      const node = target.closest(
+        "[data-node-id]"
+      );
+
+      if (!node) {
+        setSelectedNodeId(null);
+        return;
+      }
+
+      const id =
+        node.getAttribute("data-node-id");
 
       if (!id) {
         return;
       }
 
-      setSelectedId(id);
-      onSelect?.(id);
+      setSelectedNodeId(id);
     }
 
     document.addEventListener(
@@ -136,7 +146,7 @@ export function EditorControls({
         true
       );
     };
-  }, []);
+  }, [setSelectedNodeId]);
 
   const selectedRect =
     rects.find(
@@ -165,7 +175,7 @@ export function EditorControls({
         />
       ))}
 
-      {/* selected */}
+      {/* zaznaczony komponent */}
 
       {selectedRect && (
         <>
