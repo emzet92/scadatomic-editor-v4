@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Handle } from "./Handle";
 
 type SelectionBox = {
     nodeId: string;
@@ -74,19 +75,47 @@ export function EditorControls() {
         return null;
     }
 
+    const HANDLE_SIZE = 10;
+
     return (
-        <div
-            style={{
-                position: "absolute",
-                top: selectionBox.top,
-                left: selectionBox.left,
-                width: selectionBox.width,
-                height: selectionBox.height,
-                border: "2px solid #00aaff",
-                boxSizing: "border-box",
-                pointerEvents: "none",
-                zIndex: 9999,
-            }}
-        />
+        <>
+            <div
+                style={{
+                    position: "absolute",
+                    top: selectionBox.top,
+                    left: selectionBox.left,
+                    width: selectionBox.width,
+                    height: selectionBox.height,
+                    border: "2px solid #00aaff",
+                    boxSizing: "border-box",
+                    pointerEvents: "none",
+                    zIndex: 9999,
+                }}
+            />
+
+            {/* NW */}
+            <Handle
+                x={selectionBox.left}
+                y={selectionBox.top}
+            />
+
+            {/* NE */}
+            <Handle
+                x={selectionBox.left + selectionBox.width}
+                y={selectionBox.top}
+            />
+
+            {/* SW */}
+            <Handle
+                x={selectionBox.left}
+                y={selectionBox.top + selectionBox.height}
+            />
+
+            {/* SE */}
+            <Handle
+                x={selectionBox.left + selectionBox.width}
+                y={selectionBox.top + selectionBox.height}
+            />
+        </>
     );
 }
