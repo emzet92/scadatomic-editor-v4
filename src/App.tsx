@@ -40,7 +40,11 @@ const initialNodes: UiTree = {
       padding: 16,
       row: 1,
     },
-    children: ["title", "button"],
+    children: [
+      "title",
+      "button",
+      "panel1",
+    ],
   },
 
   title: {
@@ -56,6 +60,37 @@ const initialNodes: UiTree = {
     type: "Button",
     props: {
       label: "Start",
+    },
+  },
+
+  panel1: {
+    id: "panel1",
+    type: "Container",
+    props: {
+      display: "flex",
+      gap: 8,
+      padding: 12,
+      row: 1,
+    },
+    children: [
+      "panel1Text",
+      "panel1Button",
+    ],
+  },
+
+  panel1Text: {
+    id: "panel1Text",
+    type: "Text",
+    props: {
+      value: "Nested Layout",
+    },
+  },
+
+  panel1Button: {
+    id: "panel1Button",
+    type: "Button",
+    props: {
+      label: "Nested Action",
     },
   },
 };
