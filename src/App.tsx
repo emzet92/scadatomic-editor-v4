@@ -2,6 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import { type ComponentRegistry, type UiTree, RenderNode } from './uiframework/Renderer';
 import { Container } from './uiframework/Container';
+import { EditorControls } from './uiframework/EditorControls';
 
 const registry: ComponentRegistry = {
   Container: Container,
@@ -65,6 +66,7 @@ function App() {
   return (
     <>
       <RendererRoot rootId="root" nodes={nodes} registry={registry} />
+      <EditorControls/>
     </>
   )
 }
