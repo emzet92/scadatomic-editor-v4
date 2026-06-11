@@ -149,7 +149,7 @@ export function EditorControls() {
                         top: rect.top,
                         width: rect.width,
                         height: rect.height,
-                        border: "1px dashed rgba(0,120,255,.25)",
+                        border: "2px dashed rgba(0,120,255,.25)",
                         boxSizing: "border-box",
                         pointerEvents: "none",
                         zIndex: 9998,
