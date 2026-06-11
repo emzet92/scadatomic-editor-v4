@@ -1,201 +1,210 @@
 import { useEffect, useState } from "react";
 
 type RectInfo = {
-    id: string;
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-    right: number;
-    bottom: number;
+  id: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+};
+
+type Props = {
+  onSelect?: (id: string | null) => void;
 };
 
 function Handle({
-    x,
-    y,
+  x,
+  y,
 }: {
-    x: number;
-    y: number;
+  x: number;
+  y: number;
 }) {
-    return (
-        <div
-            style={{
-                position: "fixed",
-                left: x - 4,
-                top: y - 4,
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#00aaff",
-                border: "1px solid white",
-                pointerEvents: "none",
-                zIndex: 10001,
-            }}
-        />
-    );
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: x - 4,
+        top: y - 4,
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: "#00aaff",
+        border: "1px solid white",
+        pointerEvents: "none",
+        zIndex: 10001,
+      }}
+    />
+  );
 }
 
-export function EditorControls() {
-    const [rects, setRects] = useState<RectInfo[]>([]);
-    const [selection, setSelection] = useState<RectInfo | null>(null);
+export function EditorControls({
+  onSelect,
+}: Props) {
+  const [rects, setRects] = useState<RectInfo[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    useEffect(() => {
-        function collectRects() {
-            const next: RectInfo[] = [];
+  function collectRects() {
+    const next: RectInfo[] = [];
 
-            document
-                .querySelectorAll("[data-node-id]")
-                .forEach((el) => {
-                    const id = el.getAttribute("data-node-id");
+    document
+      .querySelectorAll("[data-node-id]")
+      .forEach((el) => {
+        const id = el.getAttribute("data-node-id");
 
-                    if (!id) {
-                        return;
-                    }
-
-                    const rect = el.getBoundingClientRect();
-
-                    next.push({
-                        id,
-                        left: rect.left,
-                        top: rect.top,
-                        width: rect.width,
-                        height: rect.height,
-                        right: rect.right,
-                        bottom: rect.bottom,
-                    });
-                });
-
-            setRects(next);
-
-            setSelection((current) => {
-                if (!current) {
-                    return current;
-                }
-
-                const updated = next.find((r) => r.id === current.id);
-
-                return updated ?? null;
-            });
+        if (!id) {
+          return;
         }
 
-        function handleClick(event: MouseEvent) {
-            const target = event.target as HTMLElement | null;
+        const rect = el.getBoundingClientRect();
 
-            if (!target) {
-                return;
-            }
-
-            const node = target.closest("[data-node-id]");
-
-            if (!node) {
-                setSelection(null);
-                return;
-            }
-
-            const id = node.getAttribute("data-node-id");
-
-            if (!id) {
-                return;
-            }
-
-            const rect = node.getBoundingClientRect();
-
-            setSelection({
-                id,
-                left: rect.left,
-                top: rect.top,
-                width: rect.width,
-                height: rect.height,
-                right: rect.right,
-                bottom: rect.bottom,
-            });
-        }
-
-        collectRects();
-
-        document.addEventListener("click", handleClick, true);
-
-        window.addEventListener("resize", collectRects);
-        window.addEventListener("scroll", collectRects, true);
-
-        const observer = new MutationObserver(collectRects);
-
-        observer.observe(document.body, {
-            subtree: true,
-            childList: true,
-            attributes: true,
+        next.push({
+          id,
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          bottom: rect.bottom,
         });
+      });
 
-        return () => {
-            document.removeEventListener("click", handleClick, true);
+    setRects(next);
+  }
 
-            window.removeEventListener("resize", collectRects);
-            window.removeEventListener("scroll", collectRects, true);
+  useEffect(() => {
+    collectRects();
 
-            observer.disconnect();
-        };
-    }, []);
+    function handleClick(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
 
-    return (
-        <>
-            {/* OUTLINES WSZYSTKICH KOMPONENTÓW */}
+      if (!target) {
+        return;
+      }
 
-            {rects.map((rect) => (
-                <div
-                    key={rect.id}
-                    style={{
-                        position: "fixed",
-                        left: rect.left,
-                        top: rect.top,
-                        width: rect.width,
-                        height: rect.height,
-                        border: "2px dashed rgba(0,120,255,.25)",
-                        boxSizing: "border-box",
-                        pointerEvents: "none",
-                        zIndex: 9998,
-                    }}
-                />
-            ))}
+      const node = target.closest("[data-node-id]");
 
-            {/* ZAZNACZONY KOMPONENT */}
+      if (!node) {
+        setSelectedId(null);
+        onSelect?.(null);
+        return;
+      }
 
-            {selection && (
-                <>
-                    <div
-                        style={{
-                            position: "fixed",
-                            left: selection.left,
-                            top: selection.top,
-                            width: selection.width,
-                            height: selection.height,
-                            border: "2px solid #00aaff",
-                            boxSizing: "border-box",
-                            pointerEvents: "none",
-                            zIndex: 10000,
-                        }}
-                    />
+      const id = node.getAttribute("data-node-id");
 
-                    <Handle
-                        x={selection.left}
-                        y={selection.top}
-                    />
+      if (!id) {
+        return;
+      }
 
-                    <Handle
-                        x={selection.right}
-                        y={selection.top}
-                    />
+      setSelectedId(id);
+      onSelect?.(id);
+    }
 
-                    <Handle
-                        x={selection.left}
-                        y={selection.bottom}
-                    />
-
-                    <Handle
-                        x={selection.right}
-                        y={selection.bottom}
-                    />
-                </>
-            )}
-        </>
+    document.addEventListener(
+      "click",
+      handleClick,
+      true
     );
+
+    window.addEventListener(
+      "resize",
+      collectRects
+    );
+
+    window.addEventListener(
+      "scroll",
+      collectRects,
+      true
+    );
+
+    return () => {
+      document.removeEventListener(
+        "click",
+        handleClick,
+        true
+      );
+
+      window.removeEventListener(
+        "resize",
+        collectRects
+      );
+
+      window.removeEventListener(
+        "scroll",
+        collectRects,
+        true
+      );
+    };
+  }, []);
+
+  const selectedRect =
+    rects.find(
+      (r) => r.id === selectedId
+    ) ?? null;
+
+  return (
+    <>
+      {/* outline wszystkich komponentów */}
+
+      {rects.map((rect) => (
+        <div
+          key={rect.id}
+          style={{
+            position: "fixed",
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            border:
+              "1px dashed rgba(0,120,255,.25)",
+            boxSizing: "border-box",
+            pointerEvents: "none",
+            zIndex: 9998,
+          }}
+        />
+      ))}
+
+      {/* selected */}
+
+      {selectedRect && (
+        <>
+          <div
+            style={{
+              position: "fixed",
+              left: selectedRect.left,
+              top: selectedRect.top,
+              width: selectedRect.width,
+              height: selectedRect.height,
+              border:
+                "2px solid #00aaff",
+              boxSizing: "border-box",
+              pointerEvents: "none",
+              zIndex: 10000,
+            }}
+          />
+
+          <Handle
+            x={selectedRect.left}
+            y={selectedRect.top}
+          />
+
+          <Handle
+            x={selectedRect.right}
+            y={selectedRect.top}
+          />
+
+          <Handle
+            x={selectedRect.left}
+            y={selectedRect.bottom}
+          />
+
+          <Handle
+            x={selectedRect.right}
+            y={selectedRect.bottom}
+          />
+        </>
+      )}
+    </>
+  );
 }

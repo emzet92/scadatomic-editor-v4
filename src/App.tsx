@@ -3,6 +3,7 @@ import './App.css'
 import { type ComponentRegistry, type UiTree, RenderNode } from './uiframework/Renderer';
 import { Container } from './uiframework/Container';
 import { EditorControls } from './uiframework/EditorControls';
+import { PropertyPanel } from './uiframework/PropertyPanel';
 
 const registry: ComponentRegistry = {
   Container: Container,
@@ -61,12 +62,16 @@ function RendererRoot({
 
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
     <>
       <RendererRoot rootId="root" nodes={nodes} registry={registry} />
-      <EditorControls/>
+      <EditorControls onSelect={setSelectedId}/>
+      <PropertyPanel
+        nodes={nodes}
+        selectedNodeId={selectedId}
+      />
     </>
   )
 }
