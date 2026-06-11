@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import './App.css'
-import { type ComponentRegistry, type UiTree, type Ren, RenderNode } from './uiframework/Renderer';
+import { type ComponentRegistry, type UiTree, RenderNode } from './uiframework/Renderer';
+import { Container } from './uiframework/Container';
 
 const registry: ComponentRegistry = {
-  Container: ({ children, ...props }) => <div {...props}>{children}</div>,
+  Container: Container,
 
   Text: ({ value, ...props }) => <span {...props}>{String(value ?? "")}</span>,
 
@@ -63,7 +64,7 @@ function App() {
 
   return (
     <>
-      <RendererRoot rootId="root" nodes={nodes} registry={registry} />;
+      <RendererRoot rootId="root" nodes={nodes} registry={registry} />
     </>
   )
 }
