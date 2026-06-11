@@ -22,7 +22,7 @@ export function Container({
       style={{
         border: `${borderSize}px solid white`,
         borderRadius: 5,
-        padding,
+        padding: `${padding}px`,
         display: "grid",
         gridTemplateColumns: `repeat(${row}, 1fr)`,
         gap: 8,
