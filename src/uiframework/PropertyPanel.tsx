@@ -1,41 +1,45 @@
 import type { UiTree } from "./Renderer";
+import { useEditorStore } from "./editor-store";
 
 type Props = {
-  nodes: UiTree;
-  selectedNodeId: string | null;
+    nodes: UiTree;
+    selectedNodeId: string | null;
 };
 
 export function PropertyPanel({
-  nodes,
-  selectedNodeId,
+    nodes,
 }: Props) {
-  if (!selectedNodeId) {
-    return <div>No selection</div>;
-  }
+    const selectedNodeId =
+        useEditorStore(
+            (s) => s.selectedNodeId
+        );
+    if (!selectedNodeId) {
+        return <div>No selection</div>;
+    }
 
-  const node = nodes[selectedNodeId];
+    const node = nodes[selectedNodeId];
 
-  const propsToRender =
-    node.type === "Container"
-      ? (node.props.style ?? {})
-      : (node.props ?? {});
+    const propsToRender =
+        node.type === "Container"
+            ? (node.props.style ?? {})
+            : (node.props ?? {});
 
-  return (
-    <>
-      <h3>{node.type}</h3>
+    return (
+        <>
+            <h3>{node.type}</h3>
 
-      {Object.entries(propsToRender).map(
-        ([key, value]) => (
-          <div key={key}>
-            <label>{key}</label>
+            {Object.entries(propsToRender).map(
+                ([key, value]) => (
+                    <div key={key}>
+                        <label>{key}</label>
 
-            <input
-              value={String(value)}
-              readOnly
-            />
-          </div>
-        )
-      )}
-    </>
-  );
+                        <input
+                            value={String(value)}
+                            readOnly
+                        />
+                    </div>
+                )
+            )}
+        </>
+    );
 }

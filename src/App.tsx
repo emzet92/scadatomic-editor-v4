@@ -4,6 +4,7 @@ import { type ComponentRegistry, type UiTree, RenderNode } from './uiframework/R
 import { Container } from './uiframework/Container';
 import { EditorControls } from './uiframework/EditorControls';
 import { PropertyPanel } from './uiframework/PropertyPanel';
+import { useEditorStore } from './uiframework/editor-store';
 
 const registry: ComponentRegistry = {
   Container: Container,
@@ -62,15 +63,21 @@ function RendererRoot({
 
 
 function App() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = useEditorStore(
+    (s) => s.selectedNodeId
+  );
+
+  const setSelectedId =
+    useEditorStore(
+      (s) => s.setSelectedNodeId
+    );
 
   return (
     <>
       <RendererRoot rootId="root" nodes={nodes} registry={registry} />
-      <EditorControls onSelect={setSelectedId}/>
+      <EditorControls onSelect={setSelectedId} />
       <PropertyPanel
         nodes={nodes}
-        selectedNodeId={selectedId}
       />
     </>
   )
