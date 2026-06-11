@@ -20,7 +20,7 @@ export function Container({
       {...domProps}
       className="container"
       style={{
-        border: `${borderSize}px solid white`,
+        border: `${borderSize}px solid black`,
         borderRadius: 5,
         padding: `${padding}px`,
         display: "grid",

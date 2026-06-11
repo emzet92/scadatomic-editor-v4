@@ -39,6 +39,7 @@ const initialNodes: UiTree = {
       gap: 12,
       padding: 16,
       row: 1,
+      borderSize: 1,
     },
     children: [
       "title",
@@ -71,6 +72,7 @@ const initialNodes: UiTree = {
       gap: 8,
       padding: 12,
       row: 1,
+      borderSize: 0
     },
     children: [
       "panel1Text",
