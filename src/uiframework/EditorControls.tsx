@@ -1,121 +1,201 @@
 import { useEffect, useState } from "react";
-import { Handle } from "./Handle";
 
-type SelectionBox = {
-    nodeId: string;
-    top: number;
+type RectInfo = {
+    id: string;
     left: number;
+    top: number;
     width: number;
     height: number;
+    right: number;
+    bottom: number;
 };
 
+function Handle({
+    x,
+    y,
+}: {
+    x: number;
+    y: number;
+}) {
+    return (
+        <div
+            style={{
+                position: "fixed",
+                left: x - 4,
+                top: y - 4,
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#00aaff",
+                border: "1px solid white",
+                pointerEvents: "none",
+                zIndex: 10001,
+            }}
+        />
+    );
+}
+
 export function EditorControls() {
-    const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+    const [rects, setRects] = useState<RectInfo[]>([]);
+    const [selection, setSelection] = useState<RectInfo | null>(null);
 
     useEffect(() => {
-        function updateSelectionBox(target: Element) {
-            const nodeId = target.getAttribute("data-node-id");
+        function collectRects() {
+            const next: RectInfo[] = [];
 
-            if (!nodeId) return;
+            document
+                .querySelectorAll("[data-node-id]")
+                .forEach((el) => {
+                    const id = el.getAttribute("data-node-id");
 
-            const rect = target.getBoundingClientRect();
+                    if (!id) {
+                        return;
+                    }
 
-            setSelectionBox({
-                nodeId,
-                top: rect.top + window.scrollY,
-                left: rect.left + window.scrollX,
-                width: rect.width,
-                height: rect.height,
+                    const rect = el.getBoundingClientRect();
+
+                    next.push({
+                        id,
+                        left: rect.left,
+                        top: rect.top,
+                        width: rect.width,
+                        height: rect.height,
+                        right: rect.right,
+                        bottom: rect.bottom,
+                    });
+                });
+
+            setRects(next);
+
+            setSelection((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                const updated = next.find((r) => r.id === current.id);
+
+                return updated ?? null;
             });
         }
 
         function handleClick(event: MouseEvent) {
             const target = event.target as HTMLElement | null;
 
-            if (!target) return;
-
-            const nodeEl = target.closest("[data-node-id]");
-
-            if (!nodeEl) {
-                setSelectionBox(null);
+            if (!target) {
                 return;
             }
 
-            event.stopPropagation();
-            updateSelectionBox(nodeEl);
-        }
+            const node = target.closest("[data-node-id]");
 
-        function handleResizeOrScroll() {
-            if (!selectionBox) return;
-
-            const el = document.querySelector(
-                `[data-node-id="${selectionBox.nodeId}"]`
-            );
-
-            if (!el) {
-                setSelectionBox(null);
+            if (!node) {
+                setSelection(null);
                 return;
             }
 
-            updateSelectionBox(el);
+            const id = node.getAttribute("data-node-id");
+
+            if (!id) {
+                return;
+            }
+
+            const rect = node.getBoundingClientRect();
+
+            setSelection({
+                id,
+                left: rect.left,
+                top: rect.top,
+                width: rect.width,
+                height: rect.height,
+                right: rect.right,
+                bottom: rect.bottom,
+            });
         }
+
+        collectRects();
 
         document.addEventListener("click", handleClick, true);
-        window.addEventListener("resize", handleResizeOrScroll);
-        window.addEventListener("scroll", handleResizeOrScroll, true);
+
+        window.addEventListener("resize", collectRects);
+        window.addEventListener("scroll", collectRects, true);
+
+        const observer = new MutationObserver(collectRects);
+
+        observer.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+        });
 
         return () => {
             document.removeEventListener("click", handleClick, true);
-            window.removeEventListener("resize", handleResizeOrScroll);
-            window.removeEventListener("scroll", handleResizeOrScroll, true);
+
+            window.removeEventListener("resize", collectRects);
+            window.removeEventListener("scroll", collectRects, true);
+
+            observer.disconnect();
         };
-    }, [selectionBox]);
-
-    if (!selectionBox) {
-        return null;
-    }
-
-    const HANDLE_SIZE = 10;
+    }, []);
 
     return (
         <>
-            <div
-                style={{
-                    position: "absolute",
-                    top: selectionBox.top,
-                    left: selectionBox.left,
-                    width: selectionBox.width,
-                    height: selectionBox.height,
-                    border: "2px solid #00aaff",
-                    boxSizing: "border-box",
-                    pointerEvents: "none",
-                    zIndex: 9999,
-                }}
-            />
+            {/* OUTLINES WSZYSTKICH KOMPONENTÓW */}
 
-            {/* NW */}
-            <Handle
-                x={selectionBox.left}
-                y={selectionBox.top}
-            />
+            {rects.map((rect) => (
+                <div
+                    key={rect.id}
+                    style={{
+                        position: "fixed",
+                        left: rect.left,
+                        top: rect.top,
+                        width: rect.width,
+                        height: rect.height,
+                        border: "1px dashed rgba(0,120,255,.25)",
+                        boxSizing: "border-box",
+                        pointerEvents: "none",
+                        zIndex: 9998,
+                    }}
+                />
+            ))}
 
-            {/* NE */}
-            <Handle
-                x={selectionBox.left + selectionBox.width}
-                y={selectionBox.top}
-            />
+            {/* ZAZNACZONY KOMPONENT */}
 
-            {/* SW */}
-            <Handle
-                x={selectionBox.left}
-                y={selectionBox.top + selectionBox.height}
-            />
+            {selection && (
+                <>
+                    <div
+                        style={{
+                            position: "fixed",
+                            left: selection.left,
+                            top: selection.top,
+                            width: selection.width,
+                            height: selection.height,
+                            border: "2px solid #00aaff",
+                            boxSizing: "border-box",
+                            pointerEvents: "none",
+                            zIndex: 10000,
+                        }}
+                    />
 
-            {/* SE */}
-            <Handle
-                x={selectionBox.left + selectionBox.width}
-                y={selectionBox.top + selectionBox.height}
-            />
+                    <Handle
+                        x={selection.left}
+                        y={selection.top}
+                    />
+
+                    <Handle
+                        x={selection.right}
+                        y={selection.top}
+                    />
+
+                    <Handle
+                        x={selection.left}
+                        y={selection.bottom}
+                    />
+
+                    <Handle
+                        x={selection.right}
+                        y={selection.bottom}
+                    />
+                </>
+            )}
         </>
     );
 }
