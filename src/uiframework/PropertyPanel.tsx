@@ -15,11 +15,16 @@ export function PropertyPanel({
 
   const node = nodes[selectedNodeId];
 
+  const propsToRender =
+    node.type === "Container"
+      ? (node.props.style ?? {})
+      : (node.props ?? {});
+
   return (
     <>
       <h3>{node.type}</h3>
 
-      {Object.entries(node.props ?? {}).map(
+      {Object.entries(propsToRender).map(
         ([key, value]) => (
           <div key={key}>
             <label>{key}</label>
