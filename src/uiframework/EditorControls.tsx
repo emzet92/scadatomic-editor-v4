@@ -39,6 +39,10 @@ function Handle({
 export function EditorControls() {
   const [rects, setRects] = useState<RectInfo[]>([]);
 
+  const nodes = useEditorStore(
+    (s) => s.nodes
+  );
+
   const selectedId = useEditorStore(
     (s) => s.selectedNodeId
   );
@@ -53,13 +57,16 @@ export function EditorControls() {
     document
       .querySelectorAll("[data-node-id]")
       .forEach((el) => {
-        const id = el.getAttribute("data-node-id");
+        const id = el.getAttribute(
+          "data-node-id"
+        );
 
         if (!id) {
           return;
         }
 
-        const rect = el.getBoundingClientRect();
+        const rect =
+          el.getBoundingClientRect();
 
         next.push({
           id,
@@ -75,19 +82,35 @@ export function EditorControls() {
     setRects(next);
   }
 
+  //
+  // Recalculate after React rerendered layout
+  //
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      collectRects();
+    });
+  }, [nodes]);
+
+  //
+  // Global editor events
+  //
   useEffect(() => {
     collectRects();
 
-    function handleClick(event: MouseEvent) {
-      const target = event.target as HTMLElement | null;
+    function handleClick(
+      event: MouseEvent
+    ) {
+      const target =
+        event.target as HTMLElement | null;
 
       if (!target) {
         return;
       }
 
-      // ignorujemy PropertyPanel, Toolbar itd.
       if (
-        target.closest("[data-editor-ignore]")
+        target.closest(
+          "[data-editor-ignore]"
+        )
       ) {
         return;
       }
@@ -102,7 +125,9 @@ export function EditorControls() {
       }
 
       const id =
-        node.getAttribute("data-node-id");
+        node.getAttribute(
+          "data-node-id"
+        );
 
       if (!id) {
         return;
@@ -155,7 +180,7 @@ export function EditorControls() {
 
   return (
     <>
-      {/* outline wszystkich komponentów */}
+      {/* outlines */}
 
       {rects.map((rect) => (
         <div
@@ -175,7 +200,7 @@ export function EditorControls() {
         />
       ))}
 
-      {/* zaznaczony komponent */}
+      {/* selection */}
 
       {selectedRect && (
         <>
