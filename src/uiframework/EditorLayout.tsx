@@ -19,7 +19,17 @@ export function Canvas({
 export function RightSidebar({
   children,
 }: React.PropsWithChildren) {
-  return <div className="w-96 border-l overflow-auto p-4 shrink-0">{children}</div>;
+  const className = `
+w-96
+border-l
+border-zinc-800
+bg-zinc-950
+overflow-auto
+p-4
+shrink-0
+`;
+
+  return <div className={className}>{children}</div>;
 }
 
 export function StatusBar() {
