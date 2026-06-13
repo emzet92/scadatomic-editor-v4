@@ -3,6 +3,11 @@ import type { UiNode, UiTree } from "./Renderer";
 
 export type NodeId = string;
 
+export type DragPreview = {
+  type: string;
+  props: Record<string, unknown>;
+};
+
 type EditorState = {
   //
   // Selection
@@ -17,7 +22,7 @@ type EditorState = {
   //
   // Drag Preview
   //
-  dragPreview: string | null;
+  dragPreview: DragPreview | null;
   dragX: number;
   dragY: number;
 
@@ -44,7 +49,7 @@ type EditorState = {
   // Drag API
   //
   startComponentDrag: (
-    type: string
+    preview: DragPreview
   ) => void;
 
   moveDrag: (
@@ -57,19 +62,34 @@ type EditorState = {
 
 export const useEditorStore =
   create<EditorState>((set) => ({
+    //
+    // Selection
+    //
     selectedNodeId: null,
 
+    //
+    // Document
+    //
     nodes: {},
 
+    //
+    // Drag
+    //
     dragPreview: null,
     dragX: 0,
     dragY: 0,
 
+    //
+    // Selection API
+    //
     setSelectedNodeId: (id) =>
       set({
         selectedNodeId: id,
       }),
 
+    //
+    // Document API
+    //
     setNodes: (nodes) =>
       set({
         nodes,
@@ -95,11 +115,14 @@ export const useEditorStore =
         };
       }),
 
+    //
+    // Drag API
+    //
     startComponentDrag: (
-      type
+      preview
     ) =>
       set({
-        dragPreview: type,
+        dragPreview: preview,
       }),
 
     moveDrag: (

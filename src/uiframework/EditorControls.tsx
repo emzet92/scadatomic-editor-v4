@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useEditorStore } from "./editor-store";
+import type { ComponentRegistry } from "./Renderer";
 
 type RectInfo = {
   id: string;
@@ -9,6 +10,10 @@ type RectInfo = {
   height: number;
   right: number;
   bottom: number;
+};
+
+type Props = {
+  registry: ComponentRegistry;
 };
 
 function Handle({
@@ -36,7 +41,9 @@ function Handle({
   );
 }
 
-export function EditorControls() {
+export function EditorControls({
+  registry,
+}: Props) {
   const [rects, setRects] = useState<RectInfo[]>([]);
 
   const nodes = useEditorStore(
@@ -93,18 +100,12 @@ export function EditorControls() {
     setRects(next);
   }
 
-  //
-  // refresh overlay po zmianie layoutu
-  //
   useEffect(() => {
     requestAnimationFrame(() => {
       collectRects();
     });
   }, [nodes]);
 
-  //
-  // globalne eventy edytora
-  //
   useEffect(() => {
     collectRects();
 
@@ -231,28 +232,34 @@ export function EditorControls() {
       (r) => r.id === selectedId
     ) ?? null;
 
+  const PreviewComponent =
+    dragPreview
+      ? registry[
+          dragPreview.type
+        ]
+      : null;
+
   return (
     <>
       {/* DRAG PREVIEW */}
 
-      {dragPreview && (
-        <div
-          style={{
-            position: "fixed",
-            left: dragX + 12,
-            top: dragY + 12,
-            zIndex: 99999,
-            background: "red",
-            color: "white",
-            padding: 12,
-            borderRadius: 4,
-            pointerEvents: "none",
-            fontWeight: "bold",
-          }}
-        >
-          {dragPreview}
-        </div>
-      )}
+      {dragPreview &&
+        PreviewComponent && (
+          <div
+            style={{
+              position: "fixed",
+              left: dragX + 12,
+              top: dragY + 12,
+              zIndex: 99999,
+              pointerEvents: "none",
+              opacity: 0.75,
+            }}
+          >
+            <PreviewComponent
+              {...dragPreview.props}
+            />
+          </div>
+        )}
 
       {/* OUTLINES */}
 

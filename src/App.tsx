@@ -144,7 +144,7 @@ function App() {
         registry={registry}
       />
 
-      <EditorControls />
+      <EditorControls registry={registry}/>
 
       <PropertyPanel
         nodes={nodes}

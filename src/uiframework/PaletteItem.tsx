@@ -3,8 +3,24 @@
 import { useEditorStore } from "./editor-store";
 
 type PaletteItem = {
-  type: string;
+  type: keyof typeof defaults;
   label: string;
+};
+
+const defaults = {
+  Container: {
+    padding: 12,
+    row: 1,
+    gap: 8,
+  },
+
+  Text: {
+    value: "Text",
+  },
+
+  Button: {
+    label: "Button",
+  },
 };
 
 const items: PaletteItem[] = [
@@ -23,9 +39,10 @@ const items: PaletteItem[] = [
 ];
 
 export function ComponentPalette() {
-  const startComponentDrag = useEditorStore(
-    (s) => s.startComponentDrag
-  );
+  const startComponentDrag =
+    useEditorStore(
+      (s) => s.startComponentDrag
+    );
 
   return (
     <div data-editor-ignore>
@@ -35,7 +52,10 @@ export function ComponentPalette() {
         <div
           key={item.type}
           onPointerDown={() => {
-            startComponentDrag(item.type);
+            startComponentDrag({
+              type: item.type,
+              props: defaults[item.type],
+            });
           }}
           style={{
             padding: 8,
