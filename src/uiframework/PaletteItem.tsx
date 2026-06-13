@@ -1,5 +1,7 @@
 // ComponentPalette.tsx
 
+import { useEditorStore } from "./editor-store";
+
 type PaletteItem = {
   type: string;
   label: string;
@@ -21,6 +23,10 @@ const items: PaletteItem[] = [
 ];
 
 export function ComponentPalette() {
+  const startComponentDrag = useEditorStore(
+    (s) => s.startComponentDrag
+  );
+
   return (
     <div data-editor-ignore>
       <h3>Components</h3>
@@ -28,14 +34,8 @@ export function ComponentPalette() {
       {items.map((item) => (
         <div
           key={item.type}
-          draggable
-          onDragStart={(event) => {
-            event.dataTransfer.setData(
-              "application/scadatomic-component",
-              item.type
-            );
-
-            event.dataTransfer.effectAllowed = "copy";
+          onPointerDown={() => {
+            startComponentDrag(item.type);
           }}
           style={{
             padding: 8,
@@ -44,7 +44,7 @@ export function ComponentPalette() {
             borderRadius: 4,
             cursor: "grab",
             userSelect: "none",
-            width: "150 px"
+            width: 150,
           }}
         >
           {item.label}

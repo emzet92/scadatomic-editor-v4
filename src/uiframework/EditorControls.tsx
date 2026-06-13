@@ -51,15 +51,26 @@ export function EditorControls() {
     (s) => s.setSelectedNodeId
   );
 
+  const dragPreview = useEditorStore(
+    (s) => s.dragPreview
+  );
+
+  const dragX = useEditorStore(
+    (s) => s.dragX
+  );
+
+  const dragY = useEditorStore(
+    (s) => s.dragY
+  );
+
   function collectRects() {
     const next: RectInfo[] = [];
 
     document
       .querySelectorAll("[data-node-id]")
       .forEach((el) => {
-        const id = el.getAttribute(
-          "data-node-id"
-        );
+        const id =
+          el.getAttribute("data-node-id");
 
         if (!id) {
           return;
@@ -83,7 +94,7 @@ export function EditorControls() {
   }
 
   //
-  // Recalculate after React rerendered layout
+  // refresh overlay po zmianie layoutu
   //
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -92,7 +103,7 @@ export function EditorControls() {
   }, [nodes]);
 
   //
-  // Global editor events
+  // globalne eventy edytora
   //
   useEffect(() => {
     collectRects();
@@ -136,10 +147,42 @@ export function EditorControls() {
       setSelectedNodeId(id);
     }
 
+    function handlePointerMove(
+      event: PointerEvent
+    ) {
+      const state =
+        useEditorStore.getState();
+
+      if (!state.dragPreview) {
+        return;
+      }
+
+      state.moveDrag(
+        event.clientX,
+        event.clientY
+      );
+    }
+
+    function handlePointerUp() {
+      useEditorStore
+        .getState()
+        .endComponentDrag();
+    }
+
     document.addEventListener(
       "click",
       handleClick,
       true
+    );
+
+    window.addEventListener(
+      "pointermove",
+      handlePointerMove
+    );
+
+    window.addEventListener(
+      "pointerup",
+      handlePointerUp
     );
 
     window.addEventListener(
@@ -158,6 +201,16 @@ export function EditorControls() {
         "click",
         handleClick,
         true
+      );
+
+      window.removeEventListener(
+        "pointermove",
+        handlePointerMove
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        handlePointerUp
       );
 
       window.removeEventListener(
@@ -180,7 +233,28 @@ export function EditorControls() {
 
   return (
     <>
-      {/* outlines */}
+      {/* DRAG PREVIEW */}
+
+      {dragPreview && (
+        <div
+          style={{
+            position: "fixed",
+            left: dragX + 12,
+            top: dragY + 12,
+            zIndex: 99999,
+            background: "red",
+            color: "white",
+            padding: 12,
+            borderRadius: 4,
+            pointerEvents: "none",
+            fontWeight: "bold",
+          }}
+        >
+          {dragPreview}
+        </div>
+      )}
+
+      {/* OUTLINES */}
 
       {rects.map((rect) => (
         <div
@@ -200,7 +274,7 @@ export function EditorControls() {
         />
       ))}
 
-      {/* selection */}
+      {/* SELECTED */}
 
       {selectedRect && (
         <>

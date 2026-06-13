@@ -4,14 +4,33 @@ import type { UiNode, UiTree } from "./Renderer";
 export type NodeId = string;
 
 type EditorState = {
+  //
+  // Selection
+  //
   selectedNodeId: NodeId | null;
 
+  //
+  // Document
+  //
   nodes: UiTree;
 
+  //
+  // Drag Preview
+  //
+  dragPreview: string | null;
+  dragX: number;
+  dragY: number;
+
+  //
+  // Selection API
+  //
   setSelectedNodeId: (
     id: NodeId | null
   ) => void;
 
+  //
+  // Document API
+  //
   setNodes: (
     nodes: UiTree
   ) => void;
@@ -20,6 +39,20 @@ type EditorState = {
     id: NodeId,
     updater: (node: UiNode) => UiNode
   ) => void;
+
+  //
+  // Drag API
+  //
+  startComponentDrag: (
+    type: string
+  ) => void;
+
+  moveDrag: (
+    x: number,
+    y: number
+  ) => void;
+
+  endComponentDrag: () => void;
 };
 
 export const useEditorStore =
@@ -27,6 +60,10 @@ export const useEditorStore =
     selectedNodeId: null,
 
     nodes: {},
+
+    dragPreview: null,
+    dragX: 0,
+    dragY: 0,
 
     setSelectedNodeId: (id) =>
       set({
@@ -56,5 +93,26 @@ export const useEditorStore =
             [id]: updater(node),
           },
         };
+      }),
+
+    startComponentDrag: (
+      type
+    ) =>
+      set({
+        dragPreview: type,
+      }),
+
+    moveDrag: (
+      x,
+      y
+    ) =>
+      set({
+        dragX: x,
+        dragY: y,
+      }),
+
+    endComponentDrag: () =>
+      set({
+        dragPreview: null,
       }),
   }));
