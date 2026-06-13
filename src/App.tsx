@@ -12,6 +12,7 @@ import { EditorControls } from './uiframework/EditorControls';
 import { PropertyPanel } from './uiframework/PropertyPanel';
 import { useEditorStore } from './uiframework/editor-store';
 import { ComponentPalette } from './uiframework/PaletteItem';
+import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './uiframework/EditorLayout';
 
 const registry: ComponentRegistry = {
   Container,
@@ -136,20 +137,33 @@ function App() {
   }
 
   return (
-    <>
+<div className="h-screen flex flex-col">
+  <Toolbar />
+
+  <div className="flex-1 flex">
+    <LeftSidebar>
       <ComponentPalette />
+    </LeftSidebar>
+
+    <Canvas>
       <RendererRoot
         rootId="root"
         nodes={nodes}
         registry={registry}
       />
 
-      <EditorControls registry={registry}/>
-
-      <PropertyPanel
-        nodes={nodes}
+      <EditorControls
+        registry={registry}
       />
-    </>
+    </Canvas>
+
+    <RightSidebar>
+      <PropertyPanel nodes={nodes} />
+    </RightSidebar>
+  </div>
+
+  <StatusBar />
+</div>
   );
 }
 
