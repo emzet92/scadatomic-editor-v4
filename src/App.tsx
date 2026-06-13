@@ -24,7 +24,10 @@ const registry: ComponentRegistry = {
   ),
 
   Button: ({ label, ...props }) => (
-    <button {...props}>
+
+    <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
+    rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors 
+    disabled:opacity-50 disabled:pointer-events-none" {...props}>
       {String(label ?? "Button")}
     </button>
   ),
@@ -137,33 +140,33 @@ function App() {
   }
 
   return (
-<div className="h-screen flex flex-col">
-  <Toolbar />
+    <div className="h-screen flex flex-col">
+      <Toolbar />
 
-  <div className="flex-1 flex">
-    <LeftSidebar>
-      <ComponentPalette />
-    </LeftSidebar>
+      <div className="flex-1 flex">
+        <LeftSidebar>
+          <ComponentPalette />
+        </LeftSidebar>
 
-    <Canvas>
-      <RendererRoot
-        rootId="root"
-        nodes={nodes}
-        registry={registry}
-      />
+        <Canvas>
+          <RendererRoot
+            rootId="root"
+            nodes={nodes}
+            registry={registry}
+          />
 
-      <EditorControls
-        registry={registry}
-      />
-    </Canvas>
+          <EditorControls
+            registry={registry}
+          />
+        </Canvas>
 
-    <RightSidebar>
-      <PropertyPanel nodes={nodes} />
-    </RightSidebar>
-  </div>
+        <RightSidebar>
+          <PropertyPanel nodes={nodes} />
+        </RightSidebar>
+      </div>
 
-  <StatusBar />
-</div>
+      <StatusBar />
+    </div>
   );
 }
 
