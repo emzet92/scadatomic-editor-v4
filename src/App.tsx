@@ -11,6 +11,7 @@ import { Container } from './uiframework/Container';
 import { EditorControls } from './uiframework/EditorControls';
 import { PropertyPanel } from './uiframework/PropertyPanel';
 import { useEditorStore } from './uiframework/editor-store';
+import { ComponentPalette } from './uiframework/PaletteItem';
 
 const registry: ComponentRegistry = {
   Container,
@@ -136,6 +137,7 @@ function App() {
 
   return (
     <>
+      <ComponentPalette />
       <RendererRoot
         rootId="root"
         nodes={nodes}
@@ -144,9 +146,9 @@ function App() {
 
       <EditorControls />
 
-        <PropertyPanel
-          nodes={nodes}
-        />
+      <PropertyPanel
+        nodes={nodes}
+      />
     </>
   );
 }
