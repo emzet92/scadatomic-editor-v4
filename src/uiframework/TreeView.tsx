@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useEditorStore } from "./editor-store";
 
 function TreeNode({
@@ -27,13 +28,16 @@ function TreeNode({
         return null;
     }
 
-    return (
-        <>
-            <div
-                onClick={() =>
-                    setSelectedNodeId(nodeId)
-                }
-                className={`
+    const [collapsed, setCollapsed] =
+  useState(false);
+
+const hasChildren =
+  (node.children?.length ?? 0) > 0;
+
+return (
+  <>
+    <div
+      className={`
         flex
         items-center
         gap-1
@@ -43,40 +47,62 @@ function TreeNode({
         cursor-pointer
         text-sm
         hover:bg-zinc-800
-        ${selectedNodeId === nodeId
-                        ? "bg-sky-900"
-                        : ""
-                    }
+        ${
+          selectedNodeId === nodeId
+            ? "bg-sky-900"
+            : ""
+        }
       `}
-                style={{
-                    paddingLeft:
-                        level * 16 + 8,
-                }}
-            >
-                {(node.children?.length ?? 0) > 0 ? (
-                    <span className="text-zinc-500 select-none">
-                        ▾
-                    </span>
-                ) : (
-                    <span className="w-3" />
-                )}
+      style={{
+        paddingLeft:
+          level * 16 + 8,
+      }}
+    >
+      <span
+        className="
+          w-4
+          text-zinc-500
+          select-none
+        "
+        onClick={(e) => {
+          e.stopPropagation();
 
-                <span>
-                    {node.type} ({node.id})
-                </span>
-            </div>
+          if (hasChildren) {
+            setCollapsed(
+              !collapsed
+            );
+          }
+        }}
+      >
+        {hasChildren
+          ? collapsed
+            ? "▸"
+            : "▾"
+          : ""}
+      </span>
 
-            {(node.children ?? []).map(
-                (childId) => (
-                    <TreeNode
-                        key={childId}
-                        nodeId={childId}
-                        level={level + 1}
-                    />
-                )
-            )}
-        </>
-    );
+      <span
+        className="flex-1"
+        onClick={() =>
+          setSelectedNodeId(nodeId)
+        }
+      >
+        {node.type} ({node.id})
+      </span>
+    </div>
+
+    {!collapsed &&
+      (node.children ?? []).map(
+        (childId) => (
+          <TreeNode
+            key={childId}
+            nodeId={childId}
+            level={level + 1}
+          />
+        )
+      )}
+  </>
+);
 }
 
 export function TreeView() {
