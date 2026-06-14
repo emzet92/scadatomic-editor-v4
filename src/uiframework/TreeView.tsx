@@ -28,8 +28,7 @@ function TreeNode({
         return null;
     }
 
-    const [collapsed, setCollapsed] =
-  useState(false);
+const [collapsed, setCollapsed] = useState(level > 0);
 
 const hasChildren =
   (node.children?.length ?? 0) > 0;
