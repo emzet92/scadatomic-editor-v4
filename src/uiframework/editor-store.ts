@@ -132,42 +132,46 @@ export const useEditorStore =
       node
     ) =>
       set((state) => {
-        const parent =
-          state.nodes[parentId];
+        const parent = state.nodes[parentId];
 
         if (!parent) {
           return state;
         }
 
-        const id =
-          crypto.randomUUID();
+        const id = crypto.randomUUID();
 
         const newNode: UiNode = {
           id,
           type: node.type,
-          props: node.props,
+          props: {
+            ...node.props,
+          },
           children:
-            node.type ===
-              "Container"
+            node.type === "Container"
               ? []
               : undefined,
         };
 
-        const children =
-          parent.children ?? [];
+        const children = parent.children ?? [];
+
+        const safeInsertIndex = Math.max(
+          0,
+          Math.min(insertIndex, children.length)
+        );
 
         const nextChildren = [
-          ...children.slice(
-            0,
-            insertIndex
-          ),
-
+          ...children.slice(0, safeInsertIndex),
           id,
-
-          ...children.slice(
-            insertIndex
-          ),
+          ...children.slice(safeInsertIndex),
         ];
+
+        console.log(
+          "PARENT AFTER INSERT",
+          {
+            parentId,
+            children: nextChildren,
+          }
+        );
 
         return {
           nodes: {
@@ -177,8 +181,7 @@ export const useEditorStore =
 
             [parentId]: {
               ...parent,
-              children:
-                nextChildren,
+              children: nextChildren,
             },
           },
 

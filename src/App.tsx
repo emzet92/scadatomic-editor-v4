@@ -70,6 +70,9 @@ const initialNodes: UiTree = {
     },
   },
 
+  //
+  // LEVEL 1
+  //
   panel1: {
     id: "panel1",
     type: "Container",
@@ -77,12 +80,13 @@ const initialNodes: UiTree = {
       display: "flex",
       gap: 8,
       padding: 12,
-      row: 1,
-      borderSize: 0
+      row: 0,
+      borderSize: 1,
     },
     children: [
       "panel1Text",
       "panel1Button",
+      "panel2",
     ],
   },
 
@@ -90,7 +94,7 @@ const initialNodes: UiTree = {
     id: "panel1Text",
     type: "Text",
     props: {
-      value: "Nested Layout",
+      value: "Level 1",
     },
   },
 
@@ -98,7 +102,114 @@ const initialNodes: UiTree = {
     id: "panel1Button",
     type: "Button",
     props: {
-      label: "Nested Action",
+      label: "Action 1",
+    },
+  },
+
+  //
+  // LEVEL 2
+  //
+  panel2: {
+    id: "panel2",
+    type: "Container",
+    props: {
+      display: "flex",
+      gap: 8,
+      padding: 12,
+      row: 0,
+      borderSize: 1,
+    },
+    children: [
+      "panel2Text",
+      "panel2Button",
+      "panel3",
+    ],
+  },
+
+  panel2Text: {
+    id: "panel2Text",
+    type: "Text",
+    props: {
+      value: "Level 2",
+    },
+  },
+
+  panel2Button: {
+    id: "panel2Button",
+    type: "Button",
+    props: {
+      label: "Action 2",
+    },
+  },
+
+  //
+  // LEVEL 3
+  //
+  panel3: {
+    id: "panel3",
+    type: "Container",
+    props: {
+      display: "flex",
+      gap: 8,
+      padding: 12,
+      row: 0,
+      borderSize: 1,
+    },
+    children: [
+      "panel3Text",
+      "panel3Button",
+      "panel4",
+    ],
+  },
+
+  panel3Text: {
+    id: "panel3Text",
+    type: "Text",
+    props: {
+      value: "Level 3",
+    },
+  },
+
+  panel3Button: {
+    id: "panel3Button",
+    type: "Button",
+    props: {
+      label: "Action 3",
+    },
+  },
+
+  //
+  // LEVEL 4
+  //
+  panel4: {
+    id: "panel4",
+    type: "Container",
+    props: {
+      display: "flex",
+      gap: 8,
+      padding: 12,
+      row: 0,
+      borderSize: 1,
+    },
+    children: [
+      "panel4Text",
+      "panel4Button",
+    ],
+  },
+
+  panel4Text: {
+    id: "panel4Text",
+    type: "Text",
+    props: {
+      value: "Level 4",
+    },
+  },
+
+  panel4Button: {
+    id: "panel4Button",
+    type: "Button",
+    props: {
+      label: "Action 4",
     },
   },
 };

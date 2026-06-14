@@ -9,9 +9,11 @@ type PaletteItem = {
 
 const defaults = {
   Container: {
-    padding: 12,
-    row: 1,
+    display: "flex",
     gap: 8,
+    padding: 12,
+    row: 0,
+    borderSize: 1,
   },
 
   Text: {

@@ -275,87 +275,86 @@ export function EditorControls({ registry }: Props) {
       setSelectedNodeId(id);
     }
 
-    function handlePointerMove(
-      event: PointerEvent
-    ) {
-      const state =
-        useEditorStore.getState();
+function handlePointerMove(
+  event: PointerEvent
+) {
+  const state =
+    useEditorStore.getState();
 
-      if (!state.dragPreview) {
-        setHoverDropTarget(null);
-        return;
-      }
+  if (!state.dragPreview) {
+    setHoverDropTarget(null);
+    return;
+  }
 
-      state.moveDrag(
-        event.clientX,
+  state.moveDrag(
+    event.clientX,
+    event.clientY
+  );
+
+  const hoveredRect =
+    findDeepestRect(
+      event.clientX,
+      event.clientY
+    );
+
+  if (!hoveredRect) {
+    setHoverDropTarget(null);
+    return;
+  }
+
+  const node =
+    state.nodes[
+      hoveredRect.id
+    ];
+
+  //
+  // NAJPIERW CONTAINER
+  //
+  if (
+    node?.type ===
+    "Container"
+  ) {
+    const insertIndex =
+      findInsertIndex(
+        node.id,
         event.clientY
       );
 
-      const hoveredRect =
-        findDeepestRect(
-          event.clientX,
-          event.clientY
-        );
+    setHoverDropTarget({
+      parentId: node.id,
+      insertIndex,
+    });
 
-      if (!hoveredRect) {
-        setHoverDropTarget(null);
-        return;
-      }
+    return;
+  }
 
-      //
-      // hover nad dzieckiem
-      //
-      if (
-        hoveredRect.parentId &&
-        hoveredRect.childIndex !==
-        undefined
-      ) {
-        const middle =
-          hoveredRect.top +
-          hoveredRect.height / 2;
+  //
+  // POTEM ZWYKŁE DZIECKO
+  //
+  if (
+    hoveredRect.parentId &&
+    hoveredRect.childIndex !==
+      undefined
+  ) {
+    const insertAfter =
+      event.clientY >
+      hoveredRect.top +
+        hoveredRect.height / 2;
 
-        const insertAfter =
-          event.clientY >
-          middle;
+    setHoverDropTarget({
+      parentId:
+        hoveredRect.parentId,
 
-        setHoverDropTarget({
-          parentId:
-            hoveredRect.parentId,
+      insertIndex:
+        hoveredRect.childIndex +
+        (insertAfter ? 1 : 0),
+    });
 
-          insertIndex:
-            hoveredRect.childIndex +
-            (insertAfter ? 1 : 0),
-        });
+    return;
+  }
 
-        return;
-      }
-
-      //
-      // pusty root/container
-      //
-      const node =
-        state.nodes[
-        hoveredRect.id
-        ];
-
-      if (
-        node?.type ===
-        "Container"
-      ) {
-        setHoverDropTarget({
-          parentId:
-            hoveredRect.id,
-
-          insertIndex:
-            node.children?.length ??
-            0,
-        });
-
-        return;
-      }
-
-      setHoverDropTarget(null);
-    }
+  setHoverDropTarget(null);
+}
 
     function handlePointerUp() {
       const state = useEditorStore.getState();
