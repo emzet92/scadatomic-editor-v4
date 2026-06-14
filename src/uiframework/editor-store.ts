@@ -50,8 +50,9 @@ type EditorState = {
     updater: (node: UiNode) => UiNode
   ) => void;
 
-  addNodeToParent: (
+  insertNode: (
     parentId: NodeId,
+    insertIndex: number,
     node: NewNode
   ) => void;
 
@@ -125,8 +126,9 @@ export const useEditorStore =
         };
       }),
 
-    addNodeToParent: (
+    insertNode: (
       parentId,
+      insertIndex,
       node
     ) =>
       set((state) => {
@@ -146,10 +148,26 @@ export const useEditorStore =
           props: node.props,
           children:
             node.type ===
-            "Container"
+              "Container"
               ? []
               : undefined,
         };
+
+        const children =
+          parent.children ?? [];
+
+        const nextChildren = [
+          ...children.slice(
+            0,
+            insertIndex
+          ),
+
+          id,
+
+          ...children.slice(
+            insertIndex
+          ),
+        ];
 
         return {
           nodes: {
@@ -159,11 +177,8 @@ export const useEditorStore =
 
             [parentId]: {
               ...parent,
-              children: [
-                ...(parent.children ??
-                  []),
-                id,
-              ],
+              children:
+                nextChildren,
             },
           },
 
