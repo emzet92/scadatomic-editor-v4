@@ -45,6 +45,7 @@ export function EditorControls({
   registry,
 }: Props) {
   const [rects, setRects] = useState<RectInfo[]>([]);
+  const [hoverDropId, setHoverDropId] = useState<string | null>(null);
 
   const nodes = useEditorStore(
     (s) => s.nodes
@@ -155,6 +156,7 @@ export function EditorControls({
         useEditorStore.getState();
 
       if (!state.dragPreview) {
+        setHoverDropId(null);
         return;
       }
 
@@ -162,12 +164,91 @@ export function EditorControls({
         event.clientX,
         event.clientY
       );
+
+      const target =
+        document.elementFromPoint(
+          event.clientX,
+          event.clientY
+        ) as HTMLElement | null;
+
+      const node =
+        target?.closest(
+          "[data-node-id]"
+        );
+
+      if (!node) {
+        setHoverDropId(null);
+        return;
+      }
+
+      const id =
+        node.getAttribute(
+          "data-node-id"
+        );
+
+      if (!id) {
+        setHoverDropId(null);
+        return;
+      }
+
+      const dropNode =
+        state.nodes[id];
+
+      if (
+        dropNode?.type ===
+        "Container"
+      ) {
+        setHoverDropId(id);
+      } else {
+        setHoverDropId(null);
+      }
     }
 
-    function handlePointerUp() {
-      useEditorStore
-        .getState()
-        .endComponentDrag();
+    function handlePointerUp(
+      event: PointerEvent
+    ) {
+      const state =
+        useEditorStore.getState();
+
+      if (!state.dragPreview) {
+        return;
+      }
+
+      const target =
+        document.elementFromPoint(
+          event.clientX,
+          event.clientY
+        ) as HTMLElement | null;
+
+      const dropTarget =
+        target?.closest(
+          "[data-node-id]"
+        );
+
+      if (!dropTarget) {
+        state.endComponentDrag();
+        return;
+      }
+
+      const parentId =
+        dropTarget.getAttribute(
+          "data-node-id"
+        );
+
+      if (!parentId) {
+        state.endComponentDrag();
+        return;
+      }
+
+      state.addNodeToParent(
+        parentId,
+        {
+          type:
+            state.dragPreview.type,
+          props:
+            state.dragPreview.props,
+        }
+      );
     }
 
     document.addEventListener(
@@ -235,8 +316,8 @@ export function EditorControls({
   const PreviewComponent =
     dragPreview
       ? registry[
-          dragPreview.type
-        ]
+      dragPreview.type
+      ]
       : null;
 
   return (
@@ -272,11 +353,11 @@ export function EditorControls({
             top: rect.top,
             width: rect.width,
             height: rect.height,
-            border:
-              "1px dashed rgba(0,120,255,.25)",
+            border: "1px dashed rgba(0,120,255,.25)",
             boxSizing: "border-box",
             pointerEvents: "none",
             zIndex: 9998,
+            background: rect.id === hoverDropId ? "rgba(0,170,255,.08)" : undefined,
           }}
         />
       ))}

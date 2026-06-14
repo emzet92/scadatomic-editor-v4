@@ -8,6 +8,11 @@ export type DragPreview = {
   props: Record<string, unknown>;
 };
 
+export type NewNode = Pick<
+  UiNode,
+  "type" | "props"
+>;
+
 type EditorState = {
   //
   // Selection
@@ -43,6 +48,11 @@ type EditorState = {
   updateNode: (
     id: NodeId,
     updater: (node: UiNode) => UiNode
+  ) => void;
+
+  addNodeToParent: (
+    parentId: NodeId,
+    node: NewNode
   ) => void;
 
   //
@@ -112,6 +122,53 @@ export const useEditorStore =
             ...state.nodes,
             [id]: updater(node),
           },
+        };
+      }),
+
+    addNodeToParent: (
+      parentId,
+      node
+    ) =>
+      set((state) => {
+        const parent =
+          state.nodes[parentId];
+
+        if (!parent) {
+          return state;
+        }
+
+        const id =
+          crypto.randomUUID();
+
+        const newNode: UiNode = {
+          id,
+          type: node.type,
+          props: node.props,
+          children:
+            node.type ===
+            "Container"
+              ? []
+              : undefined,
+        };
+
+        return {
+          nodes: {
+            ...state.nodes,
+
+            [id]: newNode,
+
+            [parentId]: {
+              ...parent,
+              children: [
+                ...(parent.children ??
+                  []),
+                id,
+              ],
+            },
+          },
+
+          selectedNodeId: id,
+          dragPreview: null,
         };
       }),
 
