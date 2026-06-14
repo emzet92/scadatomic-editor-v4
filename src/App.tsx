@@ -13,6 +13,7 @@ import { PropertyPanel } from './uiframework/PropertyPanel';
 import { useEditorStore } from './uiframework/editor-store';
 import { ComponentPalette } from './uiframework/PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './uiframework/EditorLayout';
+import { TreeView } from './uiframework/TreeView';
 
 const registry: ComponentRegistry = {
   Container,
@@ -146,6 +147,8 @@ function App() {
       <div className="flex-1 flex">
         <LeftSidebar>
           <ComponentPalette />
+          <div className="my-4 border-t border-zinc-800" />
+          <TreeView />
         </LeftSidebar>
 
         <Canvas>

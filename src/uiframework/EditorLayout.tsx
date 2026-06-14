@@ -1,7 +1,7 @@
 // EditorLayout.tsx
 
 export function Toolbar() {
-  return <div className="h-14 border-b flex items-center px-4 shrink-0">Toolbar</div>;
+  return <div className="h-14 border-b flex items-center px-4 shrink-0"><b>Scada</b>tomic</div>;
 }
 
 export function LeftSidebar({
