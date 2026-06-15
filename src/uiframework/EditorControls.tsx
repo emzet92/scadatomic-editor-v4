@@ -275,86 +275,86 @@ export function EditorControls({ registry }: Props) {
       setSelectedNodeId(id);
     }
 
-function handlePointerMove(
-  event: PointerEvent
-) {
-  const state =
-    useEditorStore.getState();
+    function handlePointerMove(
+      event: PointerEvent
+    ) {
+      const state =
+        useEditorStore.getState();
 
-  if (!state.dragPreview) {
-    setHoverDropTarget(null);
-    return;
-  }
+      if (!state.dragPreview) {
+        setHoverDropTarget(null);
+        return;
+      }
 
-  state.moveDrag(
-    event.clientX,
-    event.clientY
-  );
-
-  const hoveredRect =
-    findDeepestRect(
-      event.clientX,
-      event.clientY
-    );
-
-  if (!hoveredRect) {
-    setHoverDropTarget(null);
-    return;
-  }
-
-  const node =
-    state.nodes[
-      hoveredRect.id
-    ];
-
-  //
-  // NAJPIERW CONTAINER
-  //
-  if (
-    node?.type ===
-    "Container"
-  ) {
-    const insertIndex =
-      findInsertIndex(
-        node.id,
+      state.moveDrag(
+        event.clientX,
         event.clientY
       );
 
-    setHoverDropTarget({
-      parentId: node.id,
-      insertIndex,
-    });
+      const hoveredRect =
+        findDeepestRect(
+          event.clientX,
+          event.clientY
+        );
 
-    return;
-  }
+      if (!hoveredRect) {
+        setHoverDropTarget(null);
+        return;
+      }
 
-  //
-  // POTEM ZWYKŁE DZIECKO
-  //
-  if (
-    hoveredRect.parentId &&
-    hoveredRect.childIndex !==
-      undefined
-  ) {
-    const insertAfter =
-      event.clientY >
-      hoveredRect.top +
-        hoveredRect.height / 2;
+      const node =
+        state.nodes[
+        hoveredRect.id
+        ];
 
-    setHoverDropTarget({
-      parentId:
-        hoveredRect.parentId,
+      //
+      // NAJPIERW CONTAINER
+      //
+      if (
+        node?.type ===
+        "Container"
+      ) {
+        const insertIndex =
+          findInsertIndex(
+            node.id,
+            event.clientY
+          );
 
-      insertIndex:
-        hoveredRect.childIndex +
-        (insertAfter ? 1 : 0),
-    });
+        setHoverDropTarget({
+          parentId: node.id,
+          insertIndex,
+        });
 
-    return;
-  }
+        return;
+      }
 
-  setHoverDropTarget(null);
-}
+      //
+      // POTEM ZWYKŁE DZIECKO
+      //
+      if (
+        hoveredRect.parentId &&
+        hoveredRect.childIndex !==
+        undefined
+      ) {
+        const insertAfter =
+          event.clientY >
+          hoveredRect.top +
+          hoveredRect.height / 2;
+
+        setHoverDropTarget({
+          parentId:
+            hoveredRect.parentId,
+
+          insertIndex:
+            hoveredRect.childIndex +
+            (insertAfter ? 1 : 0),
+        });
+
+        return;
+      }
+
+      setHoverDropTarget(null);
+    }
 
     function handlePointerUp() {
       const state = useEditorStore.getState();
@@ -447,8 +447,29 @@ function handlePointerMove(
         />
       )}
 
-      {selectedRect && (
+      {selectedRect && selectedId && (
         <>
+          <div
+            style={{
+              position: "fixed",
+              left: selectedRect.left,
+              top: selectedRect.top - 24,
+              height: 20,
+              padding: "0 8px",
+              borderRadius: 4,
+              background: "#0ea5e9",
+              color: "white",
+              fontSize: 12,
+              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              pointerEvents: "none",
+              zIndex: 10002,
+            }}
+          >
+            {nodes[selectedId]?.type} ({selectedId})
+          </div>
+
           <div
             style={{
               position: "fixed",
