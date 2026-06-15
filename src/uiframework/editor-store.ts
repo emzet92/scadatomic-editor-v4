@@ -69,6 +69,9 @@ type EditorState = {
   ) => void;
 
   endComponentDrag: () => void;
+  deleteNode: (
+    id: NodeId
+  ) => void;
 };
 
 export const useEditorStore =
@@ -212,5 +215,73 @@ export const useEditorStore =
     endComponentDrag: () =>
       set({
         dragPreview: null,
+      }),
+
+    deleteNode: (id) =>
+      set((state) => {
+        if (id === "root") {
+          return state;
+        }
+
+        const node =
+          state.nodes[id];
+
+        if (!node) {
+          return state;
+        }
+
+        const nextNodes = {
+          ...state.nodes,
+        };
+
+        function removeSubtree(
+          nodeId: string
+        ) {
+          const current =
+            nextNodes[nodeId];
+
+          if (!current) {
+            return;
+          }
+
+          for (const childId of current.children ??
+            []) {
+            removeSubtree(childId);
+          }
+
+          delete nextNodes[nodeId];
+        }
+
+        const parent =
+          Object.values(nextNodes).find(
+            (candidate) =>
+              candidate.children?.includes(
+                id
+              )
+          );
+
+        if (!parent) {
+          return state;
+        }
+
+        removeSubtree(id);
+
+        nextNodes[parent.id] = {
+          ...parent,
+          children:
+            parent.children?.filter(
+              (childId) =>
+                childId !== id
+            ) ?? [],
+        };
+
+        return {
+          nodes: nextNodes,
+
+          selectedNodeId:
+            state.selectedNodeId === id
+              ? null
+              : state.selectedNodeId,
+        };
       }),
   }));

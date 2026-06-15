@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useEditorStore } from "./editor-store";
 import type { ComponentRegistry } from "./Renderer";
+import { Trash2 } from "lucide-react";
 
 type RectInfo = {
   id: string;
@@ -449,26 +450,66 @@ export function EditorControls({ registry }: Props) {
 
       {selectedRect && selectedId && (
         <>
+          {/* LABEL */}
+
           <div
             style={{
               position: "fixed",
               left: selectedRect.left,
-              top: selectedRect.top - 24,
-              height: 20,
-              padding: "0 8px",
-              borderRadius: 4,
-              background: "#0ea5e9",
-              color: "white",
-              fontSize: 12,
-              fontWeight: 500,
+              top: selectedRect.top - 28,
               display: "flex",
               alignItems: "center",
-              pointerEvents: "none",
+              gap: 4,
               zIndex: 10002,
             }}
           >
-            {nodes[selectedId]?.type} ({selectedId})
+            <div
+              style={{
+                height: 24,
+                padding: "0 8px",
+                borderRadius: 6,
+                background: "#0ea5e9",
+                color: "white",
+                fontSize: 12,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              {nodes[selectedId]?.type}
+            </div>
+
+            <button
+              data-editor-ignore
+              onClick={() => {
+                useEditorStore
+                  .getState()
+                  .deleteNode(
+                    selectedId
+                  );
+              }}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                border:
+                  "1px solid #e4e4e7",
+                background: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent:
+                  "center",
+                cursor: "pointer",
+                color: "#ef4444",
+                boxShadow:
+                  "0 1px 2px rgba(0,0,0,.08)",
+              }}
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
+
+          {/* SELECTION */}
 
           <div
             style={{
@@ -477,12 +518,16 @@ export function EditorControls({ registry }: Props) {
               top: selectedRect.top,
               width: selectedRect.width,
               height: selectedRect.height,
-              border: "2px solid #00aaff",
-              boxSizing: "border-box",
+              border:
+                "2px solid #00aaff",
+              boxSizing:
+                "border-box",
               pointerEvents: "none",
               zIndex: 10000,
             }}
           />
+
+          {/* CORNERS */}
 
           <Handle
             x={selectedRect.left}
@@ -530,7 +575,8 @@ export function EditorControls({ registry }: Props) {
             x={selectedRect.left}
             y={
               selectedRect.top +
-              selectedRect.height / 2
+              selectedRect.height /
+              2
             }
           />
 
@@ -540,13 +586,12 @@ export function EditorControls({ registry }: Props) {
             x={selectedRect.right}
             y={
               selectedRect.top +
-              selectedRect.height / 2
+              selectedRect.height /
+              2
             }
           />
-
         </>
-      )
-      }
+      )}
     </>
   );
 }
