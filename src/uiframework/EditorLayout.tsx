@@ -1,32 +1,52 @@
 // EditorLayout.tsx
 
 export function Toolbar() {
-  return <div className="h-14 border-b flex items-center px-4 shrink-0"><b>Scada</b>tomic</div>;
+  return <div className="
+    h-14
+    px-4
+    flex
+    items-center
+    justify-between
+    bg-white
+    border-b
+    border-zinc-200"><span><b>Scada</b>tomic</span></div>;
 }
 
 export function LeftSidebar({
   children,
 }: React.PropsWithChildren) {
-  return <div className="w-72 border-r overflow-auto p-4 shrink-0">{children}</div>;
+  return <div className="
+    w-72
+    bg-white
+    border-r
+    border-zinc-200
+    flex
+    flex-col
+    overflow-auto">{children}</div>;
 }
 
 export function Canvas({
   children,
 }: React.PropsWithChildren) {
-  return <div className="flex-1 overflow-auto relative p-8">{children}</div>;
+  return <div  className="
+    flex-1
+    overflow-auto
+    relative
+    bg-zinc-100
+    p-8">{children}</div>;
 }
 
 export function RightSidebar({
   children,
 }: React.PropsWithChildren) {
   const className = `
-w-96
-border-l
-border-zinc-800
-bg-zinc-950
-overflow-auto
-p-4
-shrink-0
+    w-80
+    bg-white
+    border-l
+    border-zinc-200
+    flex
+    flex-col
+    overflow-auto
 `;
 
   return <div className={className}>{children}</div>;

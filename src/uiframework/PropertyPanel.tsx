@@ -22,9 +22,13 @@ export function PropertyPanel({
     return (
       <div
         data-editor-ignore
-        className="text-zinc-400 text-sm"
+        className="
+          p-4
+          text-sm
+          text-zinc-500
+        "
       >
-        No selection
+        Select a component
       </div>
     );
   }
@@ -35,7 +39,11 @@ export function PropertyPanel({
     return (
       <div
         data-editor-ignore
-        className="text-red-400 text-sm"
+        className="
+          p-4
+          text-sm
+          text-red-500
+        "
       >
         Node not found
       </div>
@@ -48,27 +56,63 @@ export function PropertyPanel({
   return (
     <div
       data-editor-ignore
-      className="space-y-4"
+      className="h-full flex flex-col"
     >
-      {/* Header */}
+      {/* HEADER */}
 
-      <div className="border-b pb-3">
-        <div className="text-xs uppercase tracking-wide text-zinc-500">
+      <div
+        className="
+          px-4
+          py-4
+          border-b
+          border-zinc-200
+          bg-white
+        "
+      >
+        <div
+          className="
+            text-xs
+            font-semibold
+            uppercase
+            tracking-wide
+            text-zinc-500
+          "
+        >
           Component
         </div>
 
-        <div className="font-medium text-zinc-100">
+        <div
+          className="
+            mt-1
+            text-sm
+            font-semibold
+            text-zinc-900
+          "
+        >
           {node.type}
         </div>
 
-        <div className="text-xs text-zinc-400">
+        <div
+          className="
+            text-xs
+            text-zinc-500
+            truncate
+          "
+        >
           {node.id}
         </div>
       </div>
 
-      {/* Properties */}
+      {/* BODY */}
 
-      <div className="space-y-3">
+      <div
+        className="
+          flex-1
+          overflow-auto
+          p-4
+          space-y-4
+        "
+      >
         {Object.entries(
           propsToRender
         ).map(([key, value]) => (
@@ -81,9 +125,9 @@ export function PropertyPanel({
                 block
                 text-xs
                 font-medium
-                text-zinc-400
                 uppercase
                 tracking-wide
+                text-zinc-500
               "
             >
               {key}
@@ -93,9 +137,6 @@ export function PropertyPanel({
               data-editor-ignore
               value={String(value)}
               onChange={(e) => {
-                const nextValue =
-                  e.target.value;
-
                 updateNode(
                   node.id,
                   (
@@ -105,24 +146,26 @@ export function PropertyPanel({
                     props: {
                       ...currentNode.props,
                       [key]:
-                        nextValue,
+                        e.target.value,
                     },
                   })
                 );
               }}
               className="
                 w-full
+                h-9
+                px-3
                 rounded-md
                 border
-                border-zinc-700
-                bg-zinc-900
-                px-3
-                py-2
+                border-zinc-200
+                bg-white
                 text-sm
-                text-zinc-100
+                text-zinc-900
                 outline-none
                 transition
                 focus:border-sky-500
+                focus:ring-2
+                focus:ring-sky-100
               "
             />
           </div>
