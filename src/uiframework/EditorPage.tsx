@@ -266,14 +266,11 @@ export function EditorPage() {
                     <div className="min-h-full bg-zinc-100 p-8">
                         <div
                             className="
-                             bg-white
-                             border
-                            border-zinc-300
-                            rounded-xl
-                            shadow-lg
-                            p-6
-                            min-h-[600px]
-                            relative
+    min-h-full
+    p-8
+    bg-white
+    bg-[radial-gradient(circle,#cbd5e1_1px,transparent_1px)]
+    bg-[size:20px_20px]
                             "
                         >
                             <RendererRoot
