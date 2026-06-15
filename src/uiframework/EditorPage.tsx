@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 
 
 import {
-  type ComponentRegistry,
-  type UiTree,
-  RenderNode
+    type ComponentRegistry,
+    type UiTree,
+    RenderNode
 } from './Renderer';
 
 import { Container } from './Container';
@@ -16,272 +16,287 @@ import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorL
 import { TreeView } from './TreeView';
 
 const registry: ComponentRegistry = {
-  Container,
+    Container,
 
-  Text: ({ value, ...props }) => (
-    <span {...props}>
-      {String(value ?? "")}
-    </span>
-  ),
+    Text: ({ value, ...props }) => (
+        <span {...props}>
+            {String(value ?? "")}
+        </span>
+    ),
 
-  Button: ({ label, ...props }) => (
+    Button: ({ label, ...props }) => (
 
-    <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
+        <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
     rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors 
     disabled:opacity-50 disabled:pointer-events-none" {...props}>
-      {String(label ?? "Button")}
-    </button>
-  ),
+            {String(label ?? "Button")}
+        </button>
+    ),
 };
 
 console.log("sram ci na matke");
 
 const initialNodes: UiTree = {
-  root: {
-    id: "root",
-    type: "Container",
-    props: {
-      display: "flex",
-      gap: 12,
-      padding: 16,
-      row: 1,
-      borderSize: 1,
+    root: {
+        id: "root",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 12,
+            padding: 16,
+            row: 1,
+            borderSize: 1,
+        },
+        children: [
+            "title",
+            "button",
+            "panel1",
+        ],
     },
-    children: [
-      "title",
-      "button",
-      "panel1",
-    ],
-  },
 
-  title: {
-    id: "title",
-    type: "Text",
-    props: {
-      value: "Scadatomic Renderer",
+    title: {
+        id: "title",
+        type: "Text",
+        props: {
+            value: "Scadatomic Renderer",
+        },
     },
-  },
 
-  button: {
-    id: "button",
-    type: "Button",
-    props: {
-      label: "Start",
+    button: {
+        id: "button",
+        type: "Button",
+        props: {
+            label: "Start",
+        },
     },
-  },
 
-  //
-  // LEVEL 1
-  //
-  panel1: {
-    id: "panel1",
-    type: "Container",
-    props: {
-      display: "flex",
-      gap: 8,
-      padding: 12,
-      row: 0,
-      borderSize: 1,
+    //
+    // LEVEL 1
+    //
+    panel1: {
+        id: "panel1",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel1Text",
+            "panel1Button",
+            "panel2",
+        ],
     },
-    children: [
-      "panel1Text",
-      "panel1Button",
-      "panel2",
-    ],
-  },
 
-  panel1Text: {
-    id: "panel1Text",
-    type: "Text",
-    props: {
-      value: "Level 1",
+    panel1Text: {
+        id: "panel1Text",
+        type: "Text",
+        props: {
+            value: "Level 1",
+        },
     },
-  },
 
-  panel1Button: {
-    id: "panel1Button",
-    type: "Button",
-    props: {
-      label: "Action 1",
+    panel1Button: {
+        id: "panel1Button",
+        type: "Button",
+        props: {
+            label: "Action 1",
+        },
     },
-  },
 
-  //
-  // LEVEL 2
-  //
-  panel2: {
-    id: "panel2",
-    type: "Container",
-    props: {
-      display: "flex",
-      gap: 8,
-      padding: 12,
-      row: 0,
-      borderSize: 1,
+    //
+    // LEVEL 2
+    //
+    panel2: {
+        id: "panel2",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel2Text",
+            "panel2Button",
+            "panel3",
+        ],
     },
-    children: [
-      "panel2Text",
-      "panel2Button",
-      "panel3",
-    ],
-  },
 
-  panel2Text: {
-    id: "panel2Text",
-    type: "Text",
-    props: {
-      value: "Level 2",
+    panel2Text: {
+        id: "panel2Text",
+        type: "Text",
+        props: {
+            value: "Level 2",
+        },
     },
-  },
 
-  panel2Button: {
-    id: "panel2Button",
-    type: "Button",
-    props: {
-      label: "Action 2",
+    panel2Button: {
+        id: "panel2Button",
+        type: "Button",
+        props: {
+            label: "Action 2",
+        },
     },
-  },
 
-  //
-  // LEVEL 3
-  //
-  panel3: {
-    id: "panel3",
-    type: "Container",
-    props: {
-      display: "flex",
-      gap: 8,
-      padding: 12,
-      row: 0,
-      borderSize: 1,
+    //
+    // LEVEL 3
+    //
+    panel3: {
+        id: "panel3",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel3Text",
+            "panel3Button",
+            "panel4",
+        ],
     },
-    children: [
-      "panel3Text",
-      "panel3Button",
-      "panel4",
-    ],
-  },
 
-  panel3Text: {
-    id: "panel3Text",
-    type: "Text",
-    props: {
-      value: "Level 3",
+    panel3Text: {
+        id: "panel3Text",
+        type: "Text",
+        props: {
+            value: "Level 3",
+        },
     },
-  },
 
-  panel3Button: {
-    id: "panel3Button",
-    type: "Button",
-    props: {
-      label: "Action 3",
+    panel3Button: {
+        id: "panel3Button",
+        type: "Button",
+        props: {
+            label: "Action 3",
+        },
     },
-  },
 
-  //
-  // LEVEL 4
-  //
-  panel4: {
-    id: "panel4",
-    type: "Container",
-    props: {
-      display: "flex",
-      gap: 8,
-      padding: 12,
-      row: 0,
-      borderSize: 1,
+    //
+    // LEVEL 4
+    //
+    panel4: {
+        id: "panel4",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel4Text",
+            "panel4Button",
+        ],
     },
-    children: [
-      "panel4Text",
-      "panel4Button",
-    ],
-  },
 
-  panel4Text: {
-    id: "panel4Text",
-    type: "Text",
-    props: {
-      value: "Level 4",
+    panel4Text: {
+        id: "panel4Text",
+        type: "Text",
+        props: {
+            value: "Level 4",
+        },
     },
-  },
 
-  panel4Button: {
-    id: "panel4Button",
-    type: "Button",
-    props: {
-      label: "Action 4",
+    panel4Button: {
+        id: "panel4Button",
+        type: "Button",
+        props: {
+            label: "Action 4",
+        },
     },
-  },
 };
 
 export function RendererRoot({
-  rootId,
-  nodes,
-  registry,
+    rootId,
+    nodes,
+    registry,
 }: {
-  rootId: string;
-  nodes: UiTree;
-  registry: ComponentRegistry;
+    rootId: string;
+    nodes: UiTree;
+    registry: ComponentRegistry;
 }) {
-  return (
-    <RenderNode
-      id={rootId}
-      nodes={nodes}
-      registry={registry}
-    />
-  );
+    return (
+        <RenderNode
+            id={rootId}
+            nodes={nodes}
+            registry={registry}
+        />
+    );
 }
 
 export function EditorPage() {
-  const nodes = useEditorStore(
-    (s) => s.nodes
-  );
+    const nodes = useEditorStore(
+        (s) => s.nodes
+    );
 
-  const setNodes = useEditorStore(
-    (s) => s.setNodes
-  );
+    const setNodes = useEditorStore(
+        (s) => s.setNodes
+    );
 
-  useEffect(() => {
-    if (Object.keys(nodes).length === 0) {
-      setNodes(initialNodes);
+    useEffect(() => {
+        if (Object.keys(nodes).length === 0) {
+            setNodes(initialNodes);
+        }
+    }, [nodes, setNodes]);
+
+    if (!nodes.root) {
+        return null;
     }
-  }, [nodes, setNodes]);
 
-  if (!nodes.root) {
-    return null;
-  }
+    return (
+        <div className="h-screen flex flex-col">
+            <Toolbar />
 
-  return (
-    <div className="h-screen flex flex-col">
-      <Toolbar />
+            <div className="flex-1 flex">
+                <LeftSidebar>
+                    <ComponentPalette />
+                    <div className="my-4 border-t border-zinc-800" />
+                    <TreeView />
+                </LeftSidebar>
 
-      <div className="flex-1 flex">
-        <LeftSidebar>
-          <ComponentPalette />
-          <div className="my-4 border-t border-zinc-800" />
-          <TreeView />
-        </LeftSidebar>
+                <Canvas>
+                    <div className="min-h-full bg-zinc-100 p-8">
+                        <div
+                            className="
+                             bg-white
+                             border
+                            border-zinc-300
+                            rounded-xl
+                            shadow-lg
+                            p-6
+                            min-h-[600px]
+                            relative
+                            "
+                        >
+                            <RendererRoot
+                                rootId="root"
+                                nodes={nodes}
+                                registry={registry}
+                            />
 
-        <Canvas>
-          <RendererRoot
-            rootId="root"
-            nodes={nodes}
-            registry={registry}
-          />
+                            <EditorControls
+                                registry={registry}
+                            />
+                        </div>
+                    </div>
+                </Canvas>
 
-          <EditorControls
-            registry={registry}
-          />
-        </Canvas>
+                <RightSidebar>
+                    <PropertyPanel nodes={nodes} />
+                </RightSidebar>
+            </div>
 
-        <RightSidebar>
-          <PropertyPanel nodes={nodes} />
-        </RightSidebar>
-      </div>
-
-      <StatusBar />
-    </div>
-  );
+            <StatusBar />
+        </div>
+    );
 }
 
 export default EditorPage;
