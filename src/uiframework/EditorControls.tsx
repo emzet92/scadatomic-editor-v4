@@ -484,12 +484,69 @@ export function EditorControls({ registry }: Props) {
             }}
           />
 
-          <Handle x={selectedRect.left} y={selectedRect.top} />
-          <Handle x={selectedRect.right} y={selectedRect.top} />
-          <Handle x={selectedRect.left} y={selectedRect.bottom} />
-          <Handle x={selectedRect.right} y={selectedRect.bottom} />
+          <Handle
+            x={selectedRect.left}
+            y={selectedRect.top}
+          />
+
+          <Handle
+            x={selectedRect.right}
+            y={selectedRect.top}
+          />
+
+          <Handle
+            x={selectedRect.left}
+            y={selectedRect.bottom}
+          />
+
+          <Handle
+            x={selectedRect.right}
+            y={selectedRect.bottom}
+          />
+
+          {/* TOP */}
+
+          <Handle
+            x={
+              selectedRect.left +
+              selectedRect.width / 2
+            }
+            y={selectedRect.top}
+          />
+
+          {/* BOTTOM */}
+
+          <Handle
+            x={
+              selectedRect.left +
+              selectedRect.width / 2
+            }
+            y={selectedRect.bottom}
+          />
+
+          {/* LEFT */}
+
+          <Handle
+            x={selectedRect.left}
+            y={
+              selectedRect.top +
+              selectedRect.height / 2
+            }
+          />
+
+          {/* RIGHT */}
+
+          <Handle
+            x={selectedRect.right}
+            y={
+              selectedRect.top +
+              selectedRect.height / 2
+            }
+          />
+
         </>
-      )}
+      )
+      }
     </>
   );
 }
