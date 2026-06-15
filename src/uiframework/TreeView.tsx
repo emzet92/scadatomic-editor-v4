@@ -3,10 +3,12 @@ import { useEditorStore } from "./editor-store";
 import {
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Box,
   Type,
   RectangleHorizontal,
 } from "lucide-react";
+
 
 function getNodeIcon(type: string) {
   switch (type) {
@@ -51,6 +53,16 @@ function TreeNode({
 
   const node = nodes[nodeId];
 
+  const moveNodeUp =
+    useEditorStore(
+      (s) => s.moveNodeUp
+    );
+
+  const moveNodeDown =
+    useEditorStore(
+      (s) => s.moveNodeDown
+    );
+
   if (!node) {
     return null;
   }
@@ -66,6 +78,7 @@ function TreeNode({
     <>
       <div
         className={`
+        group
         flex
         items-center
         gap-2
@@ -93,6 +106,7 @@ function TreeNode({
           w-4
           h-4
           text-zinc-500
+          shrink-0
         "
           onClick={(e) => {
             e.stopPropagation();
@@ -106,29 +120,81 @@ function TreeNode({
         >
           {hasChildren ? (
             collapsed ? (
-              <ChevronRight
-                size={14}
-              />
+              <ChevronRight size={14} />
             ) : (
-              <ChevronDown
-                size={14}
-              />
+              <ChevronDown size={14} />
             )
-          ) : null}
+          ) : (
+            <div className="w-3" />
+          )}
         </div>
 
-        <div className="text-zinc-400">
+        <div
+          className="
+          text-zinc-400
+          shrink-0
+        "
+        >
           {getNodeIcon(node.type)}
         </div>
 
         <div
-          className="flex-1"
+          className="
+          flex-1
+          min-w-0
+          truncate
+        "
           onClick={() =>
             setSelectedNodeId(nodeId)
           }
         >
           {node.type}
         </div>
+
+        {nodeId !== "root" && (
+          <div
+            className="
+            flex
+            items-center
+            gap-1
+            shrink-0
+          "
+          >
+            <button
+              data-editor-ignore
+              onClick={(e) => {
+                e.stopPropagation();
+                moveNodeUp(nodeId);
+              }}
+              className="
+              p-1
+              rounded
+              text-zinc-500
+              hover:bg-zinc-700
+              hover:text-white
+            "
+            >
+              <ChevronUp size={14} />
+            </button>
+
+            <button
+              data-editor-ignore
+              onClick={(e) => {
+                e.stopPropagation();
+                moveNodeDown(nodeId);
+              }}
+              className="
+              p-1
+              rounded
+              text-zinc-500
+              hover:bg-zinc-700
+              hover:text-white
+            "
+            >
+              <ChevronDown size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {!collapsed &&

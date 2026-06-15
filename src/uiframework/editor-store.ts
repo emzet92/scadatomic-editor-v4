@@ -72,6 +72,14 @@ type EditorState = {
   deleteNode: (
     id: NodeId
   ) => void;
+
+  moveNodeUp: (
+    nodeId: NodeId
+  ) => void;
+
+  moveNodeDown: (
+    nodeId: NodeId
+  ) => void;
 };
 
 export const useEditorStore =
@@ -282,6 +290,112 @@ export const useEditorStore =
             state.selectedNodeId === id
               ? null
               : state.selectedNodeId,
+        };
+      }),
+    moveNodeUp: (nodeId) =>
+      set((state) => {
+        const parent =
+          Object.values(
+            state.nodes
+          ).find((node) =>
+            node.children?.includes(
+              nodeId
+            )
+          );
+
+        if (
+          !parent ||
+          !parent.children
+        ) {
+          return state;
+        }
+
+        const index =
+          parent.children.indexOf(
+            nodeId
+          );
+
+        if (index <= 0) {
+          return state;
+        }
+
+        const nextChildren = [
+          ...parent.children,
+        ];
+
+        [
+          nextChildren[index - 1],
+          nextChildren[index],
+        ] = [
+            nextChildren[index],
+            nextChildren[index - 1],
+          ];
+
+        return {
+          nodes: {
+            ...state.nodes,
+            [parent.id]: {
+              ...parent,
+              children:
+                nextChildren,
+            },
+          },
+        };
+      }),
+
+    moveNodeDown: (nodeId) =>
+      set((state) => {
+        const parent =
+          Object.values(
+            state.nodes
+          ).find((node) =>
+            node.children?.includes(
+              nodeId
+            )
+          );
+
+        if (
+          !parent ||
+          !parent.children
+        ) {
+          return state;
+        }
+
+        const index =
+          parent.children.indexOf(
+            nodeId
+          );
+
+        if (
+          index === -1 ||
+          index >=
+          parent.children.length -
+          1
+        ) {
+          return state;
+        }
+
+        const nextChildren = [
+          ...parent.children,
+        ];
+
+        [
+          nextChildren[index],
+          nextChildren[index + 1],
+        ] = [
+            nextChildren[index + 1],
+            nextChildren[index],
+          ];
+
+        return {
+          nodes: {
+            ...state.nodes,
+            [parent.id]: {
+              ...parent,
+              children:
+                nextChildren,
+            },
+          },
         };
       }),
   }));
