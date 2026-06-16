@@ -55,32 +55,26 @@ export function RenderNode({
   nextVisited.add(id);
 
   return (
-    <div
+    <Component
+      {...node.props}
       data-node-id={id}
-      onPointerDown={(e) => {
+      onPointerDown={(e: React.PointerEvent) => {
         e.stopPropagation();
-
-        console.log(
-          "START DRAG",
-          id
-        );
 
         useEditorStore
           .getState()
           .startNodeDrag(id);
       }}
     >
-      <Component {...node.props}>
-        {node.children?.map((childId) => (
-          <RenderNode
-            key={childId}
-            id={childId}
-            nodes={nodes}
-            registry={registry}
-            visited={nextVisited}
-          />
-        ))}
-      </Component>
-    </div>
+      {node.children?.map((childId) => (
+        <RenderNode
+          key={childId}
+          id={childId}
+          nodes={nodes}
+          registry={registry}
+          visited={nextVisited}
+        />
+      ))}
+    </Component>
   );
 }
