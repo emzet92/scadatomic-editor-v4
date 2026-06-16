@@ -1,10 +1,12 @@
 // ComponentPalette.tsx
 
+import { useState } from "react";
 import { useEditorStore } from "./editor-store";
 import {
   Box,
   Type,
   RectangleHorizontal,
+  Search,
 } from "lucide-react";
 
 const defaults = {
@@ -53,15 +55,27 @@ const items = [
 ];
 
 export function ComponentPalette() {
+  const [search, setSearch] =
+    useState("");
+
   const startComponentDrag =
     useEditorStore(
       (s) => s.startComponentDrag
     );
 
+  const filteredItems =
+    items.filter((item) =>
+      item.label
+        .toLowerCase()
+        .includes(
+          search.toLowerCase()
+        )
+    );
+
   return (
     <div
       data-editor-ignore
-      className="space-y-3"
+      className="space-y-4"
     >
       <div>
         <div
@@ -71,100 +85,167 @@ export function ComponentPalette() {
             tracking-wide
             font-semibold
             text-zinc-500
+            mb-3
           "
         >
           Components
         </div>
-      </div>
 
-      {items.map((item) => {
-        const Icon =
-          item.icon;
+        <div className="relative">
+          <Search
+            size={16}
+            className="
+              absolute
+              left-3
+              top-1/2
+              -translate-y-1/2
+              text-zinc-400
+              pointer-events-none
+            "
+          />
 
-        return (
-          <button
-            key={item.type}
+          <input
             data-editor-ignore
-            onPointerDown={() => {
-              startComponentDrag(
-                {
-                  type: item.type,
-                  props:
-                    defaults[
-                    item.type
-                    ],
-                }
-              );
-            }}
+            value={search}
+            onChange={(e) =>
+              setSearch(
+                e.target.value
+              )
+            }
+            placeholder="Search components..."
             className="
               w-full
-              p-3
+              h-10
+
+              pl-10
+              pr-3
 
               rounded-xl
+
               border
               border-zinc-200
 
               bg-white
 
-              hover:border-sky-300
-              hover:bg-sky-50
+              text-sm
 
-              transition-all
+              outline-none
 
-              flex
-              items-start
-              gap-3
-
-              text-left
-              cursor-grab
-              select-none
+              focus:border-sky-400
+              focus:ring-2
+              focus:ring-sky-100
             "
-          >
-            <div
+          />
+        </div>
+      </div>
+
+      {filteredItems.map(
+        (item) => {
+          const Icon =
+            item.icon;
+
+          return (
+            <button
+              key={item.type}
+              data-editor-ignore
+              onPointerDown={() => {
+                startComponentDrag(
+                  {
+                    type:
+                      item.type,
+                    props:
+                      defaults[
+                        item.type
+                      ],
+                  }
+                );
+              }}
               className="
-                h-9
-                w-9
+                w-full
+                p-3
 
-                rounded-lg
+                rounded-xl
+                border
+                border-zinc-200
 
-                bg-sky-100
-                text-sky-600
+                bg-white
+
+                hover:border-sky-300
+                hover:bg-sky-50
+
+                transition-all
 
                 flex
-                items-center
-                justify-center
+                items-start
+                gap-3
 
-                shrink-0
+                text-left
+                cursor-grab
+                select-none
               "
             >
-              <Icon size={18} />
-            </div>
-
-            <div className="min-w-0">
               <div
                 className="
-                  text-sm
-                  font-medium
-                  text-zinc-900
+                  h-10
+                  w-10
+
+                  rounded-xl
+
+                  bg-sky-100
+                  text-sky-600
+
+                  flex
+                  items-center
+                  justify-center
+
+                  shrink-0
                 "
               >
-                {item.label}
+                <Icon
+                  size={18}
+                />
               </div>
 
-              <div
-                className="
-                  text-xs
-                  text-zinc-500
-                "
-              >
-                {
-                  item.description
-                }
+              <div className="min-w-0">
+                <div
+                  className="
+                    text-sm
+                    font-semibold
+                    text-zinc-900
+                  "
+                >
+                  {item.label}
+                </div>
+
+                <div
+                  className="
+                    text-xs
+                    text-zinc-500
+                  "
+                >
+                  {
+                    item.description
+                  }
+                </div>
               </div>
-            </div>
-          </button>
-        );
-      })}
+            </button>
+          );
+        }
+      )}
+
+      {filteredItems.length ===
+        0 && (
+        <div
+          className="
+            py-8
+            text-center
+            text-sm
+            text-zinc-500
+          "
+        >
+          No components found
+        </div>
+      )}
     </div>
   );
 }
