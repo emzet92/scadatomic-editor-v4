@@ -80,6 +80,23 @@ type EditorState = {
   moveNodeDown: (
     nodeId: NodeId
   ) => void;
+
+  //
+  // Node Drag
+  //
+  draggedNodeId: NodeId | null;
+
+  startNodeDrag: (
+    nodeId: NodeId
+  ) => void;
+
+  endNodeDrag: () => void;
+
+  moveNode: (
+    nodeId: NodeId,
+    targetParentId: NodeId,
+    targetIndex: number
+  ) => void;
 };
 
 export const useEditorStore =
@@ -100,6 +117,7 @@ export const useEditorStore =
     dragPreview: null,
     dragX: 0,
     dragY: 0,
+    draggedNodeId: null,
 
     //
     // Selection API
@@ -396,6 +414,129 @@ export const useEditorStore =
                 nextChildren,
             },
           },
+        };
+      }),
+    startNodeDrag: (
+      nodeId
+    ) =>
+      set({
+        draggedNodeId: nodeId,
+      }),
+
+    endNodeDrag: () =>
+      set({
+        draggedNodeId: null,
+      }),
+    moveNode: (
+      nodeId,
+      targetParentId,
+      targetIndex
+    ) =>
+      set((state) => {
+        if (nodeId === "root") {
+          return state;
+        }
+
+        const node = state.nodes[nodeId];
+        const targetParent =
+          state.nodes[targetParentId];
+
+        if (!node || !targetParent) {
+          return state;
+        }
+
+        function isDescendant(
+          parentId: string,
+          childId: string
+        ): boolean {
+          const parent = state.nodes[parentId];
+
+          if (!parent) {
+            return false;
+          }
+
+          for (const id of parent.children ?? []) {
+            if (id === childId) {
+              return true;
+            }
+
+            if (isDescendant(id, childId)) {
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        if (
+          nodeId === targetParentId ||
+          isDescendant(nodeId, targetParentId)
+        ) {
+          return state;
+        }
+
+        const sourceParent =
+          Object.values(state.nodes).find(
+            (candidate) =>
+              candidate.children?.includes(nodeId)
+          );
+
+        if (!sourceParent || !sourceParent.children) {
+          return state;
+        }
+
+        const nextNodes = {
+          ...state.nodes,
+        };
+
+        const originalIndex =
+          sourceParent.children.indexOf(nodeId);
+
+        const sourceChildren =
+          sourceParent.children.filter(
+            (id) => id !== nodeId
+          );
+
+        nextNodes[sourceParent.id] = {
+          ...sourceParent,
+          children: sourceChildren,
+        };
+
+        const currentTargetParent =
+          nextNodes[targetParentId];
+
+        const targetChildren =
+          currentTargetParent.children ?? [];
+
+        const adjustedIndex =
+          sourceParent.id === targetParentId &&
+            targetIndex > originalIndex
+            ? targetIndex - 1
+            : targetIndex;
+
+        const safeIndex = Math.max(
+          0,
+          Math.min(
+            adjustedIndex,
+            targetChildren.length
+          )
+        );
+
+        const nextTargetChildren = [
+          ...targetChildren.slice(0, safeIndex),
+          nodeId,
+          ...targetChildren.slice(safeIndex),
+        ];
+
+        nextNodes[targetParentId] = {
+          ...currentTargetParent,
+          children: nextTargetChildren,
+        };
+
+        return {
+          nodes: nextNodes,
+          draggedNodeId: null,
+          selectedNodeId: nodeId,
         };
       }),
   }));

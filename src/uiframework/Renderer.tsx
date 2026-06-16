@@ -1,4 +1,5 @@
 import React from "react";
+import { useEditorStore } from "./editor-store";
 
 export type NodeId = string;
 
@@ -54,16 +55,32 @@ export function RenderNode({
   nextVisited.add(id);
 
   return (
-    <Component {...node.props} data-node-id={id}>
-      {node.children?.map((childId) => (
-        <RenderNode
-          key={childId}
-          id={childId}
-          nodes={nodes}
-          registry={registry}
-          visited={nextVisited}
-        />
-      ))}
-    </Component>
+    <div
+      data-node-id={id}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+
+        console.log(
+          "START DRAG",
+          id
+        );
+
+        useEditorStore
+          .getState()
+          .startNodeDrag(id);
+      }}
+    >
+      <Component {...node.props}>
+        {node.children?.map((childId) => (
+          <RenderNode
+            key={childId}
+            id={childId}
+            nodes={nodes}
+            registry={registry}
+            visited={nextVisited}
+          />
+        ))}
+      </Component>
+    </div>
   );
 }
