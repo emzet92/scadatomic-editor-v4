@@ -115,61 +115,87 @@ export function PropertyPanel({
       >
         {Object.entries(
           propsToRender
-        ).map(([key, value]) => (
-          <div
-            key={key}
-            className="space-y-1"
-          >
-            <label
-              className="
-                block
-                text-xs
-                font-medium
-                uppercase
-                tracking-wide
-                text-zinc-500
-              "
-            >
-              {key}
-            </label>
+        ).map(([key, value]) => {
+          const isNumber =
+            typeof value ===
+            "number";
 
-            <input
-              data-editor-ignore
-              value={String(value)}
-              onChange={(e) => {
-                updateNode(
-                  node.id,
-                  (
-                    currentNode
-                  ) => ({
-                    ...currentNode,
-                    props: {
-                      ...currentNode.props,
-                      [key]:
-                        e.target.value,
-                    },
-                  })
-                );
-              }}
-              className="
-                w-full
-                h-9
-                px-3
-                rounded-md
-                border
-                border-zinc-200
-                bg-white
-                text-sm
-                text-zinc-900
-                outline-none
-                transition
-                focus:border-sky-500
-                focus:ring-2
-                focus:ring-sky-100
-              "
-            />
-          </div>
-        ))}
+          return (
+            <div
+              key={key}
+              className="space-y-1"
+            >
+              <label
+                className="
+                  block
+                  text-xs
+                  font-medium
+                  uppercase
+                  tracking-wide
+                  text-zinc-500
+                "
+              >
+                {key}
+              </label>
+
+              <input
+                data-editor-ignore
+                type={
+                  isNumber
+                    ? "number"
+                    : "text"
+                }
+                step="1"
+                value={String(value)}
+                onChange={(e) => {
+                  const rawValue =
+                    e.target.value;
+
+                  const nextValue =
+                    isNumber
+                      ? rawValue === ""
+                        ? 0
+                        : Number(
+                            rawValue
+                          )
+                      : rawValue;
+
+                  updateNode(
+                    node.id,
+                    (
+                      currentNode
+                    ) => ({
+                      ...currentNode,
+
+                      props: {
+                        ...currentNode.props,
+
+                        [key]:
+                          nextValue,
+                      },
+                    })
+                  );
+                }}
+                className="
+                  w-full
+                  h-9
+                  px-3
+                  rounded-md
+                  border
+                  border-zinc-200
+                  bg-white
+                  text-sm
+                  text-zinc-900
+                  outline-none
+                  transition
+                  focus:border-sky-500
+                  focus:ring-2
+                  focus:ring-sky-100
+                "
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

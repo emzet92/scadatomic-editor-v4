@@ -290,36 +290,50 @@ export function EditorControls({ registry }: Props) {
       setSelectedNodeId(id);
     }
 
-    function handlePointerMove(event: PointerEvent) {
-      const state = useEditorStore.getState();
+    function handlePointerMove(
+      event: PointerEvent
+    ) {
+      const state =
+        useEditorStore.getState();
 
-      const isDraggingComponent = !!state.dragPreview;
-      const isDraggingNode = !!state.draggedNodeId;
-
-      if (!isDraggingComponent && !isDraggingNode) {
+      if (!state.dragPreview) {
         setHoverDropTarget(null);
         return;
       }
 
-      state.moveDrag(event.clientX, event.clientY);
-
-      const hoveredRect = findDeepestRect(
+      state.moveDrag(
         event.clientX,
         event.clientY
       );
+
+      const hoveredRect =
+        findDeepestRect(
+          event.clientX,
+          event.clientY
+        );
 
       if (!hoveredRect) {
         setHoverDropTarget(null);
         return;
       }
 
-      const node = state.nodes[hoveredRect.id];
+      const node =
+        state.nodes[
+        hoveredRect.id
+        ];
 
-      if (node?.type === "Container") {
-        const insertIndex = findInsertIndex(
-          node.id,
-          event.clientY
-        );
+      //
+      // NAJPIERW CONTAINER
+      //
+      if (
+        node?.type ===
+        "Container"
+      ) {
+        const insertIndex =
+          findInsertIndex(
+            node.id,
+            event.clientY
+          );
 
         setHoverDropTarget({
           parentId: node.id,
@@ -329,18 +343,26 @@ export function EditorControls({ registry }: Props) {
         return;
       }
 
+      //
+      // POTEM ZWYKŁE DZIECKO
+      //
       if (
         hoveredRect.parentId &&
-        hoveredRect.childIndex !== undefined
+        hoveredRect.childIndex !==
+        undefined
       ) {
         const insertAfter =
           event.clientY >
-          hoveredRect.top + hoveredRect.height / 2;
+          hoveredRect.top +
+          hoveredRect.height / 2;
 
         setHoverDropTarget({
-          parentId: hoveredRect.parentId,
+          parentId:
+            hoveredRect.parentId,
+
           insertIndex:
-            hoveredRect.childIndex + (insertAfter ? 1 : 0),
+            hoveredRect.childIndex +
+            (insertAfter ? 1 : 0),
         });
 
         return;
@@ -353,33 +375,31 @@ export function EditorControls({ registry }: Props) {
       const state = useEditorStore.getState();
       const target = hoverDropTargetRef.current;
 
-      if (!target) {
+      if (!state.dragPreview || !target) {
         state.endComponentDrag();
-        state.endNodeDrag();
         setHoverDropTarget(null);
         return;
       }
 
-      if (state.dragPreview) {
-        state.insertNode(target.parentId, target.insertIndex, {
-          type: state.dragPreview.type,
-          props: state.dragPreview.props,
-        });
-
-        setHoverDropTarget(null);
-        return;
-      }
-
-      if (state.draggedNodeId) {
-        state.moveNode(
-          state.draggedNodeId,
-          target.parentId,
-          target.insertIndex
+      if (
+        draggedNodeId &&
+        hoverDropTarget
+      ) {
+        moveNode(
+          draggedNodeId,
+          hoverDropTarget.parentId,
+          hoverDropTarget.insertIndex
         );
 
-        setHoverDropTarget(null);
+        endNodeDrag();
+
         return;
       }
+
+      state.insertNode(target.parentId, target.insertIndex, {
+        type: state.dragPreview.type,
+        props: state.dragPreview.props,
+      });
 
       setHoverDropTarget(null);
     }

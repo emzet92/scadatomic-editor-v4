@@ -97,6 +97,13 @@ type EditorState = {
     targetParentId: NodeId,
     targetIndex: number
   ) => void;
+  resizingNodeId: NodeId | null;
+
+  startResize: (
+    nodeId: NodeId
+  ) => void;
+
+  endResize: () => void;
 };
 
 export const useEditorStore =
@@ -118,7 +125,7 @@ export const useEditorStore =
     dragX: 0,
     dragY: 0,
     draggedNodeId: null,
-
+    resizingNodeId: null,
     //
     // Selection API
     //
@@ -538,5 +545,16 @@ export const useEditorStore =
           draggedNodeId: null,
           selectedNodeId: nodeId,
         };
+      }),
+    startResize: (
+      nodeId
+    ) =>
+      set({
+        resizingNodeId: nodeId,
+      }),
+
+    endResize: () =>
+      set({
+        resizingNodeId: null,
       }),
   }));
