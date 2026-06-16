@@ -53,7 +53,7 @@ export function RenderNode({
 
   const nextVisited = new Set(visited);
   nextVisited.add(id);
-
+  // TODO: remove shitty wrapper on pointer down.
   return (
     <Component
       {...node.props}
