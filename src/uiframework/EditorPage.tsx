@@ -37,211 +37,181 @@ const registry: ComponentRegistry = {
 console.log("sram ci na matke");
 
 const initialNodes: UiTree = {
-  root: {
-    id: "root",
-    type: "Container",
-    props: {
-      display: "grid",
-      row: 1,
-
-      gap: 12,
-      padding: 16,
-      borderSize: 1,
-
-      width: 1200,
-      minHeight: 700,
-      maxWidth: "100%",
+    root: {
+        id: "root",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 12,
+            padding: 16,
+            row: 1,
+            borderSize: 1,
+        },
+        children: [
+            "title",
+            "button",
+            "panel1",
+        ],
     },
-    children: [
-      "title",
-      "button",
-      "panel1",
-    ],
-  },
 
-  title: {
-    id: "title",
-    type: "Text",
-    props: {
-      value: "Scadatomic Renderer",
+    title: {
+        id: "title",
+        type: "Text",
+        props: {
+            value: "Scadatomic Renderer",
+        },
     },
-  },
 
-  button: {
-    id: "button",
-    type: "Button",
-    props: {
-      label: "Start",
-      width: 140,
+    button: {
+        id: "button",
+        type: "Button",
+        props: {
+            label: "Start",
+        },
     },
-  },
 
-  //
-  // LEVEL 1
-  //
-  panel1: {
-    id: "panel1",
-    type: "Container",
-    props: {
-      display: "grid",
-      row: 1,
-
-      gap: 8,
-      padding: 12,
-      borderSize: 1,
-
-      width: 900,
-      minHeight: 350,
-      maxWidth: "100%",
+    //
+    // LEVEL 1
+    //
+    panel1: {
+        id: "panel1",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel1Text",
+            "panel1Button",
+            "panel2",
+        ],
     },
-    children: [
-      "panel1Text",
-      "panel1Button",
-      "panel2",
-    ],
-  },
 
-  panel1Text: {
-    id: "panel1Text",
-    type: "Text",
-    props: {
-      value: "Level 1",
+    panel1Text: {
+        id: "panel1Text",
+        type: "Text",
+        props: {
+            value: "Level 1",
+        },
     },
-  },
 
-  panel1Button: {
-    id: "panel1Button",
-    type: "Button",
-    props: {
-      label: "Action 1",
-      width: 140,
+    panel1Button: {
+        id: "panel1Button",
+        type: "Button",
+        props: {
+            label: "Action 1",
+        },
     },
-  },
 
-  //
-  // LEVEL 2
-  //
-  panel2: {
-    id: "panel2",
-    type: "Container",
-    props: {
-      display: "grid",
-      row: 1,
-
-      gap: 8,
-      padding: 12,
-      borderSize: 1,
-
-      width: 700,
-      minHeight: 260,
-      maxWidth: "100%",
+    //
+    // LEVEL 2
+    //
+    panel2: {
+        id: "panel2",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel2Text",
+            "panel2Button",
+            "panel3",
+        ],
     },
-    children: [
-      "panel2Text",
-      "panel2Button",
-      "panel3",
-    ],
-  },
 
-  panel2Text: {
-    id: "panel2Text",
-    type: "Text",
-    props: {
-      value: "Level 2",
+    panel2Text: {
+        id: "panel2Text",
+        type: "Text",
+        props: {
+            value: "Level 2",
+        },
     },
-  },
 
-  panel2Button: {
-    id: "panel2Button",
-    type: "Button",
-    props: {
-      label: "Action 2",
-      width: 140,
+    panel2Button: {
+        id: "panel2Button",
+        type: "Button",
+        props: {
+            label: "Action 2",
+        },
     },
-  },
 
-  //
-  // LEVEL 3
-  //
-  panel3: {
-    id: "panel3",
-    type: "Container",
-    props: {
-      display: "grid",
-      row: 1,
-
-      gap: 8,
-      padding: 12,
-      borderSize: 1,
-
-      width: 500,
-      minHeight: 180,
-      maxWidth: "100%",
+    //
+    // LEVEL 3
+    //
+    panel3: {
+        id: "panel3",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel3Text",
+            "panel3Button",
+            "panel4",
+        ],
     },
-    children: [
-      "panel3Text",
-      "panel3Button",
-      "panel4",
-    ],
-  },
 
-  panel3Text: {
-    id: "panel3Text",
-    type: "Text",
-    props: {
-      value: "Level 3",
+    panel3Text: {
+        id: "panel3Text",
+        type: "Text",
+        props: {
+            value: "Level 3",
+        },
     },
-  },
 
-  panel3Button: {
-    id: "panel3Button",
-    type: "Button",
-    props: {
-      label: "Action 3",
-      width: 140,
+    panel3Button: {
+        id: "panel3Button",
+        type: "Button",
+        props: {
+            label: "Action 3",
+        },
     },
-  },
 
-  //
-  // LEVEL 4
-  //
-  panel4: {
-    id: "panel4",
-    type: "Container",
-    props: {
-      display: "grid",
-      row: 1,
-
-      gap: 8,
-      padding: 12,
-      borderSize: 1,
-
-      width: 320,
-      minHeight: 120,
-      maxWidth: "100%",
+    //
+    // LEVEL 4
+    //
+    panel4: {
+        id: "panel4",
+        type: "Container",
+        props: {
+            display: "flex",
+            gap: 8,
+            padding: 12,
+            row: 0,
+            borderSize: 1,
+        },
+        children: [
+            "panel4Text",
+            "panel4Button",
+        ],
     },
-    children: [
-      "panel4Text",
-      "panel4Button",
-    ],
-  },
 
-  panel4Text: {
-    id: "panel4Text",
-    type: "Text",
-    props: {
-      value: "Level 4",
+    panel4Text: {
+        id: "panel4Text",
+        type: "Text",
+        props: {
+            value: "Level 4",
+        },
     },
-  },
 
-  panel4Button: {
-    id: "panel4Button",
-    type: "Button",
-    props: {
-      label: "Action 4",
-      width: 140,
+    panel4Button: {
+        id: "panel4Button",
+        type: "Button",
+        props: {
+            label: "Action 4",
+        },
     },
-  },
 };
 
 export function RendererRoot({

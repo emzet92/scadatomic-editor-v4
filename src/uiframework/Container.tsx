@@ -1,30 +1,17 @@
 type ContainerProps =
   React.HTMLAttributes<HTMLDivElement> & {
-    width?: number;
-    height?: number;
-
     maxWidth?: number;
-    minWidth?: number;
-    minHeight?: number;
-
     borderSize?: number;
-    padding?: number;
+    padding?: string;
     row?: number;
-
     children?: React.ReactNode;
   };
 
 export function Container({
-  width,
-  height,
-
-  maxWidth,
-  minWidth,
-  minHeight,
+  maxWidth = 400,
   borderSize = 1,
-  padding = 8,
+  padding = "8px",
   row = 1,
-
   children,
   ...domProps
 }: ContainerProps) {
@@ -33,17 +20,13 @@ export function Container({
       {...domProps}
       className="container"
       style={{
-        ...(domProps.style ?? {}),
         border: `${borderSize}px solid black`,
         borderRadius: 5,
-        padding,
+        padding: `${padding}px`,
         display: "grid",
         gridTemplateColumns: `repeat(${row}, 1fr)`,
         gap: 8,
-        width,
-        height,
         maxWidth,
-        minWidth,
       }}
     >
       {children}
