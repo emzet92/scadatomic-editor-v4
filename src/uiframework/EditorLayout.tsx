@@ -1,15 +1,25 @@
 // EditorLayout.tsx
 
 export function Toolbar() {
-  return <div className="
-    h-14
-    px-4
-    flex
-    items-center
-    justify-between
-    bg-white
-    border-b
-    border-zinc-200"><span><b>Scada</b>tomic</span></div>;
+  return (
+    <div
+      className="
+        h-24
+        px-4
+        flex
+        items-center
+        border-b
+        border-zinc-200
+        bg-white
+      "
+    >
+      <img
+        src="/logo.svg"
+        alt="Scadatomic"
+        className="h-14 w-auto"
+      />
+    </div>
+  );
 }
 
 export function LeftSidebar({
@@ -28,7 +38,7 @@ export function LeftSidebar({
 export function Canvas({
   children,
 }: React.PropsWithChildren) {
-  return <div  className="
+  return <div className="
     flex-1
     overflow-auto
     relative
