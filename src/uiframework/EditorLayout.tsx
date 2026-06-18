@@ -4,7 +4,7 @@ export function Toolbar() {
   return (
     <header
       className="
-        h-20
+        h-18
         shrink-0
 
         px-8
@@ -126,7 +126,7 @@ export function LeftSidebar({
       className="
         w-80
         shrink-0
-        bg-white
+        bg-slate-50
         border-r
         border-zinc-200
         overflow-auto
@@ -163,7 +163,7 @@ export function RightSidebar({
       className="
         w-80
         shrink-0
-        bg-white
+        bg-slate-50
         border-l
         border-zinc-200
         overflow-auto
