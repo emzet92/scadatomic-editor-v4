@@ -45,7 +45,7 @@ export function Toolbar() {
               text-zinc-900
             "
           >
-            Scadatomic
+            scadatomic
           </div>
 
           <div

@@ -535,6 +535,60 @@ export function EditorControls({ registry }: Props) {
               zIndex: 10000,
             }}
           />
+          {/* HEIGHT WIDTH LABELS */}
+          {selectedRect && (
+            <div
+              style={{
+                position: "fixed",
+                left:
+                  selectedRect.left +
+                  selectedRect.width / 2 - 20,
+                top:
+                  selectedRect.top - 20,
+                fontSize: 11,
+                background: "#0ea5e9",
+                color: "white",
+                padding: "2px 6px",
+                borderRadius: 4,
+                zIndex: 10003,
+              }}
+            >
+              {Math.round(
+                selectedRect.width
+              )}px
+            </div>
+          )}
+
+          {selectedRect && (
+            <div
+              style={{
+                position: "fixed",
+
+                left:
+                  selectedRect.left - 50,
+
+                top:
+                  selectedRect.top +
+                  selectedRect.height / 2 - 10,
+
+                fontSize: 11,
+
+                background: "#0ea5e9",
+
+                color: "white",
+
+                padding: "2px 6px",
+
+                borderRadius: 4,
+
+                zIndex: 10003,
+              }}
+            >
+              {Math.round(
+                selectedRect.height
+              )}px
+            </div>
+          )}
 
           {/* CORNERS */}
 
