@@ -2,66 +2,189 @@
 
 export function Toolbar() {
   return (
-    <div
+    <header
       className="
-        h-24
-        px-4
+        h-20
+        shrink-0
+
+        px-8
+
         flex
         items-center
+        justify-between
+
+        bg-white
         border-b
         border-zinc-200
-        bg-white
       "
     >
-      <img
-        src="/logo.svg"
-        alt="Scadatomic"
-        className="h-14 w-auto"
-      />
-    </div>
+      {/* BRAND */}
+
+      <div
+        className="
+          flex
+          items-center
+          gap-3
+        "
+      >
+        <img
+          src="/logo.svg"
+          alt="Scadatomic"
+          className="
+            h-12
+            w-auto
+            shrink-0
+          "
+        />
+
+        <div className="leading-tight">
+          <div
+            className="
+              text-2xl
+              font-bold
+              text-zinc-900
+            "
+          >
+            Scadatomic
+          </div>
+
+          <div
+            className="
+              text-sm
+              text-zinc-500
+            "
+          >
+            Visual Designer
+          </div>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+
+      <div
+        className="
+          flex
+          items-center
+          gap-2
+        "
+      >
+        <button
+          className="
+            h-9
+            px-4
+
+            rounded-md
+
+            border
+            border-zinc-200
+
+            bg-white
+
+            text-sm
+            font-medium
+
+            hover:bg-zinc-50
+          "
+        >
+          Preview
+        </button>
+
+        <button
+          className="
+            h-9
+            px-4
+
+            rounded-md
+
+            bg-sky-600
+            text-white
+
+            text-sm
+            font-medium
+
+            hover:bg-sky-500
+          "
+        >
+          Run
+        </button>
+      </div>
+    </header>
   );
 }
 
 export function LeftSidebar({
   children,
 }: React.PropsWithChildren) {
-  return <div className="
-    w-72
-    bg-white
-    border-r
-    border-zinc-200
-    flex
-    flex-col
-    overflow-auto">{children}</div>;
+  return (
+    <aside
+      className="
+        w-80
+        shrink-0
+        bg-white
+        border-r
+        border-zinc-200
+        overflow-auto
+      "
+    >
+      <div className="px-6 py-7 space-y-7">
+        {children}
+      </div>
+    </aside>
+  );
 }
 
 export function Canvas({
   children,
 }: React.PropsWithChildren) {
-  return <div className="
-    flex-1
-    overflow-auto
-    relative
-    bg-zinc-100
-    p-8">{children}</div>;
+  return (
+    <main
+      className="
+        flex-1
+        overflow-auto
+        relative
+        bg-zinc-100
+      "
+    >
+      {children}
+    </main>
+  );
 }
-
 export function RightSidebar({
   children,
 }: React.PropsWithChildren) {
-  const className = `
-    w-80
-    bg-white
-    border-l
-    border-zinc-200
-    flex
-    flex-col
-    overflow-auto
-`;
-
-  return <div className={className}>{children}</div>;
+  return (
+    <aside
+      className="
+        w-80
+        shrink-0
+        bg-white
+        border-l
+        border-zinc-200
+        overflow-auto
+      "
+    >
+      {children}
+    </aside>
+  );
 }
 
 export function StatusBar() {
-  return <div className="h-6 border-t px-3 flex items-center text-xs shrink-0">Status</div>;
+  return (
+    <div
+      className="
+        h-7
+        shrink-0
+        px-4
+        flex
+        items-center
+        border-t
+        border-zinc-200
+        bg-white
+        text-xs
+        text-zinc-500
+      "
+    >
+      Ready
+    </div>
+  );
 }

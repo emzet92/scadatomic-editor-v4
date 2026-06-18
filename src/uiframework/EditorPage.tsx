@@ -258,7 +258,7 @@ export function EditorPage() {
             <div className="flex-1 flex">
                 <LeftSidebar>
                     <ComponentPalette />
-                    <div className="my-4 border-t border-zinc-800" />
+                    <div className="border-t border-zinc-200" />
                     <TreeView />
                 </LeftSidebar>
 
