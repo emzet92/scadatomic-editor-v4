@@ -28,10 +28,10 @@ export function Toolbar() {
         "
       >
         <img
-          src="/logo.svg"
+          src="/logo2.svg"
           alt="Scadatomic"
           className="
-            h-12
+            h-8
             w-auto
             shrink-0
           "
