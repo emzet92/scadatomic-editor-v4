@@ -37,32 +37,6 @@ export function Toolbar() {
           "
         />
 
-        <div className="leading-tight">
-          <div
-            className="
-    text-2xl
-    tracking-tight
-    text-zinc-900
-  "
-          >
-            <span className="font-extrabold">
-              scada
-            </span>
-
-            <span className="font-medium text-zinc-600">
-              tomic
-            </span>
-          </div>
-
-          <div
-            className="
-              text-sm
-              text-zinc-500
-            "
-          >
-            Visual Designer
-          </div>
-        </div>
       </div>
 
       {/* ACTIONS */}
