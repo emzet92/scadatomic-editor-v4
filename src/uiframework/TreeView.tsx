@@ -78,21 +78,34 @@ function TreeNode({
     <>
       <div
         className={`
-        group
-        flex
-        items-center
-        gap-2
-        px-2
-        py-1
-        rounded
-        cursor-pointer
-        text-sm
-        hover:bg-zinc-800
-        ${selectedNodeId === nodeId
-            ? "bg-sky-900"
-            : ""
+  group
+  flex
+  items-center
+  gap-2
+
+  px-2
+  py-1.5
+
+  rounded-md
+
+  cursor-pointer
+  text-sm
+
+  transition-colors
+
+  ${selectedNodeId === nodeId
+            ? `
+        bg-sky-50
+        text-sky-700
+        border-l-2
+        border-sky-500
+      `
+            : `
+        text-zinc-700
+        hover:bg-zinc-100
+      `
           }
-      `}
+`}
         style={{
           paddingLeft:
             level * 16 + 8,
