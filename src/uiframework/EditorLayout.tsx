@@ -40,12 +40,18 @@ export function Toolbar() {
         <div className="leading-tight">
           <div
             className="
-              text-2xl
-              font-bold
-              text-zinc-900
-            "
+    text-2xl
+    tracking-tight
+    text-zinc-900
+  "
           >
-            scadatomic
+            <span className="font-extrabold">
+              scada
+            </span>
+
+            <span className="font-medium text-zinc-600">
+              tomic
+            </span>
           </div>
 
           <div
