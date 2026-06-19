@@ -1,34 +1,44 @@
-import {
-    type ComponentRegistry,
-    type UiTree,
-} from "./Renderer";
-
-import { Container } from "./Container";
-import { useEditorStore } from "./editor-store";
 import { useEffect } from "react";
+import { useEditorStore } from "./editor-store";
 import { RendererRoot } from "./EditorPage";
+import type { ComponentRegistry, UiTree } from "./Renderer";
+import { RuntimeProvider } from "./runtime-provider";
+import { useRuntimeStore } from "./runtime-store";
+import { Container } from "./Container";
 
 const registry: ComponentRegistry = {
-    Container,
+  Container,
 
-    Text: ({ value, ...props }) => (
-        <span {...props}>
-            {String(value ?? "")}
-        </span>
-    ),
+  Text: ({ value, ...props }) => (
+    <span {...props}>
+      {String(value ?? "")}
+    </span>
+  ),
 
-    Button: ({ label, ...props }) => (
-
-        <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
-    rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors 
-    disabled:opacity-50 disabled:pointer-events-none" {...props}>
-            {String(label ?? "Button")}
-        </button>
-    ),
+  Button: ({ label, ...props }) => (
+    <button
+      className="
+        inline-flex
+        items-center
+        justify-center
+        gap-2
+        h-9
+        px-4
+        rounded-md
+        bg-sky-600
+        hover:bg-sky-500
+        text-white
+        text-sm
+        font-medium
+        transition-colors
+      "
+      {...props}
+    >
+      {String(label ?? "Button")}
+    </button>
+  ),
 };
 
-
-// TMP solution delete later
 const initialNodes: UiTree = {
   root: {
     id: "root",
@@ -103,32 +113,95 @@ const initialNodes: UiTree = {
   },
 };
 
-// TMP solution
+function applyRuntimeValues(
+  nodes: UiTree,
+  values: Record<string, unknown>
+): UiTree {
+  return Object.fromEntries(
+    Object.entries(nodes).map(
+      ([id, node]) => {
+        const tag =
+          node.props?.tag as
+            | string
+            | undefined;
+
+        if (
+          !tag ||
+          values[tag] === undefined
+        ) {
+          return [
+            id,
+            node,
+          ];
+        }
+
+        return [
+          id,
+          {
+            ...node,
+            props: {
+              ...node.props,
+              value:
+                values[tag],
+            },
+          },
+        ];
+      }
+    )
+  );
+}
 
 export function RenderPage() {
-    const nodes = useEditorStore(
-        (s) => s.nodes
+  const nodes =
+    useEditorStore(
+      (s) => s.nodes
     );
 
-    const setNodes = useEditorStore(
-        (s) => s.setNodes
+  const setNodes =
+    useEditorStore(
+      (s) => s.setNodes
     );
 
-    useEffect(() => {
-        if (Object.keys(nodes).length === 0) {
-            setNodes(initialNodes);
-        }
-    }, [nodes, setNodes]);
+  const runtimeValues =
+    useRuntimeStore(
+      (s) => s.values
+    );
 
-    if (!nodes.root) {
-        return null;
+  useEffect(() => {
+    if (
+      Object.keys(nodes)
+        .length === 0
+    ) {
+      setNodes(
+        initialNodes
+      );
     }
+  }, [
+    nodes,
+    setNodes,
+  ]);
 
-    return (
-        <RendererRoot
-            rootId="root"
-            nodes={nodes}
-            registry={registry}
-        />
+  if (!nodes.root) {
+    return null;
+  }
+
+  const runtimeNodes =
+    applyRuntimeValues(
+      nodes,
+      runtimeValues
     );
+
+  return (
+    <>
+      <RuntimeProvider />
+
+      <RendererRoot
+        rootId="root"
+        nodes={
+          runtimeNodes
+        }
+        registry={registry}
+      />
+    </>
+  );
 }
