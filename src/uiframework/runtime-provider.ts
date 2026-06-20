@@ -2,52 +2,60 @@
 
 import { useEffect } from "react";
 import { useRuntimeStore } from "./runtime-store";
+import { getWs } from "./websocket";
 
 export function RuntimeProvider() {
-    const updateValue =
-        useRuntimeStore(
-            (s) => s.updateValue
+  const updateValue =
+    useRuntimeStore(
+      (s) => s.updateValue
+    );
+
+  useEffect(() => {
+    const ws = getWs();
+
+    const handleMessage = (
+      event: MessageEvent
+    ) => {
+      try {
+        const payload =
+          JSON.parse(
+            event.data
+          );
+
+        console.log(
+          "WS message:",
+          payload
         );
 
-    useEffect(() => {
-        const ws = new WebSocket(
-            "ws://localhost:8080/ws"
+        if (
+          payload.source !==
+          undefined
+        ) {
+          updateValue(
+            payload.source,
+            payload.value
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to parse WS message",
+          error
         );
+      }
+    };
 
-        ws.onopen = () => {
-            console.log(
-                "WS connected"
-            );
-        };
+    ws.addEventListener(
+      "message",
+      handleMessage
+    );
 
-        ws.onmessage = (event) => {
-            const payload = JSON.parse(
-                event.data
-            );
+    return () => {
+      ws.removeEventListener(
+        "message",
+        handleMessage
+      );
+    };
+  }, [updateValue]);
 
-            console.log(
-                "I have message here:",
-                payload
-            );
-
-            updateValue(
-                payload.source,
-                payload.value
-            );
-        };
-
-        ws.onerror = (
-            error
-        ) => {
-            console.error(
-                error
-            );
-        };
-
-        return () => {
-            ws.close();
-        };
-    }, [updateValue]);
-
-    return null;
+  return null;
 }

@@ -1,6 +1,27 @@
 // EditorLayout.tsx
 
+import { getWs } from "./websocket";
+
+const ws = getWs();
+
+
 export function Toolbar() {
+
+const publish = () => {
+  const ws = getWs();
+
+  console.log("CLICK");
+  console.log("READY STATE", ws.readyState);
+
+  ws.send(
+    JSON.stringify({
+      event: "publish",
+    })
+  );
+
+  console.log("SENT");
+};
+
   return (
     <header
       className="
@@ -70,6 +91,7 @@ export function Toolbar() {
         </button>
 
         <button
+          onClick={publish}
           className="
             h-9
             px-4
@@ -85,7 +107,7 @@ export function Toolbar() {
             hover:bg-sky-500
           "
         >
-          Run
+          Publish
         </button>
       </div>
     </header>
