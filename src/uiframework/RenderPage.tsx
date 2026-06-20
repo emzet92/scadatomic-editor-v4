@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useEditorStore } from "./editor-store";
 import { RendererRoot } from "./EditorPage";
 import type { ComponentRegistry, UiTree } from "./Renderer";
@@ -6,16 +6,20 @@ import { RuntimeProvider } from "./runtime-provider";
 import { useRuntimeStore } from "./runtime-store";
 import { Container } from "./Container";
 import { SuccessToast } from "./SuccessToast";
-import { getWs } from "./websocket";
 
 const registry: ComponentRegistry = {
     Container,
 
-    Text: ({ value, ...props }) => (
-        <span {...props}>
-            {String(value ?? "")}
-        </span>
-    ),
+  Text: ({ value, ...props }) => (
+    <span
+      {...props}
+      style={{
+        color: props.color,
+      }}
+    >
+      {String(value ?? "")}
+    </span>
+  ),
 
     Button: ({ label, ...props }) => (
         <button
@@ -66,6 +70,7 @@ const initialNodes: UiTree = {
         props: {
             value: "Pump Station P-101",
             tag: "pump.stationName",
+            color: "black",
         },
     },
 
@@ -154,6 +159,18 @@ function applyRuntimeValues(
 }
 
 export function RenderPage() {
+
+    const [showToast, setShowToast] = useState(false);
+
+    const handleScreenUpdated =
+        () => {
+            setShowToast(true);
+
+            setTimeout(() => {
+                setShowToast(false);
+            }, 3000);
+        };
+
     const nodes =
         useEditorStore(
             (s) => s.nodes
@@ -195,8 +212,15 @@ export function RenderPage() {
 
     return (
         <>
-            <SuccessToast />
-            <RuntimeProvider />
+            <RuntimeProvider
+                onScreenUpdated={
+                    handleScreenUpdated
+                }
+            />
+
+            {showToast && (
+                <SuccessToast />
+            )}
 
             <RendererRoot
                 rootId="root"

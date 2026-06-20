@@ -5,7 +5,13 @@ import { useRuntimeStore } from "./runtime-store";
 import { useEditorStore } from "./editor-store";
 import { getWs } from "./websocket";
 
-export function RuntimeProvider() {
+type Props = {
+  onScreenUpdated?: () => void;
+};
+
+export function RuntimeProvider({
+  onScreenUpdated,
+}: Props) {
   const updateValue =
     useRuntimeStore(
       (s) => s.updateValue
@@ -45,6 +51,32 @@ export function RuntimeProvider() {
               payload.nodes
             );
 
+          onScreenUpdated?.();
+
+          return;
+        }
+
+        //
+        // Node property update
+        //
+        if (
+          payload.event ===
+          "node.update"
+        ) {
+          useEditorStore
+            .getState()
+            .updateNode(
+              payload.nodeId,
+              (node) => ({
+                ...node,
+                props: {
+                  ...node.props,
+                  [payload.property]:
+                    payload.value,
+                },
+              })
+            );
+
           return;
         }
 
@@ -81,7 +113,10 @@ export function RuntimeProvider() {
         handleMessage
       );
     };
-  }, [updateValue]);
+  }, [
+    updateValue,
+    onScreenUpdated,
+  ]);
 
   return null;
 }

@@ -2,9 +2,9 @@ import { useEffect } from 'react'
 
 
 import {
-    type ComponentRegistry,
-    type UiTree,
-    RenderNode
+  type ComponentRegistry,
+  type UiTree,
+  RenderNode
 } from './Renderer';
 
 import { Container } from './Container';
@@ -16,22 +16,27 @@ import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorL
 import { TreeView } from './TreeView';
 
 const registry: ComponentRegistry = {
-    Container,
+  Container,
 
-    Text: ({ value, ...props }) => (
-        <span {...props}>
-            {String(value ?? "")}
-        </span>
-    ),
+  Text: ({ value, ...props }) => (
+    <span
+      {...props}
+      style={{
+        color: props.color,
+      }}
+    >
+      {String(value ?? "")}
+    </span>
+  ),
 
-    Button: ({ label, ...props }) => (
+  Button: ({ label, ...props }) => (
 
-        <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
+    <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
     rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors 
     disabled:opacity-50 disabled:pointer-events-none" {...props}>
-            {String(label ?? "Button")}
-        </button>
-    ),
+      {String(label ?? "Button")}
+    </button>
+  ),
 };
 
 console.log("sram ci na matke");
@@ -61,6 +66,7 @@ const initialNodes: UiTree = {
     props: {
       value: "Pump Station P-101",
       tag: "pump.stationName",
+      color: "black"
     },
   },
 
@@ -111,85 +117,85 @@ const initialNodes: UiTree = {
 };
 
 export function RendererRoot({
-    rootId,
-    nodes,
-    registry,
+  rootId,
+  nodes,
+  registry,
 }: {
-    rootId: string;
-    nodes: UiTree;
-    registry: ComponentRegistry;
+  rootId: string;
+  nodes: UiTree;
+  registry: ComponentRegistry;
 }) {
-    return (
-        <RenderNode
-            id={rootId}
-            nodes={nodes}
-            registry={registry}
-        />
-    );
+  return (
+    <RenderNode
+      id={rootId}
+      nodes={nodes}
+      registry={registry}
+    />
+  );
 }
 
 export function EditorPage() {
-    const nodes = useEditorStore(
-        (s) => s.nodes
-    );
+  const nodes = useEditorStore(
+    (s) => s.nodes
+  );
 
-    const setNodes = useEditorStore(
-        (s) => s.setNodes
-    );
+  const setNodes = useEditorStore(
+    (s) => s.setNodes
+  );
 
-    useEffect(() => {
-        if (Object.keys(nodes).length === 0) {
-            setNodes(initialNodes);
-        }
-    }, [nodes, setNodes]);
-
-    if (!nodes.root) {
-        return null;
+  useEffect(() => {
+    if (Object.keys(nodes).length === 0) {
+      setNodes(initialNodes);
     }
+  }, [nodes, setNodes]);
 
-    return (
-        <div className="h-screen flex flex-col">
-            <Toolbar />
+  if (!nodes.root) {
+    return null;
+  }
 
-            <div className="flex-1 flex">
-                <LeftSidebar>
-                    <ComponentPalette />
-                    <div className="border-t border-zinc-200" />
-                    <TreeView />
-                </LeftSidebar>
+  return (
+    <div className="h-screen flex flex-col">
+      <Toolbar />
 
-                <Canvas>
-                    <div className="min-h-full bg-zinc-100 p-8">
-                        <div
-                            className="
+      <div className="flex-1 flex">
+        <LeftSidebar>
+          <ComponentPalette />
+          <div className="border-t border-zinc-200" />
+          <TreeView />
+        </LeftSidebar>
+
+        <Canvas>
+          <div className="min-h-full bg-zinc-100 p-8">
+            <div
+              className="
     min-h-full
     p-8
     bg-white
     bg-[radial-gradient(circle,#cbd5e1_1px,transparent_1px)]
     bg-[size:20px_20px]
                             "
-                        >
-                            <RendererRoot
-                                rootId="root"
-                                nodes={nodes}
-                                registry={registry}
-                            />
+            >
+              <RendererRoot
+                rootId="root"
+                nodes={nodes}
+                registry={registry}
+              />
 
-                            <EditorControls
-                                registry={registry}
-                            />
-                        </div>
-                    </div>
-                </Canvas>
-
-                <RightSidebar>
-                    <PropertyPanel nodes={nodes} />
-                </RightSidebar>
+              <EditorControls
+                registry={registry}
+              />
             </div>
+          </div>
+        </Canvas>
 
-            <StatusBar />
-        </div>
-    );
+        <RightSidebar>
+          <PropertyPanel nodes={nodes} />
+        </RightSidebar>
+      </div>
+
+      <StatusBar />
+    </div>
+  );
 }
 
 export default EditorPage;
