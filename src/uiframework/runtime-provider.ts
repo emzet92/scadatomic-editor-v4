@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRuntimeStore } from "./runtime-store";
+import { useEditorStore } from "./editor-store";
 import { getWs } from "./websocket";
 
 export function RuntimeProvider() {
@@ -27,6 +28,29 @@ export function RuntimeProvider() {
           payload
         );
 
+        //
+        // Screen deployment
+        //
+        if (
+          payload.event ===
+          "screen.publish"
+        ) {
+          console.log(
+            "Screen updated"
+          );
+
+          useEditorStore
+            .getState()
+            .setNodes(
+              payload.nodes
+            );
+
+          return;
+        }
+
+        //
+        // Runtime tag update
+        //
         if (
           payload.source !==
           undefined
@@ -35,6 +59,8 @@ export function RuntimeProvider() {
             payload.source,
             payload.value
           );
+
+          return;
         }
       } catch (error) {
         console.error(
