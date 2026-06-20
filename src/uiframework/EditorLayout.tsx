@@ -1,26 +1,33 @@
 // EditorLayout.tsx
 
 import { getWs } from "./websocket";
+import { useEditorStore } from "./editor-store";
 
 const ws = getWs();
 
 
 export function Toolbar() {
 
-const publish = () => {
-  const ws = getWs();
+  const publish = () => {
+    const nodes =
+      useEditorStore
+        .getState()
+        .nodes;
 
-  console.log("CLICK");
-  console.log("READY STATE", ws.readyState);
+    console.log(
+      "Publishing",
+      nodes
+    );
 
-  ws.send(
-    JSON.stringify({
-      event: "publish",
-    })
-  );
+    getWs().send(
+      JSON.stringify({
+        event:
+          "screen.publish",
 
-  console.log("SENT");
-};
+        nodes,
+      })
+    );
+  };
 
   return (
     <header
