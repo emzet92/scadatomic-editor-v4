@@ -5,19 +5,20 @@ import type { ComponentRegistry, UiTree } from "./Renderer";
 import { RuntimeProvider } from "./runtime-provider";
 import { useRuntimeStore } from "./runtime-store";
 import { Container } from "./Container";
+import { SuccessToast } from "./SuccessToast";
 
 const registry: ComponentRegistry = {
-  Container,
+    Container,
 
-  Text: ({ value, ...props }) => (
-    <span {...props}>
-      {String(value ?? "")}
-    </span>
-  ),
+    Text: ({ value, ...props }) => (
+        <span {...props}>
+            {String(value ?? "")}
+        </span>
+    ),
 
-  Button: ({ label, ...props }) => (
-    <button
-      className="
+    Button: ({ label, ...props }) => (
+        <button
+            className="
         inline-flex
         items-center
         justify-center
@@ -32,176 +33,177 @@ const registry: ComponentRegistry = {
         font-medium
         transition-colors
       "
-      {...props}
-    >
-      {String(label ?? "Button")}
-    </button>
-  ),
+            {...props}
+        >
+            {String(label ?? "Button")}
+        </button>
+    ),
 };
 
 const initialNodes: UiTree = {
-  root: {
-    id: "root",
-    type: "Container",
-    props: {
-      padding: 16,
-      gap: 12,
-      borderSize: 1,
+    root: {
+        id: "root",
+        type: "Container",
+        props: {
+            padding: 16,
+            gap: 12,
+            borderSize: 1,
+        },
+        children: [
+            "stationTitle",
+            "levelLiters",
+            "levelPercent",
+            "flowRate",
+            "startButton",
+            "stopButton",
+        ],
     },
-    children: [
-      "stationTitle",
-      "levelLiters",
-      "levelPercent",
-      "flowRate",
-      "startButton",
-      "stopButton",
-    ],
-  },
 
-  stationTitle: {
-    id: "stationTitle",
-    type: "Text",
-    props: {
-      value: "Pump Station P-101",
-      tag: "pump.stationName",
+    stationTitle: {
+        id: "stationTitle",
+        type: "Text",
+        props: {
+            value: "Pump Station P-101",
+            tag: "pump.stationName",
+        },
     },
-  },
 
-  levelLiters: {
-    id: "levelLiters",
-    type: "Text",
-    props: {
-      value: "1240 L",
-      tag: "tank.levelLiters",
+    levelLiters: {
+        id: "levelLiters",
+        type: "Text",
+        props: {
+            value: "1240 L",
+            tag: "tank.levelLiters",
+        },
     },
-  },
 
-  levelPercent: {
-    id: "levelPercent",
-    type: "Text",
-    props: {
-      value: "62 %",
-      tag: "tank.levelPercent",
+    levelPercent: {
+        id: "levelPercent",
+        type: "Text",
+        props: {
+            value: "62 %",
+            tag: "tank.levelPercent",
+        },
     },
-  },
 
-  flowRate: {
-    id: "flowRate",
-    type: "Text",
-    props: {
-      value: "85 m³/h",
-      tag: "pump.flowRate",
+    flowRate: {
+        id: "flowRate",
+        type: "Text",
+        props: {
+            value: "85 m³/h",
+            tag: "pump.flowRate",
+        },
     },
-  },
 
-  startButton: {
-    id: "startButton",
-    type: "Button",
-    props: {
-      label: "START",
-      tag: "pump.startCommand",
+    startButton: {
+        id: "startButton",
+        type: "Button",
+        props: {
+            label: "START",
+            tag: "pump.startCommand",
+        },
     },
-  },
 
-  stopButton: {
-    id: "stopButton",
-    type: "Button",
-    props: {
-      label: "STOP",
-      tag: "pump.stopCommand",
+    stopButton: {
+        id: "stopButton",
+        type: "Button",
+        props: {
+            label: "STOP",
+            tag: "pump.stopCommand",
+        },
     },
-  },
 };
 
 function applyRuntimeValues(
-  nodes: UiTree,
-  values: Record<string, unknown>
+    nodes: UiTree,
+    values: Record<string, unknown>
 ): UiTree {
-  return Object.fromEntries(
-    Object.entries(nodes).map(
-      ([id, node]) => {
-        const tag =
-          node.props?.tag as
-            | string
-            | undefined;
+    return Object.fromEntries(
+        Object.entries(nodes).map(
+            ([id, node]) => {
+                const tag =
+                    node.props?.tag as
+                    | string
+                    | undefined;
 
-        if (
-          !tag ||
-          values[tag] === undefined
-        ) {
-          return [
-            id,
-            node,
-          ];
-        }
+                if (
+                    !tag ||
+                    values[tag] === undefined
+                ) {
+                    return [
+                        id,
+                        node,
+                    ];
+                }
 
-        return [
-          id,
-          {
-            ...node,
-            props: {
-              ...node.props,
-              value:
-                values[tag],
-            },
-          },
-        ];
-      }
-    )
-  );
+                return [
+                    id,
+                    {
+                        ...node,
+                        props: {
+                            ...node.props,
+                            value:
+                                values[tag],
+                        },
+                    },
+                ];
+            }
+        )
+    );
 }
 
 export function RenderPage() {
-  const nodes =
-    useEditorStore(
-      (s) => s.nodes
-    );
+    const nodes =
+        useEditorStore(
+            (s) => s.nodes
+        );
 
-  const setNodes =
-    useEditorStore(
-      (s) => s.setNodes
-    );
+    const setNodes =
+        useEditorStore(
+            (s) => s.setNodes
+        );
 
-  const runtimeValues =
-    useRuntimeStore(
-      (s) => s.values
-    );
+    const runtimeValues =
+        useRuntimeStore(
+            (s) => s.values
+        );
 
-  useEffect(() => {
-    if (
-      Object.keys(nodes)
-        .length === 0
-    ) {
-      setNodes(
-        initialNodes
-      );
-    }
-  }, [
-    nodes,
-    setNodes,
-  ]);
-
-  if (!nodes.root) {
-    return null;
-  }
-
-  const runtimeNodes =
-    applyRuntimeValues(
-      nodes,
-      runtimeValues
-    );
-
-  return (
-    <>
-      <RuntimeProvider />
-
-      <RendererRoot
-        rootId="root"
-        nodes={
-          runtimeNodes
+    useEffect(() => {
+        if (
+            Object.keys(nodes)
+                .length === 0
+        ) {
+            setNodes(
+                initialNodes
+            );
         }
-        registry={registry}
-      />
-    </>
-  );
+    }, [
+        nodes,
+        setNodes,
+    ]);
+
+    if (!nodes.root) {
+        return null;
+    }
+
+    const runtimeNodes =
+        applyRuntimeValues(
+            nodes,
+            runtimeValues
+        );
+
+    return (
+        <>
+            <SuccessToast />
+            <RuntimeProvider />
+
+            <RendererRoot
+                rootId="root"
+                nodes={
+                    runtimeNodes
+                }
+                registry={registry}
+            />
+        </>
+    );
 }
