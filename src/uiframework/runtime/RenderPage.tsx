@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { useEditorStore } from "./editor-store";
-import { RendererRoot } from "./EditorPage";
-import type {  UiTree } from "./Renderer";
-import { RuntimeProvider } from "./runtime-provider";
-import { useRuntimeStore } from "./runtime-store";
-import { SuccessToast } from "./SuccessToast";
-import { runtimeRegistry } from "./registry/runtime-registry";
-import { initialNodes } from "./registry/initial-values";
+import { useEditorStore } from "../editor-store";
+import { RendererRoot } from "../EditorPage";
+import type {  UiTree } from "../Renderer";
+import { RuntimeProvider } from "../runtime-provider";
+import { useRuntimeStore } from "../runtime-store";
+import { SuccessToast } from "../SuccessToast";
+import { runtimeRegistry } from "../registry/runtime-registry";
+import { initialNodes } from "../registry/initial-values";
 
 
 

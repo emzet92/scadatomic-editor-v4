@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { EditorPage } from "./uiframework/EditorPage";
-import { RenderPage } from "./uiframework/RenderPage";
+import { RenderPage } from "./uiframework/runtime/RenderPage";
 import './App.css'
 
 function App() {
