@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { PythonCodeEditor } from "./PythonCodeEditor";
 
 export function ScriptPage() {
+    const navigate = useNavigate();
     const { scriptId } = useParams();
 
     const resolvedScriptId = scriptId ?? "default";
@@ -27,27 +28,50 @@ export function ScriptPage() {
                     </div>
                 </div>
 
-                <button
-                    className="
-            h-9
-            px-4
-            rounded-md
-            bg-sky-600
-            hover:bg-sky-500
-            text-sm
-            font-medium
-            text-white
-            transition
-          "
-                    onClick={() => {
-                        console.log("Save script:", {
-                            scriptId: resolvedScriptId,
-                            code,
-                        });
-                    }}
-                >
-                    Save Script
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        className="
+              h-9
+              px-4
+              rounded-md
+              border
+              border-zinc-200
+              bg-white
+              hover:bg-zinc-50
+              text-sm
+              font-medium
+              text-zinc-700
+              transition
+            "
+                        onClick={() => {
+                            navigate("/");
+                        }}
+                    >
+                        Back to editor
+                    </button>
+
+                    <button
+                        className="
+              h-9
+              px-4
+              rounded-md
+              bg-sky-600
+              hover:bg-sky-500
+              text-sm
+              font-medium
+              text-white
+              transition
+            "
+                        onClick={() => {
+                            console.log("Save script:", {
+                                scriptId: resolvedScriptId,
+                                code,
+                            });
+                        }}
+                    >
+                        Save Script
+                    </button>
+                </div>
             </header>
 
             <main className="flex-1 overflow-auto p-6">
