@@ -4,33 +4,37 @@ import { sendRuntimeEvent } from "./rutime-helpers";
 type RuntimeButtonProps = React.ComponentProps<typeof Button> & {
     onClickEvent?: string;
     "data-node-id"?: string;
+    onDoubleClickEvent?: string;
 };
 
 export function RuntimeButton({
+
     onClickEvent,
     "data-node-id": nodeId,
     onClick,
+    onDoubleClickEvent,
     ...props
 }: RuntimeButtonProps) {
-    console.log("RuntimeButton props:", {
-        nodeId,
-        onClickEvent,
-        props,
-    });
-
     return (
         <Button
             {...props}
-            data-node-id={nodeId}
-            onClick={(event) => {
-                onClick?.(event);
-
+            onClick={() => {
                 if (!onClickEvent) {
                     return;
                 }
 
                 sendRuntimeEvent({
                     event: onClickEvent,
+                    nodeId,
+                });
+            }}
+            onDoubleClick={() => {
+                if (!onDoubleClickEvent) {
+                    return;
+                }
+
+                sendRuntimeEvent({
+                    event: onDoubleClickEvent,
                     nodeId,
                 });
             }}

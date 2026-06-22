@@ -62,7 +62,8 @@ export const initialNodes: UiTree = {
     props: {
       label: "START",
       tag: "pump.startCommand",
-      onClickEvent: "startButton.Clicked"
+      onClickEvent: "startButton.Clicked",
+      onDoubleClickEvent: ""
     },
   },
 

@@ -5,6 +5,15 @@ type Props = {
   nodes: UiTree;
 };
 
+const eventProps: Record<string, string> = {
+  onClickEvent: "Clicked",
+  onDoubleClickEvent: "DoubleClicked",
+};
+
+function isEventProp(key: string) {
+  return key in eventProps;
+}
+
 export function PropertyPanel({ nodes }: Props) {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
   const updateNode = useEditorStore((s) => s.updateNode);
@@ -42,8 +51,14 @@ export function PropertyPanel({ nodes }: Props) {
   }
 
   const propsToRender = node.props ?? {};
-  const isButton = node.type === "Button";
-  const hasClickEvent = Boolean(propsToRender.onClickEvent);
+
+  const normalProps = Object.entries(propsToRender).filter(
+    ([key]) => !isEventProp(key)
+  );
+
+  const runtimeEventProps = Object.entries(propsToRender).filter(
+    ([key]) => isEventProp(key)
+  );
 
   return (
     <div
@@ -108,75 +123,73 @@ export function PropertyPanel({ nodes }: Props) {
         {/* PROPS */}
 
         <div className="space-y-4">
-          {Object.entries(propsToRender)
-            .filter(([key]) => key !== "onClickEvent")
-            .map(([key, value]) => {
-              const isNumber = typeof value === "number";
+          {normalProps.map(([key, value]) => {
+            const isNumber = typeof value === "number";
 
-              return (
-                <div
-                  key={key}
-                  className="space-y-1"
+            return (
+              <div
+                key={key}
+                className="space-y-1"
+              >
+                <label
+                  className="
+                    block
+                    text-xs
+                    font-medium
+                    uppercase
+                    tracking-wide
+                    text-zinc-500
+                  "
                 >
-                  <label
-                    className="
-                      block
-                      text-xs
-                      font-medium
-                      uppercase
-                      tracking-wide
-                      text-zinc-500
-                    "
-                  >
-                    {key}
-                  </label>
+                  {key}
+                </label>
 
-                  <input
-                    data-editor-ignore
-                    type={isNumber ? "number" : "text"}
-                    value={String(value)}
-                    onChange={(e) => {
-                      const rawValue = e.target.value;
+                <input
+                  data-editor-ignore
+                  type={isNumber ? "number" : "text"}
+                  value={String(value ?? "")}
+                  onChange={(e) => {
+                    const rawValue = e.target.value;
 
-                      const nextValue = isNumber
-                        ? rawValue === ""
-                          ? 0
-                          : Number(rawValue)
-                        : rawValue;
+                    const nextValue = isNumber
+                      ? rawValue === ""
+                        ? 0
+                        : Number(rawValue)
+                      : rawValue;
 
-                      updateNode(node.id, (currentNode) => ({
-                        ...currentNode,
-                        props: {
-                          ...currentNode.props,
-                          [key]: nextValue,
-                        },
-                      }));
-                    }}
-                    className="
-                      w-full
-                      h-9
-                      px-3
-                      rounded-md
-                      border
-                      border-zinc-200
-                      bg-white
-                      text-sm
-                      text-zinc-900
-                      outline-none
-                      transition
-                      focus:border-sky-500
-                      focus:ring-2
-                      focus:ring-sky-100
-                    "
-                  />
-                </div>
-              );
-            })}
+                    updateNode(node.id, (currentNode) => ({
+                      ...currentNode,
+                      props: {
+                        ...currentNode.props,
+                        [key]: nextValue,
+                      },
+                    }));
+                  }}
+                  className="
+                    w-full
+                    h-9
+                    px-3
+                    rounded-md
+                    border
+                    border-zinc-200
+                    bg-white
+                    text-sm
+                    text-zinc-900
+                    outline-none
+                    transition
+                    focus:border-sky-500
+                    focus:ring-2
+                    focus:ring-sky-100
+                  "
+                />
+              </div>
+            );
+          })}
         </div>
 
-        {/* BUTTON EVENTS */}
+        {/* EVENTS */}
 
-        {isButton && (
+        {runtimeEventProps.length > 0 && (
           <div
             className="
               pt-4
@@ -209,79 +222,87 @@ export function PropertyPanel({ nodes }: Props) {
               </div>
             </div>
 
-            <label
-              className="
-                flex
-                items-center
-                gap-3
-                rounded-lg
-                border
-                border-zinc-200
-                bg-white
-                px-3
-                py-3
-                cursor-pointer
-                hover:bg-zinc-50
-              "
-            >
-              <input
-                data-editor-ignore
-                type="checkbox"
-                checked={hasClickEvent}
-                onChange={(e) => {
-                  const checked = e.target.checked;
+            <div className="space-y-3">
+              {runtimeEventProps.map(([key, value]) => {
+                const checked = Boolean(value);
+                const suffix = eventProps[key];
 
-                  updateNode(node.id, (currentNode) => {
-                    const nextProps = {
-                      ...currentNode.props,
-                    };
+                return (
+                  <label
+                    key={key}
+                    className="
+                      flex
+                      items-center
+                      gap-3
+                      rounded-lg
+                      border
+                      border-zinc-200
+                      bg-white
+                      px-3
+                      py-3
+                      cursor-pointer
+                      hover:bg-zinc-50
+                    "
+                  >
+                    <input
+                      data-editor-ignore
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
 
-                    if (checked) {
-                      nextProps.onClickEvent = `${node.id}.Clicked`;
-                    } else {
-                      delete nextProps.onClickEvent;
-                    }
+                        updateNode(node.id, (currentNode) => {
+                          const nextProps = {
+                            ...currentNode.props,
+                          };
 
-                    return {
-                      ...currentNode,
-                      props: nextProps,
-                    };
-                  });
-                }}
-                className="
-                  h-4
-                  w-4
-                  rounded
-                  border-zinc-300
-                  text-sky-600
-                  focus:ring-sky-500
-                "
-              />
+                          if (checked) {
+                            nextProps[key] = `${node.id}.${suffix}`;
+                          } else {
+                            nextProps[key] = "";
+                          }
 
-              <div className="min-w-0">
-                <div
-                  className="
-                    text-sm
-                    font-medium
-                    text-zinc-800
-                  "
-                >
-                  Emit click event
-                </div>
+                          return {
+                            ...currentNode,
+                            props: nextProps,
+                          };
+                        });
+                      }}
+                      className="
+                        h-4
+                        w-4
+                        rounded
+                        border-zinc-300
+                        text-sky-600
+                        focus:ring-sky-500
+                      "
+                    />
 
-                <div
-                  className="
-                    text-xs
-                    text-zinc-500
-                    truncate
-                  "
-                >
-                  {hasClickEvent
-                    ? String(propsToRender.onClickEvent)
-                    : `${node.id}.Clicked`}
-                </div>
-              </div>
-            </label>
+                    <div className="min-w-0">
+                      <div
+                        className="
+                          text-sm
+                          font-medium
+                          text-zinc-800
+                        "
+                      >
+                        {key}
+                      </div>
+
+                      <div
+                        className="
+                          text-xs
+                          text-zinc-500
+                          truncate
+                        "
+                      >
+                        {checked ? String(value) : `${node.id}.${suffix}`}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
