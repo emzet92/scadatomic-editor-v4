@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { UiNode, UiTree } from "./Renderer";
+import {
+  type UiNode,
+  type UiTree,
+} from "./Renderer";
+import { getDefaultPropsForType } from "./UiTree";
 
 export type NodeId = string;
 
@@ -8,10 +12,10 @@ export type DragPreview = {
   props: Record<string, unknown>;
 };
 
-export type NewNode = Pick<
-  UiNode,
-  "type" | "props"
->;
+export type NewNode = {
+  type: UiNode["type"];
+  props?: Record<string, unknown>;
+};
 
 type EditorState = {
   //
@@ -56,6 +60,18 @@ type EditorState = {
     node: NewNode
   ) => void;
 
+  deleteNode: (
+    id: NodeId
+  ) => void;
+
+  moveNodeUp: (
+    nodeId: NodeId
+  ) => void;
+
+  moveNodeDown: (
+    nodeId: NodeId
+  ) => void;
+
   //
   // Drag API
   //
@@ -69,17 +85,6 @@ type EditorState = {
   ) => void;
 
   endComponentDrag: () => void;
-  deleteNode: (
-    id: NodeId
-  ) => void;
-
-  moveNodeUp: (
-    nodeId: NodeId
-  ) => void;
-
-  moveNodeDown: (
-    nodeId: NodeId
-  ) => void;
 
   //
   // Node Drag
@@ -98,6 +103,27 @@ type EditorState = {
     targetIndex: number
   ) => void;
 };
+
+function createNodeWithDefaults({
+  id,
+  node,
+}: {
+  id: NodeId;
+  node: NewNode;
+}): UiNode {
+  return {
+    id,
+    type: node.type,
+    props: {
+      ...getDefaultPropsForType(node.type),
+      ...(node.props ?? {}),
+    },
+    children:
+      node.type === "Container"
+        ? []
+        : undefined,
+  } as UiNode;
+}
 
 export const useEditorStore =
   create<EditorState>((set) => ({
@@ -161,46 +187,44 @@ export const useEditorStore =
       node
     ) =>
       set((state) => {
-        const parent = state.nodes[parentId];
+        const parent =
+          state.nodes[parentId];
 
         if (!parent) {
           return state;
         }
 
-        const id = crypto.randomUUID();
+        const id =
+          crypto.randomUUID();
 
-        const newNode: UiNode = {
-          id,
-          type: node.type,
-          props: {
-            ...node.props,
-          },
-          children:
-            node.type === "Container"
-              ? []
-              : undefined,
-        };
+        const newNode =
+          createNodeWithDefaults({
+            id,
+            node,
+          });
 
-        const children = parent.children ?? [];
+        const children =
+          parent.children ?? [];
 
-        const safeInsertIndex = Math.max(
-          0,
-          Math.min(insertIndex, children.length)
-        );
+        const safeInsertIndex =
+          Math.max(
+            0,
+            Math.min(
+              insertIndex,
+              children.length
+            )
+          );
 
         const nextChildren = [
-          ...children.slice(0, safeInsertIndex),
+          ...children.slice(
+            0,
+            safeInsertIndex
+          ),
           id,
-          ...children.slice(safeInsertIndex),
+          ...children.slice(
+            safeInsertIndex
+          ),
         ];
-
-        console.log(
-          "PARENT AFTER INSERT",
-          {
-            parentId,
-            children: nextChildren,
-          }
-        );
 
         return {
           nodes: {
@@ -270,8 +294,7 @@ export const useEditorStore =
             return;
           }
 
-          for (const childId of current.children ??
-            []) {
+          for (const childId of current.children ?? []) {
             removeSubtree(childId);
           }
 
@@ -281,9 +304,7 @@ export const useEditorStore =
         const parent =
           Object.values(nextNodes).find(
             (candidate) =>
-              candidate.children?.includes(
-                id
-              )
+              candidate.children?.includes(id)
           );
 
         if (!parent) {
@@ -310,6 +331,7 @@ export const useEditorStore =
               : state.selectedNodeId,
         };
       }),
+
     moveNodeUp: (nodeId) =>
       set((state) => {
         const parent =
@@ -416,6 +438,7 @@ export const useEditorStore =
           },
         };
       }),
+
     startNodeDrag: (
       nodeId
     ) =>
@@ -427,6 +450,7 @@ export const useEditorStore =
       set({
         draggedNodeId: null,
       }),
+
     moveNode: (
       nodeId,
       targetParentId,
@@ -437,7 +461,9 @@ export const useEditorStore =
           return state;
         }
 
-        const node = state.nodes[nodeId];
+        const node =
+          state.nodes[nodeId];
+
         const targetParent =
           state.nodes[targetParentId];
 
@@ -449,7 +475,8 @@ export const useEditorStore =
           parentId: string,
           childId: string
         ): boolean {
-          const parent = state.nodes[parentId];
+          const parent =
+            state.nodes[parentId];
 
           if (!parent) {
             return false;
@@ -460,7 +487,12 @@ export const useEditorStore =
               return true;
             }
 
-            if (isDescendant(id, childId)) {
+            if (
+              isDescendant(
+                id,
+                childId
+              )
+            ) {
               return true;
             }
           }
@@ -470,18 +502,27 @@ export const useEditorStore =
 
         if (
           nodeId === targetParentId ||
-          isDescendant(nodeId, targetParentId)
+          isDescendant(
+            nodeId,
+            targetParentId
+          )
         ) {
           return state;
         }
 
         const sourceParent =
-          Object.values(state.nodes).find(
-            (candidate) =>
-              candidate.children?.includes(nodeId)
+          Object.values(
+            state.nodes
+          ).find((candidate) =>
+            candidate.children?.includes(
+              nodeId
+            )
           );
 
-        if (!sourceParent || !sourceParent.children) {
+        if (
+          !sourceParent ||
+          !sourceParent.children
+        ) {
           return state;
         }
 
@@ -490,7 +531,9 @@ export const useEditorStore =
         };
 
         const originalIndex =
-          sourceParent.children.indexOf(nodeId);
+          sourceParent.children.indexOf(
+            nodeId
+          );
 
         const sourceChildren =
           sourceParent.children.filter(
@@ -514,18 +557,24 @@ export const useEditorStore =
             ? targetIndex - 1
             : targetIndex;
 
-        const safeIndex = Math.max(
-          0,
-          Math.min(
-            adjustedIndex,
-            targetChildren.length
-          )
-        );
+        const safeIndex =
+          Math.max(
+            0,
+            Math.min(
+              adjustedIndex,
+              targetChildren.length
+            )
+          );
 
         const nextTargetChildren = [
-          ...targetChildren.slice(0, safeIndex),
+          ...targetChildren.slice(
+            0,
+            safeIndex
+          ),
           nodeId,
-          ...targetChildren.slice(safeIndex),
+          ...targetChildren.slice(
+            safeIndex
+          ),
         ];
 
         nextNodes[targetParentId] = {

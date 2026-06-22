@@ -1,5 +1,6 @@
 import { useEditorStore } from "../../editor-store";
 import type { UiTree } from "../../Renderer";
+import { getDefaultPropsForType } from "../../UiTree";
 import { isEventProp } from "./event-props";
 import { EventsEditor } from "./EventsEditor";
 import { PropertyPanelEmpty } from "./PropertyPanelEmpty";
@@ -26,7 +27,10 @@ export function PropertyPanel({ nodes }: Props) {
     return <PropertyPanelNodeNotFound />;
   }
 
-  const propsToRender = node.props ?? {};
+ const propsToRender = {
+  ...getDefaultPropsForType(node.type),
+  ...(node.props ?? {}),
+};
 
   const normalProps = Object.entries(propsToRender).filter(
     ([key]) => !isEventProp(key)
