@@ -11,7 +11,7 @@ import { PropertyPanel } from './gui/property-panel/PropertyPanel';
 import { useEditorStore } from './editor-store';
 import { ComponentPalette } from './gui/components-palette/PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
-import { TreeView } from './TreeView';
+import { TreeView } from './tree-view/TreeView';
 import { editorRegistry, type ComponentRegistry } from './registry/editor-registry';
 import { initialNodes } from './registry/initial-values';
 

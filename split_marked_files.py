@@ -1,6 +1,6 @@
+import os
 import re
 import sys
-import os
 from pathlib import Path
 
 FILE_BLOCK_RE = re.compile(
@@ -18,27 +18,50 @@ def to_ts_import_path(path: str) -> str:
     return path
 
 
-def rewrite_property_panel_imports(
+def strip_ts_extension(path: Path) -> Path:
+    if path.suffix in [".ts", ".tsx"]:
+        return path.with_suffix("")
+
+    return path
+
+
+def rewrite_imports_to_output_root(
     content: str,
     source_file: Path,
     output_root: Path,
+    block_paths: list[str],
 ) -> str:
-    property_panel_dir = output_root / "property-panel"
+    source_dir = source_file.parent
 
-    relative_path = os.path.relpath(
-        property_panel_dir,
-        start=source_file.parent,
-    )
+    for block_path in block_paths:
+        block = Path(block_path)
 
-    import_prefix = to_ts_import_path(relative_path)
+        if block.name == source_file.name:
+            continue
 
-    return content.replace(
-        '"./property-panel/',
-        f'"{import_prefix}/',
-    ).replace(
-        "'./property-panel/",
-        f"'{import_prefix}/",
-    )
+        original_import = "./" + str(
+            strip_ts_extension(block)
+        ).replace(os.sep, "/")
+
+        generated_file = output_root / block
+        generated_import = to_ts_import_path(
+            os.path.relpath(
+                strip_ts_extension(generated_file),
+                start=source_dir,
+            )
+        )
+
+        content = content.replace(
+            f'"{original_import}"',
+            f'"{generated_import}"',
+        )
+
+        content = content.replace(
+            f"'{original_import}'",
+            f"'{generated_import}'",
+        )
+
+    return content
 
 
 def split_marked_files(
@@ -60,6 +83,11 @@ def split_marked_files(
     if not matches:
         print("No @file blocks found.")
         return
+
+    block_paths = [
+        match.group(1).strip()
+        for match in matches
+    ]
 
     main_block_content = None
 
@@ -100,10 +128,11 @@ def split_marked_files(
             )
             return
 
-        cleaned_content = rewrite_property_panel_imports(
+        cleaned_content = rewrite_imports_to_output_root(
             content=main_block_content,
             source_file=source_file,
             output_root=output_root,
+            block_paths=block_paths,
         )
 
         source_file.write_text(
