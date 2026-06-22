@@ -1,11 +1,11 @@
-import type { UiTree } from "./Renderer";
-import { useEditorStore } from "./editor-store";
-import { PropertyPanelEmpty } from "./gui/property-panel/PropertyPanelEmpty";
-import { PropertyPanelNodeNotFound } from "./gui/property-panel/PropertyPanelNodeNotFound";
-import { PropertyPanelHeader } from "./gui/property-panel/PropertyPanelHeader";
-import { PropsEditor } from "./gui/property-panel/PropsEditor";
-import { EventsEditor } from "./gui/property-panel/EventsEditor";
-import { isEventProp } from "./gui/property-panel/event-props";
+import type { UiTree } from "../../Renderer";
+import { useEditorStore } from "../../editor-store";
+import { PropertyPanelEmpty } from "./PropertyPanelEmpty";
+import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
+import { PropertyPanelHeader } from "./PropertyPanelHeader";
+import { PropsEditor } from "./PropsEditor";
+import { EventsEditor } from "./EventsEditor";
+import { isEventProp } from "./event-props";
 
 type Props = {
   nodes: UiTree;

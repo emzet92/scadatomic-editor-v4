@@ -7,7 +7,7 @@ import {
 } from './Renderer';
 
 import { EditorControls } from './EditorControls';
-import { PropertyPanel } from './PropertyPanel';
+import { PropertyPanel } from './gui/property-panel/PropertyPanel';
 import { useEditorStore } from './editor-store';
 import { ComponentPalette } from './gui/components-palette/PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
