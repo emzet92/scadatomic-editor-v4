@@ -1,4 +1,4 @@
-import { useEditorStore } from "../editor-store";
+import { useEditorStore } from "../../editor-store";
 import { TreeNode } from "./TreeNode";
 
 export function TreeView() {
