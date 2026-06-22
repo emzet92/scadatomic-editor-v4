@@ -4,12 +4,20 @@ import type {
 } from "./property-panel-types";
 import { PropInput } from "./PropInput";
 import { TextStyleToolbar } from "./TextStyleToolbar";
+import { BorderSettings } from "./BorderSettings";
 
 const textStyleProps =
   new Set([
     "fontWeight",
     "italic",
     "underline",
+  ]);
+
+const borderProps =
+  new Set([
+    "borderSize",
+    "borderColor",
+    "borderRadius",
   ]);
 
 export function PropsEditor({
@@ -29,9 +37,16 @@ export function PropsEditor({
     "italic" in propsMap ||
     "underline" in propsMap;
 
+  const hasBorderSettings =
+    "borderSize" in propsMap ||
+    "borderColor" in propsMap ||
+    "borderRadius" in propsMap;
+
   const visibleProps =
     props.filter(
-      ([key]) => !textStyleProps.has(key)
+      ([key]) =>
+        !textStyleProps.has(key) &&
+        !borderProps.has(key)
     );
 
   return (
@@ -42,6 +57,16 @@ export function PropsEditor({
           fontWeight={propsMap.fontWeight}
           italic={propsMap.italic}
           underline={propsMap.underline}
+          updateNode={updateNode}
+        />
+      )}
+
+      {hasBorderSettings && (
+        <BorderSettings
+          nodeId={nodeId}
+          borderSize={propsMap.borderSize}
+          borderColor={propsMap.borderColor}
+          borderRadius={propsMap.borderRadius}
           updateNode={updateNode}
         />
       )}

@@ -80,6 +80,10 @@ export type TextNodeProps = {
     italic?: boolean;
     underline?: boolean;
     uppercase?: boolean;
+
+    borderSize?: number;
+    borderColor?: string;
+    borderRadius?: number;
 };
 
 export const defaultTextProps = {
@@ -93,6 +97,10 @@ export const defaultTextProps = {
     italic: false,
     underline: false,
     uppercase: false,
+
+    borderSize: 0,
+    borderColor: "#d4d4d8",
+    borderRadius: 0,
 } satisfies TextNodeProps;
 
 export const defaultTextPropsByVariant = {

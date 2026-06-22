@@ -39,6 +39,10 @@ export function Text({
   underline,
   uppercase,
 
+  borderSize,
+  borderColor,
+  borderRadius,
+
   style,
   ...domProps
 }: TextProps) {
@@ -60,32 +64,60 @@ export function Text({
     tag,
 
     color:
-      color ?? variantDefaults.color ?? defaultTextProps.color,
+      color ??
+      variantDefaults.color ??
+      defaultTextProps.color,
 
     fontSize:
-      fontSize ?? variantDefaults.fontSize ?? defaultTextProps.fontSize,
+      fontSize ??
+      variantDefaults.fontSize ??
+      defaultTextProps.fontSize,
 
     lineHeight:
-      lineHeight ?? variantDefaults.lineHeight ?? defaultTextProps.lineHeight,
+      lineHeight ??
+      variantDefaults.lineHeight ??
+      defaultTextProps.lineHeight,
 
     fontWeight:
-      fontWeight ?? variantDefaults.fontWeight ?? defaultTextProps.fontWeight,
+      fontWeight ??
+      variantDefaults.fontWeight ??
+      defaultTextProps.fontWeight,
 
     align:
-      align ?? defaultTextProps.align,
+      align ??
+      defaultTextProps.align,
 
     variant:
       resolvedVariant,
 
     italic:
-      italic ?? defaultTextProps.italic,
+      italic ??
+      defaultTextProps.italic,
 
     underline:
-      underline ?? defaultTextProps.underline,
+      underline ??
+      defaultTextProps.underline,
 
     uppercase:
-      uppercase ?? defaultTextProps.uppercase,
+      uppercase ??
+      defaultTextProps.uppercase,
+
+    borderSize:
+      borderSize ??
+      defaultTextProps.borderSize,
+
+    borderColor:
+      borderColor ??
+      defaultTextProps.borderColor,
+
+    borderRadius:
+      borderRadius ??
+      defaultTextProps.borderRadius,
   };
+
+  const hasBorder =
+    typeof resolvedProps.borderSize === "number" &&
+    resolvedProps.borderSize > 0;
 
   return (
     <span
@@ -106,7 +138,9 @@ export function Text({
 
         fontWeight:
           resolvedProps.fontWeight
-            ? fontWeightMap[resolvedProps.fontWeight]
+            ? fontWeightMap[
+            resolvedProps.fontWeight
+            ]
             : undefined,
 
         textAlign:
@@ -125,6 +159,19 @@ export function Text({
         textTransform:
           resolvedProps.uppercase
             ? "uppercase"
+            : undefined,
+
+        border:
+          hasBorder
+            ? `${resolvedProps.borderSize}px solid ${resolvedProps.borderColor}`
+            : undefined,
+
+        borderRadius:
+          resolvedProps.borderRadius,
+
+        padding:
+          hasBorder
+            ? "4px 6px"
             : undefined,
       }}
     >
