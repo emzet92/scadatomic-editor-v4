@@ -1,28 +1,42 @@
-// websocket.ts
-
 let ws: WebSocket | null = null;
 
+function getWebSocketUrl() {
+  const protocol =
+    window.location.protocol === "https:"
+      ? "wss"
+      : "ws";
+
+  const host =
+    window.location.hostname;
+
+  const backendPort =
+    "8080";
+
+  return `${protocol}://${host}:${backendPort}/ws`;
+}
+
 export function getWs() {
-  if (!ws) {
-    ws = new WebSocket(
-      "ws://localhost:8080/ws"
-    );
+  if (
+    !ws ||
+    ws.readyState === WebSocket.CLOSED
+  ) {
+    const url = getWebSocketUrl();
 
-    ws.onopen = () =>
-      console.log(
-        "WS connected"
-      );
+    console.log("Connecting WS:", url);
 
-    ws.onclose = () =>
-      console.log(
-        "WS closed"
-      );
+    ws = new WebSocket(url);
 
-    ws.onerror = (e) =>
-      console.log(
-        "WS error",
-        e
-      );
+    ws.onopen = () => {
+      console.log("WS connected");
+    };
+
+    ws.onclose = () => {
+      console.log("WS closed");
+    };
+
+    ws.onerror = (error) => {
+      console.error("WS error", error);
+    };
   }
 
   return ws;
