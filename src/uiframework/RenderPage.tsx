@@ -1,82 +1,14 @@
 import { useEffect, useState } from "react";
 import { useEditorStore } from "./editor-store";
 import { RendererRoot } from "./EditorPage";
-import type { ComponentRegistry, UiTree } from "./Renderer";
+import type {  UiTree } from "./Renderer";
 import { RuntimeProvider } from "./runtime-provider";
 import { useRuntimeStore } from "./runtime-store";
-import { Container } from "./components/Container";
 import { SuccessToast } from "./SuccessToast";
-import { getWs } from "./websocket";
+import { runtimeRegistry } from "./registry/runtime-registry";
 
-const buttonClassName = `
-  inline-flex
-  items-center
-  justify-center
-  gap-2
-  h-9
-  px-4
 
-  rounded-md
 
-  bg-sky-600
-  hover:bg-sky-500
-
-  text-white
-  text-sm
-  font-medium
-
-  transition-colors
-
-  disabled:opacity-50
-  disabled:pointer-events-none
-`;
-
-const registry: ComponentRegistry = {
-    Container,
-
-    Text: ({ value, ...props }) => (
-        <span
-            {...props}
-            style={{
-                color: props.color,
-            }}
-        >
-            {String(value ?? "")}
-        </span>
-    ),
-    Button: ({
-        label,
-        onClickEvent,
-        id,
-        ...props
-    }) => (
-
-        <button
-            {...props}
-            className={buttonClassName}
-            onClick={() => {
-                if (!onClickEvent) {
-                    return;
-                }
-                console.log("This is the click event", JSON.stringify({
-                    event:
-                        onClickEvent,
-                    nodeId: id,
-                }));
-
-                getWs().send(
-                    JSON.stringify({
-                        event:
-                            onClickEvent,
-                        nodeId: id,
-                    })
-                );
-            }}
-        >
-            {label}
-        </button>
-    )
-};
 
 const initialNodes: UiTree = {
     root: {
@@ -261,7 +193,7 @@ export function RenderPage() {
                 nodes={
                     runtimeNodes
                 }
-                registry={registry}
+                registry={runtimeRegistry}
             />
         </>
     );

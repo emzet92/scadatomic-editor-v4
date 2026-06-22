@@ -6,52 +6,18 @@ import {
   RenderNode
 } from './Renderer';
 
-import { Container } from './components/Container';
 import { EditorControls } from './EditorControls';
 import { PropertyPanel } from './PropertyPanel';
 import { useEditorStore } from './editor-store';
 import { ComponentPalette } from './PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
 import { TreeView } from './TreeView';
-import { editorRegistry } from './registry/editor-registry';
+import { editorRegistry, type ComponentRegistry } from './registry/editor-registry';
 
 
 
 
-const EditorButton = ({
-  label,
-  ...props
-}: any) => (
-  <button
-    {...props}
-    className="
-      inline-flex
-      items-center
-      justify-center
-      gap-2
-      h-9
-      px-4
 
-      rounded-md
-
-      bg-sky-600
-      hover:bg-sky-500
-
-      text-white
-      text-sm
-      font-medium
-
-      transition-colors
-
-      disabled:opacity-50
-      disabled:pointer-events-none
-    "
-  >
-    {String(
-      label ?? "Button"
-    )}
-  </button>
-);
 
 
 console.log("sram ci na matke");
