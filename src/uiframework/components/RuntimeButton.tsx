@@ -1,29 +1,39 @@
-// components/RuntimeButton.tsx
+import { Button } from "../components/Button";
+import { sendRuntimeEvent } from "./rutime-helpers";
 
-import { getWs } from "../websocket";
-import { Button } from "./Button";
+type RuntimeButtonProps = React.ComponentProps<typeof Button> & {
+    onClickEvent?: string;
+    "data-node-id"?: string;
+};
 
 export function RuntimeButton({
-  id,
-  onClickEvent,
-  ...props
-}) {
-  return (
-    <Button
-      {...props}
-      onClick={
-        onClickEvent
-          ? () => {
-              getWs().send(
-                JSON.stringify({
-                  event:
-                    onClickEvent,
-                  nodeId: id,
-                })
-              );
-            }
-          : undefined
-      }
-    />
-  );
+    onClickEvent,
+    "data-node-id": nodeId,
+    onClick,
+    ...props
+}: RuntimeButtonProps) {
+    console.log("RuntimeButton props:", {
+        nodeId,
+        onClickEvent,
+        props,
+    });
+
+    return (
+        <Button
+            {...props}
+            data-node-id={nodeId}
+            onClick={(event) => {
+                onClick?.(event);
+
+                if (!onClickEvent) {
+                    return;
+                }
+
+                sendRuntimeEvent({
+                    event: onClickEvent,
+                    nodeId,
+                });
+            }}
+        />
+    );
 }
