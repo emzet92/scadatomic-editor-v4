@@ -2,18 +2,18 @@ import { useEffect } from 'react'
 
 
 import {
-  type ComponentRegistry,
   type UiTree,
   RenderNode
 } from './Renderer';
 
-import { Container } from './Container';
+import { Container } from './components/Container';
 import { EditorControls } from './EditorControls';
 import { PropertyPanel } from './PropertyPanel';
 import { useEditorStore } from './editor-store';
 import { ComponentPalette } from './PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
 import { TreeView } from './TreeView';
+import { editorRegistry } from './registry/editor-registry';
 
 
 
@@ -53,26 +53,6 @@ const EditorButton = ({
   </button>
 );
 
-const registry: ComponentRegistry = {
-  Container,
-
-  Text: ({
-    value,
-    color,
-    ...props
-  }) => (
-    <span
-      {...props}
-      style={{
-        color,
-      }}
-    >
-      {String(value ?? "")}
-    </span>
-  ),
-
-  Button: EditorButton,
-};
 
 console.log("sram ci na matke");
 
@@ -214,11 +194,11 @@ export function EditorPage() {
               <RendererRoot
                 rootId="root"
                 nodes={nodes}
-                registry={registry}
+                registry={editorRegistry}
               />
 
               <EditorControls
-                registry={registry}
+                registry={editorRegistry}
               />
             </div>
           </div>

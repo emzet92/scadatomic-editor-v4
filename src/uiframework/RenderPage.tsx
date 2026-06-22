@@ -4,7 +4,7 @@ import { RendererRoot } from "./EditorPage";
 import type { ComponentRegistry, UiTree } from "./Renderer";
 import { RuntimeProvider } from "./runtime-provider";
 import { useRuntimeStore } from "./runtime-store";
-import { Container } from "./Container";
+import { Container } from "./components/Container";
 import { SuccessToast } from "./SuccessToast";
 import { getWs } from "./websocket";
 

@@ -1,5 +1,6 @@
 import React from "react";
 import { useEditorStore } from "./editor-store";
+import type { ComponentRegistry } from "./registry/editor-registry";
 
 export type NodeId = string;
 
@@ -12,14 +13,7 @@ export type UiNode = {
 
 export type UiTree = Record<NodeId, UiNode>;
 
-export type ScadatomicComponent<P = any> = React.ComponentType<
-  P & {
-    children?: React.ReactNode;
-    "data-node-id"?: string;
-  }
->;
 
-export type ComponentRegistry = Record<string, ScadatomicComponent>;
 
 export type RenderNodeProps = {
   id: NodeId;
