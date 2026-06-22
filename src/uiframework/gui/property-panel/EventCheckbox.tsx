@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { UpdateNode } from "./property-panel-types";
 
 export function EventCheckbox({
@@ -14,8 +14,6 @@ export function EventCheckbox({
   suffix: string;
   updateNode: UpdateNode;
 }) {
-  const navigate = useNavigate();
-
   const checked = Boolean(value);
   const generatedEventName = `${nodeId}.${suffix}`;
 
@@ -23,17 +21,8 @@ export function EventCheckbox({
     ? String(value)
     : generatedEventName;
 
-  function openScriptEditor() {
-    navigate(`/scripts/${encodeURIComponent(eventName)}`);
-  }
-
   return (
-    <label
-      onDoubleClick={(event) => {
-        event.preventDefault();
-        openScriptEditor();
-      }}
-      title="Double click to open script editor"
+    <div
       className="
         flex
         items-center
@@ -44,9 +33,7 @@ export function EventCheckbox({
         bg-white
         px-3
         py-3
-        cursor-pointer
         hover:bg-zinc-50
-        select-none
       "
     >
       <input
@@ -83,7 +70,7 @@ export function EventCheckbox({
         "
       />
 
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div
           className="
             text-sm
@@ -104,6 +91,21 @@ export function EventCheckbox({
           {eventName}
         </div>
       </div>
-    </label>
+
+      <Link
+        data-editor-ignore
+        to={`/scripts/${encodeURIComponent(eventName)}`}
+        className="
+          shrink-0
+          text-xs
+          font-medium
+          text-sky-600
+          hover:text-sky-700
+          hover:underline
+        "
+      >
+        Open script
+      </Link>
+    </div>
   );
 }
