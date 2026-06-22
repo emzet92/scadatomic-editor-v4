@@ -15,28 +15,63 @@ import { ComponentPalette } from './PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
 import { TreeView } from './TreeView';
 
+
+
+
+const EditorButton = ({
+  label,
+  ...props
+}: any) => (
+  <button
+    {...props}
+    className="
+      inline-flex
+      items-center
+      justify-center
+      gap-2
+      h-9
+      px-4
+
+      rounded-md
+
+      bg-sky-600
+      hover:bg-sky-500
+
+      text-white
+      text-sm
+      font-medium
+
+      transition-colors
+
+      disabled:opacity-50
+      disabled:pointer-events-none
+    "
+  >
+    {String(
+      label ?? "Button"
+    )}
+  </button>
+);
+
 const registry: ComponentRegistry = {
   Container,
 
-  Text: ({ value, ...props }) => (
+  Text: ({
+    value,
+    color,
+    ...props
+  }) => (
     <span
       {...props}
       style={{
-        color: props.color,
+        color,
       }}
     >
       {String(value ?? "")}
     </span>
   ),
 
-  Button: ({ label, ...props }) => (
-
-    <button className="inline-flex items-center justify-center gap-2 h-9 px-4 
-    rounded-md bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors 
-    disabled:opacity-50 disabled:pointer-events-none" {...props}>
-      {String(label ?? "Button")}
-    </button>
-  ),
+  Button: EditorButton,
 };
 
 console.log("sram ci na matke");
@@ -103,6 +138,7 @@ const initialNodes: UiTree = {
     props: {
       label: "START",
       tag: "pump.startCommand",
+      onClickEvent: "startButton.Clicked"
     },
   },
 

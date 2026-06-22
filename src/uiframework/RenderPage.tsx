@@ -6,43 +6,76 @@ import { RuntimeProvider } from "./runtime-provider";
 import { useRuntimeStore } from "./runtime-store";
 import { Container } from "./Container";
 import { SuccessToast } from "./SuccessToast";
+import { getWs } from "./websocket";
+
+const buttonClassName = `
+  inline-flex
+  items-center
+  justify-center
+  gap-2
+  h-9
+  px-4
+
+  rounded-md
+
+  bg-sky-600
+  hover:bg-sky-500
+
+  text-white
+  text-sm
+  font-medium
+
+  transition-colors
+
+  disabled:opacity-50
+  disabled:pointer-events-none
+`;
 
 const registry: ComponentRegistry = {
     Container,
 
-  Text: ({ value, ...props }) => (
-    <span
-      {...props}
-      style={{
-        color: props.color,
-      }}
-    >
-      {String(value ?? "")}
-    </span>
-  ),
-
-    Button: ({ label, ...props }) => (
-        <button
-            className="
-        inline-flex
-        items-center
-        justify-center
-        gap-2
-        h-9
-        px-4
-        rounded-md
-        bg-sky-600
-        hover:bg-sky-500
-        text-white
-        text-sm
-        font-medium
-        transition-colors
-      "
+    Text: ({ value, ...props }) => (
+        <span
             {...props}
+            style={{
+                color: props.color,
+            }}
         >
-            {String(label ?? "Button")}
-        </button>
+            {String(value ?? "")}
+        </span>
     ),
+    Button: ({
+        label,
+        onClickEvent,
+        id,
+        ...props
+    }) => (
+
+        <button
+            {...props}
+            className={buttonClassName}
+            onClick={() => {
+                if (!onClickEvent) {
+                    return;
+                }
+                console.log("This is the click event", JSON.stringify({
+                    event:
+                        onClickEvent,
+                    nodeId: id,
+                }));
+
+                getWs().send(
+                    JSON.stringify({
+                        event:
+                            onClickEvent,
+                        nodeId: id,
+                    })
+                );
+            }}
+        >
+            {label}
+        </button>
+    )
 };
 
 const initialNodes: UiTree = {
@@ -107,6 +140,7 @@ const initialNodes: UiTree = {
         props: {
             label: "START",
             tag: "pump.startCommand",
+            onClickEvent: "startButton.Clicked"
         },
     },
 
