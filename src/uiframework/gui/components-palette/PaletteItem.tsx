@@ -1,7 +1,7 @@
 // ComponentPalette.tsx
 
 import { useState } from "react";
-import { useEditorStore } from "./editor-store";
+import { useEditorStore } from "../../editor-store";
 import {
   Box,
   Type,

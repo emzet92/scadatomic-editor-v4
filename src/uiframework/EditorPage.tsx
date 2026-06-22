@@ -9,7 +9,7 @@ import {
 import { EditorControls } from './EditorControls';
 import { PropertyPanel } from './PropertyPanel';
 import { useEditorStore } from './editor-store';
-import { ComponentPalette } from './PaletteItem';
+import { ComponentPalette } from './gui/components-palette/PaletteItem';
 import { Canvas, LeftSidebar, RightSidebar, StatusBar, Toolbar } from './EditorLayout';
 import { TreeView } from './TreeView';
 import { editorRegistry, type ComponentRegistry } from './registry/editor-registry';
