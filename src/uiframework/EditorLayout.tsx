@@ -56,7 +56,7 @@ export function Toolbar() {
         "
       >
         <img
-          src="/logo2.svg"
+          src="/logo3.svg"
           alt="Scadatomic"
           className="
             h-8

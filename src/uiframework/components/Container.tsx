@@ -8,7 +8,7 @@ type ContainerProps =
   };
 
 export function Container({
-  maxWidth = 400,
+  maxWidth = 800,
   borderSize = 1,
   padding = "8px",
   row = 1,
