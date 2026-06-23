@@ -1,4 +1,5 @@
 import { Button } from "../components/Button";
+import { Chart } from "../components/Chart";
 import { Container } from "../components/Container";
 import { Text } from "../components/Text";
 
@@ -16,4 +17,5 @@ export const editorRegistry: ComponentRegistry  = {
   Container,
   Text,
   Button,
+  Chart
 };

@@ -171,15 +171,89 @@ export type ButtonUINode =
         ButtonNodeProps
     >;
 
+export type ChartUiNode =
+    BaseUINode<
+        "Chart",
+        ChartNodeProps
+    >;
+
 export type UINode =
     | ContainerUINode
     | TextUINode
-    | ButtonUINode;
+    | ButtonUINode
+    | ChartUiNode;
 
 export type UITree = {
     root: NodeId;
     nodes: Record<NodeId, UINode>;
 };
+
+
+//
+// Chart
+//
+
+export type ChartKind =
+    | "line"
+    | "bar";
+
+export type ChartPoint = {
+    label: string;
+    value: number;
+};
+
+export type ChartNodeProps = {
+    title?: string;
+
+    kind?: ChartKind;
+
+    tag?: string;
+
+    width?: CssSize;
+    height?: CssSize;
+
+    minHeight?: CssSize;
+
+    points?: ChartPoint[];
+
+    color?: string;
+
+    showLegend?: boolean;
+    showGrid?: boolean;
+};
+
+export const defaultChartProps = {
+    title: "Trend",
+    kind: "line",
+    tag: "",
+    width: "100%",
+    minHeight: 240,
+    points: [
+        {
+            label: "1",
+            value: 20,
+        },
+        {
+            label: "2",
+            value: 35,
+        },
+        {
+            label: "3",
+            value: 28,
+        },
+        {
+            label: "4",
+            value: 44,
+        },
+        {
+            label: "5",
+            value: 38,
+        },
+    ],
+    color: "#0284c7",
+    showLegend: false,
+    showGrid: true,
+} satisfies ChartNodeProps;
 
 //
 // Defaults
@@ -188,6 +262,7 @@ export type UITree = {
 export const defaultPropsByType = {
     Container: defaultContainerProps,
     Text: defaultTextProps,
+    Chart: defaultChartProps
 } as const;
 
 export function getDefaultPropsForType(
@@ -201,3 +276,5 @@ export function getDefaultPropsForType(
         ),
     };
 }
+
+

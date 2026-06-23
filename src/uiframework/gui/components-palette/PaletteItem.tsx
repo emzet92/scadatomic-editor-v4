@@ -7,6 +7,7 @@ import {
   Type,
   RectangleHorizontal,
   Search,
+  ChartLine,
 } from "lucide-react";
 
 const defaults = {
@@ -25,32 +26,68 @@ const defaults = {
   Button: {
     label: "Button",
   },
+
+  Chart: {
+    title: "Trend",
+    kind: "line",
+    tag: "",
+    width: "100%",
+    minHeight: 240,
+    points: [
+      {
+        label: "1",
+        value: 20,
+      },
+      {
+        label: "2",
+        value: 35,
+      },
+      {
+        label: "3",
+        value: 28,
+      },
+      {
+        label: "4",
+        value: 44,
+      },
+      {
+        label: "5",
+        value: 38,
+      },
+    ],
+    color: "#0284c7",
+    showLegend: false,
+    showGrid: true,
+  },
 };
 
 const items = [
   {
     type: "Container" as const,
     label: "Container",
-    description:
-      "Layout container",
+    description: "Layout container",
     icon: Box,
   },
 
   {
     type: "Text" as const,
     label: "Text",
-    description:
-      "Static text",
+    description: "Static text",
     icon: Type,
   },
 
   {
     type: "Button" as const,
     label: "Button",
-    description:
-      "User action",
-    icon:
-      RectangleHorizontal,
+    description: "User action",
+    icon: RectangleHorizontal,
+  },
+
+  {
+    type: "Chart" as const,
+    label: "Chart",
+    description: "Line or bar chart",
+    icon: ChartLine,
   },
 ];
 
@@ -155,7 +192,7 @@ export function ComponentPalette() {
                       item.type,
                     props:
                       defaults[
-                        item.type
+                      item.type
                       ],
                   }
                 );
@@ -235,17 +272,17 @@ export function ComponentPalette() {
 
       {filteredItems.length ===
         0 && (
-        <div
-          className="
+          <div
+            className="
             py-8
             text-center
             text-sm
             text-zinc-500
           "
-        >
-          No components found
-        </div>
-      )}
+          >
+            No components found
+          </div>
+        )}
     </div>
   );
 }
