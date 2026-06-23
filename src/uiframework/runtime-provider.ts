@@ -1,21 +1,19 @@
-// RuntimeProvider.tsx
-
 import { useEffect } from "react";
-import { useRuntimeStore } from "./runtime-store";
+
 import { useEditorStore } from "./editor-store";
+import { useRuntimeStore } from "./runtime-store";
 import { getWs } from "./websocket";
 
-type Props = {
+type RuntimeProviderProps = {
   onScreenUpdated?: () => void;
 };
 
 export function RuntimeProvider({
   onScreenUpdated,
-}: Props) {
-  const updateValue =
-    useRuntimeStore(
-      (s) => s.updateValue
-    );
+}: RuntimeProviderProps) {
+  const updateValue = useRuntimeStore(
+    (state) => state.updateValue
+  );
 
   useEffect(() => {
     const ws = getWs();
@@ -25,9 +23,7 @@ export function RuntimeProvider({
     ) => {
       try {
         const payload =
-          JSON.parse(
-            event.data
-          );
+          JSON.parse(event.data);
 
         console.log(
           "WS message:",
@@ -35,21 +31,24 @@ export function RuntimeProvider({
         );
 
         //
-        // Screen deployment
+        // Publish screen from editor to runtime
         //
         if (
           payload.event ===
           "screen.publish"
         ) {
-          console.log(
-            "Screen updated"
-          );
+          if (!payload.nodes) {
+            console.warn(
+              "screen.publish without nodes",
+              payload
+            );
+
+            return;
+          }
 
           useEditorStore
             .getState()
-            .setNodes(
-              payload.nodes
-            );
+            .setNodes(payload.nodes);
 
           onScreenUpdated?.();
 
@@ -57,12 +56,24 @@ export function RuntimeProvider({
         }
 
         //
-        // Node property update
+        // Runtime script / backend can update one node prop
         //
         if (
           payload.event ===
           "node.update"
         ) {
+          if (
+            !payload.nodeId ||
+            !payload.property
+          ) {
+            console.warn(
+              "node.update without nodeId/property",
+              payload
+            );
+
+            return;
+          }
+
           useEditorStore
             .getState()
             .updateNode(
@@ -70,7 +81,7 @@ export function RuntimeProvider({
               (node) => ({
                 ...node,
                 props: {
-                  ...node.props,
+                  ...(node.props ?? {}),
                   [payload.property]:
                     payload.value,
                 },
@@ -81,23 +92,42 @@ export function RuntimeProvider({
         }
 
         //
-        // Runtime tag update
+        // Signal value update
         //
+        // Supports both:
+        // { source: "station1.tank.levelLiters", value: 123 }
+        // { tag: "station1.tank.levelLiters", value: 123 }
+        //
+        const signalTag =
+          payload.source ??
+          payload.tag;
+
         if (
-          payload.source !==
-          undefined
+          signalTag !== undefined
         ) {
+          console.log(
+            "Runtime signal:",
+            signalTag,
+            payload.value
+          );
+
           updateValue(
-            payload.source,
+            String(signalTag),
             payload.value
           );
 
           return;
         }
+
+        console.warn(
+          "Unhandled WS payload:",
+          payload
+        );
       } catch (error) {
         console.error(
           "Failed to parse WS message",
-          error
+          error,
+          event.data
         );
       }
     };
@@ -112,6 +142,12 @@ export function RuntimeProvider({
         "message",
         handleMessage
       );
+
+      //
+      // Important:
+      // do NOT close ws here.
+      // It is a shared singleton used also by toolbar/publish.
+      //
     };
   }, [
     updateValue,
