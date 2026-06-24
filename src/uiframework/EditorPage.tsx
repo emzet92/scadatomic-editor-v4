@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -30,31 +31,10 @@ import {
 } from './registry/editor-registry';
 import { initialNodes } from './registry/initial-values';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  'http://localhost:8080';
-
-type UiProjectResponse = {
-  id: string;
-  name: string;
-  tree: UiTree;
-};
-
-async function loadProject(
-  projectId: string
-): Promise<UiProjectResponse> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/projects/${projectId}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to load project ${projectId}: ${response.status}`
-    );
-  }
-
-  return response.json();
-}
+import {
+  getProjectById,
+  updateProject,
+} from '../http/projects-api';
 
 export function RendererRoot({
   rootId,
@@ -86,33 +66,90 @@ export function EditorPage() {
     (s) => s.setNodes
   );
 
+  const [projectName, setProjectName] =
+    useState('Untitled Project');
+
   const [loading, setLoading] =
-    useState(false);
+    useState(true);
 
   const [error, setError] =
     useState<string | null>(null);
 
+  const [saveStatus, setSaveStatus] =
+    useState<
+      | 'idle'
+      | 'saving'
+      | 'saved'
+      | 'error'
+    >('idle');
+
+  const loadedRef =
+    useRef(false);
+
+  const saveTimerRef =
+    useRef<number | null>(null);
+
+  const lastSavedSnapshotRef =
+    useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      if (!projectId) {
-        setNodes(initialNodes);
-        return;
-      }
-
+    async function loadProject() {
       try {
         setLoading(true);
         setError(null);
+        setSaveStatus('idle');
+
+        loadedRef.current = false;
+        lastSavedSnapshotRef.current = null;
+
+        if (!projectId) {
+          const snapshot =
+            JSON.stringify({
+              name: 'Untitled Project',
+              tree: initialNodes,
+            });
+
+          setProjectName('Untitled Project');
+          setNodes(initialNodes);
+
+          lastSavedSnapshotRef.current =
+            snapshot;
+
+          loadedRef.current = true;
+
+          return;
+        }
 
         const project =
-          await loadProject(projectId);
+          await getProjectById(projectId);
 
         if (cancelled) {
           return;
         }
 
-        setNodes(project.tree);
+        const loadedName =
+          project.name ??
+          'Untitled Project';
+
+        const loadedTree =
+          project.tree ??
+          initialNodes;
+
+        const snapshot =
+          JSON.stringify({
+            name: loadedName,
+            tree: loadedTree,
+          });
+
+        setProjectName(loadedName);
+        setNodes(loadedTree);
+
+        lastSavedSnapshotRef.current =
+          snapshot;
+
+        loadedRef.current = true;
       } catch (error) {
         if (cancelled) {
           return;
@@ -130,14 +167,100 @@ export function EditorPage() {
       }
     }
 
-    load();
+    loadProject();
 
     return () => {
       cancelled = true;
+
+      if (saveTimerRef.current) {
+        window.clearTimeout(
+          saveTimerRef.current
+        );
+      }
     };
   }, [
     projectId,
     setNodes,
+  ]);
+
+  useEffect(() => {
+    if (!projectId) {
+      return;
+    }
+
+    if (!loadedRef.current) {
+      return;
+    }
+
+    if (loading) {
+      return;
+    }
+
+    if (!nodes.root) {
+      return;
+    }
+
+    const snapshot =
+      JSON.stringify({
+        name: projectName,
+        tree: nodes,
+      });
+
+    if (
+      snapshot ===
+      lastSavedSnapshotRef.current
+    ) {
+      return;
+    }
+
+    if (saveTimerRef.current) {
+      window.clearTimeout(
+        saveTimerRef.current
+      );
+    }
+
+    saveTimerRef.current =
+      window.setTimeout(
+        async () => {
+          try {
+            setSaveStatus('saving');
+
+            await updateProject(
+              projectId,
+              {
+                name: projectName,
+                tree: nodes,
+              }
+            );
+
+            lastSavedSnapshotRef.current =
+              snapshot;
+
+            setSaveStatus('saved');
+          } catch (error) {
+            console.error(
+              'Autosave failed',
+              error
+            );
+
+            setSaveStatus('error');
+          }
+        },
+        500
+      );
+
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(
+          saveTimerRef.current
+        );
+      }
+    };
+  }, [
+    projectId,
+    projectName,
+    nodes,
+    loading,
   ]);
 
   if (loading) {
@@ -205,6 +328,28 @@ export function EditorPage() {
       </div>
 
       <StatusBar />
+
+      <div
+        className="
+          fixed
+          bottom-3
+          right-4
+          rounded-full
+          border
+          border-zinc-200
+          bg-white
+          px-3
+          py-1
+          text-xs
+          shadow-sm
+          text-zinc-500
+        "
+      >
+        {saveStatus === 'idle' && projectName}
+        {saveStatus === 'saving' && 'Saving...'}
+        {saveStatus === 'saved' && 'Saved'}
+        {saveStatus === 'error' && 'Save error'}
+      </div>
     </div>
   );
 }
