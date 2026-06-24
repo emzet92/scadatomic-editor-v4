@@ -2,7 +2,7 @@ import type { UiTree } from "../uiframework/Renderer";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
-  "http://localhost:8080";
+  `${window.location.protocol}//${window.location.hostname}:8080`;
 
 export type ProjectId = string;
 
@@ -34,9 +34,8 @@ async function requestJson<TResponse>(
   });
 
   if (!response.ok) {
-    const body = await response
-      .text()
-      .catch(() => "");
+    const body =
+      await response.text().catch(() => "");
 
     throw new Error(
       `HTTP ${response.status} ${response.statusText}: ${body}`

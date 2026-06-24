@@ -9,34 +9,40 @@ function getWebSocketUrl() {
   const host =
     window.location.hostname;
 
-  const backendPort =
-    "8080";
-
-  return `${protocol}://${host}:${backendPort}/ws`;
+  return `${protocol}://${host}:8080/ws`;
 }
 
 export function getWs() {
   if (
     !ws ||
-    ws.readyState === WebSocket.CLOSED
+    ws.readyState === WebSocket.CLOSED ||
+    ws.readyState === WebSocket.CLOSING
   ) {
-    const url = getWebSocketUrl();
+    const url =
+      getWebSocketUrl();
 
-    console.log("Connecting WS:", url);
+    console.log(
+      "Connecting WS:",
+      url
+    );
 
     ws = new WebSocket(url);
 
-    ws.onopen = () => {
+    ws.onopen = () =>
       console.log("WS connected");
-    };
 
-    ws.onclose = () => {
-      console.log("WS closed");
-    };
+    ws.onclose = (event) =>
+      console.log(
+        "WS closed",
+        event.code,
+        event.reason
+      );
 
-    ws.onerror = (error) => {
-      console.error("WS error", error);
-    };
+    ws.onerror = (error) =>
+      console.error(
+        "WS error",
+        error
+      );
   }
 
   return ws;
