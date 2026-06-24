@@ -8,7 +8,7 @@ function App() {
   return (
     <Routes>
       <Route
-        path="/"
+        path="/project/:projectId"
         element={<EditorPage />}
       />
 
