@@ -1,124 +1,127 @@
-import { useEffect, useState } from "react";
-import { useEditorStore } from "../editor-store";
-import { RendererRoot } from "../EditorPage";
-import type {  UiTree } from "../Renderer";
-import { RuntimeProvider } from "../runtime-provider";
-import { useRuntimeStore } from "../runtime-store";
-import { SuccessToast } from "../SuccessToast";
-import { runtimeRegistry } from "../registry/runtime-registry";
-import { initialNodes } from "../registry/initial-values";
+import {
+    useEffect,
+    useState,
+} from 'react';
 
+import {
+    useParams,
+} from 'react-router-dom';
 
+import {
+    RenderNode,
+} from '../Renderer';
 
-function applyRuntimeValues(
-    nodes: UiTree,
-    values: Record<string, unknown>
-): UiTree {
-    return Object.fromEntries(
-        Object.entries(nodes).map(
-            ([id, node]) => {
-                const tag =
-                    node.props?.tag as
-                    | string
-                    | undefined;
-
-                if (
-                    !tag ||
-                    values[tag] === undefined
-                ) {
-                    return [
-                        id,
-                        node,
-                    ];
-                }
-
-                return [
-                    id,
-                    {
-                        ...node,
-                        props: {
-                            ...node.props,
-                            value:
-                                values[tag],
-                        },
-                    },
-                ];
-            }
-        )
-    );
-}
+import { useEditorStore } from '../editor-store';
+import { runtimeRegistry } from '../registry/runtime-registry';
+import { RuntimeProvider } from '../runtime-provider'
+import { getProjectById } from '../../http/projects-api';
 
 export function RenderPage() {
-
-    const [showToast, setShowToast] = useState(false);
-
-    const handleScreenUpdated =
-        () => {
-            setShowToast(true);
-
-            setTimeout(() => {
-                setShowToast(false);
-            }, 3000);
-        };
+    const { projectId } =
+        useParams();
 
     const nodes =
         useEditorStore(
-            (s) => s.nodes
+            (state) => state.nodes
         );
 
     const setNodes =
         useEditorStore(
-            (s) => s.setNodes
+            (state) => state.setNodes
         );
 
-    const runtimeValues =
-        useRuntimeStore(
-            (s) => s.values
-        );
+    const [loading, setLoading] =
+        useState(true);
+
+    const [error, setError] =
+        useState<string | null>(null);
 
     useEffect(() => {
-        if (
-            Object.keys(nodes)
-                .length === 0
-        ) {
-            setNodes(
-                initialNodes
-            );
+        let cancelled = false;
+
+        async function loadProject() {
+            if (!projectId) {
+                setError('Missing project id');
+                setLoading(false);
+                return;
+            }
+
+            try {
+                setLoading(true);
+                setError(null);
+
+                const project =
+                    await getProjectById(projectId);
+
+                if (cancelled) {
+                    return;
+                }
+
+                setNodes(project.tree);
+            } catch (error) {
+                if (cancelled) {
+                    return;
+                }
+
+                setError(
+                    error instanceof Error
+                        ? error.message
+                        : 'Failed to load project'
+                );
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
         }
+
+        loadProject();
+
+        return () => {
+            cancelled = true;
+        };
     }, [
-        nodes,
+        projectId,
         setNodes,
     ]);
 
-    if (!nodes.root) {
-        return null;
+    if (loading) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
+                Loading runtime...
+            </div>
+        );
     }
 
-    const runtimeNodes =
-        applyRuntimeValues(
-            nodes,
-            runtimeValues
+    if (error) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-zinc-950 text-red-400 text-sm">
+                {error}
+            </div>
         );
+    }
+
+    if (!nodes.root) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
+                Empty project
+            </div>
+        );
+    }
 
     return (
-        <>
-            <RuntimeProvider
-                onScreenUpdated={
-                    handleScreenUpdated
-                }
-            />
+        <div className="min-h-screen bg-zinc-950 p-8">
+            <RuntimeProvider />
 
-            {showToast && (
-                <SuccessToast />
-            )}
-
-            <RendererRoot
-                rootId="root"
-                nodes={
-                    runtimeNodes
-                }
-                registry={runtimeRegistry}
-            />
-        </>
+            <div className="mx-auto max-w-7xl rounded-2xl bg-white p-8 shadow-2xl">
+                <RenderNode
+                    id="root"
+                    nodes={nodes}
+                    registry={runtimeRegistry}
+                />
+            </div>
+        </div>
     );
 }
+
+export default RenderPage;

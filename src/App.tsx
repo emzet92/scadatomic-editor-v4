@@ -13,7 +13,7 @@ function App() {
       />
 
       <Route
-        path="/render"
+        path="/render/:projectId"
         element={<RenderPage />}
       />
       <Route
