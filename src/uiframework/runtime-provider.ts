@@ -6,10 +6,12 @@ import { getWs } from "./websocket";
 
 type RuntimeProviderProps = {
   onScreenUpdated?: () => void;
+  onNodeUpdated?: () => void;
 };
 
 export function RuntimeProvider({
   onScreenUpdated,
+  onNodeUpdated,
 }: RuntimeProviderProps) {
   const updateValue = useRuntimeStore(
     (state) => state.updateValue
@@ -88,6 +90,8 @@ export function RuntimeProvider({
               })
             );
 
+          onNodeUpdated?.();
+
           return;
         }
 
@@ -152,6 +156,7 @@ export function RuntimeProvider({
   }, [
     updateValue,
     onScreenUpdated,
+    onNodeUpdated,
   ]);
 
   return null;

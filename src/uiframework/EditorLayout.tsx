@@ -3,11 +3,7 @@
 import { getWs } from "./websocket";
 import { useEditorStore } from "./editor-store";
 
-const ws = getWs();
-
-
 export function Toolbar() {
-
   const publish = () => {
     const nodes =
       useEditorStore
@@ -19,13 +15,53 @@ export function Toolbar() {
       nodes
     );
 
-    getWs().send(
+    if (!nodes.root) {
+      console.error(
+        "Cannot publish empty tree"
+      );
+
+      return;
+    }
+
+    const payload =
       JSON.stringify({
         event:
           "screen.publish",
 
         nodes,
-      })
+      });
+
+    const ws =
+      getWs();
+
+    if (
+      ws.readyState ===
+      WebSocket.OPEN
+    ) {
+      ws.send(payload);
+      return;
+    }
+
+    if (
+      ws.readyState ===
+      WebSocket.CONNECTING
+    ) {
+      ws.addEventListener(
+        "open",
+        () => {
+          ws.send(payload);
+        },
+        {
+          once: true,
+        }
+      );
+
+      return;
+    }
+
+    console.error(
+      "Cannot publish, WS state:",
+      ws.readyState
     );
   };
 
@@ -64,7 +100,6 @@ export function Toolbar() {
             shrink-0
           "
         />
-
       </div>
 
       {/* ACTIONS */}
@@ -77,27 +112,7 @@ export function Toolbar() {
         "
       >
         <button
-          className="
-            h-9
-            px-4
-
-            rounded-md
-
-            border
-            border-zinc-200
-
-            bg-white
-
-            text-sm
-            font-medium
-
-            hover:bg-zinc-50
-          "
-        >
-          Preview
-        </button>
-
-        <button
+          data-editor-ignore
           onClick={publish}
           className="
             h-9
@@ -158,6 +173,7 @@ export function Canvas({
     </main>
   );
 }
+
 export function RightSidebar({
   children,
 }: React.PropsWithChildren) {
