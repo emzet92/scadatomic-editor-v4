@@ -29,11 +29,13 @@ export function EventCheckbox({
         gap-3
         rounded-lg
         border
-        border-zinc-200
-        bg-white
+        border-[var(--editor-border)]
+        bg-[var(--editor-surface)]
         px-3
         py-3
-        hover:bg-zinc-50
+        transition
+        hover:bg-[var(--editor-accent-soft)]
+        hover:border-[var(--editor-accent-border)]
       "
     >
       <input
@@ -64,9 +66,9 @@ export function EventCheckbox({
           h-4
           w-4
           rounded
-          border-zinc-300
-          text-sky-600
-          focus:ring-sky-500
+          border-[var(--editor-border-strong)]
+          text-[var(--editor-accent)]
+          focus:ring-[var(--editor-accent-soft)]
         "
       />
 
@@ -75,7 +77,7 @@ export function EventCheckbox({
           className="
             text-sm
             font-medium
-            text-zinc-800
+            text-[var(--editor-text)]
           "
         >
           {propName}
@@ -84,7 +86,7 @@ export function EventCheckbox({
         <div
           className="
             text-xs
-            text-zinc-500
+            text-[var(--editor-text-muted)]
             truncate
           "
         >
@@ -99,8 +101,7 @@ export function EventCheckbox({
           shrink-0
           text-xs
           font-medium
-          text-sky-600
-          hover:text-sky-700
+          text-[var(--editor-accent)]
           hover:underline
         "
       >

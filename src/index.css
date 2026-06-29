@@ -1,1 +1,27 @@
 @import "tailwindcss";
+:root {
+  --editor-app-bg: #f7f7fb;
+  --editor-surface: #ffffff;
+  --editor-surface-muted: #fafaff;
+
+  --editor-border: #e5e7f0;
+  --editor-border-strong: #cfd3e6;
+
+  --editor-text: #18181b;
+  --editor-text-muted: #71717a;
+  --editor-text-soft: #9ca3af;
+
+  --editor-accent: #4f46e5;
+  --editor-accent-hover: #4338ca;
+  --editor-accent-soft: #eef2ff;
+  --editor-accent-border: #c7d2fe;
+
+  --editor-selected: #5b4bff;
+  --editor-selected-soft: #f1efff;
+
+  --editor-success: #16a34a;
+  --editor-danger: #dc2626;
+
+  --editor-canvas-bg: #f3f4f8;
+  --editor-grid-dot: #d8dbea;
+}

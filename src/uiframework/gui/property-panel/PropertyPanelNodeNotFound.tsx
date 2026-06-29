@@ -5,7 +5,7 @@ export function PropertyPanelNodeNotFound() {
       className="
         p-4
         text-sm
-        text-red-500
+        text-[var(--editor-danger)]
       "
     >
       Node not found

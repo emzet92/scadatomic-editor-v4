@@ -84,10 +84,12 @@ export function PropInput({
               w-12
               rounded-md
               border
-              border-zinc-200
-              bg-white
+              border-[var(--editor-border)]
+              bg-[var(--editor-surface)]
               p-1
               cursor-pointer
+              transition
+              hover:border-[var(--editor-accent-border)]
             "
           />
 
@@ -208,10 +210,12 @@ export function PropInput({
             px-3
             rounded-md
             border
-            border-zinc-200
-            bg-white
+            border-[var(--editor-border)]
+            bg-[var(--editor-surface)]
             cursor-pointer
-            hover:bg-zinc-50
+            transition
+            hover:bg-[var(--editor-accent-soft)]
+            hover:border-[var(--editor-accent-border)]
           "
         >
           <input
@@ -225,13 +229,18 @@ export function PropInput({
               h-4
               w-4
               rounded
-              border-zinc-300
-              text-sky-600
-              focus:ring-sky-500
+              border-[var(--editor-border-strong)]
+              text-[var(--editor-accent)]
+              focus:ring-[var(--editor-accent-soft)]
             "
           />
 
-          <span className="text-sm text-zinc-700">
+          <span
+            className="
+              text-sm
+              text-[var(--editor-text-muted)]
+            "
+          >
             {checked ? "Enabled" : "Disabled"}
           </span>
         </label>
@@ -283,7 +292,7 @@ function PropertyField({
           font-medium
           uppercase
           tracking-wide
-          text-zinc-500
+          text-[var(--editor-text-muted)]
         "
       >
         {label}
@@ -344,15 +353,17 @@ function optionButtonClassName(
     ${
       selected
         ? `
-          border-sky-500
-          bg-sky-50
-          text-sky-700
+          border-[var(--editor-accent-border)]
+          bg-[var(--editor-accent-soft)]
+          text-[var(--editor-accent)]
         `
         : `
-          border-zinc-200
-          bg-white
-          text-zinc-600
-          hover:bg-zinc-50
+          border-[var(--editor-border)]
+          bg-[var(--editor-surface)]
+          text-[var(--editor-text-muted)]
+          hover:bg-[var(--editor-accent-soft)]
+          hover:border-[var(--editor-accent-border)]
+          hover:text-[var(--editor-accent)]
         `
     }
   `;
@@ -364,13 +375,14 @@ const inputClassName = `
   px-3
   rounded-md
   border
-  border-zinc-200
-  bg-white
+  border-[var(--editor-border)]
+  bg-[var(--editor-surface)]
   text-sm
-  text-zinc-900
+  text-[var(--editor-text)]
   outline-none
   transition
-  focus:border-sky-500
+  placeholder:text-[var(--editor-text-soft)]
+  focus:border-[var(--editor-accent-border)]
   focus:ring-2
-  focus:ring-sky-100
+  focus:ring-[var(--editor-accent-soft)]
 `;

@@ -45,18 +45,9 @@ export function TreeNodeRow({
 
         transition-colors
 
-        ${
-          selected
-            ? `
-              bg-sky-50
-              text-sky-700
-              border-l-2
-              border-sky-500
-            `
-            : `
-              text-zinc-700
-              hover:bg-zinc-100
-            `
+        ${selected
+          ? "bg-[var(--editor-selected-soft)] text-[var(--editor-accent)] border-l-2 border-[var(--editor-selected)]"
+          : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)]"
         }
       `}
       style={{

@@ -19,7 +19,7 @@ export function EventsEditor({
       className="
         pt-4
         border-t
-        border-zinc-200
+        border-[var(--editor-border)]
         space-y-3
       "
     >
@@ -30,7 +30,7 @@ export function EventsEditor({
             font-semibold
             uppercase
             tracking-wide
-            text-zinc-500
+            text-[var(--editor-text-muted)]
           "
         >
           Events
@@ -40,7 +40,7 @@ export function EventsEditor({
           className="
             mt-1
             text-xs
-            text-zinc-400
+            text-[var(--editor-text-soft)]
           "
         >
           Enable runtime events emitted by this component.

@@ -20,8 +20,10 @@ export function TreeNodeToggle({
         justify-center
         w-4
         h-4
-        text-zinc-500
+        text-[var(--editor-text-soft)]
+        hover:text-[var(--editor-accent)]
         shrink-0
+        transition
       "
       onClick={(e) => {
         e.stopPropagation();

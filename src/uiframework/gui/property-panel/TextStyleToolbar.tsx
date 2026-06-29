@@ -39,7 +39,7 @@ export function TextStyleToolbar({
           font-medium
           uppercase
           tracking-wide
-          text-zinc-500
+          text-[var(--editor-text-muted)]
         "
       >
         Text style
@@ -100,15 +100,17 @@ function styleButtonClassName(
     ${
       selected
         ? `
-          border-sky-500
-          bg-sky-50
-          text-sky-700
+          border-[var(--editor-accent-border)]
+          bg-[var(--editor-accent-soft)]
+          text-[var(--editor-accent)]
         `
         : `
-          border-zinc-200
-          bg-white
-          text-zinc-600
-          hover:bg-zinc-50
+          border-[var(--editor-border)]
+          bg-[var(--editor-surface)]
+          text-[var(--editor-text-muted)]
+          hover:bg-[var(--editor-accent-soft)]
+          hover:border-[var(--editor-accent-border)]
+          hover:text-[var(--editor-accent)]
         `
     }
   `;

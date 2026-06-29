@@ -284,7 +284,7 @@ export function EditorPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col bg-[var(--editor-app-bg)]">
       <Toolbar />
 
       <div className="flex-1 flex">
@@ -297,13 +297,13 @@ export function EditorPage() {
         </LeftSidebar>
 
         <Canvas>
-          <div className="min-h-full bg-zinc-100 p-8">
+          <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
             <div
               className="
                 min-h-full
                 p-8
-                bg-white
-                bg-[radial-gradient(circle,#cbd5e1_1px,transparent_1px)]
+                bg-[var(--editor-surface)]
+                bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)]
                 bg-[size:20px_20px]
               "
             >

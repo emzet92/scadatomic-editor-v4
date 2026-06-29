@@ -8,7 +8,7 @@ export function TreeNodeIcon({
   return (
     <div
       className="
-        text-zinc-400
+        text-[var(--editor-text-soft)]
         shrink-0
       "
     >

@@ -61,13 +61,19 @@ export function BorderSettings({
             font-medium
             uppercase
             tracking-wide
-            text-zinc-500
+            text-[var(--editor-text-muted)]
           "
                 >
                     Border settings
                 </div>
 
-                <div className="mt-1 text-xs text-zinc-400">
+                <div
+                    className="
+            mt-1
+            text-xs
+            text-[var(--editor-text-soft)]
+          "
+                >
                     Border style for this text component.
                 </div>
             </div>
@@ -98,7 +104,7 @@ export function BorderSettings({
             font-medium
             uppercase
             tracking-wide
-            text-zinc-500
+            text-[var(--editor-text-muted)]
           "
                 >
                     Color
@@ -117,10 +123,12 @@ export function BorderSettings({
               w-12
               rounded-md
               border
-              border-zinc-200
-              bg-white
+              border-[var(--editor-border)]
+              bg-[var(--editor-surface)]
               p-1
               cursor-pointer
+              transition
+              hover:border-[var(--editor-accent-border)]
             "
                     />
 
@@ -157,7 +165,7 @@ function NumberField({
           font-medium
           uppercase
           tracking-wide
-          text-zinc-500
+          text-[var(--editor-text-muted)]
         "
             >
                 {label}
@@ -216,13 +224,14 @@ const inputClassName = `
   px-3
   rounded-md
   border
-  border-zinc-200
-  bg-white
+  border-[var(--editor-border)]
+  bg-[var(--editor-surface)]
   text-sm
-  text-zinc-900
+  text-[var(--editor-text)]
   outline-none
   transition
-  focus:border-sky-500
+  placeholder:text-[var(--editor-text-soft)]
+  focus:border-[var(--editor-accent-border)]
   focus:ring-2
-  focus:ring-sky-100
+  focus:ring-[var(--editor-accent-soft)]
 `;

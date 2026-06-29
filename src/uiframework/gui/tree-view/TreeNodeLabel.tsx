@@ -13,6 +13,7 @@ export function TreeNodeLabel({
         flex-1
         min-w-0
         truncate
+        text-sm
       "
       onClick={() =>
         setSelectedNodeId(nodeId)

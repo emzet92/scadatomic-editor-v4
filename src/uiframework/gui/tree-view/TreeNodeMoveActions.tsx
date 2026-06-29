@@ -33,10 +33,11 @@ export function TreeNodeMoveActions({
         }}
         className="
           p-1
-          rounded
-          text-zinc-500
-          hover:bg-zinc-700
-          hover:text-white
+          rounded-md
+          text-[var(--editor-text-soft)]
+          hover:bg-[var(--editor-accent-soft)]
+          hover:text-[var(--editor-accent)]
+          transition
         "
       >
         <ChevronUp size={14} />
@@ -50,10 +51,11 @@ export function TreeNodeMoveActions({
         }}
         className="
           p-1
-          rounded
-          text-zinc-500
-          hover:bg-zinc-700
-          hover:text-white
+          rounded-md
+          text-[var(--editor-text-soft)]
+          hover:bg-[var(--editor-accent-soft)]
+          hover:text-[var(--editor-accent)]
+          transition
         "
       >
         <ChevronDown size={14} />

@@ -11,8 +11,8 @@ export function PropertyPanelHeader({
         px-4
         py-4
         border-b
-        border-zinc-200
-        bg-white
+        border-[var(--editor-border)]
+        bg-[var(--editor-surface)]
       "
     >
       <div
@@ -21,7 +21,7 @@ export function PropertyPanelHeader({
           font-semibold
           uppercase
           tracking-wide
-          text-zinc-500
+          text-[var(--editor-text-muted)]
         "
       >
         Component
@@ -32,7 +32,7 @@ export function PropertyPanelHeader({
           mt-1
           text-sm
           font-semibold
-          text-zinc-900
+          text-[var(--editor-text)]
         "
       >
         {node.type}
@@ -41,7 +41,7 @@ export function PropertyPanelHeader({
       <div
         className="
           text-xs
-          text-zinc-500
+          text-[var(--editor-text-muted)]
           truncate
         "
       >

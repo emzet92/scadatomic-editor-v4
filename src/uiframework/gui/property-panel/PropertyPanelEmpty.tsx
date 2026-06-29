@@ -5,7 +5,7 @@ export function PropertyPanelEmpty() {
       className="
         p-4
         text-sm
-        text-zinc-500
+        text-[var(--editor-text-muted)]
       "
     >
       Select a component

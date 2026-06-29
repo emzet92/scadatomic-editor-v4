@@ -68,20 +68,16 @@ export function Toolbar() {
   return (
     <header
       className="
-        h-18
-        shrink-0
-
-        px-8
-
-        flex
-        items-center
-        justify-between
-
-        bg-white
-        border-b
-        border-zinc-200
-      "
-    >
+    h-18
+    shrink-0
+    px-8
+    flex
+    items-center
+    justify-between
+    bg-[var(--editor-surface)]
+    border-b
+    border-[var(--editor-border)]
+  ">
       {/* BRAND */}
 
       <div
@@ -115,24 +111,23 @@ export function Toolbar() {
           data-editor-ignore
           onClick={publish}
           className="
-            h-9
-            px-4
-
-            rounded-md
-
-            bg-sky-600
-            text-white
-
-            text-sm
-            font-medium
-
-            hover:bg-sky-500
-          "
+  h-9
+  px-4
+  rounded-md
+  bg-[var(--editor-accent)]
+  text-white
+  text-sm
+  font-medium
+  shadow-sm
+  hover:bg-[var(--editor-accent-hover)]
+  active:scale-[0.98]
+  transition
+"
         >
           Publish
         </button>
       </div>
-    </header>
+    </header >
   );
 }
 
@@ -144,9 +139,9 @@ export function LeftSidebar({
       className="
         w-80
         shrink-0
-        bg-slate-50
+        bg-[var(--editor-surface-muted)]
         border-r
-        border-zinc-200
+        border-[var(--editor-border)]
         overflow-auto
       "
     >
@@ -166,7 +161,7 @@ export function Canvas({
         flex-1
         overflow-auto
         relative
-        bg-zinc-100
+        bg-[var(--editor-canvas-bg)]
       "
     >
       {children}
@@ -182,9 +177,9 @@ export function RightSidebar({
       className="
         w-80
         shrink-0
-        bg-slate-50
+        bg-[var(--editor-surface-muted)]
         border-l
-        border-zinc-200
+        border-[var(--editor-border)]
         overflow-auto
       "
     >
@@ -203,10 +198,10 @@ export function StatusBar() {
         flex
         items-center
         border-t
-        border-zinc-200
-        bg-white
+        border-[var(--editor-border)]
+        bg-[var(--editor-surface)]
         text-xs
-        text-zinc-500
+        text-[var(--editor-text-muted)]
       "
     >
       Ready

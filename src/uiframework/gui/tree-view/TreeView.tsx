@@ -28,7 +28,16 @@ export function TreeView() {
 
   return (
     <div className="space-y-1">
-      <div className="mb-2 text-xs uppercase text-zinc-500">
+      <div
+        className="
+          mb-2
+          text-xs
+          uppercase
+          tracking-wide
+          font-semibold
+          text-[var(--editor-text-muted)]
+        "
+      >
         Project Tree
       </div>
 

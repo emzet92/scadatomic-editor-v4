@@ -55,7 +55,7 @@ const defaults = {
         value: 38,
       },
     ],
-    color: "#0284c7",
+    color: "#4f46e5",
     showLegend: false,
     showGrid: true,
   },
@@ -121,7 +121,7 @@ export function ComponentPalette() {
             uppercase
             tracking-wide
             font-semibold
-            text-zinc-500
+            text-[var(--editor-text-muted)]
             mb-3
           "
         >
@@ -136,7 +136,7 @@ export function ComponentPalette() {
               left-3
               top-1/2
               -translate-y-1/2
-              text-zinc-400
+              text-[var(--editor-text-soft)]
               pointer-events-none
             "
           />
@@ -160,17 +160,20 @@ export function ComponentPalette() {
               rounded-xl
 
               border
-              border-zinc-200
+              border-[var(--editor-border)]
 
-              bg-white
+              bg-[var(--editor-surface)]
 
               text-sm
+              text-[var(--editor-text)]
 
               outline-none
 
-              focus:border-sky-400
+              placeholder:text-[var(--editor-text-soft)]
+
+              focus:border-[var(--editor-accent-border)]
               focus:ring-2
-              focus:ring-sky-100
+              focus:ring-[var(--editor-accent-soft)]
             "
           />
         </div>
@@ -203,12 +206,12 @@ export function ComponentPalette() {
 
                 rounded-xl
                 border
-                border-zinc-200
+                border-[var(--editor-border)]
 
-                bg-white
+                bg-[var(--editor-surface)]
 
-                hover:border-sky-300
-                hover:bg-sky-50
+                hover:border-[var(--editor-accent-border)]
+                hover:bg-[var(--editor-accent-soft)]
 
                 transition-all
 
@@ -228,8 +231,8 @@ export function ComponentPalette() {
 
                   rounded-xl
 
-                  bg-sky-100
-                  text-sky-600
+                  bg-[var(--editor-accent-soft)]
+                  text-[var(--editor-accent)]
 
                   flex
                   items-center
@@ -248,7 +251,7 @@ export function ComponentPalette() {
                   className="
                     text-sm
                     font-semibold
-                    text-zinc-900
+                    text-[var(--editor-text)]
                   "
                 >
                   {item.label}
@@ -257,7 +260,7 @@ export function ComponentPalette() {
                 <div
                   className="
                     text-xs
-                    text-zinc-500
+                    text-[var(--editor-text-muted)]
                   "
                 >
                   {
@@ -274,11 +277,11 @@ export function ComponentPalette() {
         0 && (
           <div
             className="
-            py-8
-            text-center
-            text-sm
-            text-zinc-500
-          "
+              py-8
+              text-center
+              text-sm
+              text-[var(--editor-text-muted)]
+            "
           >
             No components found
           </div>

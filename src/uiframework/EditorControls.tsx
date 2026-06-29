@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useEditorStore } from "./editor-store";
-import type { ComponentRegistry } from "./Renderer";
 import { Trash2 } from "lucide-react";
+import type { ComponentRegistry } from "./registry/editor-registry";
 
 type RectInfo = {
   id: string;
@@ -25,7 +29,25 @@ type Props = {
   registry: ComponentRegistry;
 };
 
-function Handle({ x, y }: { x: number; y: number }) {
+const selectedColor =
+  "var(--editor-selected)";
+
+const selectedSoftColor =
+  "var(--editor-selected-soft)";
+
+const editorSurface =
+  "var(--editor-surface)";
+
+const editorBorder =
+  "var(--editor-border)";
+
+function Handle({
+  x,
+  y,
+}: {
+  x: number;
+  y: number;
+}) {
   return (
     <div
       style={{
@@ -35,8 +57,9 @@ function Handle({ x, y }: { x: number; y: number }) {
         width: 8,
         height: 8,
         borderRadius: "50%",
-        background: "#00aaff",
-        border: "1px solid white",
+        background: selectedColor,
+        border: `1px solid ${editorSurface}`,
+        boxShadow: `0 0 0 2px ${selectedSoftColor}`,
         pointerEvents: "none",
         zIndex: 10001,
       }}
@@ -44,18 +67,27 @@ function Handle({ x, y }: { x: number; y: number }) {
   );
 }
 
-function findParentId(nodes: Record<string, any>, nodeId: string) {
+function findParentId(
+  nodes: Record<string, any>,
+  nodeId: string
+) {
   return Object.values(nodes).find((node: any) =>
     node.children?.includes(nodeId)
   )?.id as string | undefined;
 }
 
-function getDepth(nodes: Record<string, any>, nodeId: string): number {
+function getDepth(
+  nodes: Record<string, any>,
+  nodeId: string
+): number {
   let depth = 0;
   let current = nodeId;
 
   while (true) {
-    const parentId = findParentId(nodes, current);
+    const parentId = findParentId(
+      nodes,
+      current
+    );
 
     if (!parentId) {
       return depth;
@@ -66,74 +98,116 @@ function getDepth(nodes: Record<string, any>, nodeId: string): number {
   }
 }
 
-export function EditorControls({ registry }: Props) {
-  const [rects, setRects] = useState<RectInfo[]>([]);
-  const [hoverDropTarget, setHoverDropTargetState] =
-    useState<DropTarget | null>(null);
+export function EditorControls({
+  registry,
+}: Props) {
+  const [rects, setRects] =
+    useState<RectInfo[]>([]);
 
-  const hoverDropTargetRef = useRef<DropTarget | null>(null);
-  const rectsRef = useRef<RectInfo[]>([]);
+  const [
+    hoverDropTarget,
+    setHoverDropTargetState,
+  ] = useState<DropTarget | null>(null);
 
-  function setHoverDropTarget(next: DropTarget | null) {
+  const hoverDropTargetRef =
+    useRef<DropTarget | null>(null);
+
+  const rectsRef =
+    useRef<RectInfo[]>([]);
+
+  function setHoverDropTarget(
+    next: DropTarget | null
+  ) {
     hoverDropTargetRef.current = next;
     setHoverDropTargetState(next);
   }
 
-  function setCollectedRects(next: RectInfo[]) {
+  function setCollectedRects(
+    next: RectInfo[]
+  ) {
     rectsRef.current = next;
     setRects(next);
   }
 
-  const nodes = useEditorStore((s) => s.nodes);
-  const selectedId = useEditorStore((s) => s.selectedNodeId);
-  const setSelectedNodeId = useEditorStore((s) => s.setSelectedNodeId);
-  const dragPreview = useEditorStore((s) => s.dragPreview);
-  const dragX = useEditorStore((s) => s.dragX);
-  const dragY = useEditorStore((s) => s.dragY);
-  const draggedNodeId =
+  const nodes = useEditorStore(
+    (s) => s.nodes
+  );
+
+  const selectedId =
     useEditorStore(
-      (s) => s.draggedNodeId
+      (s) => s.selectedNodeId
     );
 
-  const moveNode =
+  const setSelectedNodeId =
     useEditorStore(
-      (s) => s.moveNode
+      (s) => s.setSelectedNodeId
     );
 
-  const endNodeDrag =
+  const dragPreview =
     useEditorStore(
-      (s) => s.endNodeDrag
+      (s) => s.dragPreview
+    );
+
+  const dragX =
+    useEditorStore(
+      (s) => s.dragX
+    );
+
+  const dragY =
+    useEditorStore(
+      (s) => s.dragY
     );
 
   function collectRects() {
-    const state = useEditorStore.getState();
-    const currentNodes = state.nodes;
+    const state =
+      useEditorStore.getState();
+
+    const currentNodes =
+      state.nodes;
+
     const next: RectInfo[] = [];
 
-    document.querySelectorAll("[data-node-id]").forEach((el) => {
-      const id = el.getAttribute("data-node-id");
+    document
+      .querySelectorAll("[data-node-id]")
+      .forEach((el) => {
+        const id =
+          el.getAttribute("data-node-id");
 
-      if (!id) {
-        return;
-      }
+        if (!id) {
+          return;
+        }
 
-      const parentId = findParentId(currentNodes, id);
-      const parent = parentId ? currentNodes[parentId] : undefined;
-      const rect = el.getBoundingClientRect();
+        const parentId =
+          findParentId(
+            currentNodes,
+            id
+          );
 
-      next.push({
-        id,
-        parentId,
-        childIndex: parent?.children?.indexOf(id),
-        depth: getDepth(currentNodes, id),
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-        right: rect.right,
-        bottom: rect.bottom,
+        const parent =
+          parentId
+            ? currentNodes[parentId]
+            : undefined;
+
+        const rect =
+          el.getBoundingClientRect();
+
+        next.push({
+          id,
+          parentId,
+          childIndex:
+            parent?.children?.indexOf(id),
+          depth: getDepth(
+            currentNodes,
+            id
+          ),
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          bottom: rect.bottom,
+        });
       });
-    });
 
     setCollectedRects(next);
   }
@@ -165,21 +239,37 @@ export function EditorControls({ registry }: Props) {
     return candidates[0];
   }
 
-  function getDropLineRect(target: DropTarget | null) {
+  function getDropLineRect(
+    target: DropTarget | null
+  ) {
     if (!target) {
       return null;
     }
 
-    const currentRects = rectsRef.current;
-    const state = useEditorStore.getState();
-    const parent = state.nodes[target.parentId];
-    const children = parent?.children ?? [];
+    const currentRects =
+      rectsRef.current;
 
-    const beforeChildId = children[target.insertIndex];
-    const previousChildId = children[target.insertIndex - 1];
+    const state =
+      useEditorStore.getState();
+
+    const parent =
+      state.nodes[target.parentId];
+
+    const children =
+      parent?.children ?? [];
+
+    const beforeChildId =
+      children[target.insertIndex];
+
+    const previousChildId =
+      children[target.insertIndex - 1];
 
     if (beforeChildId) {
-      const beforeRect = currentRects.find((r) => r.id === beforeChildId);
+      const beforeRect =
+        currentRects.find(
+          (r) => r.id === beforeChildId
+        );
+
       if (beforeRect) {
         return {
           left: beforeRect.left,
@@ -190,7 +280,11 @@ export function EditorControls({ registry }: Props) {
     }
 
     if (previousChildId) {
-      const previousRect = currentRects.find((r) => r.id === previousChildId);
+      const previousRect =
+        currentRects.find(
+          (r) => r.id === previousChildId
+        );
+
       if (previousRect) {
         return {
           left: previousRect.left,
@@ -200,12 +294,19 @@ export function EditorControls({ registry }: Props) {
       }
     }
 
-    const parentRect = currentRects.find((r) => r.id === target.parentId);
+    const parentRect =
+      currentRects.find(
+        (r) => r.id === target.parentId
+      );
+
     if (parentRect) {
       return {
         left: parentRect.left + 8,
         top: parentRect.top + 8,
-        width: Math.max(parentRect.width - 16, 24),
+        width: Math.max(
+          parentRect.width - 16,
+          24
+        ),
       };
     }
 
@@ -263,25 +364,36 @@ export function EditorControls({ registry }: Props) {
   useEffect(() => {
     collectRects();
 
-    function handleClick(event: MouseEvent) {
-      const target = event.target as HTMLElement | null;
+    function handleClick(
+      event: MouseEvent
+    ) {
+      const target =
+        event.target as HTMLElement | null;
 
       if (!target) {
         return;
       }
 
-      if (target.closest("[data-editor-ignore]")) {
+      if (
+        target.closest(
+          "[data-editor-ignore]"
+        )
+      ) {
         return;
       }
 
-      const node = target.closest("[data-node-id]");
+      const node =
+        target.closest("[data-node-id]");
 
       if (!node) {
         setSelectedNodeId(null);
         return;
       }
 
-      const id = node.getAttribute("data-node-id");
+      const id =
+        node.getAttribute(
+          "data-node-id"
+        );
 
       if (!id) {
         return;
@@ -290,36 +402,51 @@ export function EditorControls({ registry }: Props) {
       setSelectedNodeId(id);
     }
 
-    function handlePointerMove(event: PointerEvent) {
-      const state = useEditorStore.getState();
+    function handlePointerMove(
+      event: PointerEvent
+    ) {
+      const state =
+        useEditorStore.getState();
 
-      const isDraggingComponent = !!state.dragPreview;
-      const isDraggingNode = !!state.draggedNodeId;
+      const isDraggingComponent =
+        !!state.dragPreview;
 
-      if (!isDraggingComponent && !isDraggingNode) {
+      const isDraggingNode =
+        !!state.draggedNodeId;
+
+      if (
+        !isDraggingComponent &&
+        !isDraggingNode
+      ) {
         setHoverDropTarget(null);
         return;
       }
 
-      state.moveDrag(event.clientX, event.clientY);
-
-      const hoveredRect = findDeepestRect(
+      state.moveDrag(
         event.clientX,
         event.clientY
       );
+
+      const hoveredRect =
+        findDeepestRect(
+          event.clientX,
+          event.clientY
+        );
 
       if (!hoveredRect) {
         setHoverDropTarget(null);
         return;
       }
 
-      const node = state.nodes[hoveredRect.id];
+      const node =
+        state.nodes[hoveredRect.id];
 
       if (node?.type === "Container") {
-        const insertIndex = findInsertIndex(
-          node.id,
-          event.clientY
-        );
+        const insertIndex =
+          findInsertIndex(
+            node.id,
+            event.clientY
+          );
 
         setHoverDropTarget({
           parentId: node.id,
@@ -331,16 +458,19 @@ export function EditorControls({ registry }: Props) {
 
       if (
         hoveredRect.parentId &&
-        hoveredRect.childIndex !== undefined
+        hoveredRect.childIndex !==
+          undefined
       ) {
         const insertAfter =
           event.clientY >
-          hoveredRect.top + hoveredRect.height / 2;
+          hoveredRect.top +
+            hoveredRect.height / 2;
 
         setHoverDropTarget({
           parentId: hoveredRect.parentId,
           insertIndex:
-            hoveredRect.childIndex + (insertAfter ? 1 : 0),
+            hoveredRect.childIndex +
+            (insertAfter ? 1 : 0),
         });
 
         return;
@@ -350,8 +480,11 @@ export function EditorControls({ registry }: Props) {
     }
 
     function handlePointerUp() {
-      const state = useEditorStore.getState();
-      const target = hoverDropTargetRef.current;
+      const state =
+        useEditorStore.getState();
+
+      const target =
+        hoverDropTargetRef.current;
 
       if (!target) {
         state.endComponentDrag();
@@ -361,10 +494,14 @@ export function EditorControls({ registry }: Props) {
       }
 
       if (state.dragPreview) {
-        state.insertNode(target.parentId, target.insertIndex, {
-          type: state.dragPreview.type,
-          props: state.dragPreview.props,
-        });
+        state.insertNode(
+          target.parentId,
+          target.insertIndex,
+          {
+            type: state.dragPreview.type,
+            props: state.dragPreview.props,
+          }
+        );
 
         setHoverDropTarget(null);
         return;
@@ -384,24 +521,74 @@ export function EditorControls({ registry }: Props) {
       setHoverDropTarget(null);
     }
 
-    document.addEventListener("click", handleClick, true);
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-    window.addEventListener("resize", collectRects);
-    window.addEventListener("scroll", collectRects, true);
+    document.addEventListener(
+      "click",
+      handleClick,
+      true
+    );
+
+    window.addEventListener(
+      "pointermove",
+      handlePointerMove
+    );
+
+    window.addEventListener(
+      "pointerup",
+      handlePointerUp
+    );
+
+    window.addEventListener(
+      "resize",
+      collectRects
+    );
+
+    window.addEventListener(
+      "scroll",
+      collectRects,
+      true
+    );
 
     return () => {
-      document.removeEventListener("click", handleClick, true);
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
-      window.removeEventListener("resize", collectRects);
-      window.removeEventListener("scroll", collectRects, true);
+      document.removeEventListener(
+        "click",
+        handleClick,
+        true
+      );
+
+      window.removeEventListener(
+        "pointermove",
+        handlePointerMove
+      );
+
+      window.removeEventListener(
+        "pointerup",
+        handlePointerUp
+      );
+
+      window.removeEventListener(
+        "resize",
+        collectRects
+      );
+
+      window.removeEventListener(
+        "scroll",
+        collectRects,
+        true
+      );
     };
   }, [setSelectedNodeId]);
 
-  const selectedRect = rects.find((r) => r.id === selectedId) ?? null;
-  const PreviewComponent = dragPreview ? registry[dragPreview.type] : null;
-  const dropLineRect = getDropLineRect(hoverDropTarget);
+  const selectedRect =
+    rects.find((r) => r.id === selectedId) ??
+    null;
+
+  const PreviewComponent =
+    dragPreview
+      ? registry[dragPreview.type]
+      : null;
+
+  const dropLineRect =
+    getDropLineRect(hoverDropTarget);
 
   return (
     <>
@@ -416,7 +603,9 @@ export function EditorControls({ registry }: Props) {
             opacity: 0.75,
           }}
         >
-          <PreviewComponent {...dragPreview.props} />
+          <PreviewComponent
+            {...dragPreview.props}
+          />
         </div>
       )}
 
@@ -429,13 +618,15 @@ export function EditorControls({ registry }: Props) {
             top: rect.top,
             width: rect.width,
             height: rect.height,
-            border: "1px dashed rgba(0,120,255,.25)",
+            border:
+              "1px dashed rgba(79, 70, 229, 0.22)",
             boxSizing: "border-box",
             pointerEvents: "none",
             zIndex: 9998,
             background:
-              hoverDropTarget?.parentId === rect.id
-                ? "rgba(0,170,255,.08)"
+              hoverDropTarget?.parentId ===
+              rect.id
+                ? "rgba(79, 70, 229, 0.08)"
                 : undefined,
           }}
         />
@@ -449,8 +640,9 @@ export function EditorControls({ registry }: Props) {
             top: dropLineRect.top,
             width: dropLineRect.width,
             height: 4,
-            background: "#00aaff",
+            background: selectedColor,
             borderRadius: 999,
+            boxShadow: `0 0 0 3px ${selectedSoftColor}`,
             pointerEvents: "none",
             zIndex: 20000,
           }}
@@ -477,12 +669,14 @@ export function EditorControls({ registry }: Props) {
                 height: 24,
                 padding: "0 8px",
                 borderRadius: 6,
-                background: "#0ea5e9",
+                background: selectedColor,
                 color: "white",
                 fontSize: 12,
                 fontWeight: 500,
                 display: "flex",
                 alignItems: "center",
+                boxShadow:
+                  "0 1px 2px rgba(0,0,0,.10)",
               }}
             >
               {nodes[selectedId]?.type}
@@ -501,15 +695,13 @@ export function EditorControls({ registry }: Props) {
                 width: 24,
                 height: 24,
                 borderRadius: 6,
-                border:
-                  "1px solid #e4e4e7",
-                background: "white",
+                border: `1px solid ${editorBorder}`,
+                background: editorSurface,
                 display: "flex",
                 alignItems: "center",
-                justifyContent:
-                  "center",
+                justifyContent: "center",
                 cursor: "pointer",
-                color: "#ef4444",
+                color: "var(--editor-danger)",
                 boxShadow:
                   "0 1px 2px rgba(0,0,0,.08)",
               }}
@@ -527,68 +719,63 @@ export function EditorControls({ registry }: Props) {
               top: selectedRect.top,
               width: selectedRect.width,
               height: selectedRect.height,
-              border:
-                "2px solid #00aaff",
-              boxSizing:
-                "border-box",
+              border: `2px solid ${selectedColor}`,
+              boxShadow: `0 0 0 3px ${selectedSoftColor}`,
+              boxSizing: "border-box",
               pointerEvents: "none",
               zIndex: 10000,
             }}
           />
+
           {/* HEIGHT WIDTH LABELS */}
-          {selectedRect && (
-            <div
-              style={{
-                position: "fixed",
-                left:
-                  selectedRect.left +
-                  selectedRect.width / 2 - 20,
-                top:
-                  selectedRect.top - 20,
-                fontSize: 11,
-                background: "#0ea5e9",
-                color: "white",
-                padding: "2px 6px",
-                borderRadius: 4,
-                zIndex: 10003,
-              }}
-            >
-              {Math.round(
-                selectedRect.width
-              )}px
-            </div>
-          )}
 
-          {selectedRect && (
-            <div
-              style={{
-                position: "fixed",
+          <div
+            style={{
+              position: "fixed",
+              left:
+                selectedRect.left +
+                selectedRect.width / 2 -
+                20,
+              top: selectedRect.top - 20,
+              fontSize: 11,
+              background: selectedColor,
+              color: "white",
+              padding: "2px 6px",
+              borderRadius: 4,
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,.10)",
+              zIndex: 10003,
+            }}
+          >
+            {Math.round(
+              selectedRect.width
+            )}
+            px
+          </div>
 
-                left:
-                  selectedRect.left - 50,
-
-                top:
-                  selectedRect.top +
-                  selectedRect.height / 2 - 10,
-
-                fontSize: 11,
-
-                background: "#0ea5e9",
-
-                color: "white",
-
-                padding: "2px 6px",
-
-                borderRadius: 4,
-
-                zIndex: 10003,
-              }}
-            >
-              {Math.round(
-                selectedRect.height
-              )}px
-            </div>
-          )}
+          <div
+            style={{
+              position: "fixed",
+              left: selectedRect.left - 50,
+              top:
+                selectedRect.top +
+                selectedRect.height / 2 -
+                10,
+              fontSize: 11,
+              background: selectedColor,
+              color: "white",
+              padding: "2px 6px",
+              borderRadius: 4,
+              boxShadow:
+                "0 1px 2px rgba(0,0,0,.10)",
+              zIndex: 10003,
+            }}
+          >
+            {Math.round(
+              selectedRect.height
+            )}
+            px
+          </div>
 
           {/* CORNERS */}
 
@@ -638,8 +825,7 @@ export function EditorControls({ registry }: Props) {
             x={selectedRect.left}
             y={
               selectedRect.top +
-              selectedRect.height /
-              2
+              selectedRect.height / 2
             }
           />
 
@@ -649,8 +835,7 @@ export function EditorControls({ registry }: Props) {
             x={selectedRect.right}
             y={
               selectedRect.top +
-              selectedRect.height /
-              2
+              selectedRect.height / 2
             }
           />
         </>
