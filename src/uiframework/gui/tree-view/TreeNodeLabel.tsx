@@ -18,8 +18,9 @@ export function TreeNodeLabel({
       onClick={() =>
         setSelectedNodeId(nodeId)
       }
+      title={`${nodeId} (${type})`}
     >
-      {type}
+      {nodeId}
     </div>
   );
 }
