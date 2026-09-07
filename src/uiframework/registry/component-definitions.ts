@@ -98,6 +98,7 @@ export const componentDefinitions = {
     inspector: {
       label: { kind: "text" },
       disabled: { kind: "toggle" },
+      backgroundColor: { kind: "color" },
     },
     events: {
       click: { label: "Click", defaultSuffix: "Clicked" },

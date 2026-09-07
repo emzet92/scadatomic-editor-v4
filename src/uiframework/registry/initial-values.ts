@@ -16,6 +16,7 @@ const nodes: Record<string, UiNode> = {
       "flowRate",
       "startButton",
       "stopButton",
+      "randomColorButton",
     ],
   },
 
@@ -98,6 +99,20 @@ const nodes: Record<string, UiNode> = {
     events: {
       click: {
         handlerId: "stopButton.Clicked",
+      },
+    },
+  },
+
+  randomColorButton: {
+    id: "randomColorButton",
+    type: "Button",
+    props: {
+      label: "RANDOM COLOR",
+      backgroundColor: "#7c3aed",
+    },
+    events: {
+      click: {
+        handlerId: "randomColorButton.RandomColorClicked",
       },
     },
   },

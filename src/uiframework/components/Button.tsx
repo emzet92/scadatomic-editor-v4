@@ -7,12 +7,18 @@ export type ButtonProps =
 
 export function Button({
   label,
+  backgroundColor,
   className,
+  style,
   ...props
 }: ButtonProps) {
   return (
     <button
       {...props}
+      style={{
+        ...style,
+        backgroundColor: backgroundColor ?? "#0284c7",
+      }}
       className={
         className ??
         `
@@ -23,8 +29,6 @@ export function Button({
           h-9
           px-4
           rounded-md
-          bg-sky-600
-          hover:bg-sky-500
           text-white
           text-sm
           font-medium

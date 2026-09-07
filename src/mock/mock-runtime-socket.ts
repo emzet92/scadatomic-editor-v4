@@ -56,6 +56,21 @@ class MockRuntimeSocket extends EventTarget {
       this.process.running = false;
     }
 
+    if (handler.includes("randomcolor")) {
+      const nodeId = payload.nodeId;
+
+      if (typeof nodeId === "string") {
+        this.emitMockResponse({
+          type: "node.update",
+          projectId: payload.projectId,
+          nodeId,
+          property: "backgroundColor",
+          value: randomColor(),
+          timestamp: Date.now(),
+        });
+      }
+    }
+
     console.info("[mock-ws] runtime.event", payload);
   }
 
@@ -109,6 +124,11 @@ class MockRuntimeSocket extends EventTarget {
     });
   }
 
+  private emitMockResponse(payload: MockWsPayload) {
+    this.dispatchPayload(payload);
+    this.channel?.postMessage(payload);
+  }
+
   private dispatchPayload(payload: unknown) {
     this.dispatchEvent(
       new MessageEvent("message", {
@@ -135,6 +155,11 @@ function createBroadcastChannel() {
   }
 
   return new BroadcastChannel(CHANNEL_NAME);
+}
+
+function randomColor() {
+  const value = Math.floor(Math.random() * 0x1000000);
+  return `#${value.toString(16).padStart(6, "0")}`;
 }
 
 function randomBetween(min: number, max: number) {

@@ -87,11 +87,13 @@ export const defaultTextPropsByVariant = {
 export type ButtonNodeProps = {
   label?: string;
   disabled?: boolean;
+  backgroundColor?: string;
 };
 
 export const defaultButtonProps = {
   label: "Button",
   disabled: false,
+  backgroundColor: "#0284c7",
 } satisfies ButtonNodeProps;
 
 export type ChartKind = "line" | "bar";

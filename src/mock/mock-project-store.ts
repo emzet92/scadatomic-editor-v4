@@ -1,6 +1,7 @@
-import type {
-  LegacyUiTree,
-  UiDocument,
+import {
+  normalizeUiDocument,
+  type LegacyUiTree,
+  type UiDocument,
 } from "../uiframework/core/document";
 import { initialDocument } from "../uiframework/registry/initial-values";
 
@@ -11,11 +12,13 @@ export type MockUiProject = {
   name: string;
   tree: UiDocument | LegacyUiTree;
   revision: number;
+  mockSeedVersion?: number;
 };
 
 const STORAGE_PREFIX = "scadatomic.mock.project.";
 const memoryFallback = new Map<string, MockUiProject>();
 const DEFAULT_LATENCY_MS = 120;
+const DEMO_SEED_VERSION = 2;
 
 export async function createMockProject(input: {
   name: string;
@@ -42,7 +45,11 @@ export async function getMockProjectById(
 
   const existing = readProject(id);
   if (existing) {
-    return clone(existing);
+    const migrated = migrateDemoProject(existing);
+    if (migrated !== existing) {
+      writeProject(migrated);
+    }
+    return clone(migrated);
   }
 
   // Development-friendly behavior: any project URL works immediately.
@@ -51,6 +58,7 @@ export async function getMockProjectById(
     name: id === "demo" ? "Pump Station Demo" : `Mock Project ${id}`,
     tree: clone(initialDocument),
     revision: 1,
+    ...(id === "demo" ? { mockSeedVersion: DEMO_SEED_VERSION } : {}),
   };
 
   writeProject(seeded);
@@ -85,10 +93,56 @@ export async function updateMockProject(
     name: input.name,
     tree: clone(input.tree),
     revision: currentRevision + 1,
+    ...(current?.mockSeedVersion !== undefined
+      ? { mockSeedVersion: current.mockSeedVersion }
+      : {}),
   };
 
   writeProject(project);
   return clone(project);
+}
+
+function migrateDemoProject(project: MockUiProject): MockUiProject {
+  if (
+    project.id !== "demo" ||
+    (project.mockSeedVersion ?? 0) >= DEMO_SEED_VERSION
+  ) {
+    return project;
+  }
+
+  const document = normalizeUiDocument(project.tree);
+  const randomColorButton = initialDocument.nodes.randomColorButton;
+  const root = document.nodes[document.rootId];
+
+  if (!randomColorButton || !root) {
+    return {
+      ...project,
+      mockSeedVersion: DEMO_SEED_VERSION,
+    };
+  }
+
+  const rootChildren = root.children ?? [];
+  const nextDocument: UiDocument = {
+    ...document,
+    nodes: {
+      ...document.nodes,
+      [document.rootId]: {
+        ...root,
+        children: rootChildren.includes(randomColorButton.id)
+          ? rootChildren
+          : [...rootChildren, randomColorButton.id],
+      },
+      [randomColorButton.id]:
+        document.nodes[randomColorButton.id] ?? clone(randomColorButton),
+    },
+  };
+
+  return {
+    ...project,
+    tree: nextDocument,
+    revision: project.revision + 1,
+    mockSeedVersion: DEMO_SEED_VERSION,
+  };
 }
 
 export function resetMockProjects() {
