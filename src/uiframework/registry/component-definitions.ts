@@ -18,6 +18,7 @@ export type InspectorControl =
   | { kind: "number"; min?: number; max?: number; step?: number }
   | { kind: "color" }
   | { kind: "toggle" }
+  | { kind: "text-format" }
   | { kind: "select"; options: readonly string[] };
 
 export type ComponentDefinition = {
@@ -68,17 +69,12 @@ export const componentDefinitions = {
       color: { kind: "color" },
       fontSize: { kind: "number", min: 1 },
       lineHeight: { kind: "text" },
-      fontWeight: {
-        kind: "select",
-        options: ["normal", "medium", "semibold", "bold"],
-      },
+      formatting: { kind: "text-format" },
       align: { kind: "select", options: ["left", "center", "right"] },
       variant: {
         kind: "select",
         options: ["body", "label", "title", "caption"],
       },
-      italic: { kind: "toggle" },
-      underline: { kind: "toggle" },
       uppercase: { kind: "toggle" },
       borderSize: { kind: "number", min: 0 },
       borderColor: { kind: "color" },

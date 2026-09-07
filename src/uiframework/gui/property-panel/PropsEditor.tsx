@@ -21,6 +21,7 @@ export function PropsEditor({
           nodeId={nodeId}
           propName={key}
           value={values[key]}
+          values={values}
           control={control}
           updateNode={updateNode}
         />

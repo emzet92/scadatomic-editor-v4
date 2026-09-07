@@ -17,12 +17,14 @@ export function PropInput({
   nodeId,
   propName,
   value,
+  values,
   control,
   updateNode,
 }: {
   nodeId: string;
   propName: string;
   value: unknown;
+  values: Record<string, unknown>;
   control: InspectorControl;
   updateNode: UpdateNode;
 }) {
@@ -34,6 +36,63 @@ export function PropInput({
         [propName]: nextValue,
       },
     }));
+  }
+
+  if (control.kind === "text-format") {
+    const bold = values.fontWeight === "bold";
+    const italic = Boolean(values.italic);
+    const underline = Boolean(values.underline);
+
+    function toggleTextStyle(
+      property: "fontWeight" | "italic" | "underline",
+      enabled: boolean,
+    ) {
+      updateNode(nodeId, (currentNode) => {
+        const nextProps = { ...(currentNode.props ?? {}) };
+
+        if (enabled) {
+          nextProps[property] = property === "fontWeight" ? "bold" : true;
+        } else {
+          delete nextProps[property];
+        }
+
+        return {
+          ...currentNode,
+          props: nextProps,
+        };
+      });
+    }
+
+    return (
+      <PropertyField label="format">
+        <div
+          data-editor-ignore
+          className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
+        >
+          <FormatButton
+            label="B"
+            title="Bold"
+            active={bold}
+            className="font-bold"
+            onClick={() => toggleTextStyle("fontWeight", !bold)}
+          />
+          <FormatButton
+            label="I"
+            title="Italic"
+            active={italic}
+            className="italic"
+            onClick={() => toggleTextStyle("italic", !italic)}
+          />
+          <FormatButton
+            label="U"
+            title="Underline"
+            active={underline}
+            className="underline"
+            onClick={() => toggleTextStyle("underline", !underline)}
+          />
+        </div>
+      </PropertyField>
+    );
   }
 
   if (control.kind === "color") {
@@ -129,6 +188,42 @@ export function PropInput({
         className={inputClassName}
       />
     </PropertyField>
+  );
+}
+
+function FormatButton({
+  label,
+  title,
+  active,
+  className,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  active: boolean;
+  className?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      aria-pressed={active}
+      title={title}
+      onClick={onClick}
+      className={`
+        h-9 min-w-10 border-r border-[var(--editor-border)] px-3 text-sm
+        transition last:border-r-0
+        ${
+          active
+            ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+            : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-text)]"
+        }
+        ${className ?? ""}
+      `}
+    >
+      {label}
+    </button>
   );
 }
 
