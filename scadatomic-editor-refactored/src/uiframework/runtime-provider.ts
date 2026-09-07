@@ -20,9 +20,11 @@ export function RuntimeProvider({
   useEffect(() => {
     const ws = getWs();
 
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = (event: Event) => {
+      const messageEvent = event as MessageEvent<string>;
+
       try {
-        const payload = JSON.parse(event.data) as Record<string, unknown>;
+        const payload = JSON.parse(messageEvent.data) as Record<string, unknown>;
 
         if (
           typeof payload.projectId === "string" &&
@@ -78,7 +80,11 @@ export function RuntimeProvider({
           runtimeSignals.set(String(signalTag), payload.value);
         }
       } catch (error) {
-        console.error("Failed to parse WS message", error, event.data);
+        console.error(
+          "Failed to parse runtime message",
+          error,
+          messageEvent.data
+        );
       }
     };
 

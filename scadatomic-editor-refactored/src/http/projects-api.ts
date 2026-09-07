@@ -1,11 +1,12 @@
+import {
+  createMockProject,
+  getMockProjectById,
+  updateMockProject,
+} from "../mock/mock-project-store";
 import type {
   LegacyUiTree,
   UiDocument,
 } from "../uiframework/core/document";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  `${window.location.protocol}//${window.location.hostname}:8080`;
 
 export type ProjectId = string;
 
@@ -26,43 +27,23 @@ export type CreateUiProjectResponse = {
   revision?: number;
 };
 
-async function requestJson<TResponse>(
-  url: string,
-  options?: RequestInit
-): Promise<TResponse> {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options?.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `HTTP ${response.status} ${response.statusText}: ${body}`
-    );
-  }
-
-  return response.json() as Promise<TResponse>;
-}
-
+/**
+ * Development API adapter.
+ *
+ * There is intentionally no network request here. The mock persists projects
+ * in localStorage, adds a small artificial latency and keeps the same public
+ * API as the future HTTP implementation.
+ */
 export async function createProject(
   request: SaveUiDocumentRequest
 ): Promise<CreateUiProjectResponse> {
-  return requestJson<CreateUiProjectResponse>(`${API_BASE_URL}/api/projects`, {
-    method: "POST",
-    body: JSON.stringify(toLegacyWireRequest(request)),
-  });
+  return createMockProject(request);
 }
 
 export async function getProjectById(
   id: ProjectId
 ): Promise<UiProjectResponse> {
-  return requestJson<UiProjectResponse>(`${API_BASE_URL}/api/projects/${id}`, {
-    method: "GET",
-  });
+  return getMockProjectById(id);
 }
 
 export async function updateProject(
@@ -70,22 +51,5 @@ export async function updateProject(
   request: SaveUiDocumentRequest,
   revision?: number
 ): Promise<UiProjectResponse> {
-  return requestJson<UiProjectResponse>(`${API_BASE_URL}/api/projects/${id}`, {
-    method: "PUT",
-    ...(revision === undefined
-      ? {}
-      : {
-          headers: {
-            "If-Match": String(revision),
-          },
-        }),
-    body: JSON.stringify(toLegacyWireRequest(request)),
-  });
-}
-
-function toLegacyWireRequest(request: SaveUiDocumentRequest) {
-  return {
-    name: request.name,
-    tree: request.tree.nodes,
-  };
+  return updateMockProject(id, request, revision);
 }

@@ -38,3 +38,12 @@ The original archive contained platform-specific `node_modules`, so Vite's nativ
 npm ci
 npm run build
 ```
+
+## Backendless mock mode
+
+- Replaced real HTTP transport with a localStorage-backed async project mock.
+- Replaced real WebSocket transport with an EventTarget/BroadcastChannel mock.
+- Added random process signals for tank level and pump flow.
+- Runtime `start` / `stop` handler names influence the mocked pump state.
+- `/project/demo` and `/render/demo` work without starting a backend.
+- Public transport-facing APIs were kept stable so real adapters can be restored later.

@@ -71,3 +71,9 @@ export default defineConfig([
   },
 ])
 ```
+
+## Backendless development
+
+This build uses a mock project API backed by `localStorage` and a mock runtime WebSocket that generates random SCADA values. No backend process is required. See `MOCK_BACKEND.md`.
+
+Try `/project/demo` for the editor and `/render/demo` for the runtime preview.

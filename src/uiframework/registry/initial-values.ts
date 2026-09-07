@@ -95,6 +95,11 @@ const nodes: Record<string, UiNode> = {
     props: {
       label: "STOP",
     },
+    events: {
+      click: {
+        handlerId: "stopButton.Clicked",
+      },
+    },
   },
 };
 
