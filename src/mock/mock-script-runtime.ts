@@ -1,4 +1,10 @@
 import { getMockScript } from "./mock-script-store";
+import {
+  clearMockSessionState,
+  deleteMockSessionValue,
+  getMockSessionValue,
+  setMockSessionValue,
+} from "./mock-session-state";
 
 export type MockScriptEvent = {
   projectId: string;
@@ -19,6 +25,12 @@ export type MockScriptContext = {
   sourceNodeId: string;
   eventName: string;
   payload: Record<string, unknown>;
+  state: {
+    get<T>(key: string, fallback?: T): unknown | T;
+    set(key: string, value: unknown): void;
+    delete(key: string): void;
+    clear(): void;
+  };
   ui: {
     setProp(nodeId: string, property: string, value: unknown): void;
     setColor(nodeId: string, color: string): void;
@@ -75,6 +87,20 @@ function createContext(
     sourceNodeId: event.sourceNodeId,
     eventName: event.eventName,
     payload: Object.freeze({ ...(event.payload ?? {}) }),
+    state: Object.freeze({
+      get<T>(key: string, fallback?: T) {
+        return getMockSessionValue(event.projectId, key, fallback);
+      },
+      set(key: string, value: unknown) {
+        setMockSessionValue(event.projectId, key, value);
+      },
+      delete(key: string) {
+        deleteMockSessionValue(event.projectId, key);
+      },
+      clear() {
+        clearMockSessionState(event.projectId);
+      },
+    }),
     ui: Object.freeze({
       setProp(nodeId: string, property: string, value: unknown) {
         host.setNodeProp(nodeId, property, value);
