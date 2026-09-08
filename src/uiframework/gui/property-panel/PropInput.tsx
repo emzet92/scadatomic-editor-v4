@@ -95,6 +95,63 @@ export function PropInput({
     );
   }
 
+  if (control.kind === "text-align") {
+    const alignment =
+      value === "center" || value === "right" ? value : "left";
+
+    return (
+      <PropertyField label="alignment">
+        <div
+          data-editor-ignore
+          className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
+        >
+          {(["left", "center", "right"] as const).map((nextAlignment) => (
+            <IconToggleButton
+              key={nextAlignment}
+              active={alignment === nextAlignment}
+              title={`Align ${nextAlignment}`}
+              onClick={() => updateProp(nextAlignment)}
+            >
+              <TextAlignIcon alignment={nextAlignment} />
+            </IconToggleButton>
+          ))}
+        </div>
+      </PropertyField>
+    );
+  }
+
+  if (control.kind === "border-size") {
+    const borderSize =
+      typeof value === "number" ? value : Number(value ?? control.min ?? 0);
+
+    return (
+      <PropertyField label="border">
+        <div
+          data-editor-ignore
+          className="flex h-9 w-full items-center overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
+        >
+          <span
+            title="Border size · all sides"
+            className="flex h-full w-10 shrink-0 items-center justify-center border-r border-[var(--editor-border)] text-[var(--editor-text-muted)]"
+          >
+            <BorderAllIcon />
+          </span>
+          <input
+            type="number"
+            aria-label="Border size"
+            value={Number.isFinite(borderSize) ? borderSize : 0}
+            min={control.min}
+            max={control.max}
+            step={control.step}
+            onChange={(event) => updateProp(Number(event.target.value))}
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-[var(--editor-text)] outline-none"
+          />
+          <span className="pr-3 text-xs text-[var(--editor-text-muted)] opacity-70">px</span>
+        </div>
+      </PropertyField>
+    );
+  }
+
   if (control.kind === "color") {
     const textColorValue =
       typeof value === "string" && value ? value : "#18181b";
@@ -224,6 +281,109 @@ function FormatButton({
     >
       {label}
     </button>
+  );
+}
+
+function IconToggleButton({
+  active,
+  title,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      aria-pressed={active}
+      title={title}
+      onClick={onClick}
+      className={`
+        flex h-9 min-w-10 items-center justify-center border-r border-[var(--editor-border)] px-2
+        transition last:border-r-0
+        ${
+          active
+            ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+            : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-text)]"
+        }
+      `}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TextAlignIcon({
+  alignment,
+}: {
+  alignment: "left" | "center" | "right";
+}) {
+  const lines = [14, 10, 14, 8];
+
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      {lines.map((width, index) => {
+        const x =
+          alignment === "left"
+            ? 1
+            : alignment === "center"
+              ? (16 - width) / 2
+              : 15 - width;
+        const y = 2 + index * 4;
+
+        return (
+          <path
+            key={`${width}-${index}`}
+            d={`M${x} ${y}H${x + width}`}
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+function BorderAllIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
+      <rect
+        x="2.25"
+        y="2.25"
+        width="11.5"
+        height="11.5"
+        rx="1.25"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <rect
+        x="5"
+        y="5"
+        width="6"
+        height="6"
+        rx="0.75"
+        stroke="currentColor"
+        strokeWidth="1"
+        opacity="0.55"
+      />
+    </svg>
   );
 }
 

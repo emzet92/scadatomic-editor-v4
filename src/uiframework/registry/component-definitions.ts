@@ -19,6 +19,8 @@ export type InspectorControl =
   | { kind: "color" }
   | { kind: "toggle" }
   | { kind: "text-format" }
+  | { kind: "text-align" }
+  | { kind: "border-size"; min?: number; max?: number; step?: number }
   | { kind: "select"; options: readonly string[] };
 
 export type ComponentDefinition = {
@@ -53,7 +55,7 @@ export const componentDefinitions = {
       padding: { kind: "number", min: 0 },
       gap: { kind: "number", min: 0 },
       columns: { kind: "number", min: 1, max: 24 },
-      borderSize: { kind: "number", min: 0 },
+      borderSize: { kind: "border-size", min: 0 },
       display: { kind: "select", options: ["grid", "flex"] },
     },
   },
@@ -70,13 +72,13 @@ export const componentDefinitions = {
       fontSize: { kind: "number", min: 1 },
       lineHeight: { kind: "text" },
       formatting: { kind: "text-format" },
-      align: { kind: "select", options: ["left", "center", "right"] },
+      align: { kind: "text-align" },
       variant: {
         kind: "select",
         options: ["body", "label", "title", "caption"],
       },
       uppercase: { kind: "toggle" },
-      borderSize: { kind: "number", min: 0 },
+      borderSize: { kind: "border-size", min: 0 },
       borderColor: { kind: "color" },
       borderRadius: { kind: "number", min: 0 },
     },
