@@ -3,6 +3,10 @@ import { applyDocumentCommand } from "./core/commands";
 import { parseUiDocument, type UiDocument } from "./core/document";
 import { runtimeSignals } from "./runtime-signals";
 import { getWs } from "./websocket";
+import {
+  applyMockRuntimeUiState,
+  setMockRuntimeNodeProp,
+} from "../mock/mock-runtime-ui-state";
 
 type RuntimeProviderProps = {
   projectId?: string | undefined;
@@ -20,6 +24,10 @@ export function RuntimeProvider({
   useEffect(() => {
     const ws = getWs();
 
+    if (projectId) {
+      setDocument((current) => applyMockRuntimeUiState(projectId, current));
+    }
+
     const handleMessage = (event: Event) => {
       const messageEvent = event as MessageEvent<string>;
 
@@ -35,7 +43,12 @@ export function RuntimeProvider({
         }
 
         if (payload.type === "screen.publish") {
-          setDocument(parseUiDocument(payload.document));
+          const publishedDocument = parseUiDocument(payload.document);
+          setDocument(
+            projectId
+              ? applyMockRuntimeUiState(projectId, publishedDocument)
+              : publishedDocument
+          );
           onScreenUpdated?.();
           return;
         }
@@ -46,6 +59,10 @@ export function RuntimeProvider({
 
           if (typeof nodeId !== "string" || typeof property !== "string") {
             return;
+          }
+
+          if (projectId) {
+            setMockRuntimeNodeProp(projectId, nodeId, property, payload.value);
           }
 
           setDocument((current) =>
