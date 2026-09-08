@@ -1,56 +1,72 @@
-# Mock backend
+# Browser-only prototype runtime
 
-The editor currently runs without any backend service.
+This build intentionally has no real backend.
 
-## Mock HTTP
+## Project storage
 
-`src/http/projects-api.ts` keeps the same API that the real HTTP client can use later, but delegates to `src/mock/mock-project-store.ts`.
+Projects are persisted in `localStorage` through the mock project repository.
+The editor talks to the repository API, not directly to browser storage, so a
+future HTTP adapter can replace it without changing the UI.
 
-- projects are persisted in `localStorage`
-- an artificial ~120 ms delay makes loading/saving behave like an async API
-- any `/project/:projectId` is auto-seeded from the demo document on first open
-- revisions are incremented and optimistic revision conflicts are still checked
+## JavaScript handler storage
 
-Useful route:
+Runtime handlers are stored separately from `UiDocument` in `localStorage`.
+A node only keeps a handler reference, for example:
 
-```text
-/project/demo
+```json
+{
+  "events": {
+    "click": {
+      "handlerId": "randomColorButton.RandomColorClicked"
+    }
+  }
+}
 ```
 
-Runtime preview:
+The script editor is available at:
 
-```text
-/render/demo
+`/project/:projectId/scripts/:scriptId`
+
+Each handler is one JavaScript script body. Example:
+
+```js
+const color = ctx.random.color();
+ctx.ui.setColor(ctx.sourceNodeId, color);
+ctx.emit("ui.color.changed", { color });
 ```
 
-## Mock WebSocket
+## Prototype ctx API
 
-`src/uiframework/websocket.ts` delegates to `src/mock/mock-runtime-socket.ts` and opens no network socket.
+Scripts receive one `ctx` object:
 
-The mock emits process values roughly every 650 ms:
+```js
+ctx.projectId
+ctx.handlerId
+ctx.sourceNodeId
+ctx.eventName
+ctx.payload
 
-- `tank.levelPercent`
-- `tank.levelLiters`
-- `pump.flowRate`
-- `pump.running`
-- `pump.stationName`
+ctx.ui.setProp(nodeId, property, value)
+ctx.ui.setColor(nodeId, color)
 
-Publish and runtime events use the same message shape as before. `BroadcastChannel` mirrors them between tabs, so you can keep `/project/demo` open in one tab and `/render/demo` in another and test publish behavior without a server.
+ctx.emit(eventName, payload?)
 
-The `start`/`stop` handler names also influence the mocked pump flow if runtime button events contain those words.
-
-## Mock click -> random color
-
-The demo project contains a `RANDOM COLOR` button. Its click handler is sent through the same runtime event API as a real backend event:
-
-```text
-RuntimeButton click
-  -> runtime.event
-  -> mock runtime transport
-  -> node.update(backgroundColor = random hex)
-  -> RuntimeProvider
-  -> document command
-  -> renderer updates the button
+ctx.random.color()
+ctx.random.number(min, max)
+ctx.log(...args)
 ```
 
-The mock recognizes handlers containing `randomColor` and updates the clicked node's `backgroundColor`. This keeps the UI component free of mock-only behavior and exercises the future backend event path.
+`ctx.ui.*` produces the same `node.update` message consumed by the runtime
+provider. `ctx.emit()` produces a runtime custom event. The current simulation
+uses `pump.start` and `pump.stop` events to control the mock process.
+
+## Runtime signals
+
+The mock runtime emits random process values in-browser and mirrors runtime
+messages between tabs using `BroadcastChannel` when available.
+
+## Security
+
+The script runtime deliberately uses `new Function()` and is **not sandboxed**.
+It is suitable only for this trusted local prototype. Do not use this mechanism
+for untrusted production scripts.

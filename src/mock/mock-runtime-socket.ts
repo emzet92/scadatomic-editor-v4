@@ -1,3 +1,5 @@
+import { executeMockScript } from "./mock-script-runtime";
+
 type MockWsPayload = Record<string, unknown>;
 
 const CHANNEL_NAME = "scadatomic.mock.runtime";
@@ -46,32 +48,67 @@ class MockRuntimeSocket extends EventTarget {
       return;
     }
 
-    const handler = String(payload.event ?? "").toLowerCase();
+    const projectId = payload.projectId;
+    const handlerId = payload.handlerId;
+    const sourceNodeId = payload.nodeId;
+    const eventName = payload.eventName;
 
-    if (handler.includes("start")) {
-      this.process.running = true;
+    if (
+      typeof projectId !== "string" ||
+      typeof handlerId !== "string" ||
+      typeof sourceNodeId !== "string" ||
+      typeof eventName !== "string"
+    ) {
+      console.warn("[mock-ws] Invalid runtime.event", payload);
+      return;
     }
 
-    if (handler.includes("stop")) {
-      this.process.running = false;
-    }
+    executeMockScript(
+      {
+        projectId,
+        handlerId,
+        sourceNodeId,
+        eventName,
+      },
+      {
+        setNodeProp: (nodeId, property, value) => {
+          this.emitMockResponse({
+            type: "node.update",
+            projectId,
+            nodeId,
+            property,
+            value,
+            timestamp: Date.now(),
+          });
+        },
+        emit: (customEventName, customPayload) => {
+          this.handleScriptEvent(customEventName);
 
-    if (handler.includes("randomcolor")) {
-      const nodeId = payload.nodeId;
-
-      if (typeof nodeId === "string") {
-        this.emitMockResponse({
-          type: "node.update",
-          projectId: payload.projectId,
-          nodeId,
-          property: "backgroundColor",
-          value: randomColor(),
-          timestamp: Date.now(),
-        });
+          this.emitMockResponse({
+            type: "runtime.custom-event",
+            projectId,
+            sourceNodeId,
+            eventName: customEventName,
+            payload: customPayload ?? {},
+            timestamp: Date.now(),
+          });
+        },
       }
-    }
+    );
 
     console.info("[mock-ws] runtime.event", payload);
+  }
+
+  private handleScriptEvent(eventName: string) {
+    if (eventName === "pump.start") {
+      this.process.running = true;
+      this.emitProcessSignals();
+    }
+
+    if (eventName === "pump.stop") {
+      this.process.running = false;
+      this.emitProcessSignals();
+    }
   }
 
   private startRandomSignals() {
@@ -79,7 +116,6 @@ class MockRuntimeSocket extends EventTarget {
       return;
     }
 
-    // Seed values immediately so runtime widgets don't wait for the first tick.
     this.emitSignal("pump.stationName", "Pump Station P-101");
     this.emitProcessSignals();
 
@@ -114,11 +150,10 @@ class MockRuntimeSocket extends EventTarget {
     this.emitSignal("pump.running", this.process.running);
   }
 
-  private emitSignal(tag: string, value: unknown) {
+  private emitSignal(source: string, value: unknown) {
     this.dispatchPayload({
       type: "runtime.signal",
-      source: tag,
-      tag,
+      source,
       value,
       timestamp: Date.now(),
     });
@@ -155,11 +190,6 @@ function createBroadcastChannel() {
   }
 
   return new BroadcastChannel(CHANNEL_NAME);
-}
-
-function randomColor() {
-  const value = Math.floor(Math.random() * 0x1000000);
-  return `#${value.toString(16).padStart(6, "0")}`;
 }
 
 function randomBetween(min: number, max: number) {

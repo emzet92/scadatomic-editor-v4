@@ -1,17 +1,20 @@
 import { sendWsMessage } from "../websocket";
 
 export function sendRuntimeEvent({
-  event,
+  handlerId,
+  eventName,
   nodeId,
   projectId,
 }: {
-  event: string;
+  handlerId: string;
+  eventName: string;
   nodeId: string;
   projectId?: string | undefined;
 }) {
   sendWsMessage({
     type: "runtime.event",
-    event,
+    handlerId,
+    eventName,
     nodeId,
     projectId,
   });

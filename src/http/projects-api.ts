@@ -3,17 +3,14 @@ import {
   getMockProjectById,
   updateMockProject,
 } from "../mock/mock-project-store";
-import type {
-  LegacyUiTree,
-  UiDocument,
-} from "../uiframework/core/document";
+import type { UiDocument } from "../uiframework/core/document";
 
 export type ProjectId = string;
 
 export type UiProjectResponse = {
   id: ProjectId;
   name: string;
-  tree: UiDocument | LegacyUiTree;
+  tree: UiDocument;
   revision?: number;
 };
 

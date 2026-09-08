@@ -1,6 +1,5 @@
 import {
-  normalizeUiDocument,
-  type LegacyUiTree,
+  parseUiDocument,
   type UiDocument,
 } from "../uiframework/core/document";
 import { initialDocument } from "../uiframework/registry/initial-values";
@@ -10,15 +9,13 @@ export type MockProjectId = string;
 export type MockUiProject = {
   id: MockProjectId;
   name: string;
-  tree: UiDocument | LegacyUiTree;
+  tree: UiDocument;
   revision: number;
-  mockSeedVersion?: number;
 };
 
-const STORAGE_PREFIX = "scadatomic.mock.project.";
+const STORAGE_PREFIX = "scadatomic.mock.v1.project.";
 const memoryFallback = new Map<string, MockUiProject>();
 const DEFAULT_LATENCY_MS = 120;
-const DEMO_SEED_VERSION = 2;
 
 export async function createMockProject(input: {
   name: string;
@@ -45,11 +42,7 @@ export async function getMockProjectById(
 
   const existing = readProject(id);
   if (existing) {
-    const migrated = migrateDemoProject(existing);
-    if (migrated !== existing) {
-      writeProject(migrated);
-    }
-    return clone(migrated);
+    return clone(existing);
   }
 
   // Development-friendly behavior: any project URL works immediately.
@@ -58,7 +51,6 @@ export async function getMockProjectById(
     name: id === "demo" ? "Pump Station Demo" : `Mock Project ${id}`,
     tree: clone(initialDocument),
     revision: 1,
-    ...(id === "demo" ? { mockSeedVersion: DEMO_SEED_VERSION } : {}),
   };
 
   writeProject(seeded);
@@ -93,56 +85,10 @@ export async function updateMockProject(
     name: input.name,
     tree: clone(input.tree),
     revision: currentRevision + 1,
-    ...(current?.mockSeedVersion !== undefined
-      ? { mockSeedVersion: current.mockSeedVersion }
-      : {}),
   };
 
   writeProject(project);
   return clone(project);
-}
-
-function migrateDemoProject(project: MockUiProject): MockUiProject {
-  if (
-    project.id !== "demo" ||
-    (project.mockSeedVersion ?? 0) >= DEMO_SEED_VERSION
-  ) {
-    return project;
-  }
-
-  const document = normalizeUiDocument(project.tree);
-  const randomColorButton = initialDocument.nodes.randomColorButton;
-  const root = document.nodes[document.rootId];
-
-  if (!randomColorButton || !root) {
-    return {
-      ...project,
-      mockSeedVersion: DEMO_SEED_VERSION,
-    };
-  }
-
-  const rootChildren = root.children ?? [];
-  const nextDocument: UiDocument = {
-    ...document,
-    nodes: {
-      ...document.nodes,
-      [document.rootId]: {
-        ...root,
-        children: rootChildren.includes(randomColorButton.id)
-          ? rootChildren
-          : [...rootChildren, randomColorButton.id],
-      },
-      [randomColorButton.id]:
-        document.nodes[randomColorButton.id] ?? clone(randomColorButton),
-    },
-  };
-
-  return {
-    ...project,
-    tree: nextDocument,
-    revision: project.revision + 1,
-    mockSeedVersion: DEMO_SEED_VERSION,
-  };
 }
 
 export function resetMockProjects() {
@@ -164,13 +110,36 @@ function readProject(id: MockProjectId): MockUiProject | null {
   try {
     const raw = localStorage.getItem(storageKey(id));
     if (raw) {
-      return JSON.parse(raw) as MockUiProject;
+      return parseMockProject(JSON.parse(raw));
     }
-  } catch {
-    // Fall through to the in-memory store.
+  } catch (error) {
+    console.error(`[mock-http] Invalid project ${id}`, error);
+    return null;
   }
 
   return memoryFallback.get(id) ?? null;
+}
+
+function parseMockProject(value: unknown): MockUiProject {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid mock project");
+  }
+
+  const project = value as Record<string, unknown>;
+  if (
+    typeof project.id !== "string" ||
+    typeof project.name !== "string" ||
+    typeof project.revision !== "number"
+  ) {
+    throw new Error("Invalid mock project metadata");
+  }
+
+  return {
+    id: project.id,
+    name: project.name,
+    revision: project.revision,
+    tree: parseUiDocument(project.tree),
+  };
 }
 
 function writeProject(project: MockUiProject) {

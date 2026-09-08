@@ -26,10 +26,6 @@ export type UiDocument = {
   nodes: Record<NodeId, UiNode>;
 };
 
-export type LegacyUiTree = Record<NodeId, UiNode>;
-
-export type UiDocumentInput = UiDocument | LegacyUiTree;
-
 export function createUiDocument(
   rootId: NodeId,
   nodes: Record<NodeId, UiNode>
@@ -46,141 +42,86 @@ export function createEmptyUiDocument(): UiDocument {
 }
 
 export function isUiDocument(value: unknown): value is UiDocument {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
 
-  const candidate = value as Partial<UiDocument>;
+  const candidate = value as Record<string, unknown>;
+  if (
+    candidate.schemaVersion !== 1 ||
+    typeof candidate.rootId !== "string" ||
+    !candidate.nodes ||
+    typeof candidate.nodes !== "object" ||
+    Array.isArray(candidate.nodes)
+  ) {
+    return false;
+  }
 
-  return (
-    candidate.schemaVersion === 1 &&
-    typeof candidate.rootId === "string" &&
-    !!candidate.nodes &&
-    typeof candidate.nodes === "object"
+  return Object.entries(candidate.nodes).every(([id, node]) =>
+    isUiNode(node, id)
   );
 }
 
-export function normalizeUiDocument(input: unknown): UiDocument {
-  if (isUiDocument(input)) {
-    return {
-      ...input,
-      nodes: normalizeNodes(input.nodes),
-    };
+export function parseUiDocument(value: unknown): UiDocument {
+  if (!isUiDocument(value)) {
+    throw new Error("Invalid UiDocument v1");
   }
 
-  if (input && typeof input === "object") {
-    const nodes = normalizeNodes(input as LegacyUiTree);
-    const rootId = nodes.root ? "root" : Object.keys(nodes)[0] ?? "root";
+  return value;
+}
 
-    return createUiDocument(rootId, nodes);
+function isUiNode(value: unknown, expectedId: string): value is UiNode {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
   }
 
-  return createEmptyUiDocument();
-}
-
-function normalizeNodes(
-  nodes: Record<NodeId, UiNode>
-): Record<NodeId, UiNode> {
-  return Object.fromEntries(
-    Object.entries(nodes).map(([id, node]) => [
-      id,
-      normalizeNode({
-        ...node,
-        id: node.id ?? id,
-      }),
-    ])
-  );
-}
-
-function normalizeNode(node: UiNode): UiNode {
-  const props = {
-    ...(node.props ?? {}),
-  };
-
-  const bindings = {
-    ...(node.bindings ?? {}),
-  };
-
-  const events = {
-    ...(node.events ?? {}),
-  };
-
-  migrateLegacyContainerProps(props);
-  migrateLegacyBindings(node.type, props, bindings);
-  migrateLegacyEvents(props, events);
-
-  return {
-    ...node,
-    props,
-    bindings: Object.keys(bindings).length > 0 ? bindings : undefined,
-    events: Object.keys(events).length > 0 ? events : undefined,
-    children: node.children ? [...node.children] : undefined,
-  };
-}
-
-function migrateLegacyContainerProps(
-  props: Record<string, unknown>
-) {
-  if (
-    props.columns === undefined &&
-    typeof props.row === "number"
-  ) {
-    props.columns = Math.max(1, props.row);
+  const node = value as Record<string, unknown>;
+  if (node.id !== expectedId || typeof node.type !== "string") {
+    return false;
   }
 
-  delete props.row;
-}
-
-function migrateLegacyBindings(
-  type: string,
-  props: Record<string, unknown>,
-  bindings: Record<string, Binding>
-) {
-  const tag = props.tag;
-
-  if (
-    (type === "Text" || type === "Chart") &&
-    typeof tag === "string" &&
-    tag.length > 0 &&
-    !bindings.value
-  ) {
-    bindings.value = {
-      kind: "tag",
-      path: tag,
-    };
-  }
-
-  // `tag` used to be mixed into visual props. Runtime bindings now own it.
-  delete props.tag;
-}
-
-function migrateLegacyEvents(
-  props: Record<string, unknown>,
-  events: Record<string, HandlerRef>
-) {
-  const clickEvent = props.onClickEvent;
-  const doubleClickEvent = props.onDoubleClickEvent;
-
-  if (
-    typeof clickEvent === "string" &&
-    clickEvent.length > 0 &&
-    !events.click
-  ) {
-    events.click = {
-      handlerId: clickEvent,
-    };
+  if (node.props !== undefined && !isRecord(node.props)) {
+    return false;
   }
 
   if (
-    typeof doubleClickEvent === "string" &&
-    doubleClickEvent.length > 0 &&
-    !events.doubleClick
+    node.children !== undefined &&
+    (!Array.isArray(node.children) ||
+      !node.children.every((childId) => typeof childId === "string"))
   ) {
-    events.doubleClick = {
-      handlerId: doubleClickEvent,
-    };
+    return false;
   }
 
-  delete props.onClickEvent;
-  delete props.onDoubleClickEvent;
+  if (
+    node.bindings !== undefined &&
+    (!isRecord(node.bindings) ||
+      !Object.values(node.bindings).every(isBinding))
+  ) {
+    return false;
+  }
+
+  if (
+    node.events !== undefined &&
+    (!isRecord(node.events) || !Object.values(node.events).every(isHandlerRef))
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isBinding(value: unknown): value is Binding {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return value.kind === "tag" && typeof value.path === "string";
+}
+
+function isHandlerRef(value: unknown): value is HandlerRef {
+  return isRecord(value) && typeof value.handlerId === "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }

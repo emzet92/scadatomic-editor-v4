@@ -5,7 +5,6 @@ import {
 } from "./core/commands";
 import {
   createEmptyUiDocument,
-  normalizeUiDocument,
   type Binding,
   type HandlerRef,
   type NodeId,
@@ -41,7 +40,7 @@ type EditorState = {
   nodeDragCandidate: NodeDragCandidate | null;
 
   setSelectedNodeId: (id: NodeId | null) => void;
-  setDocument: (document: UiDocument | unknown) => void;
+  setDocument: (document: UiDocument) => void;
   dispatch: (command: DocumentCommand) => void;
 
   updateNode: (
@@ -106,12 +105,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   setDocument: (document) => {
-    const normalized = normalizeUiDocument(document);
-
     set((state) => ({
-      document: normalized,
+      document,
       selectedNodeId:
-        state.selectedNodeId && normalized.nodes[state.selectedNodeId]
+        state.selectedNodeId && document.nodes[state.selectedNodeId]
           ? state.selectedNodeId
           : null,
       draggedNodeId: null,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
-import { normalizeUiDocument, type UiDocument } from "./core/document";
+import type { UiDocument } from "./core/document";
 import { EditorControls } from "./EditorControls";
 import {
   Canvas,
@@ -100,10 +100,8 @@ export function EditorPage() {
           return;
         }
 
-        const loadedName = project.name ?? "Untitled Project";
-        const loadedDocument = normalizeUiDocument(
-          project.tree ?? initialDocument
-        );
+        const loadedName = project.name;
+        const loadedDocument = project.tree;
 
         setProjectName(loadedName);
         setDocument(loadedDocument);

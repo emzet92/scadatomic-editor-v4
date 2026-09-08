@@ -13,7 +13,6 @@ function App() {
         path="/project/:projectId/scripts/:scriptId"
         element={<ScriptPage />}
       />
-      <Route path="/scripts/:scriptId" element={<ScriptPage />} />
     </Routes>
   );
 }

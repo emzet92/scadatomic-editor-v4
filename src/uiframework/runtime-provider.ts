@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { applyDocumentCommand } from "./core/commands";
-import { normalizeUiDocument, type UiDocument } from "./core/document";
+import { parseUiDocument, type UiDocument } from "./core/document";
 import { runtimeSignals } from "./runtime-signals";
 import { getWs } from "./websocket";
 
@@ -34,27 +34,13 @@ export function RuntimeProvider({
           return;
         }
 
-        const messageType =
-          typeof payload.type === "string"
-            ? payload.type
-            : typeof payload.event === "string"
-              ? payload.event
-              : undefined;
-
-        if (messageType === "screen.publish") {
-          const documentInput =
-            payload.document ?? payload.tree ?? payload.nodes;
-
-          if (!documentInput) {
-            return;
-          }
-
-          setDocument(normalizeUiDocument(documentInput));
+        if (payload.type === "screen.publish") {
+          setDocument(parseUiDocument(payload.document));
           onScreenUpdated?.();
           return;
         }
 
-        if (messageType === "node.update") {
+        if (payload.type === "node.update") {
           const nodeId = payload.nodeId;
           const property = payload.property;
 
@@ -75,9 +61,11 @@ export function RuntimeProvider({
           return;
         }
 
-        const signalTag = payload.source ?? payload.tag;
-        if (signalTag !== undefined) {
-          runtimeSignals.set(String(signalTag), payload.value);
+        if (
+          payload.type === "runtime.signal" &&
+          typeof payload.source === "string"
+        ) {
+          runtimeSignals.set(payload.source, payload.value);
         }
       } catch (error) {
         console.error(

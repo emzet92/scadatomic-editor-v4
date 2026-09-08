@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById } from "../../http/projects-api";
-import { normalizeUiDocument, type UiDocument } from "../core/document";
+import { createEmptyUiDocument, type UiDocument } from "../core/document";
 import { RenderNode } from "../Renderer";
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
@@ -9,7 +9,7 @@ import { RuntimeProvider } from "../runtime-provider";
 export function RenderPage() {
   const { projectId } = useParams();
   const [document, setDocument] = useState<UiDocument>(() =>
-    normalizeUiDocument(null)
+    createEmptyUiDocument()
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function RenderPage() {
 
         const project = await getProjectById(projectId);
         if (!cancelled) {
-          setDocument(normalizeUiDocument(project.tree));
+          setDocument(project.tree);
         }
       } catch (error) {
         if (!cancelled) {

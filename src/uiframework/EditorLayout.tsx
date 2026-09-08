@@ -12,11 +12,8 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
 
     sendWsMessage({
       type: "screen.publish",
-      event: "screen.publish",
       projectId,
       document,
-      // Legacy field for older runtimes/backends during migration.
-      nodes: document.nodes,
     });
   };
 

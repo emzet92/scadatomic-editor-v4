@@ -37,7 +37,7 @@ export function EventsEditor({
           const handlerId = handler?.handlerId ?? generatedHandlerId;
           const scriptPath = projectId
             ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(handlerId)}`
-            : `/scripts/${encodeURIComponent(handlerId)}`;
+            : null;
 
           return (
             <div
@@ -69,13 +69,23 @@ export function EventsEditor({
                 </div>
               </div>
 
-              <Link
-                data-editor-ignore
-                to={scriptPath}
-                className="shrink-0 text-xs font-medium text-[var(--editor-accent)] hover:underline"
-              >
-                Open script
-              </Link>
+              {scriptPath ? (
+                <Link
+                  data-editor-ignore
+                  to={scriptPath}
+                  className="shrink-0 text-xs font-medium text-[var(--editor-accent)] hover:underline"
+                >
+                  Open script
+                </Link>
+              ) : (
+                <span
+                  data-editor-ignore
+                  className="shrink-0 text-xs text-[var(--editor-text-soft)]"
+                  title="Open the editor through /project/:projectId to edit scripts"
+                >
+                  Save project first
+                </span>
+              )}
             </div>
           );
         })}

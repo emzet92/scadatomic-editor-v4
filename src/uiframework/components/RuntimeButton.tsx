@@ -14,34 +14,26 @@ export function RuntimeButton({
   "data-node-id": nodeId,
   ...props
 }: RuntimeButtonProps) {
+  function executeEvent(eventName: string) {
+    const handlerId = runtimeEvents?.[eventName]?.handlerId;
+    if (!handlerId || !nodeId || !runtimeProjectId) {
+      return;
+    }
+
+    sendRuntimeEvent({
+      handlerId,
+      eventName,
+      nodeId,
+      projectId: runtimeProjectId,
+    });
+  }
+
   return (
     <Button
       {...props}
       data-node-id={nodeId}
-      onClick={() => {
-        const handlerId = runtimeEvents?.click?.handlerId;
-        if (!handlerId || !nodeId) {
-          return;
-        }
-
-        sendRuntimeEvent({
-          event: handlerId,
-          nodeId,
-          projectId: runtimeProjectId,
-        });
-      }}
-      onDoubleClick={() => {
-        const handlerId = runtimeEvents?.doubleClick?.handlerId;
-        if (!handlerId || !nodeId) {
-          return;
-        }
-
-        sendRuntimeEvent({
-          event: handlerId,
-          nodeId,
-          projectId: runtimeProjectId,
-        });
-      }}
+      onClick={() => executeEvent("click")}
+      onDoubleClick={() => executeEvent("doubleClick")}
     />
   );
 }
