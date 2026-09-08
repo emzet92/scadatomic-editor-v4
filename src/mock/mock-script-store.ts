@@ -5,7 +5,10 @@ export type MockScript = {
   updatedAt: number;
 };
 
-const STORAGE_PREFIX = "scadatomic.mock.v2.script.";
+// v3 intentionally starts with a clean script namespace. The previous prototype
+// generated handler bodies by inspecting scriptId (e.g. "randomcolor"), which
+// could hide whether the code actually came from script storage.
+const STORAGE_PREFIX = "scadatomic.mock.v3.script.";
 const memoryFallback = new Map<string, MockScript>();
 
 export function getMockScript(projectId: string, scriptId: string): MockScript {
@@ -17,7 +20,28 @@ export function getMockScript(projectId: string, scriptId: string): MockScript {
   const script: MockScript = {
     projectId,
     scriptId,
-    code: createDefaultScript(scriptId),
+    code: createEmptyScriptTemplate(),
+    updatedAt: Date.now(),
+  };
+
+  writeScript(script);
+  return clone(script);
+}
+
+export function ensureMockScript(
+  projectId: string,
+  scriptId: string,
+  code: string
+): MockScript {
+  const existing = readScript(projectId, scriptId);
+  if (existing) {
+    return clone(existing);
+  }
+
+  const script: MockScript = {
+    projectId,
+    scriptId,
+    code,
     updatedAt: Date.now(),
   };
 
@@ -110,27 +134,7 @@ function storageKey(projectId: string, scriptId: string) {
   return `${STORAGE_PREFIX}${encodeURIComponent(projectId)}.${encodeURIComponent(scriptId)}`;
 }
 
-function createDefaultScript(scriptId: string) {
-  const normalized = scriptId.toLowerCase();
-
-  if (normalized.includes("randomcolor")) {
-    return `const color = ctx.random.color();
-
-ctx.ui.setColor(ctx.sourceNodeId, color);
-ctx.emit("ui.color.changed", {
-  nodeId: ctx.sourceNodeId,
-  color,
-});`;
-  }
-
-  if (normalized.includes("start")) {
-    return `ctx.emit("pump.start");`;
-  }
-
-  if (normalized.includes("stop")) {
-    return `ctx.emit("pump.stop");`;
-  }
-
+function createEmptyScriptTemplate() {
   return `// ctx is the SCADAtomic prototype runtime API.
 ctx.log("handler", ctx.handlerId, "from", ctx.sourceNodeId);
 

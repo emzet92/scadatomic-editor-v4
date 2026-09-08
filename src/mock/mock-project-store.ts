@@ -3,6 +3,7 @@ import {
   type UiDocument,
 } from "../uiframework/core/document";
 import { initialDocument } from "../uiframework/registry/initial-values";
+import { ensureMockScript } from "./mock-script-store";
 
 export type MockProjectId = string;
 
@@ -32,6 +33,7 @@ export async function createMockProject(input: {
   };
 
   writeProject(project);
+  seedPrototypeScripts(id);
   return { id, revision: project.revision };
 }
 
@@ -42,6 +44,7 @@ export async function getMockProjectById(
 
   const existing = readProject(id);
   if (existing) {
+    seedPrototypeScripts(id);
     return clone(existing);
   }
 
@@ -54,6 +57,7 @@ export async function getMockProjectById(
   };
 
   writeProject(seeded);
+  seedPrototypeScripts(id);
   return clone(seeded);
 }
 
@@ -151,6 +155,26 @@ function writeProject(project: MockUiProject) {
   } catch {
     // In-memory fallback is enough for a development mock.
   }
+}
+
+function seedPrototypeScripts(projectId: string) {
+  ensureMockScript(
+    projectId,
+    "startButton.Clicked",
+    `ctx.emit("pump.start");`
+  );
+
+  ensureMockScript(
+    projectId,
+    "stopButton.Clicked",
+    `ctx.emit("pump.stop");`
+  );
+
+  ensureMockScript(
+    projectId,
+    "randomColorButton.RandomColorClicked",
+    `ctx.ui.setColor(ctx.sourceNodeId, ctx.random.color());`
+  );
 }
 
 function storageKey(id: MockProjectId) {
