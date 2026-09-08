@@ -5,7 +5,7 @@ export type MockScript = {
   updatedAt: number;
 };
 
-const STORAGE_PREFIX = "scadatomic.mock.v1.script.";
+const STORAGE_PREFIX = "scadatomic.mock.v2.script.";
 const memoryFallback = new Map<string, MockScript>();
 
 export function getMockScript(projectId: string, scriptId: string): MockScript {
@@ -132,7 +132,7 @@ ctx.emit("ui.color.changed", {
   }
 
   return `// ctx is the SCADAtomic prototype runtime API.
-ctx.log("handler THAT SHIET", ctx.handlerId, "from", ctx.sourceNodeId);
+ctx.log("handler", ctx.handlerId, "from", ctx.sourceNodeId);
 
 // Examples:
 // ctx.ui.setProp(ctx.sourceNodeId, "label", "Clicked");

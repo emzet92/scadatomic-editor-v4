@@ -24,6 +24,18 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
       </div>
 
       <div className="flex items-center gap-2">
+        {projectId ? (
+          <a
+            data-editor-ignore
+            href={`/render/${encodeURIComponent(projectId)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="h-9 px-4 inline-flex items-center rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)] text-sm font-medium hover:bg-[var(--editor-surface-muted)] transition"
+          >
+            Runtime preview
+          </a>
+        ) : null}
+
         <button
           data-editor-ignore
           onClick={publish}

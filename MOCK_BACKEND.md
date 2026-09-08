@@ -70,3 +70,10 @@ messages between tabs using `BroadcastChannel` when available.
 The script runtime deliberately uses `new Function()` and is **not sandboxed**.
 It is suitable only for this trusted local prototype. Do not use this mechanism
 for untrusted production scripts.
+
+## Runtime event testing
+
+Editor components are intentionally non-interactive. Test JavaScript handlers in
+`/render/:projectId` (or use **Runtime preview** in the editor toolbar). The mock
+project/script storage uses a fresh v2 namespace so old prototype data cannot
+silently remove the new `events` fields.

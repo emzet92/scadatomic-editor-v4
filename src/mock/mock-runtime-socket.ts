@@ -2,7 +2,7 @@ import { executeMockScript } from "./mock-script-runtime";
 
 type MockWsPayload = Record<string, unknown>;
 
-const CHANNEL_NAME = "scadatomic.mock.runtime";
+const CHANNEL_NAME = "scadatomic.mock.runtime.v2";
 const SIGNAL_INTERVAL_MS = 650;
 
 class MockRuntimeSocket extends EventTarget {
