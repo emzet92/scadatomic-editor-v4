@@ -65,6 +65,7 @@ export function TreeNodeRow({
 
       <TreeNodeLabel
         nodeId={nodeId}
+        name={node.name}
         type={node.type}
         setSelectedNodeId={setSelectedNodeId}
       />

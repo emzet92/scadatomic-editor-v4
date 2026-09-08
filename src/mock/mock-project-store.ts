@@ -14,7 +14,7 @@ export type MockUiProject = {
   revision: number;
 };
 
-const STORAGE_PREFIX = "scadatomic.mock.v2.project.";
+const STORAGE_PREFIX = "scadatomic.mock.v3.project.";
 const memoryFallback = new Map<string, MockUiProject>();
 const DEFAULT_LATENCY_MS = 120;
 

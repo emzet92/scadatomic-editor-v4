@@ -3,6 +3,7 @@ import { createUiDocument, type UiNode } from "../core/document";
 const nodes: Record<string, UiNode> = {
   root: {
     id: "root",
+    name: "Container1",
     type: "Container",
     props: {
       padding: 16,
@@ -22,6 +23,7 @@ const nodes: Record<string, UiNode> = {
 
   stationTitle: {
     id: "stationTitle",
+    name: "Text1",
     type: "Text",
     props: {
       value: "Pump Station P-101",
@@ -37,6 +39,7 @@ const nodes: Record<string, UiNode> = {
 
   levelLiters: {
     id: "levelLiters",
+    name: "Text2",
     type: "Text",
     props: {
       value: "1240 L",
@@ -51,6 +54,7 @@ const nodes: Record<string, UiNode> = {
 
   levelPercent: {
     id: "levelPercent",
+    name: "Text3",
     type: "Text",
     props: {
       value: "62 %",
@@ -65,6 +69,7 @@ const nodes: Record<string, UiNode> = {
 
   flowRate: {
     id: "flowRate",
+    name: "Text4",
     type: "Text",
     props: {
       value: "85 m³/h",
@@ -79,6 +84,7 @@ const nodes: Record<string, UiNode> = {
 
   startButton: {
     id: "startButton",
+    name: "Button1",
     type: "Button",
     props: {
       label: "START",
@@ -92,6 +98,7 @@ const nodes: Record<string, UiNode> = {
 
   stopButton: {
     id: "stopButton",
+    name: "Button2",
     type: "Button",
     props: {
       label: "STOP",
@@ -105,6 +112,7 @@ const nodes: Record<string, UiNode> = {
 
   randomColorButton: {
     id: "randomColorButton",
+    name: "Button3",
     type: "Button",
     props: {
       label: "RANDOM COLOR",

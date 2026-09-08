@@ -13,6 +13,7 @@ export type HandlerRef = {
 
 export type UiNode = {
   id: NodeId;
+  name: string;
   type: string;
   props?: Record<string, unknown> | undefined;
   bindings?: Record<string, Binding> | undefined;
@@ -21,7 +22,7 @@ export type UiNode = {
 };
 
 export type UiDocument = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   rootId: NodeId;
   nodes: Record<NodeId, UiNode>;
 };
@@ -31,7 +32,7 @@ export function createUiDocument(
   nodes: Record<NodeId, UiNode>
 ): UiDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     rootId,
     nodes,
   };
@@ -48,7 +49,7 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
   const candidate = value as Record<string, unknown>;
   if (
-    candidate.schemaVersion !== 1 ||
+    candidate.schemaVersion !== 2 ||
     typeof candidate.rootId !== "string" ||
     !candidate.nodes ||
     typeof candidate.nodes !== "object" ||
@@ -64,7 +65,7 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
 export function parseUiDocument(value: unknown): UiDocument {
   if (!isUiDocument(value)) {
-    throw new Error("Invalid UiDocument v1");
+    throw new Error("Invalid UiDocument v2");
   }
 
   return value;
@@ -76,7 +77,12 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
   }
 
   const node = value as Record<string, unknown>;
-  if (node.id !== expectedId || typeof node.type !== "string") {
+  if (
+    node.id !== expectedId ||
+    typeof node.name !== "string" ||
+    node.name.trim().length === 0 ||
+    typeof node.type !== "string"
+  ) {
     return false;
   }
 

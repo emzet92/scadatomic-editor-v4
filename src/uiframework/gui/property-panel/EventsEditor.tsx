@@ -3,11 +3,13 @@ import type { HandlerRef } from "../../core/document";
 
 export function EventsEditor({
   nodeId,
+  nodeName,
   definitions,
   events,
   setEvent,
 }: {
   nodeId: string;
+  nodeName: string;
   definitions: Record<string, { label: string; defaultSuffix: string }>;
   events: Record<string, HandlerRef> | undefined;
   setEvent: (
@@ -31,7 +33,7 @@ export function EventsEditor({
 
       <div className="space-y-3">
         {Object.entries(definitions).map(([eventName, definition]) => {
-          const generatedHandlerId = `${nodeId}.${definition.defaultSuffix}`;
+          const generatedHandlerId = `${nodeName}.${definition.defaultSuffix}`;
           const handler = events?.[eventName];
           const checked = !!handler;
           const handlerId = handler?.handlerId ?? generatedHandlerId;

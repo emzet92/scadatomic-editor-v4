@@ -35,7 +35,7 @@ export function PropertyPanelHeader({
           text-[var(--editor-text)]
         "
       >
-        {node.type}
+        {node.name}
       </div>
 
       <div
@@ -45,7 +45,7 @@ export function PropertyPanelHeader({
           truncate
         "
       >
-        {node.id}
+        {node.type}
       </div>
     </div>
   );

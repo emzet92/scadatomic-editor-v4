@@ -64,6 +64,7 @@ export function PropertyPanel({ document }: Props) {
         {definition?.events && (
           <EventsEditor
             nodeId={node.id}
+            nodeName={node.name}
             definitions={definition.events}
             events={node.events}
             setEvent={setEvent}

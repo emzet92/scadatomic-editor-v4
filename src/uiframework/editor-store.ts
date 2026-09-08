@@ -178,8 +178,10 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       const definition = getComponentDefinition(node.type);
       const id = crypto.randomUUID();
+      const name = createUniqueNodeName(state.document, node.type);
       const newNode: UiNode = {
         id,
+        name,
         type: node.type,
         props: { ...(node.props ?? {}) },
         children: definition?.acceptsChildren ? [] : undefined,
@@ -305,3 +307,20 @@ export const useEditorStore = create<EditorState>((set) => ({
     }));
   },
 }));
+
+
+function createUniqueNodeName(document: UiDocument, type: string): string {
+  const usedNames = new Set(
+    Object.values(document.nodes).map((node) => node.name)
+  );
+
+  let index = 1;
+  let candidate = `${type}${index}`;
+
+  while (usedNames.has(candidate)) {
+    index += 1;
+    candidate = `${type}${index}`;
+  }
+
+  return candidate;
+}

@@ -1,5 +1,6 @@
 export type TreeNodeData = {
   id: string;
+  name: string;
   type: string;
   children?: string[] | undefined;
 };
