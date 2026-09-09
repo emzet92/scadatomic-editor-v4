@@ -1,6 +1,7 @@
 import {
   createMockProject,
   getMockProjectById,
+  subscribeMockProject,
   updateMockProject,
 } from "../mock/mock-project-store";
 import type { UiDocument } from "../uiframework/core/document";
@@ -49,4 +50,11 @@ export async function updateProject(
   revision?: number
 ): Promise<UiProjectResponse> {
   return updateMockProject(id, request, revision);
+}
+
+export function subscribeProject(
+  id: ProjectId,
+  listener: (project: UiProjectResponse) => void
+): () => void {
+  return subscribeMockProject(id, listener);
 }

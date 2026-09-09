@@ -18,6 +18,9 @@ const STORAGE_PREFIX = "scadatomic.mock.v3.project.";
 const memoryFallback = new Map<string, MockUiProject>();
 const DEFAULT_LATENCY_MS = 120;
 
+type MockProjectListener = (project: MockUiProject) => void;
+const projectListeners = new Map<MockProjectId, Set<MockProjectListener>>();
+
 export async function createMockProject(input: {
   name: string;
   tree: UiDocument;
@@ -65,6 +68,41 @@ export async function getMockProjectById(
 export function getMockProjectSnapshot(id: MockProjectId): MockUiProject | null {
   const project = readProject(id);
   return project ? clone(project) : null;
+}
+
+export function subscribeMockProject(
+  id: MockProjectId,
+  listener: MockProjectListener
+): () => void {
+  let listeners = projectListeners.get(id);
+  if (!listeners) {
+    listeners = new Set();
+    projectListeners.set(id, listeners);
+  }
+  listeners.add(listener);
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== storageKey(id) || !event.newValue) {
+      return;
+    }
+
+    try {
+      listener(clone(parseMockProject(JSON.parse(event.newValue))));
+    } catch (error) {
+      console.error(`[mock-http] Invalid project update ${id}`, error);
+    }
+  };
+
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    const current = projectListeners.get(id);
+    current?.delete(listener);
+    if (current?.size === 0) {
+      projectListeners.delete(id);
+    }
+  };
 }
 
 export async function updateMockProject(
@@ -160,6 +198,14 @@ function writeProject(project: MockUiProject) {
     localStorage.setItem(storageKey(project.id), JSON.stringify(snapshot));
   } catch {
     // In-memory fallback is enough for a development mock.
+  }
+
+  notifyProjectListeners(snapshot);
+}
+
+function notifyProjectListeners(project: MockUiProject) {
+  for (const listener of projectListeners.get(project.id) ?? []) {
+    listener(clone(project));
   }
 }
 

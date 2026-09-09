@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getProjectById, updateProject } from "../../../http/projects-api";
+import {
+  getProjectById,
+  subscribeProject,
+  updateProject,
+} from "../../../http/projects-api";
 import {
   ensureMockScript,
   getMockScript,
@@ -57,15 +61,26 @@ function ScriptEditor({
   useEffect(() => {
     let cancelled = false;
 
+    function applyProject(project: {
+      tree: UiDocument;
+      name: string;
+      revision?: number;
+    }) {
+      if (cancelled) {
+        return;
+      }
+
+      setDocument(project.tree);
+      setProjectName(project.name);
+      setProjectRevision(project.revision);
+      setApiError(null);
+    }
+
+    const unsubscribe = subscribeProject(projectId, applyProject);
+
     async function loadDocument() {
       try {
-        const project = await getProjectById(projectId);
-        if (!cancelled) {
-          setDocument(project.tree);
-          setProjectName(project.name);
-          setProjectRevision(project.revision);
-          setApiError(null);
-        }
+        applyProject(await getProjectById(projectId));
       } catch (error) {
         if (!cancelled) {
           setApiError(
@@ -78,6 +93,7 @@ function ScriptEditor({
     loadDocument();
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [projectId]);
 

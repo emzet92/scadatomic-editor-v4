@@ -1,5 +1,5 @@
 import { Boxes, LayoutTemplate, Palette } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
 import type { UiDocument } from "./core/document";
@@ -104,6 +104,55 @@ export function EditorPage() {
   const lastSavedSnapshotRef = useRef<string | null>(null);
   const revisionRef = useRef<number | undefined>(undefined);
   const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSaveRef = useRef<{
+    projectId: string;
+    projectName: string;
+    document: UiDocument;
+    snapshot: string;
+  } | null>(null);
+
+  const flushPendingSave = useCallback((updateUi: boolean) => {
+    const pending = pendingSaveRef.current;
+    if (!pending || pending.snapshot === lastSavedSnapshotRef.current) {
+      pendingSaveRef.current = null;
+      return;
+    }
+
+    pendingSaveRef.current = null;
+    if (updateUi) {
+      setSaveStatus("saving");
+    }
+
+    saveChainRef.current = saveChainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const savedProject = await updateProject(
+          pending.projectId,
+          {
+            name: pending.projectName,
+            tree: pending.document,
+          },
+          revisionRef.current
+        );
+
+        revisionRef.current = savedProject.revision ?? revisionRef.current;
+        lastSavedSnapshotRef.current = pending.snapshot;
+      })
+      .then(() => {
+        if (updateUi) {
+          setSaveStatus("saved");
+        }
+      })
+      .catch((error) => {
+        console.error("Autosave failed", error);
+        if (!pendingSaveRef.current) {
+          pendingSaveRef.current = pending;
+        }
+        if (updateUi) {
+          setSaveStatus("error");
+        }
+      });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +166,7 @@ export function EditorPage() {
         loadedRef.current = false;
         lastSavedSnapshotRef.current = null;
         revisionRef.current = undefined;
+        pendingSaveRef.current = null;
 
         if (!projectId) {
           setProjectName("Untitled Project");
@@ -165,8 +215,9 @@ export function EditorPage() {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
       }
+      flushPendingSave(false);
     };
-  }, [projectId, setDocument]);
+  }, [projectId, setDocument, flushPendingSave]);
 
   useEffect(() => {
     if (!componentMode) {
@@ -202,34 +253,15 @@ export function EditorPage() {
       window.clearTimeout(saveTimerRef.current);
     }
 
+    pendingSaveRef.current = {
+      projectId,
+      projectName,
+      document,
+      snapshot,
+    };
+
     saveTimerRef.current = window.setTimeout(() => {
-      setSaveStatus("saving");
-
-      saveChainRef.current = saveChainRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (snapshot === lastSavedSnapshotRef.current) {
-            return;
-          }
-
-          const savedProject = await updateProject(
-            projectId,
-            {
-              name: projectName,
-              tree: document,
-            },
-            revisionRef.current
-          );
-
-          revisionRef.current =
-            savedProject.revision ?? revisionRef.current;
-          lastSavedSnapshotRef.current = snapshot;
-        })
-        .then(() => setSaveStatus("saved"))
-        .catch((error) => {
-          console.error("Autosave failed", error);
-          setSaveStatus("error");
-        });
+      flushPendingSave(true);
     }, 500);
 
     return () => {
@@ -237,7 +269,7 @@ export function EditorPage() {
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [projectId, projectName, document, loading]);
+  }, [projectId, projectName, document, loading, flushPendingSave]);
 
   function editVariant(nodeId: string, variantName: string) {
     setSelectedNodeId(nodeId);
