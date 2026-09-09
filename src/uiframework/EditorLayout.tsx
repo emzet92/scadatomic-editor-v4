@@ -1,10 +1,13 @@
+import type { UiDocument } from "./core/document";
+import { WorkspaceHeader } from "./gui/workspace/WorkspaceHeader";
 import { useEditorStore } from "./editor-store";
 import { sendWsMessage } from "./websocket";
 
 export function Toolbar({ projectId }: { projectId?: string | undefined }) {
-  const publish = () => {
-    const document = useEditorStore.getState().document;
+  const document = useEditorStore((state) => state.document);
+  const scriptId = getFirstScriptId(document);
 
+  const publish = () => {
     if (!document.nodes[document.rootId]) {
       console.error("Cannot publish empty document");
       return;
@@ -18,34 +21,53 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
   };
 
   return (
-    <header className="h-18 shrink-0 px-8 flex items-center justify-between bg-[var(--editor-surface)] border-b border-[var(--editor-border)]">
-      <div className="flex items-center gap-4">
-        <img src="/logo6.svg" alt="Scadatomic" className="h-10 w-auto shrink-0" />
-      </div>
+    <WorkspaceHeader
+      active="editor"
+      projectId={projectId}
+      scriptId={scriptId}
+      title="Designer"
+      subtitle="Visual UI editor"
+      actions={
+        <>
+          {projectId ? (
+            <a
+              data-editor-ignore
+              href={`/render/${encodeURIComponent(projectId)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="h-9 px-4 inline-flex items-center rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)] text-sm font-medium hover:bg-[var(--editor-surface-muted)] transition"
+            >
+              Runtime preview
+            </a>
+          ) : null}
 
-      <div className="flex items-center gap-2">
-        {projectId ? (
-          <a
+          <button
             data-editor-ignore
-            href={`/render/${encodeURIComponent(projectId)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="h-9 px-4 inline-flex items-center rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)] text-sm font-medium hover:bg-[var(--editor-surface-muted)] transition"
+            onClick={publish}
+            className="h-9 px-4 rounded-md bg-[var(--editor-accent)] text-white text-sm font-medium shadow-sm hover:bg-[var(--editor-accent-hover)] active:scale-[0.98] transition"
           >
-            Runtime preview
-          </a>
-        ) : null}
-
-        <button
-          data-editor-ignore
-          onClick={publish}
-          className="h-9 px-4 rounded-md bg-[var(--editor-accent)] text-white text-sm font-medium shadow-sm hover:bg-[var(--editor-accent-hover)] active:scale-[0.98] transition"
-        >
-          Publish
-        </button>
-      </div>
-    </header>
+            Publish
+          </button>
+        </>
+      }
+    />
   );
+}
+
+function getFirstScriptId(document: UiDocument) {
+  for (const node of Object.values(document.nodes)) {
+    const firstHandler = Object.values(node.events ?? {})[0];
+    if (firstHandler) {
+      return firstHandler.handlerId;
+    }
+
+    const firstMethod = Object.values(node.methods ?? {})[0];
+    if (firstMethod) {
+      return firstMethod.scriptId;
+    }
+  }
+
+  return "default";
 }
 
 export function LeftSidebar({ children }: React.PropsWithChildren) {
