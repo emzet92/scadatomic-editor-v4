@@ -11,7 +11,6 @@ import {
   type ComponentApiDescription,
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
-import { ComponentApiEditor } from "./ComponentApiEditor";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
 
@@ -210,6 +209,8 @@ function ScriptEditor({
           document={document}
           currentScriptId={scriptId}
           onSelect={selectScript}
+          onAddMethod={addComponentMethod}
+          onRemoveMethod={removeComponentMethod}
         />
 
         <main className="min-w-0 flex-1 overflow-auto p-6">
@@ -271,15 +272,7 @@ function ScriptEditor({
               </p>
             </div>
 
-            <ComponentApiEditor
-              document={document}
-              components={componentApi}
-              error={apiError}
-              currentScriptId={scriptId}
-              onSelectScript={selectScript}
-              onAddMethod={addComponentMethod}
-              onRemoveMethod={removeComponentMethod}
-            />
+
           </div>
         </main>
       </div>
