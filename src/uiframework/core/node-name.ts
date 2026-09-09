@@ -1,6 +1,7 @@
 import type { NodeId, UiDocument } from "./document";
 
 const NODE_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const RESERVED_UI_API_NAMES = new Set(["get", "setProp", "setColor"]);
 
 export type NodeNameValidationResult =
   | { ok: true; name: string }
@@ -21,6 +22,13 @@ export function validateNodeName(
     return {
       ok: false,
       error: "Use a JS identifier, e.g. MainPump or start_button.",
+    };
+  }
+
+  if (RESERVED_UI_API_NAMES.has(name)) {
+    return {
+      ok: false,
+      error: `“${name}” is reserved by ctx.ui.`,
     };
   }
 

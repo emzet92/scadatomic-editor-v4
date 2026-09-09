@@ -1,3 +1,6 @@
+import { parseUiDocument, type UiDocument } from "../uiframework/core/document";
+import { getMockProjectSnapshot } from "./mock-project-store";
+import { applyMockRuntimeUiState } from "./mock-runtime-ui-state";
 import { executeMockScript } from "./mock-script-runtime";
 
 type MockWsPayload = Record<string, unknown>;
@@ -9,6 +12,7 @@ class MockRuntimeSocket extends EventTarget {
   readonly readyState = WebSocket.OPEN;
 
   private readonly channel = createBroadcastChannel();
+  private readonly publishedDocuments = new Map<string, UiDocument>();
   private signalTimer: number | null = null;
   private process = {
     levelPercent: 62,
@@ -21,6 +25,7 @@ class MockRuntimeSocket extends EventTarget {
 
     if (this.channel) {
       this.channel.addEventListener("message", (event) => {
+        this.capturePublishedDocument(event.data);
         this.dispatchPayload(event.data);
       });
     }
@@ -38,9 +43,38 @@ class MockRuntimeSocket extends EventTarget {
       return;
     }
 
+    this.capturePublishedDocument(payload);
     this.handleOutgoingPayload(payload);
     this.dispatchPayload(payload);
     this.channel?.postMessage(payload);
+  }
+
+  private capturePublishedDocument(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      return;
+    }
+
+    const message = payload as MockWsPayload;
+    if (message.type !== "screen.publish" || typeof message.projectId !== "string") {
+      return;
+    }
+
+    try {
+      this.publishedDocuments.set(
+        message.projectId,
+        structuredClone(parseUiDocument(message.document))
+      );
+    } catch (error) {
+      console.warn("[mock-ws] Ignoring invalid published document", error);
+    }
+  }
+
+  private getProjectDocument(projectId: string): UiDocument | undefined {
+    const document =
+      this.publishedDocuments.get(projectId) ??
+      getMockProjectSnapshot(projectId)?.tree;
+
+    return document ? applyMockRuntimeUiState(projectId, document) : undefined;
   }
 
   private handleOutgoingPayload(payload: MockWsPayload) {
@@ -80,6 +114,12 @@ class MockRuntimeSocket extends EventTarget {
             value,
             timestamp: Date.now(),
           });
+        },
+        resolveUiNode: (name) => {
+          const document = this.getProjectDocument(projectId);
+          return Object.values(document?.nodes ?? {}).find(
+            (node) => node.name === name
+          );
         },
         emit: (customEventName, customPayload) => {
           this.handleScriptEvent(customEventName);

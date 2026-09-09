@@ -61,6 +61,12 @@ export async function getMockProjectById(
   return clone(seeded);
 }
 
+
+export function getMockProjectSnapshot(id: MockProjectId): MockUiProject | null {
+  const project = readProject(id);
+  return project ? clone(project) : null;
+}
+
 export async function updateMockProject(
   id: MockProjectId,
   input: {
@@ -173,7 +179,7 @@ function seedPrototypeScripts(projectId: string) {
   ensureMockScript(
     projectId,
     "randomColorButton.RandomColorClicked",
-    `ctx.ui.setColor(ctx.sourceNodeId, ctx.random.color());`
+    `ctx.ui.Button3.backgroundColor = ctx.random.color();`
   );
 }
 

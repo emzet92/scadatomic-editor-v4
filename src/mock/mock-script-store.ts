@@ -139,8 +139,9 @@ function createEmptyScriptTemplate() {
 ctx.log("handler", ctx.handlerId, "from", ctx.sourceNodeId);
 
 // Examples:
-// ctx.ui.setProp(ctx.sourceNodeId, "label", "Clicked");
-// ctx.ui.setColor(ctx.sourceNodeId, ctx.random.color());
+// ctx.ui.Button1.label = "Clicked";
+// ctx.ui.Button1.backgroundColor = ctx.random.color();
+// ctx.ui.Button1.setProp("disabled", true);
 // ctx.emit("my.event", { value: 123 });`;
 }
 
