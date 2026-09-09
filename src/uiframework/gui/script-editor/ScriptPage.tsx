@@ -1,3 +1,4 @@
+import { Code2, LayoutDashboard } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -210,27 +211,44 @@ function ScriptEditor({
 
   return (
     <div className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
-      <header className="h-16 shrink-0 border-b border-zinc-200 bg-white px-6 flex items-center justify-between">
-        <div>
-          <div className="text-sm font-semibold text-zinc-900">Script Editor</div>
-          <div className="text-xs text-zinc-500">
-            JavaScript handlers + generated component API
+      <header className="h-16 shrink-0 border-b border-zinc-200 bg-white px-6 flex items-center justify-between gap-6">
+        <div className="min-w-0 flex items-center gap-5">
+          <div className="shrink-0">
+            <div className="text-sm font-semibold text-zinc-900">Script Editor</div>
+            <div className="text-xs text-zinc-500">
+              JavaScript handlers + generated component API
+            </div>
           </div>
+
+          <nav
+            aria-label="Project workspace"
+            className="h-9 p-1 inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-zinc-50"
+          >
+            <button
+              type="button"
+              className="h-7 px-3 inline-flex items-center gap-2 rounded-md text-sm font-medium text-zinc-600 hover:bg-white hover:text-zinc-900 transition"
+              onClick={() => {
+                navigate(`/project/${encodeURIComponent(projectId)}`);
+              }}
+            >
+              <LayoutDashboard size={15} strokeWidth={1.8} />
+              Editor
+            </button>
+
+            <div
+              aria-current="page"
+              className="h-7 px-3 inline-flex items-center gap-2 rounded-md bg-white text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-zinc-200/70"
+            >
+              <Code2 size={15} strokeWidth={1.8} />
+              Scripts
+            </div>
+          </nav>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-zinc-400">
             {dirty ? "Unsaved changes" : "Saved locally"}
           </span>
-
-          <button
-            className="h-9 px-4 rounded-md border border-zinc-200 bg-white hover:bg-zinc-50 text-sm font-medium text-zinc-700 transition"
-            onClick={() => {
-              navigate(`/project/${encodeURIComponent(projectId)}`);
-            }}
-          >
-            Back to editor
-          </button>
 
           <button
             className="h-9 px-4 rounded-md bg-sky-600 hover:bg-sky-500 text-sm font-medium text-white transition"
