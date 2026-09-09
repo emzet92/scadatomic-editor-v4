@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getProjectById } from "../../../http/projects-api";
+import { getProjectById, updateProject } from "../../../http/projects-api";
 import {
+  ensureMockScript,
   getMockScript,
   saveMockScript,
 } from "../../../mock/mock-script-store";
@@ -10,6 +11,7 @@ import {
   type ComponentApiDescription,
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
+import { ComponentApiEditor } from "./ComponentApiEditor";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
 
@@ -39,6 +41,8 @@ function ScriptEditor({
   const [code, setCode] = useState(initialScript.code);
   const [savedCode, setSavedCode] = useState(initialScript.code);
   const [document, setDocument] = useState<UiDocument | null>(null);
+  const [projectName, setProjectName] = useState("");
+  const [projectRevision, setProjectRevision] = useState<number | undefined>();
   const [apiError, setApiError] = useState<string | null>(null);
 
   const dirty = code !== savedCode;
@@ -59,6 +63,8 @@ function ScriptEditor({
         const project = await getProjectById(projectId);
         if (!cancelled) {
           setDocument(project.tree);
+          setProjectName(project.name);
+          setProjectRevision(project.revision);
           setApiError(null);
         }
       } catch (error) {
@@ -93,6 +99,77 @@ function ScriptEditor({
     navigate(
       `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(nextScriptId)}`
     );
+  }
+
+  async function persistMethod(
+    nodeId: string,
+    methodName: string,
+    scriptId: string | null
+  ) {
+    if (!document) {
+      throw new Error("Component API is not loaded yet.");
+    }
+
+    const node = document.nodes[nodeId];
+    if (!node) {
+      throw new Error("Component no longer exists in the document.");
+    }
+
+    const methods = { ...(node.methods ?? {}) };
+    if (scriptId) {
+      methods[methodName] = { scriptId };
+    } else {
+      delete methods[methodName];
+    }
+
+    const nextNode = {
+      ...node,
+      ...(Object.keys(methods).length > 0 ? { methods } : { methods: undefined }),
+    };
+
+    const nextDocument: UiDocument = {
+      ...document,
+      nodes: {
+        ...document.nodes,
+        [nodeId]: nextNode,
+      },
+    };
+
+    const saved = await updateProject(
+      projectId,
+      {
+        name: projectName || projectId,
+        tree: nextDocument,
+      },
+      projectRevision
+    );
+
+    setDocument(saved.tree);
+    setProjectName(saved.name);
+    setProjectRevision(saved.revision);
+    return saved.tree.nodes[nodeId];
+  }
+
+  async function addComponentMethod(nodeId: string, methodName: string) {
+    const node = document?.nodes[nodeId];
+    if (!node) {
+      throw new Error("Component no longer exists in the document.");
+    }
+
+    const methodScriptId = `component-method.${crypto.randomUUID()}`;
+    await persistMethod(nodeId, methodName, methodScriptId);
+
+    ensureMockScript(
+      projectId,
+      methodScriptId,
+      `// Component method: ${node.name}.${methodName}()\n// self === ctx.ui.${node.name}\n\nctx.log("${node.name}.${methodName}");`
+    );
+
+    return methodScriptId;
+  }
+
+  async function removeComponentMethod(nodeId: string, methodName: string) {
+    await persistMethod(nodeId, methodName, null);
   }
 
   return (
@@ -194,126 +271,18 @@ function ScriptEditor({
               </p>
             </div>
 
-            <ComponentApiSection components={componentApi} error={apiError} />
+            <ComponentApiEditor
+              document={document}
+              components={componentApi}
+              error={apiError}
+              currentScriptId={scriptId}
+              onSelectScript={selectScript}
+              onAddMethod={addComponentMethod}
+              onRemoveMethod={removeComponentMethod}
+            />
           </div>
         </main>
       </div>
-    </div>
-  );
-}
-
-function ComponentApiSection({
-  components,
-  error,
-}: {
-  components: ComponentApiDescription[];
-  error: string | null;
-}) {
-  return (
-    <section className="rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Component API
-          </div>
-          <p className="mt-1 text-sm text-zinc-500">
-            Generated from the current project. Component names are the public API symbols.
-          </p>
-        </div>
-        <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500">
-          {components.length} components
-        </span>
-      </div>
-
-      {error ? (
-        <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </div>
-      ) : components.length === 0 ? (
-        <div className="mt-4 text-sm text-zinc-400">Loading component API…</div>
-      ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {components.map((component) => (
-            <ComponentApiCard key={component.nodeId} component={component} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ComponentApiCard({
-  component,
-}: {
-  component: ComponentApiDescription;
-}) {
-  return (
-    <div className="min-w-0 rounded-lg border border-zinc-200 bg-zinc-50/60 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <code className="truncate text-sm font-semibold text-zinc-900">
-          ctx.ui.{component.name}
-        </code>
-        <span className="shrink-0 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs font-medium text-zinc-500">
-          {component.type}
-        </span>
-      </div>
-
-      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-        Read only
-      </div>
-      <div className="mt-1 flex flex-wrap gap-1.5 text-xs font-mono text-zinc-600">
-        <code>.id</code>
-        <code>.name</code>
-        <code>.type</code>
-      </div>
-
-      <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-        Props · read / write
-      </div>
-      <div className="mt-1 flex flex-wrap gap-1.5">
-        {component.properties.map((property) => (
-          <code
-            key={property.name}
-            className="rounded border border-zinc-200 bg-white px-1.5 py-1 text-xs text-zinc-700"
-            title={`ctx.ui.${component.name}.${property.name}`}
-          >
-            .{property.name}
-            <span className="ml-1 text-zinc-400">:{property.valueType}</span>
-          </code>
-        ))}
-      </div>
-
-      {component.methods.length > 0 ? (
-        <>
-          <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-            Methods
-          </div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {component.methods.map((method) => (
-              <code
-                key={method.name}
-                className="rounded border border-sky-200 bg-sky-50 px-1.5 py-1 text-xs text-sky-700"
-                title={`ctx.ui.${component.name}.${method.name}()`}
-              >
-                .{method.name}()
-              </code>
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      <div className="mt-3 space-y-1 text-xs font-mono text-zinc-600">
-        <div>.setProp(prop, value)</div>
-        {component.colorProperty ? (
-          <div>.setColor(color) → {component.colorProperty}</div>
-        ) : null}
-      </div>
-
-      {component.properties.length > 0 ? (
-        <div className="mt-3 rounded-md bg-zinc-900 px-2.5 py-2 text-xs font-mono text-zinc-100 overflow-x-auto">
-          ctx.ui.{component.name}.{component.properties[0]?.name} = value;
-        </div>
-      ) : null}
     </div>
   );
 }
