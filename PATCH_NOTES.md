@@ -1,19 +1,14 @@
-# Designer Surface refactor
+# Create component click regression fix
 
-The visual editor now has a single interaction engine.
+Fixes a regression introduced by Designer Surface Architecture.
 
-## Architecture
+`DesignerSurface` used a document-level capture-phase click listener and treated every click outside a rendered node as canvas deselection. Clicking controls in the right inspector (including `Create component`) therefore cleared the current selection before React handled the button click.
 
-- `DesignerSurface` owns pointer events, drag/drop, hit testing, selection overlays,
-  drop indicators and geometry refresh.
-- `DesignerAdapter` is the persistence boundary used by the surface.
-- `PageDesignerSurface` adapts the engine to the active Page tree.
-- `ComponentDesignerSurface` adapts the same engine to a reusable component
-  definition tree.
+The selection event handling is now scoped to the adapter's canvas:
 
-The old `EditorControls.tsx` and `ComponentDefinitionControls.tsx` no longer
-contain separate interaction implementations; they are compatibility shims only.
+- clicks outside the active designer canvas are ignored,
+- `[data-editor-ignore]` regions are ignored,
+- clicking an empty area inside the canvas still clears selection,
+- clicking a node inside the canvas still selects/multiselects it.
 
-Adding future designer behavior (resize, snapping, keyboard movement, marquee
-selection, guides, etc.) should happen in `DesignerSurface` once and be shared by
-both Page and reusable-component editing.
+Only `src/uiframework/designer/DesignerSurface.tsx` changes.

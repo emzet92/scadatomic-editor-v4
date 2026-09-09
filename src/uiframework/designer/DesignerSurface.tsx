@@ -70,12 +70,30 @@ export function DesignerSurface({
   }, [adapter.key, adapter.snapshot.document]);
 
   useEffect(() => {
-    function findNodeElement(target: EventTarget | null) {
+    function getCanvasElement() {
+      return window.document.querySelector<HTMLElement>(
+        adapterRef.current.canvasSelector
+      );
+    }
+
+    function getCanvasTarget(target: EventTarget | null) {
       if (!(target instanceof HTMLElement)) return null;
       if (target.closest("[data-editor-ignore]")) return null;
-      return target.closest<HTMLElement>(
+
+      const canvas = getCanvasElement();
+      if (!canvas || !canvas.contains(target)) return null;
+
+      return { canvas, target };
+    }
+
+    function findNodeElement(target: EventTarget | null) {
+      const canvasTarget = getCanvasTarget(target);
+      if (!canvasTarget) return null;
+
+      const element = canvasTarget.target.closest<HTMLElement>(
         `[${adapterRef.current.nodeIdAttribute}]`
       );
+      return element && canvasTarget.canvas.contains(element) ? element : null;
     }
 
     function readNodeId(element: HTMLElement | null) {
@@ -83,6 +101,9 @@ export function DesignerSurface({
     }
 
     function handleClick(event: MouseEvent) {
+      const canvasTarget = getCanvasTarget(event.target);
+      if (!canvasTarget) return;
+
       const nodeId = readNodeId(findNodeElement(event.target));
       adapterRef.current.selectNode(
         nodeId,
