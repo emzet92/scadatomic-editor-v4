@@ -3,17 +3,20 @@ import {
   Box,
   Boxes,
   ChartLine,
+  LayoutTemplate,
   RectangleHorizontal,
   Search,
   Type,
 } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
+import { createProjectComponentRepository } from "../../component-repository";
 import {
   componentDefinitions,
   type RegisteredComponentType,
 } from "../../registry/component-definitions";
 
 const icons = {
+  Page: LayoutTemplate,
   Container: Box,
   Text: Type,
   Button: RectangleHorizontal,
@@ -23,17 +26,17 @@ const icons = {
 export function ComponentPalette() {
   const [search, setSearch] = useState("");
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
-  const componentDefinitionsById = useEditorStore(
-    (s) => s.document.components
-  );
+  const document = useEditorStore((s) => s.document);
   const reusableComponents = useMemo(
-    () => Object.values(componentDefinitionsById ?? {}),
-    [componentDefinitionsById]
+    () => createProjectComponentRepository(document).list(),
+    [document]
   );
 
   const normalizedSearch = search.toLowerCase();
-  const items = Object.values(componentDefinitions).filter((item) =>
-    item.label.toLowerCase().includes(normalizedSearch)
+  const items = Object.values(componentDefinitions).filter(
+    (item) =>
+      item.type !== "Page" &&
+      item.label.toLowerCase().includes(normalizedSearch)
   );
   const reusableItems = reusableComponents.filter((item) =>
     item.name.toLowerCase().includes(normalizedSearch)
@@ -62,12 +65,13 @@ export function ComponentPalette() {
         </div>
       </div>
 
-      {reusableItems.length > 0 ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
-            <Boxes size={12} /> Project components
-          </div>
-          {reusableItems.map((item) => (
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
+          <Boxes size={12} /> Component library
+        </div>
+
+        {reusableItems.length > 0 ? (
+          reusableItems.map((item) => (
             <button
               key={item.id}
               data-editor-ignore
@@ -94,13 +98,17 @@ export function ComponentPalette() {
                   {item.name}
                 </div>
                 <div className="text-xs text-[var(--editor-text-muted)]">
-                  Encapsulated component
+                  Reusable project component
                 </div>
               </div>
             </button>
-          ))}
-        </div>
-      ) : null}
+          ))
+        ) : (
+          <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 px-3 py-3 text-[10px] leading-4 text-violet-700/80">
+            Create a component from a Container or multi-selection and it will appear here.
+          </div>
+        )}
+      </div>
 
       <div className="space-y-2">
         {items.map((item) => {

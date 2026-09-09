@@ -15,7 +15,11 @@ import {
   type UiNode,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
-import { createReusableComponentFromNode } from "./reusable-components";
+import { createProjectComponentRepository } from "./component-repository";
+import {
+  createReusableComponentFromNode,
+  createReusableComponentFromSelection,
+} from "./reusable-components";
 import {
   createUniqueNodeName,
   validateNodeName,
@@ -45,6 +49,7 @@ type NodeDragCandidate = {
 
 type EditorState = {
   selectedNodeId: NodeId | null;
+  selectedNodeIds: NodeId[];
   document: UiDocument;
 
   dragPreview: DragPreview | null;
@@ -54,6 +59,10 @@ type EditorState = {
   nodeDragCandidate: NodeDragCandidate | null;
 
   setSelectedNodeId: (id: NodeId | null) => void;
+  selectNode: (
+    id: NodeId | null,
+    options?: { toggle?: boolean; additive?: boolean }
+  ) => void;
   setDocument: (document: UiDocument) => void;
   dispatch: (command: DocumentCommand) => void;
   renameNode: (nodeId: NodeId, name: string) => RenameNodeResult;
@@ -82,6 +91,7 @@ type EditorState = {
   ) => void;
 
   createReusableComponent: (nodeId: NodeId) => string | null;
+  createReusableComponentFromSelection: (nodeIds?: NodeId[]) => string | null;
   updateComponentDefinition: (
     componentId: string,
     updater: (definition: UiComponentDefinition) => UiComponentDefinition
@@ -129,6 +139,7 @@ const NODE_DRAG_THRESHOLD_PX = 4;
 
 export const useEditorStore = create<EditorState>((set) => ({
   selectedNodeId: null,
+  selectedNodeIds: [],
   document: createEmptyUiDocument(),
 
   dragPreview: null,
@@ -138,16 +149,50 @@ export const useEditorStore = create<EditorState>((set) => ({
   nodeDragCandidate: null,
 
   setSelectedNodeId: (id) => {
-    set({ selectedNodeId: id });
+    set({
+      selectedNodeId: id,
+      selectedNodeIds: id ? [id] : [],
+    });
+  },
+
+  selectNode: (id, options = {}) => {
+    set((state) => {
+      if (!id) {
+        return { selectedNodeId: null, selectedNodeIds: [] };
+      }
+
+      if (!state.document.nodes[id]) return state;
+
+      const { toggle = false, additive = false } = options;
+      if (!toggle && !additive) {
+        return { selectedNodeId: id, selectedNodeIds: [id] };
+      }
+
+      const selected = new Set(state.selectedNodeIds);
+      if (toggle && selected.has(id)) {
+        selected.delete(id);
+      } else {
+        selected.add(id);
+      }
+
+      const selectedNodeIds = Array.from(selected);
+      return {
+        selectedNodeIds,
+        selectedNodeId: selected.has(id)
+          ? id
+          : selectedNodeIds.at(-1) ?? null,
+      };
+    });
   },
 
   setDocument: (document) => {
     set((state) => ({
       document,
+      selectedNodeIds: state.selectedNodeIds.filter((id) => !!document.nodes[id]),
       selectedNodeId:
         state.selectedNodeId && document.nodes[state.selectedNodeId]
           ? state.selectedNodeId
-          : null,
+          : state.selectedNodeIds.find((id) => !!document.nodes[id]) ?? null,
       draggedNodeId: null,
       nodeDragCandidate: null,
       dragPreview: null,
@@ -160,10 +205,11 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         document,
+        selectedNodeIds: state.selectedNodeIds.filter((id) => !!document.nodes[id]),
         selectedNodeId:
           state.selectedNodeId && document.nodes[state.selectedNodeId]
             ? state.selectedNodeId
-            : null,
+            : state.selectedNodeIds.find((id) => !!document.nodes[id]) ?? null,
       };
     });
   },
@@ -261,9 +307,35 @@ export const useEditorStore = create<EditorState>((set) => ({
         return {
           document: result.document,
           selectedNodeId: result.instanceNodeId,
+          selectedNodeIds: [result.instanceNodeId],
         };
       } catch (error) {
         console.error("Failed to create reusable component", error);
+        return state;
+      }
+    });
+
+    return componentId;
+  },
+
+  createReusableComponentFromSelection: (requestedNodeIds) => {
+    let componentId: string | null = null;
+
+    set((state) => {
+      const nodeIds = requestedNodeIds ?? state.selectedNodeIds;
+      try {
+        const result = createReusableComponentFromSelection(
+          state.document,
+          nodeIds
+        );
+        componentId = result.componentId;
+        return {
+          document: result.document,
+          selectedNodeId: result.instanceNodeId,
+          selectedNodeIds: [result.instanceNodeId],
+        };
+      } catch (error) {
+        console.error("Failed to create reusable component from selection", error);
         return state;
       }
     });
@@ -277,13 +349,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (!current) return state;
 
       return {
-        document: {
-          ...state.document,
-          components: {
-            ...(state.document.components ?? {}),
-            [componentId]: updater(current),
-          },
-        },
+        document: createProjectComponentRepository(state.document).upsert(
+          updater(current)
+        ),
       };
     });
   },
@@ -303,13 +371,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       };
 
       return {
-        document: {
-          ...state.document,
-          components: {
-            ...(state.document.components ?? {}),
-            [componentId]: nextDefinition,
-          },
-        },
+        document: createProjectComponentRepository(state.document).upsert(
+          nextDefinition
+        ),
       };
     });
   },
@@ -329,13 +393,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       };
 
       return {
-        document: {
-          ...state.document,
-          components: {
-            ...(state.document.components ?? {}),
-            [componentId]: nextDefinition,
-          },
-        },
+        document: createProjectComponentRepository(state.document).upsert(
+          nextDefinition
+        ),
       };
     });
   },
@@ -375,6 +435,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         document,
         selectedNodeId: document.nodes[id] ? id : state.selectedNodeId,
+        selectedNodeIds: document.nodes[id] ? [id] : state.selectedNodeIds,
         dragPreview: null,
         draggedNodeId: null,
         nodeDragCandidate: null,
@@ -391,10 +452,11 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       return {
         document,
+        selectedNodeIds: state.selectedNodeIds.filter((nodeId) => !!document.nodes[nodeId]),
         selectedNodeId:
           state.selectedNodeId && document.nodes[state.selectedNodeId]
             ? state.selectedNodeId
-            : null,
+            : state.selectedNodeIds.find((nodeId) => !!document.nodes[nodeId]) ?? null,
       };
     });
   },
@@ -482,6 +544,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       draggedNodeId: null,
       nodeDragCandidate: null,
       selectedNodeId: nodeId,
+      selectedNodeIds: [nodeId],
     }));
   },
 }));

@@ -1,4 +1,4 @@
-import type { TreeNodeData } from "./tree-view-types";
+import type { TreeNodeData, TreeSelectionOptions } from "./tree-view-types";
 import { TreeNodeToggle } from "./TreeNodeToggle";
 import { TreeNodeIcon } from "./TreeNodeIcon";
 import { TreeNodeLabel } from "./TreeNodeLabel";
@@ -11,8 +11,9 @@ export function TreeNodeRow({
   collapsed,
   hasChildren,
   selected,
+  primarySelected,
   setCollapsed,
-  setSelectedNodeId,
+  selectNode,
   moveNodeUp,
   moveNodeDown,
 }: {
@@ -22,38 +23,22 @@ export function TreeNodeRow({
   collapsed: boolean;
   hasChildren: boolean;
   selected: boolean;
+  primarySelected: boolean;
   setCollapsed: (collapsed: boolean) => void;
-  setSelectedNodeId: (nodeId: string) => void;
+  selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
 }) {
   return (
     <div
-      className={`
-        group
-        flex
-        items-center
-        gap-2
-
-        px-2
-        py-1.5
-
-        rounded-md
-
-        cursor-pointer
-        text-sm
-
-        transition-colors
-
-        ${selected
+      className={`group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
+        primarySelected
           ? "bg-[var(--editor-selected-soft)] text-[var(--editor-accent)] border-l-2 border-[var(--editor-selected)]"
-          : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)]"
-        }
-      `}
-      style={{
-        paddingLeft:
-          level * 16 + 8,
-      }}
+          : selected
+            ? "bg-violet-50 text-violet-700"
+            : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)]"
+      }`}
+      style={{ paddingLeft: level * 16 + 8 }}
     >
       <TreeNodeToggle
         collapsed={collapsed}
@@ -67,7 +52,7 @@ export function TreeNodeRow({
         nodeId={nodeId}
         name={node.name}
         type={node.type}
-        setSelectedNodeId={setSelectedNodeId}
+        selectNode={selectNode}
       />
 
       <TreeNodeMoveActions

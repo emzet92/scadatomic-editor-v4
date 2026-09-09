@@ -1,5 +1,29 @@
 export type CssSize = number | string;
 
+export type PageDeviceMode = "desktop" | "tablet" | "mobile";
+
+export type PageNodeProps = {
+  deviceMode?: PageDeviceMode;
+  width?: CssSize;
+  height?: CssSize;
+  backgroundColor?: string;
+  padding?: number;
+  gap?: number;
+  columns?: number;
+  display?: "grid" | "flex";
+};
+
+export const defaultPageProps = {
+  deviceMode: "desktop",
+  width: 1440,
+  height: 900,
+  backgroundColor: "#ffffff",
+  padding: 24,
+  gap: 12,
+  columns: 1,
+  display: "grid",
+} satisfies PageNodeProps;
+
 export type ContainerNodeProps = {
   width?: CssSize;
   height?: CssSize;

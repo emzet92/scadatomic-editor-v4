@@ -3,9 +3,27 @@ import { createUiDocument, type UiNode } from "../core/document";
 const nodes: Record<string, UiNode> = {
   root: {
     id: "root",
+    name: "Page1",
+    type: "Page",
+    props: {
+      deviceMode: "desktop",
+      width: 1440,
+      height: 900,
+      backgroundColor: "#ffffff",
+      padding: 24,
+      gap: 12,
+      columns: 1,
+      display: "grid",
+    },
+    children: ["mainContainer"],
+  },
+
+  mainContainer: {
+    id: "mainContainer",
     name: "Container1",
     type: "Container",
     props: {
+      width: "100%",
       padding: 16,
       gap: 12,
       borderSize: 1,
@@ -41,14 +59,9 @@ const nodes: Record<string, UiNode> = {
     id: "levelLiters",
     name: "Text2",
     type: "Text",
-    props: {
-      value: "1240 L",
-    },
+    props: { value: "1240 L" },
     bindings: {
-      value: {
-        kind: "tag",
-        path: "tank.levelLiters",
-      },
+      value: { kind: "tag", path: "tank.levelLiters" },
     },
   },
 
@@ -56,14 +69,9 @@ const nodes: Record<string, UiNode> = {
     id: "levelPercent",
     name: "Text3",
     type: "Text",
-    props: {
-      value: "62 %",
-    },
+    props: { value: "62 %" },
     bindings: {
-      value: {
-        kind: "tag",
-        path: "tank.levelPercent",
-      },
+      value: { kind: "tag", path: "tank.levelPercent" },
     },
   },
 
@@ -71,14 +79,9 @@ const nodes: Record<string, UiNode> = {
     id: "flowRate",
     name: "Text4",
     type: "Text",
-    props: {
-      value: "85 m³/h",
-    },
+    props: { value: "85 m³/h" },
     bindings: {
-      value: {
-        kind: "tag",
-        path: "pump.flowRate",
-      },
+      value: { kind: "tag", path: "pump.flowRate" },
     },
   },
 
@@ -86,18 +89,12 @@ const nodes: Record<string, UiNode> = {
     id: "startButton",
     name: "Button1",
     type: "Button",
-    props: {
-      label: "START",
-    },
+    props: { label: "START" },
     events: {
-      click: {
-        handlerId: "startButton.Clicked",
-      },
+      click: { handlerId: "startButton.Clicked" },
     },
     methods: {
-      enable: {
-        scriptId: "startButton.method.enable",
-      },
+      enable: { scriptId: "startButton.method.enable" },
     },
   },
 
@@ -105,13 +102,9 @@ const nodes: Record<string, UiNode> = {
     id: "stopButton",
     name: "Button2",
     type: "Button",
-    props: {
-      label: "STOP",
-    },
+    props: { label: "STOP" },
     events: {
-      click: {
-        handlerId: "stopButton.Clicked",
-      },
+      click: { handlerId: "stopButton.Clicked" },
     },
   },
 
@@ -124,9 +117,7 @@ const nodes: Record<string, UiNode> = {
       backgroundColor: "#7c3aed",
     },
     events: {
-      click: {
-        handlerId: "randomColorButton.RandomColorClicked",
-      },
+      click: { handlerId: "randomColorButton.RandomColorClicked" },
     },
   },
 };

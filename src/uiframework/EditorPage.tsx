@@ -46,9 +46,21 @@ export function RendererRoot({
       registry={registry}
       decorateProps={(node) => ({
         ...getDefaultComponentVariantProps(node),
+        ...(node.type === "Page"
+          ? {
+              style: {
+                boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
+              },
+            }
+          : {}),
         "data-node-id": node.id,
         onPointerDown: (event: React.PointerEvent) => {
-          if (event.button !== 0) {
+          if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey
+          ) {
             return;
           }
 

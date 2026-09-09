@@ -65,7 +65,7 @@ export type UiNode = {
 };
 
 export type UiDocument = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   rootId: NodeId;
   nodes: Record<NodeId, UiNode>;
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
@@ -76,14 +76,27 @@ export function createUiDocument(
   nodes: Record<NodeId, UiNode>
 ): UiDocument {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     rootId,
     nodes,
   };
 }
 
 export function createEmptyUiDocument(): UiDocument {
-  return createUiDocument("root", {});
+  return createUiDocument("root", {
+    root: {
+      id: "root",
+      name: "Page1",
+      type: "Page",
+      props: {
+        deviceMode: "desktop",
+        width: 1440,
+        height: 900,
+        backgroundColor: "#ffffff",
+      },
+      children: [],
+    },
+  });
 }
 
 export function isUiDocument(value: unknown): value is UiDocument {
@@ -93,7 +106,7 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
   const candidate = value as Record<string, unknown>;
   if (
-    candidate.schemaVersion !== 2 ||
+    candidate.schemaVersion !== 3 ||
     typeof candidate.rootId !== "string" ||
     !candidate.nodes ||
     typeof candidate.nodes !== "object" ||
@@ -105,6 +118,11 @@ export function isUiDocument(value: unknown): value is UiDocument {
   if (
     !Object.entries(candidate.nodes).every(([id, node]) => isUiNode(node, id))
   ) {
+    return false;
+  }
+
+  const root = (candidate.nodes as Record<string, unknown>)[candidate.rootId];
+  if (!isRecord(root) || root.type !== "Page") {
     return false;
   }
 
@@ -124,7 +142,7 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
 export function parseUiDocument(value: unknown): UiDocument {
   if (!isUiDocument(value)) {
-    throw new Error("Invalid UiDocument v2");
+    throw new Error("Invalid UiDocument v3");
   }
 
   return value;

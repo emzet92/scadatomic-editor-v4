@@ -1,7 +1,4 @@
-import type {
-  TreeNodeData,
-  TreeNodes,
-} from "./tree-view-types";
+import type { TreeNodeData, TreeNodes, TreeSelectionOptions } from "./tree-view-types";
 import { TreeNode } from "./TreeNode";
 
 export function TreeNodeChildren({
@@ -9,7 +6,8 @@ export function TreeNodeChildren({
   level,
   nodes,
   selectedNodeId,
-  setSelectedNodeId,
+  selectedNodeIds,
+  selectNode,
   moveNodeUp,
   moveNodeDown,
 }: {
@@ -17,26 +15,26 @@ export function TreeNodeChildren({
   level: number;
   nodes: TreeNodes;
   selectedNodeId?: string | null | undefined;
-  setSelectedNodeId: (nodeId: string) => void;
+  selectedNodeIds?: readonly string[] | undefined;
+  selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
 }) {
   return (
     <>
-      {(node.children ?? []).map(
-        (childId) => (
-          <TreeNode
-            key={childId}
-            nodeId={childId}
-            level={level + 1}
-            nodes={nodes}
-            selectedNodeId={selectedNodeId}
-            setSelectedNodeId={setSelectedNodeId}
-            moveNodeUp={moveNodeUp}
-            moveNodeDown={moveNodeDown}
-          />
-        )
-      )}
+      {(node.children ?? []).map((childId) => (
+        <TreeNode
+          key={childId}
+          nodeId={childId}
+          level={level + 1}
+          nodes={nodes}
+          selectedNodeId={selectedNodeId}
+          selectedNodeIds={selectedNodeIds}
+          selectNode={selectNode}
+          moveNodeUp={moveNodeUp}
+          moveNodeDown={moveNodeDown}
+        />
+      ))}
     </>
   );
 }

@@ -12,6 +12,8 @@ import { EventsEditor } from "./EventsEditor";
 import { PropertyPanelEmpty } from "./PropertyPanelEmpty";
 import { PropertyPanelHeader } from "./PropertyPanelHeader";
 import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
+import { MultiSelectionPanel } from "./MultiSelectionPanel";
+import { PageSettingsEditor } from "./PageSettingsEditor";
 import { PropsEditor } from "./PropsEditor";
 import { VariantsEditor } from "./VariantsEditor";
 import type { UpdateNode } from "./property-panel-types";
@@ -44,12 +46,16 @@ export function PropertyPanel({
   onExitComponentMode,
 }: Props) {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
   const updateNode = useEditorStore((state) => state.updateNode);
   const renameNode = useEditorStore((state) => state.renameNode);
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
   const createReusableComponent = useEditorStore(
     (state) => state.createReusableComponent
+  );
+  const createReusableComponentFromSelection = useEditorStore(
+    (state) => state.createReusableComponentFromSelection
   );
   const updateComponentDefinition = useEditorStore(
     (state) => state.updateComponentDefinition
@@ -172,6 +178,21 @@ export function PropertyPanel({
     );
   }
 
+  if (selectedNodeIds.length > 1) {
+    return (
+      <MultiSelectionPanel
+        document={document}
+        selectedNodeIds={selectedNodeIds}
+        onCreateComponent={() => {
+          const componentId = createReusableComponentFromSelection(
+            selectedNodeIds
+          );
+          if (componentId) onEditComponentDefinition(componentId);
+        }}
+      />
+    );
+  }
+
   if (!selectedNodeId) {
     return <PropertyPanelEmpty />;
   }
@@ -209,6 +230,10 @@ export function PropertyPanel({
       />
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
+        {node.type === "Page" ? (
+          <PageSettingsEditor node={node} updateNode={updateNode} />
+        ) : null}
+
         {definition ? (
           <PropsEditor
             nodeId={node.id}
@@ -222,11 +247,13 @@ export function PropertyPanel({
           </div>
         )}
 
-        <VariantsEditor
-          node={node}
-          updateNode={updateNode}
-          onEditVariant={onEditVariant}
-        />
+        {node.type !== "Page" ? (
+          <VariantsEditor
+            node={node}
+            updateNode={updateNode}
+            onEditVariant={onEditVariant}
+          />
+        ) : null}
 
         {node.id !== document.rootId ? (
           <section className="border-t border-[var(--editor-border)] pt-5">

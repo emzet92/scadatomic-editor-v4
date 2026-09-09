@@ -2,12 +2,14 @@ import type { ElementType } from "react";
 import { Button } from "../components/Button";
 import { Chart } from "../components/Chart";
 import { Container } from "../components/Container";
+import { Page } from "../components/Page";
 import { RuntimeButton } from "../components/RuntimeButton";
 import { RuntimeChart } from "../components/RuntimeChart";
 import { RuntimeText } from "../components/RuntimeText";
 import { Text } from "../components/Text";
 import {
   defaultButtonProps,
+  defaultPageProps,
   defaultChartProps,
   defaultContainerProps,
   defaultTextProps,
@@ -37,6 +39,22 @@ export type ComponentDefinition = {
 };
 
 export const componentDefinitions = {
+  Page: {
+    type: "Page",
+    label: "Page",
+    description: "Root viewport",
+    editor: Page,
+    runtime: Page,
+    defaults: defaultPageProps,
+    acceptsChildren: true,
+    inspector: {
+      backgroundColor: { kind: "color" },
+      padding: { kind: "number", min: 0 },
+      gap: { kind: "number", min: 0 },
+      columns: { kind: "number", min: 1, max: 24 },
+      display: { kind: "select", options: ["grid", "flex"] },
+    },
+  },
   Container: {
     type: "Container",
     label: "Container",

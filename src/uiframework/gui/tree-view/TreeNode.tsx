@@ -3,27 +3,23 @@ import type { TreeNodeProps } from "./tree-view-types";
 import { TreeNodeRow } from "./TreeNodeRow";
 import { TreeNodeChildren } from "./TreeNodeChildren";
 
-
 export function TreeNode({
   nodeId,
   level = 0,
   nodes,
   selectedNodeId,
-  setSelectedNodeId,
+  selectedNodeIds = [],
+  selectNode,
   moveNodeUp,
   moveNodeDown,
 }: TreeNodeProps) {
   const node = nodes[nodeId];
+  const [collapsed, setCollapsed] = useState(level > 0);
 
-  const [collapsed, setCollapsed] =
-    useState(level > 0);
+  if (!node) return null;
 
-  if (!node) {
-    return null;
-  }
-
-  const hasChildren =
-    (node.children?.length ?? 0) > 0;
+  const hasChildren = (node.children?.length ?? 0) > 0;
+  const selected = selectedNodeIds.includes(nodeId);
 
   return (
     <>
@@ -33,9 +29,10 @@ export function TreeNode({
         level={level}
         collapsed={collapsed}
         hasChildren={hasChildren}
-        selected={selectedNodeId === nodeId}
+        selected={selected}
+        primarySelected={selectedNodeId === nodeId}
         setCollapsed={setCollapsed}
-        setSelectedNodeId={setSelectedNodeId}
+        selectNode={selectNode}
         moveNodeUp={moveNodeUp}
         moveNodeDown={moveNodeDown}
       />
@@ -46,7 +43,8 @@ export function TreeNode({
           level={level}
           nodes={nodes}
           selectedNodeId={selectedNodeId}
-          setSelectedNodeId={setSelectedNodeId}
+          selectedNodeIds={selectedNodeIds}
+          selectNode={selectNode}
           moveNodeUp={moveNodeUp}
           moveNodeDown={moveNodeDown}
         />

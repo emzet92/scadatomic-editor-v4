@@ -25,7 +25,8 @@ type Props = {
 export function EditorControls({ registry }: Props) {
   const document = useEditorStore((state) => state.document);
   const selectedId = useEditorStore((state) => state.selectedNodeId);
-  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
+  const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
+  const selectNode = useEditorStore((state) => state.selectNode);
   const dragPreview = useEditorStore((state) => state.dragPreview);
   const dragX = useEditorStore((state) => state.dragX);
   const dragY = useEditorStore((state) => state.dragY);
@@ -73,7 +74,10 @@ export function EditorControls({ registry }: Props) {
 
       const node = target.closest<HTMLElement>("[data-node-id]");
       const id = node?.dataset.nodeId;
-      setSelectedNodeId(id ?? null);
+      selectNode(id ?? null, id ? {
+        toggle: event.metaKey || event.ctrlKey,
+        additive: event.shiftKey,
+      } : undefined);
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -189,11 +193,19 @@ export function EditorControls({ registry }: Props) {
         cancelAnimationFrame(collectFrame);
       }
     };
-  }, [setSelectedNodeId]);
+  }, [selectNode]);
 
   const selectedRect = useMemo(
     () => rects.find((rect) => rect.id === selectedId) ?? null,
     [rects, selectedId]
+  );
+
+  const secondarySelectedRects = useMemo(
+    () =>
+      rects.filter(
+        (rect) => rect.id !== selectedId && selectedNodeIds.includes(rect.id)
+      ),
+    [rects, selectedId, selectedNodeIds]
   );
 
   const dropIndicatorRect = useMemo(
@@ -217,6 +229,23 @@ export function EditorControls({ registry }: Props) {
 
       <NodeBoundsOverlay rects={rects} dropTarget={hoverDropTarget} />
       <DropIndicator rect={dropIndicatorRect} />
+      {secondarySelectedRects.map((rect) => (
+        <div
+          key={rect.id}
+          style={{
+            position: "fixed",
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            border: "1.5px solid #8b5cf6",
+            boxShadow: "0 0 0 2px rgba(139,92,246,.10)",
+            boxSizing: "border-box",
+            pointerEvents: "none",
+            zIndex: 9999,
+          }}
+        />
+      ))}
       <SelectionOverlay
         rect={selectedRect}
         nodeType={selectedNode?.type}
