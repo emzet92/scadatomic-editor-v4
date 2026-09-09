@@ -12,6 +12,10 @@ import {
   type UiNode,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
+import {
+  createUniqueNodeName,
+  validateNodeName,
+} from "./core/node-name";
 
 export type DragPreview = {
   type: string;
@@ -22,6 +26,10 @@ export type NewNode = {
   type: UiNode["type"];
   props?: Record<string, unknown>;
 };
+
+export type RenameNodeResult =
+  | { ok: true }
+  | { ok: false; error: string };
 
 type NodeDragCandidate = {
   nodeId: NodeId;
@@ -42,6 +50,7 @@ type EditorState = {
   setSelectedNodeId: (id: NodeId | null) => void;
   setDocument: (document: UiDocument) => void;
   dispatch: (command: DocumentCommand) => void;
+  renameNode: (nodeId: NodeId, name: string) => RenameNodeResult;
 
   updateNode: (
     id: NodeId,
@@ -129,6 +138,40 @@ export const useEditorStore = create<EditorState>((set) => ({
             : null,
       };
     });
+  },
+
+  renameNode: (nodeId, value) => {
+    let result: RenameNodeResult = {
+      ok: false,
+      error: "Node not found.",
+    };
+
+    set((state) => {
+      const node = state.document.nodes[nodeId];
+      if (!node) {
+        return state;
+      }
+
+      const validation = validateNodeName(state.document, nodeId, value);
+      if (!validation.ok) {
+        result = validation;
+        return state;
+      }
+
+      result = { ok: true };
+
+      return {
+        document: applyDocumentCommand(state.document, {
+          type: "node.replace",
+          node: {
+            ...node,
+            name: validation.name,
+          },
+        }),
+      };
+    });
+
+    return result;
   },
 
   updateNode: (id, updater) => {
@@ -308,19 +351,3 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 }));
 
-
-function createUniqueNodeName(document: UiDocument, type: string): string {
-  const usedNames = new Set(
-    Object.values(document.nodes).map((node) => node.name)
-  );
-
-  let index = 1;
-  let candidate = `${type}${index}`;
-
-  while (usedNames.has(candidate)) {
-    index += 1;
-    candidate = `${type}${index}`;
-  }
-
-  return candidate;
-}

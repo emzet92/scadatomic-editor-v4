@@ -15,6 +15,7 @@ type Props = {
 export function PropertyPanel({ document }: Props) {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const updateNode = useEditorStore((state) => state.updateNode);
+  const renameNode = useEditorStore((state) => state.renameNode);
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
 
@@ -36,7 +37,11 @@ export function PropertyPanel({ document }: Props) {
 
   return (
     <div data-editor-ignore className="h-full flex flex-col">
-      <PropertyPanelHeader node={node} />
+      <PropertyPanelHeader
+        key={node.id}
+        node={node}
+        renameNode={renameNode}
+      />
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
         {definition ? (
