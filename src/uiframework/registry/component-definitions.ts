@@ -3,6 +3,7 @@ import { Button } from "../components/Button";
 import { Chart } from "../components/Chart";
 import { Container } from "../components/Container";
 import { Page } from "../components/Page";
+import { Navigation } from "../components/Navigation";
 import { RuntimeButton } from "../components/RuntimeButton";
 import { RuntimeChart } from "../components/RuntimeChart";
 import { RuntimeText } from "../components/RuntimeText";
@@ -13,6 +14,7 @@ import {
   defaultChartProps,
   defaultContainerProps,
   defaultTextProps,
+  defaultNavigationProps,
 } from "../component-props";
 
 export type InspectorControl =
@@ -53,6 +55,22 @@ export const componentDefinitions = {
       gap: { kind: "number", min: 0 },
       columns: { kind: "number", min: 1, max: 24 },
       display: { kind: "select", options: ["grid", "flex"] },
+    },
+  },
+  Navigation: {
+    type: "Navigation",
+    label: "Navigation",
+    description: "Top-level page navigation",
+    editor: Navigation,
+    runtime: Navigation,
+    defaults: defaultNavigationProps,
+    inspector: {
+      backgroundColor: { kind: "color" },
+      color: { kind: "color" },
+      activeColor: { kind: "color" },
+      gap: { kind: "number", min: 0, max: 48 },
+      padding: { kind: "number", min: 0, max: 48 },
+      borderRadius: { kind: "number", min: 0, max: 48 },
     },
   },
   Container: {

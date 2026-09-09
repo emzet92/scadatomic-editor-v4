@@ -2,7 +2,7 @@ import { Boxes, LayoutTemplate, Palette } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
-import type { UiDocument } from "./core/document";
+import { getPage, type UiDocument } from "./core/document";
 import { createComponentDefinitionDocument } from "./reusable-components";
 import { EditorControls } from "./EditorControls";
 import {
@@ -19,7 +19,10 @@ import {
 } from "./component-variants";
 import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
+import { PageTree } from "./gui/pages/PageTree";
 import { PageViewportFrame } from "./gui/page/PageViewportFrame";
+import { NavigationRuntimeProvider } from "./navigation/navigation-context";
+import { buildNavigationTree, resolveNavigationPath } from "./navigation/navigation";
 import {
   PropertyPanel,
   type ComponentDefinitionEditorMode,
@@ -133,6 +136,8 @@ function ComponentDefinitionRenderer({
 export function EditorPage() {
   const { projectId } = useParams();
   const document = useEditorStore((state) => state.document);
+  const activePageId = useEditorStore((state) => state.activePageId);
+  const setActivePageId = useEditorStore((state) => state.setActivePageId);
   const setDocument = useEditorStore((state) => state.setDocument);
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
 
@@ -269,6 +274,11 @@ export function EditorPage() {
   }, [projectId, setDocument, flushPendingSave]);
 
   useEffect(() => {
+    setComponentMode(null);
+    setComponentDefinitionMode(null);
+  }, [activePageId]);
+
+  useEffect(() => {
     if (!componentMode) {
       return;
     }
@@ -376,6 +386,8 @@ export function EditorPage() {
     return null;
   }
 
+  const activePage = getPage(document, activePageId);
+  const activeDocument: UiDocument = { ...document, rootId: activePage.rootId };
   const focusedNode = componentMode
     ? document.nodes[componentMode.nodeId]
     : undefined;
@@ -383,7 +395,8 @@ export function EditorPage() {
     ? document.components?.[componentDefinitionMode.componentId]
     : undefined;
   const inComponentMode = !!componentMode || !!componentDefinitionMode;
-  const rootPage = document.nodes[document.rootId];
+  const rootPage = document.nodes[activePage.rootId];
+  const navigationTree = buildNavigationTree(document);
   const pageWidth = Math.max(1, Number(rootPage?.props?.width ?? 1440) || 1440);
   const pageHeight = Math.max(1, Number(rootPage?.props?.height ?? 900) || 900);
   const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
@@ -407,6 +420,8 @@ export function EditorPage() {
             />
           ) : (
             <>
+              <PageTree />
+              <div className="border-t border-zinc-200" />
               <ComponentPalette />
               <div className="border-t border-zinc-200" />
               <TreeView />
@@ -480,6 +495,16 @@ export function EditorPage() {
                   : "min-h-full"
               }`}
             >
+              <NavigationRuntimeProvider
+                value={{
+                  items: navigationTree,
+                  currentPageId: activePageId,
+                  navigateTo: (path) => {
+                    const target = resolveNavigationPath(document, path);
+                    if (target) setActivePageId(target.pageId);
+                  },
+                }}
+              >
               {componentDefinitionMode && focusedDefinition ? (
                 <div className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
                   <ComponentDefinitionRenderer
@@ -507,18 +532,19 @@ export function EditorPage() {
                     height={pageHeight}
                     deviceMode={pageDeviceMode}
                   >
-                    <RendererRoot document={document} registry={editorRegistry} />
+                    <RendererRoot document={activeDocument} registry={editorRegistry} />
                   </PageViewportFrame>
                   <EditorControls registry={editorRegistry} />
                 </>
               )}
+              </NavigationRuntimeProvider>
             </div>
           </div>
         </Canvas>
 
         <RightSidebar>
           <PropertyPanel
-            document={document}
+            document={activeDocument}
             componentMode={componentMode}
             componentDefinitionMode={componentDefinitionMode}
             onEditVariant={editVariant}

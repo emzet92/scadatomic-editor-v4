@@ -199,8 +199,16 @@ export function createComponentDefinitionDocument(
   definition: UiComponentDefinition
 ): UiDocument {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     rootId: definition.rootId,
+    startPageId: "__component__",
+    pages: {
+      __component__: {
+        id: "__component__",
+        name: definition.name,
+        rootId: definition.rootId,
+      },
+    },
     nodes: definition.nodes,
     components: document.components,
   };
@@ -259,8 +267,16 @@ export function applyComponentInstanceInputs(
   }
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     rootId: definition.rootId,
+    startPageId: "__component__",
+    pages: {
+      __component__: {
+        id: "__component__",
+        name: definition.name,
+        rootId: definition.rootId,
+      },
+    },
     nodes,
     components: document.components,
   };

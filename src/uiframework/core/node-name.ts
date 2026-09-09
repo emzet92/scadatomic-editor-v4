@@ -10,7 +10,8 @@ export type NodeNameValidationResult =
 export function validateNodeName(
   document: UiDocument,
   nodeId: NodeId,
-  value: string
+  value: string,
+  rootId: NodeId = document.rootId
 ): NodeNameValidationResult {
   const name = value.trim();
 
@@ -32,12 +33,14 @@ export function validateNodeName(
     };
   }
 
-  const duplicate = Object.values(document.nodes).some(
-    (node) => node.id !== nodeId && node.name === name
-  );
+  const scopedNodeIds = collectSubtreeIds(document, rootId);
+  const duplicate = scopedNodeIds.some((id) => {
+    const node = document.nodes[id];
+    return node?.id !== nodeId && node?.name === name;
+  });
 
   if (duplicate) {
-    return { ok: false, error: `“${name}” is already used.` };
+    return { ok: false, error: `“${name}” is already used on this page.` };
   }
 
   return { ok: true, name };
@@ -45,11 +48,14 @@ export function validateNodeName(
 
 export function createUniqueNodeName(
   document: UiDocument,
-  type: string
+  type: string,
+  rootId: NodeId = document.rootId
 ): string {
   const baseName = toIdentifier(type) || "Component";
   const usedNames = new Set(
-    Object.values(document.nodes).map((node) => node.name)
+    collectSubtreeIds(document, rootId)
+      .map((id) => document.nodes[id]?.name)
+      .filter((name): name is string => !!name)
   );
 
   let index = 1;
@@ -61,6 +67,25 @@ export function createUniqueNodeName(
   }
 
   return candidate;
+}
+
+function collectSubtreeIds(document: UiDocument, rootId: NodeId) {
+  const result: NodeId[] = [];
+  const stack = [rootId];
+  const visited = new Set<NodeId>();
+
+  while (stack.length > 0) {
+    const nodeId = stack.pop();
+    if (!nodeId || visited.has(nodeId)) continue;
+    visited.add(nodeId);
+
+    const node = document.nodes[nodeId];
+    if (!node) continue;
+    result.push(nodeId);
+    stack.push(...(node.children ?? []));
+  }
+
+  return result;
 }
 
 function toIdentifier(value: string): string {

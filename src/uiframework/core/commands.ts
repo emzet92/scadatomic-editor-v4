@@ -61,7 +61,8 @@ export type DocumentCommand =
 
 export function applyDocumentCommand(
   document: UiDocument,
-  command: DocumentCommand
+  command: DocumentCommand,
+  rootId: NodeId = document.rootId
 ): UiDocument {
   switch (command.type) {
     case "node.replace":
@@ -71,13 +72,13 @@ export function applyDocumentCommand(
       return insertNode(document, command);
 
     case "node.delete":
-      return deleteNode(document, command.nodeId);
+      return deleteNode(document, command.nodeId, rootId);
 
     case "node.move":
-      return moveNode(document, command);
+      return moveNode(document, command, rootId);
 
     case "node.moveBy":
-      return moveNodeBy(document, command.nodeId, command.offset);
+      return moveNodeBy(document, command.nodeId, command.offset, rootId);
 
     case "node.setProp":
       return setProp(document, command);
@@ -136,16 +137,17 @@ function insertNode(
 
 function deleteNode(
   document: UiDocument,
-  nodeId: NodeId
+  nodeId: NodeId,
+  rootId: NodeId
 ): UiDocument {
   if (
-    nodeId === document.rootId ||
+    nodeId === rootId ||
     !document.nodes[nodeId]
   ) {
     return document;
   }
 
-  const index = buildDocumentIndex(document);
+  const index = buildDocumentIndex(document, rootId);
   const parentId = index.parentById.get(nodeId);
   const parent = parentId ? document.nodes[parentId] : undefined;
 
@@ -185,9 +187,10 @@ function deleteNode(
 function moveNodeBy(
   document: UiDocument,
   nodeId: NodeId,
-  offset: -1 | 1
+  offset: -1 | 1,
+  rootId: NodeId
 ): UiDocument {
-  const index = buildDocumentIndex(document);
+  const index = buildDocumentIndex(document, rootId);
   const parentId = index.parentById.get(nodeId);
   const parent = parentId ? document.nodes[parentId] : undefined;
 
@@ -228,9 +231,10 @@ function moveNodeBy(
 
 function moveNode(
   document: UiDocument,
-  command: Extract<DocumentCommand, { type: "node.move" }>
+  command: Extract<DocumentCommand, { type: "node.move" }>,
+  rootId: NodeId
 ): UiDocument {
-  if (command.nodeId === document.rootId) {
+  if (command.nodeId === rootId) {
     return document;
   }
 
@@ -248,7 +252,7 @@ function moveNode(
     return document;
   }
 
-  const index = buildDocumentIndex(document);
+  const index = buildDocumentIndex(document, rootId);
   const sourceParentId = index.parentById.get(command.nodeId);
   const sourceParent = sourceParentId
     ? document.nodes[sourceParentId]

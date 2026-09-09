@@ -5,11 +5,14 @@ import {
 } from "./core/commands";
 import {
   createEmptyUiDocument,
+  createPageRootNode,
+  getPage,
   type Binding,
   type HandlerRef,
   type MethodRef,
   type ScopedMethodRef,
   type UiComponentDefinition,
+  type PageId,
   type NodeId,
   type UiDocument,
   type UiNode,
@@ -48,6 +51,7 @@ type NodeDragCandidate = {
 };
 
 type EditorState = {
+  activePageId: PageId;
   selectedNodeId: NodeId | null;
   selectedNodeIds: NodeId[];
   document: UiDocument;
@@ -58,6 +62,8 @@ type EditorState = {
   draggedNodeId: NodeId | null;
   nodeDragCandidate: NodeDragCandidate | null;
 
+  setActivePageId: (pageId: PageId) => void;
+  addPage: (parentPageId?: PageId | undefined) => PageId | null;
   setSelectedNodeId: (id: NodeId | null) => void;
   selectNode: (
     id: NodeId | null,
@@ -137,16 +143,92 @@ type EditorState = {
 
 const NODE_DRAG_THRESHOLD_PX = 4;
 
+const initialEditorDocument = createEmptyUiDocument();
+
+function getActiveRootId(state: Pick<EditorState, "document" | "activePageId">) {
+  return getPage(state.document, state.activePageId).rootId;
+}
+
+function applyActiveCommand(state: EditorState, command: DocumentCommand) {
+  return applyDocumentCommand(state.document, command, getActiveRootId(state));
+}
+
+function createUniquePageName(document: UiDocument, parentPageId?: PageId) {
+  const siblingNames = new Set(
+    Object.values(document.pages)
+      .filter((page) => page.parentPageId === parentPageId)
+      .map((page) => page.name)
+  );
+
+  const base = parentPageId ? "SubPage" : "Page";
+  let index = 1;
+  while (siblingNames.has(`${base}${index}`)) index += 1;
+  return `${base}${index}`;
+}
+
 export const useEditorStore = create<EditorState>((set) => ({
+  activePageId: initialEditorDocument.startPageId,
   selectedNodeId: null,
   selectedNodeIds: [],
-  document: createEmptyUiDocument(),
+  document: initialEditorDocument,
 
   dragPreview: null,
   dragX: 0,
   dragY: 0,
   draggedNodeId: null,
   nodeDragCandidate: null,
+
+  setActivePageId: (pageId) => {
+    set((state) => {
+      const page = state.document.pages[pageId];
+      if (!page) return state;
+      return {
+        activePageId: pageId,
+        selectedNodeId: page.rootId,
+        selectedNodeIds: [page.rootId],
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+        dragPreview: null,
+      };
+    });
+  },
+
+  addPage: (parentPageId) => {
+    let createdPageId: PageId | null = null;
+
+    set((state) => {
+      if (parentPageId && !state.document.pages[parentPageId]) return state;
+
+      const name = createUniquePageName(state.document, parentPageId);
+      const root = createPageRootNode(name);
+      const pageId = crypto.randomUUID();
+      createdPageId = pageId;
+
+      return {
+        document: {
+          ...state.document,
+          pages: {
+            ...state.document.pages,
+            [pageId]: {
+              id: pageId,
+              name,
+              rootId: root.id,
+              ...(parentPageId ? { parentPageId } : {}),
+            },
+          },
+          nodes: {
+            ...state.document.nodes,
+            [root.id]: root,
+          },
+        },
+        activePageId: pageId,
+        selectedNodeId: root.id,
+        selectedNodeIds: [root.id],
+      };
+    });
+
+    return createdPageId;
+  },
 
   setSelectedNodeId: (id) => {
     set({
@@ -186,22 +268,21 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   setDocument: (document) => {
-    set((state) => ({
+    const startPage = getPage(document, document.startPageId);
+    set({
       document,
-      selectedNodeIds: state.selectedNodeIds.filter((id) => !!document.nodes[id]),
-      selectedNodeId:
-        state.selectedNodeId && document.nodes[state.selectedNodeId]
-          ? state.selectedNodeId
-          : state.selectedNodeIds.find((id) => !!document.nodes[id]) ?? null,
+      activePageId: startPage.id,
+      selectedNodeIds: [startPage.rootId],
+      selectedNodeId: startPage.rootId,
       draggedNodeId: null,
       nodeDragCandidate: null,
       dragPreview: null,
-    }));
+    });
   },
 
   dispatch: (command) => {
     set((state) => {
-      const document = applyDocumentCommand(state.document, command);
+      const document = applyActiveCommand(state, command);
 
       return {
         document,
@@ -226,22 +307,60 @@ export const useEditorStore = create<EditorState>((set) => ({
         return state;
       }
 
-      const validation = validateNodeName(state.document, nodeId, value);
+      const pageEntry = Object.values(state.document.pages).find(
+        (page) => page.rootId === nodeId
+      );
+      const validation = validateNodeName(
+        state.document,
+        nodeId,
+        value,
+        getActiveRootId(state)
+      );
       if (!validation.ok) {
         result = validation;
         return state;
       }
 
+      if (
+        pageEntry &&
+        Object.values(state.document.pages).some(
+          (page) =>
+            page.id !== pageEntry.id &&
+            page.parentPageId === pageEntry.parentPageId &&
+            page.name === validation.name
+        )
+      ) {
+        result = {
+          ok: false,
+          error: `“${validation.name}” is already used by a sibling page.`,
+        };
+        return state;
+      }
+
       result = { ok: true };
 
+      const renamedDocument = applyActiveCommand(state, {
+        type: "node.replace",
+        node: {
+          ...node,
+          name: validation.name,
+        },
+      });
+      if (!pageEntry) {
+        return { document: renamedDocument };
+      }
+
       return {
-        document: applyDocumentCommand(state.document, {
-          type: "node.replace",
-          node: {
-            ...node,
-            name: validation.name,
+        document: {
+          ...renamedDocument,
+          pages: {
+            ...renamedDocument.pages,
+            [pageEntry.id]: {
+              ...pageEntry,
+              name: validation.name,
+            },
           },
-        }),
+        },
       };
     });
 
@@ -256,7 +375,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       }
 
       return {
-        document: applyDocumentCommand(state.document, {
+        document: applyActiveCommand(state, {
           type: "node.replace",
           node: updater(current),
         }),
@@ -266,7 +385,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setBinding: (nodeId, property, binding) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.setBinding",
         nodeId,
         property,
@@ -277,7 +396,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setEvent: (nodeId, event, handler) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.setEvent",
         nodeId,
         event,
@@ -288,7 +407,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setMethod: (nodeId, method, script) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.setMethod",
         nodeId,
         method,
@@ -302,10 +421,14 @@ export const useEditorStore = create<EditorState>((set) => ({
 
     set((state) => {
       try {
-        const result = createReusableComponentFromNode(state.document, nodeId);
+        const activeDocument = {
+          ...state.document,
+          rootId: getActiveRootId(state),
+        };
+        const result = createReusableComponentFromNode(activeDocument, nodeId);
         componentId = result.componentId;
         return {
-          document: result.document,
+          document: { ...result.document, rootId: state.document.rootId },
           selectedNodeId: result.instanceNodeId,
           selectedNodeIds: [result.instanceNodeId],
         };
@@ -324,13 +447,17 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => {
       const nodeIds = requestedNodeIds ?? state.selectedNodeIds;
       try {
+        const activeDocument = {
+          ...state.document,
+          rootId: getActiveRootId(state),
+        };
         const result = createReusableComponentFromSelection(
-          state.document,
+          activeDocument,
           nodeIds
         );
         componentId = result.componentId;
         return {
-          document: result.document,
+          document: { ...result.document, rootId: state.document.rootId },
           selectedNodeId: result.instanceNodeId,
           selectedNodeIds: [result.instanceNodeId],
         };
@@ -414,7 +541,8 @@ export const useEditorStore = create<EditorState>((set) => ({
         : undefined;
       const name = createUniqueNodeName(
         state.document,
-        reusableName ?? node.type
+        reusableName ?? node.type,
+        getActiveRootId(state)
       );
       const newNode: UiNode = {
         id,
@@ -425,7 +553,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         children: definition?.acceptsChildren ? [] : undefined,
       };
 
-      const document = applyDocumentCommand(state.document, {
+      const document = applyActiveCommand(state, {
         type: "node.insert",
         parentId,
         insertIndex,
@@ -445,7 +573,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   deleteNode: (id) => {
     set((state) => {
-      const document = applyDocumentCommand(state.document, {
+      const document = applyActiveCommand(state, {
         type: "node.delete",
         nodeId: id,
       });
@@ -463,7 +591,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   moveNodeUp: (nodeId) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.moveBy",
         nodeId,
         offset: -1,
@@ -473,7 +601,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   moveNodeDown: (nodeId) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.moveBy",
         nodeId,
         offset: 1,
@@ -535,7 +663,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   moveNode: (nodeId, targetParentId, targetIndex) => {
     set((state) => ({
-      document: applyDocumentCommand(state.document, {
+      document: applyActiveCommand(state, {
         type: "node.move",
         nodeId,
         targetParentId,

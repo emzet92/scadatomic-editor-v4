@@ -6,6 +6,7 @@ import {
 } from "@codemirror/autocomplete";
 import type { Extension } from "@codemirror/state";
 import type { ComponentApiDescription } from "../../component-api";
+import type { NavigationTreeNode } from "../../navigation/navigation";
 
 type ApiNode = {
   label: string;
@@ -16,9 +17,10 @@ type ApiNode = {
 
 export function createCtxAutocompleteExtension(
   components: ComponentApiDescription[],
-  selfComponent?: ComponentApiDescription
+  selfComponent?: ComponentApiDescription,
+  navigation: NavigationTreeNode[] = []
 ): Extension {
-  const roots = [buildCtxApiTree(components)];
+  const roots = [buildCtxApiTree(components, navigation)];
 
   if (selfComponent) {
     roots.push(buildComponentRoot("self", selfComponent));
@@ -30,7 +32,10 @@ export function createCtxAutocompleteExtension(
   });
 }
 
-function buildCtxApiTree(components: ComponentApiDescription[]): ApiNode {
+function buildCtxApiTree(
+  components: ComponentApiDescription[],
+  navigation: NavigationTreeNode[]
+): ApiNode {
   const uiComponents: ApiNode[] = components
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name))
@@ -45,6 +50,17 @@ function buildCtxApiTree(components: ComponentApiDescription[]): ApiNode {
         completionType: "namespace",
         detail: "UI component API",
         children: uiComponents,
+      },
+      {
+        label: "nav",
+        completionType: "namespace",
+        detail: "type-safe page navigation",
+        children: navigation.map(buildNavigationNode),
+      },
+      {
+        label: "navigateTo",
+        completionType: "method",
+        detail: '("Page/SubPage")',
       },
       {
         label: "state",
@@ -100,6 +116,19 @@ function buildCtxApiTree(components: ComponentApiDescription[]): ApiNode {
         completionType: "property",
         detail: "string · read only",
       },
+    ],
+  };
+}
+
+function buildNavigationNode(node: NavigationTreeNode): ApiNode {
+  return {
+    label: node.name,
+    completionType: "class",
+    detail: node.path,
+    children: [
+      { label: "go", completionType: "method", detail: `() → ${node.path}` },
+      { label: "path", completionType: "property", detail: `"${node.path}" · read only` },
+      ...node.children.map(buildNavigationNode),
     ],
   };
 }

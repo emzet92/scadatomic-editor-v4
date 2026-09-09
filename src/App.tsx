@@ -8,7 +8,7 @@ function App() {
     <Routes>
       <Route path="/" element={<EditorPage />} />
       <Route path="/project/:projectId" element={<EditorPage />} />
-      <Route path="/render/:projectId" element={<RenderPage />} />
+      <Route path="/render/:projectId/*" element={<RenderPage />} />
       <Route
         path="/project/:projectId/scripts/:scriptId"
         element={<ScriptPage />}

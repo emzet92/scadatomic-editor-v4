@@ -7,7 +7,8 @@ export type DocumentIndex = {
 };
 
 export function buildDocumentIndex(
-  document: UiDocument
+  document: UiDocument,
+  rootId: NodeId = document.rootId
 ): DocumentIndex {
   const parentById = new Map<NodeId, NodeId>();
   const childIndexById = new Map<NodeId, number>();
@@ -32,7 +33,7 @@ export function buildDocumentIndex(
     }
   }
 
-  visit(document.rootId, 0);
+  visit(rootId, 0);
 
   return {
     parentById,

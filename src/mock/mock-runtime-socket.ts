@@ -1,4 +1,5 @@
 import { parseUiDocument, type UiDocument } from "../uiframework/core/document";
+import { buildNavigationTree } from "../uiframework/navigation/navigation";
 import { getMockProjectSnapshot } from "./mock-project-store";
 import {
   applyMockRuntimeUiState,
@@ -89,6 +90,7 @@ class MockRuntimeSocket extends EventTarget {
     const handlerId = payload.handlerId;
     const sourceNodeId = payload.nodeId;
     const eventName = payload.eventName;
+    const pageId = typeof payload.pageId === "string" ? payload.pageId : undefined;
 
     if (
       typeof projectId !== "string" ||
@@ -106,6 +108,7 @@ class MockRuntimeSocket extends EventTarget {
         handlerId,
         sourceNodeId,
         eventName,
+        pageId,
       },
       {
         setNodeProp: (nodeId, property, value) => {
@@ -131,13 +134,30 @@ class MockRuntimeSocket extends EventTarget {
           getMockRuntimeNodeVariant(projectId, nodeId),
         resolveUiNode: (name) => {
           const document = this.getProjectDocument(projectId);
-          return Object.values(document?.nodes ?? {}).find(
-            (node) => node.name === name
-          );
+          if (!document) return undefined;
+
+          const page = pageId ? document.pages[pageId] : undefined;
+          if (!page) {
+            return Object.values(document.nodes).find((node) => node.name === name);
+          }
+
+          return findNodeByNameInSubtree(document, page.rootId, name);
         },
         resolveComponentDefinition: (componentDefinitionId) => {
           const document = this.getProjectDocument(projectId);
           return document?.components?.[componentDefinitionId];
+        },
+        getNavigationTree: () => {
+          const document = this.getProjectDocument(projectId);
+          return document ? buildNavigationTree(document) : [];
+        },
+        navigateTo: (path) => {
+          this.emitMockResponse({
+            type: "runtime.navigate",
+            projectId,
+            path,
+            timestamp: Date.now(),
+          });
         },
         emit: (customEventName, customPayload) => {
           this.handleScriptEvent(customEventName);
@@ -229,6 +249,28 @@ class MockRuntimeSocket extends EventTarget {
       })
     );
   }
+}
+
+function findNodeByNameInSubtree(
+  document: UiDocument,
+  rootId: string,
+  name: string
+) {
+  const stack = [rootId];
+  const visited = new Set<string>();
+
+  while (stack.length > 0) {
+    const nodeId = stack.pop();
+    if (!nodeId || visited.has(nodeId)) continue;
+    visited.add(nodeId);
+
+    const node = document.nodes[nodeId];
+    if (!node) continue;
+    if (node.name === name) return node;
+    stack.push(...(node.children ?? []));
+  }
+
+  return undefined;
 }
 
 let socket: MockRuntimeSocket | null = null;

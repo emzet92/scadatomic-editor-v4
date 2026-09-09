@@ -1,10 +1,13 @@
 import type { UiDocument } from "./core/document";
+import { getNavigationPathForPage } from "./navigation/navigation";
 import { WorkspaceHeader } from "./gui/workspace/WorkspaceHeader";
 import { useEditorStore } from "./editor-store";
 import { sendWsMessage } from "./websocket";
 
 export function Toolbar({ projectId }: { projectId?: string | undefined }) {
   const document = useEditorStore((state) => state.document);
+  const activePageId = useEditorStore((state) => state.activePageId);
+  const activePagePath = getNavigationPathForPage(document, activePageId);
   const scriptId = getFirstScriptId(document);
 
   const publish = () => {
@@ -32,7 +35,14 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
           {projectId ? (
             <a
               data-editor-ignore
-              href={`/render/${encodeURIComponent(projectId)}`}
+              href={`/render/${encodeURIComponent(projectId)}${
+                activePagePath
+                  ? `/${activePagePath
+                      .split("/")
+                      .map((segment) => encodeURIComponent(segment))
+                      .join("/")}`
+                  : ""
+              }`}
               target="_blank"
               rel="noreferrer"
               className="h-9 px-4 inline-flex items-center rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)] text-sm font-medium hover:bg-[var(--editor-surface-muted)] transition"

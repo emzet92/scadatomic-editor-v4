@@ -21,6 +21,7 @@ import type {
   UiNode,
 } from "../../core/document";
 import { getComponentDefinition } from "../../registry/component-definitions";
+import { buildNavigationTree, type NavigationTreeNode } from "../../navigation/navigation";
 
 type HandlerTreeProps = {
   document: UiDocument | null;
@@ -86,14 +87,13 @@ export function HandlerTree({
               />
             ) : null}
 
-            <HandlerNode
+            <PagesApiSection
               document={document}
-              nodeId={document.rootId}
+              pages={buildNavigationTree(document)}
               currentScriptId={currentScriptId}
               onSelect={onSelect}
               onAddMethod={onAddMethod}
               onRemoveMethod={onRemoveMethod}
-              depth={0}
             />
           </>
         )}
@@ -102,6 +102,98 @@ export function HandlerTree({
   );
 }
 
+
+function PagesApiSection({
+  document,
+  pages,
+  currentScriptId,
+  onSelect,
+  onAddMethod,
+  onRemoveMethod,
+}: {
+  document: UiDocument;
+  pages: NavigationTreeNode[];
+  currentScriptId: string;
+  onSelect: (scriptId: string) => void;
+  onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
+  onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-1">
+      {pages.map((page) => (
+        <PageApiRow
+          key={page.pageId}
+          document={document}
+          page={page}
+          currentScriptId={currentScriptId}
+          onSelect={onSelect}
+          onAddMethod={onAddMethod}
+          onRemoveMethod={onRemoveMethod}
+          depth={0}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PageApiRow({
+  document,
+  page,
+  currentScriptId,
+  onSelect,
+  onAddMethod,
+  onRemoveMethod,
+  depth,
+}: {
+  document: UiDocument;
+  page: NavigationTreeNode;
+  currentScriptId: string;
+  onSelect: (scriptId: string) => void;
+  onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
+  onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
+  depth: number;
+}) {
+  const pageDefinition = document.pages[page.pageId];
+  if (!pageDefinition) return null;
+
+  return (
+    <details open className="rounded-lg border border-zinc-100 bg-zinc-50/40">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold text-zinc-600"
+        style={{ paddingLeft: 10 + depth * 10 }}
+      >
+        <ChevronRight size={12} className="text-zinc-400" />
+        <span className="truncate">{page.name}</span>
+        <span className="ml-auto font-mono text-[9px] font-normal text-zinc-400">
+          {page.path}
+        </span>
+      </summary>
+      <div className="pb-1 pl-2">
+        <HandlerNode
+          document={document}
+          nodeId={pageDefinition.rootId}
+          currentScriptId={currentScriptId}
+          onSelect={onSelect}
+          onAddMethod={onAddMethod}
+          onRemoveMethod={onRemoveMethod}
+          depth={1}
+        />
+        {page.children.map((child) => (
+          <PageApiRow
+            key={child.pageId}
+            document={document}
+            page={child}
+            currentScriptId={currentScriptId}
+            onSelect={onSelect}
+            onAddMethod={onAddMethod}
+            onRemoveMethod={onRemoveMethod}
+            depth={depth + 1}
+          />
+        ))}
+      </div>
+    </details>
+  );
+}
 
 function ComponentDefinitionsSection({
   definitions,

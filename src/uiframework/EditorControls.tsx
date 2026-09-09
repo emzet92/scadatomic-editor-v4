@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore } from "./editor-store";
+import { getPage } from "./core/document";
 import type { ComponentRegistry } from "./registry/editor-registry";
 import { getComponentDefinition } from "./registry/component-definitions";
 import {
@@ -24,6 +25,12 @@ type Props = {
 
 export function EditorControls({ registry }: Props) {
   const document = useEditorStore((state) => state.document);
+  const activePageId = useEditorStore((state) => state.activePageId);
+  const activeRootId = getPage(document, activePageId).rootId;
+  const activeDocument = useMemo(
+    () => ({ ...document, rootId: activeRootId }),
+    [document, activeRootId]
+  );
   const selectedId = useEditorStore((state) => state.selectedNodeId);
   const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
   const selectNode = useEditorStore((state) => state.selectNode);
@@ -52,7 +59,10 @@ export function EditorControls({ registry }: Props) {
     }
 
     const next = collectNodeRects(
-      useEditorStore.getState().document,
+      (() => {
+        const state = useEditorStore.getState();
+        return { ...state.document, rootId: getPage(state.document, state.activePageId).rootId };
+      })(),
       canvas
     );
 
@@ -63,7 +73,7 @@ export function EditorControls({ registry }: Props) {
   useEffect(() => {
     const frame = requestAnimationFrame(collectRects);
     return () => cancelAnimationFrame(frame);
-  }, [document]);
+  }, [document, activePageId]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -120,7 +130,7 @@ export function EditorControls({ registry }: Props) {
         setHoverDropTarget({
           parentId: hoveredNode.id,
           insertIndex: findContainerInsertIndex(
-            state.document,
+            { ...state.document, rootId: getPage(state.document, state.activePageId).rootId },
             rectsRef.current,
             hoveredNode.id,
             event.clientX,
@@ -132,7 +142,7 @@ export function EditorControls({ registry }: Props) {
 
       setHoverDropTarget(
         findSiblingDropTarget(
-          state.document,
+          { ...state.document, rootId: getPage(state.document, state.activePageId).rootId },
           hoveredRect,
           event.clientX,
           event.clientY
@@ -209,8 +219,8 @@ export function EditorControls({ registry }: Props) {
   );
 
   const dropIndicatorRect = useMemo(
-    () => getDropIndicatorRect(document, rects, hoverDropTarget),
-    [document, rects, hoverDropTarget]
+    () => getDropIndicatorRect(activeDocument, rects, hoverDropTarget),
+    [activeDocument, rects, hoverDropTarget]
   );
 
   const selectedNode = selectedId ? document.nodes[selectedId] : undefined;
@@ -249,7 +259,7 @@ export function EditorControls({ registry }: Props) {
       <SelectionOverlay
         rect={selectedRect}
         nodeType={selectedNode?.type}
-        canDelete={!!selectedId && selectedId !== document.rootId}
+        canDelete={!!selectedId && selectedId !== activeRootId}
         onDelete={() => {
           if (selectedId) {
             useEditorStore.getState().deleteNode(selectedId);

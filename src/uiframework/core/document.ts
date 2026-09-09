@@ -1,4 +1,5 @@
 export type NodeId = string;
+export type PageId = string;
 export type ComponentDefinitionId = string;
 
 export type TagBinding = {
@@ -64,9 +65,24 @@ export type UiNode = {
   children?: NodeId[] | undefined;
 };
 
-export type UiDocument = {
-  schemaVersion: 3;
+/**
+ * Page metadata is project-global while the actual page tree lives in the
+ * project-global node table. Node ids stay globally unique inside a project.
+ */
+export type UiPage = {
+  id: PageId;
+  name: string;
   rootId: NodeId;
+  parentPageId?: PageId | undefined;
+};
+
+export type UiDocument = {
+  schemaVersion: 4;
+  /** Root of the start page. Kept as a convenient default render root. */
+  rootId: NodeId;
+  startPageId: PageId;
+  pages: Record<PageId, UiPage>;
+  /** All page nodes. Components remain global per project below. */
   nodes: Record<NodeId, UiNode>;
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
 };
@@ -75,9 +91,20 @@ export function createUiDocument(
   rootId: NodeId,
   nodes: Record<NodeId, UiNode>
 ): UiDocument {
+  const rootNode = nodes[rootId];
+  const pageId = crypto.randomUUID();
+
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     rootId,
+    startPageId: pageId,
+    pages: {
+      [pageId]: {
+        id: pageId,
+        name: rootNode?.name ?? "Page1",
+        rootId,
+      },
+    },
     nodes,
   };
 }
@@ -99,6 +126,43 @@ export function createEmptyUiDocument(): UiDocument {
   });
 }
 
+export function getStartPage(document: UiDocument): UiPage {
+  return document.pages[document.startPageId] ?? Object.values(document.pages)[0]!;
+}
+
+export function getPage(document: UiDocument, pageId: PageId | undefined): UiPage {
+  if (pageId && document.pages[pageId]) {
+    return document.pages[pageId]!;
+  }
+  return getStartPage(document);
+}
+
+export function getPageByRootId(
+  document: UiDocument,
+  rootId: NodeId
+): UiPage | undefined {
+  return Object.values(document.pages).find((page) => page.rootId === rootId);
+}
+
+export function createPageRootNode(name: string): UiNode {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    type: "Page",
+    props: {
+      deviceMode: "desktop",
+      width: 1440,
+      height: 900,
+      backgroundColor: "#ffffff",
+      padding: 24,
+      gap: 12,
+      columns: 1,
+      display: "grid",
+    },
+    children: [],
+  };
+}
+
 export function isUiDocument(value: unknown): value is UiDocument {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
@@ -106,8 +170,10 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
   const candidate = value as Record<string, unknown>;
   if (
-    candidate.schemaVersion !== 3 ||
+    candidate.schemaVersion !== 4 ||
     typeof candidate.rootId !== "string" ||
+    typeof candidate.startPageId !== "string" ||
+    !isRecord(candidate.pages) ||
     !candidate.nodes ||
     typeof candidate.nodes !== "object" ||
     Array.isArray(candidate.nodes)
@@ -121,8 +187,19 @@ export function isUiDocument(value: unknown): value is UiDocument {
     return false;
   }
 
-  const root = (candidate.nodes as Record<string, unknown>)[candidate.rootId];
-  if (!isRecord(root) || root.type !== "Page") {
+  const nodes = candidate.nodes as Record<string, UiNode>;
+  const pages = candidate.pages as Record<string, unknown>;
+
+  if (
+    !Object.entries(pages).every(([id, page]) => isUiPage(page, id, nodes)) ||
+    !pages[candidate.startPageId] ||
+    !isPageGraphValid(pages as Record<PageId, UiPage>)
+  ) {
+    return false;
+  }
+
+  const startPage = pages[candidate.startPageId] as UiPage;
+  if (candidate.rootId !== startPage.rootId) {
     return false;
   }
 
@@ -142,10 +219,56 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
 export function parseUiDocument(value: unknown): UiDocument {
   if (!isUiDocument(value)) {
-    throw new Error("Invalid UiDocument v3");
+    throw new Error("Invalid UiDocument v4");
   }
 
   return value;
+}
+
+function isPageGraphValid(pages: Record<PageId, UiPage>) {
+  const rootIds = new Set<NodeId>();
+
+  for (const page of Object.values(pages)) {
+    if (rootIds.has(page.rootId)) return false;
+    rootIds.add(page.rootId);
+
+    if (page.parentPageId && !pages[page.parentPageId]) {
+      return false;
+    }
+  }
+
+  for (const page of Object.values(pages)) {
+    const visited = new Set<PageId>();
+    let current: UiPage | undefined = page;
+
+    while (current?.parentPageId) {
+      if (visited.has(current.id)) return false;
+      visited.add(current.id);
+      current = pages[current.parentPageId];
+    }
+  }
+
+  return true;
+}
+
+function isUiPage(
+  value: unknown,
+  expectedId: string,
+  nodes: Record<string, UiNode>
+): value is UiPage {
+  if (!isRecord(value)) return false;
+
+  if (
+    value.id !== expectedId ||
+    typeof value.name !== "string" ||
+    !isJsIdentifier(value.name) ||
+    typeof value.rootId !== "string" ||
+    (value.parentPageId !== undefined && typeof value.parentPageId !== "string")
+  ) {
+    return false;
+  }
+
+  return nodes[value.rootId]?.type === "Page";
 }
 
 function isUiNode(value: unknown, expectedId: string): value is UiNode {

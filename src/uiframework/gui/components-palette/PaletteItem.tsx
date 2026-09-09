@@ -4,6 +4,7 @@ import {
   Boxes,
   ChartLine,
   LayoutTemplate,
+  Menu,
   RectangleHorizontal,
   Search,
   Type,
@@ -21,6 +22,7 @@ const icons = {
   Text: Type,
   Button: RectangleHorizontal,
   Chart: ChartLine,
+  Navigation: Menu,
 } satisfies Record<RegisteredComponentType, typeof Box>;
 
 export function ComponentPalette() {

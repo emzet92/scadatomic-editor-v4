@@ -14,6 +14,7 @@ import {
   describeComponentApi,
   type ComponentApiDescription,
 } from "../../component-api";
+import { buildNavigationTree } from "../../navigation/navigation";
 import type {
   ScopedMethodRef,
   UiComponentDefinition,
@@ -55,14 +56,18 @@ function ScriptEditor({
   const [apiError, setApiError] = useState<string | null>(null);
 
   const dirty = code !== savedCode;
-  const componentApi = document
+  const allComponentApi = document
     ? Object.values(document.nodes).map((node) =>
         describeComponentApi(node, document)
       )
     : [];
+  const navigationTree = document ? buildNavigationTree(document) : [];
   const scriptSelection = document
-    ? findScriptSelection(document, scriptId, componentApi)
+    ? findScriptSelection(document, scriptId, allComponentApi)
     : null;
+  const componentApi = document
+    ? getScopedComponentApi(document, scriptSelection, allComponentApi)
+    : [];
   const selfComponent =
     scriptSelection?.kind === "method"
       ? scriptSelection.component
@@ -357,6 +362,7 @@ function ScriptEditor({
               onChange={setCode}
               components={componentApi}
               selfComponent={selfComponent}
+              navigation={navigationTree}
             />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -374,6 +380,8 @@ function ScriptEditor({
                 <code>ctx.ui.ComponentName.setColor(color)</code>
                 <code>ctx.ui.ComponentName.variant.enabled()</code>
                 <code>ctx.ui.ComponentName.variant.current</code>
+                <code>ctx.navigateTo("Page/SubPage")</code>
+                <code>ctx.nav.Page1.go()</code>
                 {scriptSelection?.kind === "method" ||
                 scriptSelection?.kind === "componentMethod" ? (
                   <>
@@ -454,6 +462,48 @@ function findScriptSelection(
   }
 
   return null;
+}
+
+function getScopedComponentApi(
+  document: UiDocument,
+  selection: ScriptSelection | null,
+  components: ComponentApiDescription[]
+) {
+  if (!selection || selection.kind === "componentMethod") {
+    return components;
+  }
+
+  const sourceNodeId = selection.component.nodeId;
+  const page = Object.values(document.pages).find((candidate) =>
+    subtreeContains(document, candidate.rootId, sourceNodeId)
+  );
+  if (!page) return components;
+
+  const nodeIds = collectSubtreeNodeIds(document, page.rootId);
+  return components.filter((component) => nodeIds.has(component.nodeId));
+}
+
+function subtreeContains(
+  document: UiDocument,
+  rootId: string,
+  candidateId: string
+) {
+  return collectSubtreeNodeIds(document, rootId).has(candidateId);
+}
+
+function collectSubtreeNodeIds(document: UiDocument, rootId: string) {
+  const ids = new Set<string>();
+  const stack = [rootId];
+
+  while (stack.length > 0) {
+    const nodeId = stack.pop();
+    if (!nodeId || ids.has(nodeId)) continue;
+    ids.add(nodeId);
+    const node = document.nodes[nodeId];
+    if (node) stack.push(...(node.children ?? []));
+  }
+
+  return ids;
 }
 
 function describeDefinitionSelfApi(

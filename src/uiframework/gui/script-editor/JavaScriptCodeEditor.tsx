@@ -2,6 +2,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
 import type { ComponentApiDescription } from "../../component-api";
+import type { NavigationTreeNode } from "../../navigation/navigation";
 import { createCtxAutocompleteExtension } from "./ctx-completions";
 
 type JavaScriptCodeEditorProps = {
@@ -9,6 +10,7 @@ type JavaScriptCodeEditorProps = {
   onChange: (value: string) => void;
   components: ComponentApiDescription[];
   selfComponent?: ComponentApiDescription | undefined;
+  navigation?: NavigationTreeNode[] | undefined;
 };
 
 export function JavaScriptCodeEditor({
@@ -16,10 +18,11 @@ export function JavaScriptCodeEditor({
   onChange,
   components,
   selfComponent,
+  navigation = [],
 }: JavaScriptCodeEditorProps) {
   const autocompleteExtension = useMemo(
-    () => createCtxAutocompleteExtension(components, selfComponent),
-    [components, selfComponent]
+    () => createCtxAutocompleteExtension(components, selfComponent, navigation),
+    [components, selfComponent, navigation]
   );
 
   return (

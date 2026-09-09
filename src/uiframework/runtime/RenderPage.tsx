@@ -1,16 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getProjectById } from "../../http/projects-api";
-import { createEmptyUiDocument, type UiDocument } from "../core/document";
+import {
+  createEmptyUiDocument,
+  getPage,
+  type UiDocument,
+} from "../core/document";
 import { RenderNode } from "../Renderer";
+import {
+  buildNavigationTree,
+  resolveNavigationPath,
+} from "../navigation/navigation";
+import { NavigationRuntimeProvider } from "../navigation/navigation-context";
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
 
 export function RenderPage() {
-  const { projectId } = useParams();
+  const { projectId, "*": routePath = "" } = useParams();
+  const routerNavigate = useNavigate();
   const [document, setDocument] = useState<UiDocument>(() =>
     createEmptyUiDocument()
   );
+  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateToastVisible, setUpdateToastVisible] = useState(false);
@@ -37,6 +48,7 @@ export function RenderPage() {
         const project = await getProjectById(projectId);
         if (!cancelled) {
           setDocument(project.tree);
+          setCurrentPageId(project.tree.startPageId);
         }
       } catch (error) {
         if (!cancelled) {
@@ -57,6 +69,40 @@ export function RenderPage() {
     };
   }, [projectId]);
 
+  useEffect(() => {
+    if (loading) return;
+    const target = resolveNavigationPath(document, routePath);
+    if (target) {
+      setCurrentPageId(target.pageId);
+    } else if (!currentPageId || !document.pages[currentPageId]) {
+      setCurrentPageId(document.startPageId);
+    }
+  }, [routePath, document, currentPageId, loading]);
+
+  const navigateTo = useCallback(
+    (path: string) => {
+      if (!projectId) return;
+      const target = resolveNavigationPath(document, path);
+      if (!target) {
+        console.warn(`[runtime] Unknown navigation path: ${path}`);
+        return;
+      }
+
+      setCurrentPageId(target.pageId);
+      const encodedPath = target.path
+        .split("/")
+        .map((segment) => encodeURIComponent(segment))
+        .join("/");
+      routerNavigate(`/render/${encodeURIComponent(projectId)}/${encodedPath}`);
+    },
+    [document, projectId, routerNavigate]
+  );
+
+  const navigationItems = useMemo(
+    () => buildNavigationTree(document),
+    [document]
+  );
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
@@ -73,10 +119,11 @@ export function RenderPage() {
     );
   }
 
-  if (!document.nodes[document.rootId]) {
+  const currentPage = getPage(document, currentPageId ?? document.startPageId);
+  if (!document.nodes[currentPage.rootId]) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
-        Empty project
+        Empty page
       </div>
     );
   }
@@ -86,43 +133,53 @@ export function RenderPage() {
       <RuntimeProvider
         projectId={projectId}
         setDocument={setDocument}
+        onNavigate={navigateTo}
         onScreenUpdated={showUpdateToast}
         onNodeUpdated={showUpdateToast}
       />
 
-      <div className="mx-auto w-fit">
-        <RenderNode
-          id={document.rootId}
-          document={document}
-          registry={runtimeRegistry}
-          decorateComponentInternals
-          decorateProps={(node, context) => {
-            const runtimeNodeId = context.componentInstanceId
-              ? `${context.componentInstanceId}::${node.id}`
-              : node.id;
-            const baseProps = {
-              "data-node-id": runtimeNodeId,
-            };
-
-            if (node.type === "Text" || node.type === "Chart") {
-              return {
-                ...baseProps,
-                runtimeBindings: node.bindings,
+      <NavigationRuntimeProvider
+        value={{
+          items: navigationItems,
+          currentPageId: currentPage.id,
+          navigateTo,
+        }}
+      >
+        <div className="mx-auto w-fit">
+          <RenderNode
+            id={currentPage.rootId}
+            document={document}
+            registry={runtimeRegistry}
+            decorateComponentInternals
+            decorateProps={(node, context) => {
+              const runtimeNodeId = context.componentInstanceId
+                ? `${context.componentInstanceId}::${node.id}`
+                : node.id;
+              const baseProps = {
+                "data-node-id": runtimeNodeId,
               };
-            }
 
-            if (node.type === "Button") {
-              return {
-                ...baseProps,
-                runtimeEvents: node.events,
-                runtimeProjectId: projectId,
-              };
-            }
+              if (node.type === "Text" || node.type === "Chart") {
+                return {
+                  ...baseProps,
+                  runtimeBindings: node.bindings,
+                };
+              }
 
-            return baseProps;
-          }}
-        />
-      </div>
+              if (node.type === "Button") {
+                return {
+                  ...baseProps,
+                  runtimeEvents: node.events,
+                  runtimeProjectId: projectId,
+                  runtimePageId: currentPage.id,
+                };
+              }
+
+              return baseProps;
+            }}
+          />
+        </div>
+      </NavigationRuntimeProvider>
 
       {updateToastVisible && (
         <div className="fixed right-5 bottom-5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">

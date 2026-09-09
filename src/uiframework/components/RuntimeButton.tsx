@@ -5,12 +5,14 @@ import { sendRuntimeEvent } from "./runtime-helpers";
 type RuntimeButtonProps = React.ComponentProps<typeof Button> & {
   runtimeEvents?: Record<string, HandlerRef>;
   runtimeProjectId?: string | undefined;
+  runtimePageId?: string | undefined;
   "data-node-id"?: string;
 };
 
 export function RuntimeButton({
   runtimeEvents,
   runtimeProjectId,
+  runtimePageId,
   "data-node-id": nodeId,
   ...props
 }: RuntimeButtonProps) {
@@ -25,6 +27,7 @@ export function RuntimeButton({
       eventName,
       nodeId,
       projectId: runtimeProjectId,
+      pageId: runtimePageId,
     });
   }
 

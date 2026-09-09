@@ -1,4 +1,5 @@
 import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
+import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
 import {
   getComponentApiMethodNames,
   getComponentApiPropertyNames,
@@ -19,6 +20,7 @@ import {
 
 export type MockScriptEvent = {
   projectId: string;
+  pageId?: string | undefined;
   handlerId: string;
   sourceNodeId: string;
   eventName: string;
@@ -33,6 +35,8 @@ export type MockScriptHost = {
   resolveComponentDefinition(
     componentDefinitionId: string
   ): UiComponentDefinition | undefined;
+  getNavigationTree(): NavigationTreeNode[];
+  navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
 };
 
@@ -58,6 +62,17 @@ export type MockScriptUiApi = {
   [key: string]: unknown;
 };
 
+export type MockScriptNavigationNodeApi = {
+  readonly path: string;
+  readonly pageId: string;
+  go(): void;
+  [key: string]: unknown;
+};
+
+export type MockScriptNavigationApi = {
+  [key: string]: MockScriptNavigationNodeApi | unknown;
+};
+
 export type MockScriptContext = {
   projectId: string;
   handlerId: string;
@@ -71,6 +86,8 @@ export type MockScriptContext = {
     clear(): void;
   };
   ui: MockScriptUiApi;
+  nav: MockScriptNavigationApi;
+  navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
   random: {
     color(): string;
@@ -120,6 +137,7 @@ function createContext(
 ): MockScriptContext {
   let ctx: MockScriptContext;
   const ui = createUiApi(host, event.projectId, () => ctx);
+  const nav = createNavigationApi(host);
 
   ctx = Object.freeze({
     projectId: event.projectId,
@@ -142,6 +160,10 @@ function createContext(
       },
     }),
     ui,
+    nav,
+    navigateTo(path: string) {
+      host.navigateTo(path);
+    },
     emit(eventName: string, payload?: Record<string, unknown>) {
       host.emit(eventName, payload);
     },
@@ -159,6 +181,47 @@ function createContext(
   });
 
   return ctx;
+}
+
+function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
+  const roots = host.getNavigationTree();
+  const rootByName = new Map(roots.map((node) => [node.name, node]));
+  const cache = new Map<string, MockScriptNavigationNodeApi>();
+
+  function createNodeApi(node: NavigationTreeNode): MockScriptNavigationNodeApi {
+    const cached = cache.get(node.pageId);
+    if (cached) return cached;
+
+    const childByName = new Map(node.children.map((child) => [child.name, child]));
+    const target = {
+      path: node.path,
+      pageId: node.pageId,
+      go() {
+        host.navigateTo(node.path);
+      },
+    } as MockScriptNavigationNodeApi;
+
+    const proxy = new Proxy(target, {
+      get(apiTarget, property, receiver) {
+        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+          return Reflect.get(apiTarget, property, receiver);
+        }
+        const child = childByName.get(property);
+        return child ? createNodeApi(child) : undefined;
+      },
+    });
+
+    cache.set(node.pageId, proxy);
+    return proxy;
+  }
+
+  return new Proxy({} as MockScriptNavigationApi, {
+    get(_target, property) {
+      if (typeof property !== "string") return undefined;
+      const node = rootByName.get(property);
+      return node ? createNodeApi(node) : undefined;
+    },
+  });
 }
 
 function createUiApi(

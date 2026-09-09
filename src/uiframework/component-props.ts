@@ -155,3 +155,21 @@ export const defaultChartProps = {
   showLegend: false,
   showGrid: true,
 } satisfies ChartNodeProps;
+
+export type NavigationNodeProps = {
+  backgroundColor?: string;
+  color?: string;
+  activeColor?: string;
+  gap?: number;
+  padding?: number;
+  borderRadius?: number;
+};
+
+export const defaultNavigationProps = {
+  backgroundColor: "#ffffff",
+  color: "#52525b",
+  activeColor: "#7c3aed",
+  gap: 4,
+  padding: 4,
+  borderRadius: 8,
+} satisfies NavigationNodeProps;

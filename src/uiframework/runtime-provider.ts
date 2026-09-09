@@ -16,6 +16,7 @@ type RuntimeProviderProps = {
   setDocument: React.Dispatch<React.SetStateAction<UiDocument>>;
   onScreenUpdated?: () => void;
   onNodeUpdated?: () => void;
+  onNavigate?: (path: string) => void;
 };
 
 export function RuntimeProvider({
@@ -23,6 +24,7 @@ export function RuntimeProvider({
   setDocument,
   onScreenUpdated,
   onNodeUpdated,
+  onNavigate,
 }: RuntimeProviderProps) {
   useEffect(() => {
     const ws = getWs();
@@ -53,6 +55,13 @@ export function RuntimeProvider({
               : publishedDocument
           );
           onScreenUpdated?.();
+          return;
+        }
+
+        if (payload.type === "runtime.navigate") {
+          if (typeof payload.path === "string") {
+            onNavigate?.(payload.path);
+          }
           return;
         }
 
@@ -140,7 +149,7 @@ export function RuntimeProvider({
 
     ws.addEventListener("message", handleMessage);
     return () => ws.removeEventListener("message", handleMessage);
-  }, [projectId, setDocument, onScreenUpdated, onNodeUpdated]);
+  }, [projectId, setDocument, onScreenUpdated, onNodeUpdated, onNavigate]);
 
   return null;
 }
