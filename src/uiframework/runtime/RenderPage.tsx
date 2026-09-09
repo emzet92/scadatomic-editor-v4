@@ -82,7 +82,7 @@ export function RenderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 p-8">
+    <div className="min-h-screen min-w-full overflow-auto bg-zinc-950">
       <RuntimeProvider
         projectId={projectId}
         setDocument={setDocument}
@@ -90,7 +90,7 @@ export function RenderPage() {
         onNodeUpdated={showUpdateToast}
       />
 
-      <div className="mx-auto max-w-7xl rounded-2xl bg-white p-8 shadow-2xl">
+      <div className="mx-auto w-fit">
         <RenderNode
           id={document.rootId}
           document={document}

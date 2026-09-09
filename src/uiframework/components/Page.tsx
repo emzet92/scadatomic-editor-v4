@@ -23,6 +23,7 @@ export function Page({
 
   const pageStyle: CSSProperties = {
     width: toCssSize(width),
+    height: toCssSize(height),
     minHeight: toCssSize(height),
     backgroundColor,
     padding,

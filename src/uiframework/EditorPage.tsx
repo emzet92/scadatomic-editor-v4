@@ -19,6 +19,7 @@ import {
 } from "./component-variants";
 import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
+import { PageViewportFrame } from "./gui/page/PageViewportFrame";
 import {
   PropertyPanel,
   type ComponentDefinitionEditorMode,
@@ -382,6 +383,10 @@ export function EditorPage() {
     ? document.components?.[componentDefinitionMode.componentId]
     : undefined;
   const inComponentMode = !!componentMode || !!componentDefinitionMode;
+  const rootPage = document.nodes[document.rootId];
+  const pageWidth = Math.max(1, Number(rootPage?.props?.width ?? 1440) || 1440);
+  const pageHeight = Math.max(1, Number(rootPage?.props?.height ?? 900) || 900);
+  const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
 
   return (
     <div className="h-screen flex flex-col bg-[var(--editor-app-bg)]">
@@ -472,7 +477,7 @@ export function EditorPage() {
               className={`min-h-[520px] bg-[var(--editor-surface)] bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)] bg-[size:20px_20px] ${
                 inComponentMode
                   ? "flex items-center justify-center p-16"
-                  : "min-h-full p-8"
+                  : "min-h-full"
               }`}
             >
               {componentDefinitionMode && focusedDefinition ? (
@@ -497,7 +502,13 @@ export function EditorPage() {
                 </div>
               ) : (
                 <>
-                  <RendererRoot document={document} registry={editorRegistry} />
+                  <PageViewportFrame
+                    width={pageWidth}
+                    height={pageHeight}
+                    deviceMode={pageDeviceMode}
+                  >
+                    <RendererRoot document={document} registry={editorRegistry} />
+                  </PageViewportFrame>
                   <EditorControls registry={editorRegistry} />
                 </>
               )}
@@ -527,6 +538,10 @@ export function EditorPage() {
       </div>
     </div>
   );
+}
+
+function getPageDeviceMode(value: unknown): "desktop" | "tablet" | "mobile" {
+  return value === "tablet" || value === "mobile" ? value : "desktop";
 }
 
 export default EditorPage;
