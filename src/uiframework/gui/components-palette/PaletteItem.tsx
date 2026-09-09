@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Box,
   Boxes,
@@ -23,8 +23,12 @@ const icons = {
 export function ComponentPalette() {
   const [search, setSearch] = useState("");
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
-  const reusableComponents = useEditorStore((s) =>
-    Object.values(s.document.components ?? {})
+  const componentDefinitionsById = useEditorStore(
+    (s) => s.document.components
+  );
+  const reusableComponents = useMemo(
+    () => Object.values(componentDefinitionsById ?? {}),
+    [componentDefinitionsById]
   );
 
   const normalizedSearch = search.toLowerCase();
