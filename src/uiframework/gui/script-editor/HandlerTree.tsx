@@ -11,37 +11,23 @@ import {
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { validateComponentMethodName } from "../../component-api";
-import { validateComponentVariantName } from "../../component-variants";
 import type { UiDocument, UiNode } from "../../core/document";
 import { getComponentDefinition } from "../../registry/component-definitions";
-
-export type SelectedVariant = {
-  nodeId: string;
-  variantName: string;
-};
 
 type HandlerTreeProps = {
   document: UiDocument | null;
   currentScriptId: string;
-  selectedVariant: SelectedVariant | null;
   onSelect: (scriptId: string) => void;
-  onSelectVariant: (nodeId: string, variantName: string) => void;
   onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
   onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
-  onAddVariant: (nodeId: string, variantName: string) => Promise<void>;
-  onRemoveVariant: (nodeId: string, variantName: string) => Promise<void>;
 };
 
 export function HandlerTree({
   document,
   currentScriptId,
-  selectedVariant,
   onSelect,
-  onSelectVariant,
   onAddMethod,
   onRemoveMethod,
-  onAddVariant,
-  onRemoveVariant,
 }: HandlerTreeProps) {
   const apiEntryCount = useMemo(
     () => (document ? countApiEntries(document) : 0),
@@ -74,13 +60,9 @@ export function HandlerTree({
             document={document}
             nodeId={document.rootId}
             currentScriptId={currentScriptId}
-            selectedVariant={selectedVariant}
             onSelect={onSelect}
-            onSelectVariant={onSelectVariant}
             onAddMethod={onAddMethod}
             onRemoveMethod={onRemoveMethod}
-            onAddVariant={onAddVariant}
-            onRemoveVariant={onRemoveVariant}
             depth={0}
           />
         )}
@@ -93,13 +75,9 @@ type HandlerNodeProps = {
   document: UiDocument;
   nodeId: string;
   currentScriptId: string;
-  selectedVariant: SelectedVariant | null;
   onSelect: (scriptId: string) => void;
-  onSelectVariant: (nodeId: string, variantName: string) => void;
   onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
   onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
-  onAddVariant: (nodeId: string, variantName: string) => Promise<void>;
-  onRemoveVariant: (nodeId: string, variantName: string) => Promise<void>;
   depth: number;
 };
 
@@ -107,13 +85,9 @@ function HandlerNode({
   document,
   nodeId,
   currentScriptId,
-  selectedVariant,
   onSelect,
-  onSelectVariant,
   onAddMethod,
   onRemoveMethod,
-  onAddVariant,
-  onRemoveVariant,
   depth,
 }: HandlerNodeProps) {
   const node = document.nodes[nodeId];
@@ -121,10 +95,6 @@ function HandlerNode({
   const [methodDraft, setMethodDraft] = useState("");
   const [methodError, setMethodError] = useState<string | null>(null);
   const [savingMethod, setSavingMethod] = useState(false);
-  const [addingVariant, setAddingVariant] = useState(false);
-  const [variantDraft, setVariantDraft] = useState("");
-  const [variantError, setVariantError] = useState<string | null>(null);
-  const [savingVariant, setSavingVariant] = useState(false);
 
   if (!node) {
     return null;
@@ -158,29 +128,6 @@ function HandlerNode({
     }
   }
 
-  async function addVariant() {
-    const validation = validateComponentVariantName(node, variantDraft);
-    if (!validation.ok) {
-      setVariantError(validation.error);
-      return;
-    }
-
-    setSavingVariant(true);
-    try {
-      await onAddVariant(node.id, validation.name);
-      setVariantDraft("");
-      setVariantError(null);
-      setAddingVariant(false);
-      onSelectVariant(node.id, validation.name);
-    } catch (error) {
-      setVariantError(
-        error instanceof Error ? error.message : "Failed to add variant."
-      );
-    } finally {
-      setSavingVariant(false);
-    }
-  }
-
   return (
     <div>
       <details open className="group/component">
@@ -209,10 +156,7 @@ function HandlerNode({
               {eventEntries.map(([eventName, handler]) => (
                 <ScriptButton
                   key={`event:${node.id}:${eventName}`}
-                  active={
-                    selectedVariant === null &&
-                    handler.handlerId === currentScriptId
-                  }
+                  active={handler.handlerId === currentScriptId}
                   depth={depth}
                   label={getEventLabel(node, eventName)}
                   scriptId={handler.handlerId}
@@ -243,10 +187,7 @@ function HandlerNode({
             {methodEntries.map(([methodName, method]) => (
               <MethodButton
                 key={`method:${node.id}:${methodName}`}
-                active={
-                  selectedVariant === null &&
-                  method.scriptId === currentScriptId
-                }
+                active={method.scriptId === currentScriptId}
                 depth={depth}
                 label={`${methodName}()`}
                 scriptId={method.scriptId}
@@ -282,54 +223,23 @@ function HandlerNode({
             icon={<Palette size={12} />}
             label="Variants"
             count={variantEntries.length}
-            action={
-              !addingVariant ? (
-                <AddButton
-                  title={`Add variant to ${node.name}`}
-                  onClick={() => {
-                    setAddingVariant(true);
-                    setVariantDraft("");
-                    setVariantError(null);
-                  }}
-                />
-              ) : null
-            }
           >
             {variantEntries.map(([variantName]) => (
-              <VariantButton
+              <VariantApiRow
                 key={`variant:${node.id}:${variantName}`}
-                active={
-                  selectedVariant?.nodeId === node.id &&
-                  selectedVariant.variantName === variantName
-                }
                 depth={depth}
                 label={variantName}
                 isDefault={node.defaultVariant === variantName}
                 apiPath={`ctx.ui.${node.name}.variant.${variantName}()`}
-                onSelect={() => onSelectVariant(node.id, variantName)}
-                onRemove={() => void onRemoveVariant(node.id, variantName)}
               />
             ))}
-
-            {addingVariant ? (
-              <InlineAddForm
-                depth={depth}
-                value={variantDraft}
-                placeholder="enabled"
-                suffix="()"
-                saving={savingVariant}
-                error={variantError}
-                hint={`ctx.ui.${node.name}.variant.${variantDraft || "variant"}()`}
-                onChange={(value) => {
-                  setVariantDraft(value);
-                  setVariantError(null);
-                }}
-                onSubmit={() => void addVariant()}
-                onCancel={() => {
-                  setAddingVariant(false);
-                  setVariantError(null);
-                }}
-              />
+            {variantEntries.length === 0 ? (
+              <div
+                className="py-1.5 pr-2 text-[10px] text-zinc-400"
+                style={{ paddingLeft: `${44 + depth * 12}px` }}
+              >
+                Define variants in the Designer property panel.
+              </div>
             ) : null}
           </TreeSection>
 
@@ -339,13 +249,9 @@ function HandlerNode({
               document={document}
               nodeId={childId}
               currentScriptId={currentScriptId}
-              selectedVariant={selectedVariant}
               onSelect={onSelect}
-              onSelectVariant={onSelectVariant}
               onAddMethod={onAddMethod}
               onRemoveMethod={onRemoveMethod}
-              onAddVariant={onAddVariant}
-              onRemoveVariant={onRemoveVariant}
               depth={depth + 1}
             />
           ))}
@@ -565,53 +471,38 @@ function MethodButton({
   );
 }
 
-function VariantButton({
-  active,
+function VariantApiRow({
   depth,
   label,
   isDefault,
   apiPath,
-  onSelect,
-  onRemove,
 }: {
-  active: boolean;
   depth: number;
   label: string;
   isDefault: boolean;
   apiPath: string;
-  onSelect: () => void;
-  onRemove: () => void;
 }) {
   return (
     <div
-      className={`group/variant flex items-center rounded-md pr-1 transition ${
-        active ? "bg-violet-50 text-violet-700" : "text-zinc-600 hover:bg-zinc-50"
-      }`}
-      style={{ marginLeft: `${36 + depth * 12}px` }}
+      className="flex items-start gap-2 rounded-md py-1.5 pr-2 text-zinc-600"
+      style={{ paddingLeft: `${44 + depth * 12}px` }}
+      title={apiPath}
     >
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-2 text-left"
-        title={apiPath}
-      >
-        <Palette size={12} className="mt-0.5 shrink-0" />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 truncate font-mono text-xs font-medium">
-            {label}()
-            {isDefault ? (
-              <span
-                className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-700"
-                title="Default variant"
-              >
-                <Star size={8} fill="currentColor" /> default
-              </span>
-            ) : null}
-          </span>
-          <span className="block truncate text-[10px] opacity-55">{apiPath}</span>
+      <Palette size={12} className="mt-0.5 shrink-0 text-violet-500" />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 truncate font-mono text-xs font-medium">
+          {label}()
+          {isDefault ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-700"
+              title="Default variant"
+            >
+              <Star size={8} fill="currentColor" /> default
+            </span>
+          ) : null}
         </span>
-      </button>
-      <RemoveButton label={`Remove variant ${label}`} onRemove={onRemove} />
+        <span className="block truncate text-[10px] opacity-55">{apiPath}</span>
+      </span>
     </div>
   );
 }

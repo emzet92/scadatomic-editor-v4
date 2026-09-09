@@ -1,3 +1,4 @@
+import { Boxes, LayoutTemplate, Palette } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
@@ -11,10 +12,16 @@ import {
   Toolbar,
 } from "./EditorLayout";
 import { RenderNode } from "./Renderer";
-import { getDefaultComponentVariantProps } from "./component-variants";
+import {
+  getComponentVariantProps,
+  getDefaultComponentVariantProps,
+} from "./component-variants";
 import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
-import { PropertyPanel } from "./gui/property-panel/PropertyPanel";
+import {
+  PropertyPanel,
+  type ComponentEditorMode,
+} from "./gui/property-panel/PropertyPanel";
 import { TreeView } from "./gui/tree-view/TreeView";
 import {
   editorRegistry,
@@ -56,14 +63,38 @@ export function RendererRoot({
   );
 }
 
+function ComponentModeRenderer({
+  document,
+  mode,
+}: {
+  document: UiDocument;
+  mode: ComponentEditorMode;
+}) {
+  return (
+    <RenderNode
+      id={mode.nodeId}
+      document={document}
+      registry={editorRegistry}
+      decorateProps={(node) => ({
+        ...(node.id === mode.nodeId
+          ? getComponentVariantProps(node, mode.variantName)
+          : getDefaultComponentVariantProps(node)),
+      })}
+    />
+  );
+}
+
 export function EditorPage() {
   const { projectId } = useParams();
   const document = useEditorStore((state) => state.document);
   const setDocument = useEditorStore((state) => state.setDocument);
+  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
 
   const [projectName, setProjectName] = useState("Untitled Project");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [componentMode, setComponentMode] =
+    useState<ComponentEditorMode | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -82,6 +113,7 @@ export function EditorPage() {
         setLoading(true);
         setError(null);
         setSaveStatus("idle");
+        setComponentMode(null);
         loadedRef.current = false;
         lastSavedSnapshotRef.current = null;
         revisionRef.current = undefined;
@@ -135,6 +167,17 @@ export function EditorPage() {
       }
     };
   }, [projectId, setDocument]);
+
+  useEffect(() => {
+    if (!componentMode) {
+      return;
+    }
+
+    const node = document.nodes[componentMode.nodeId];
+    if (!node?.variants?.[componentMode.variantName]) {
+      setComponentMode(null);
+    }
+  }, [componentMode, document]);
 
   useEffect(() => {
     if (
@@ -196,6 +239,11 @@ export function EditorPage() {
     };
   }, [projectId, projectName, document, loading]);
 
+  function editVariant(nodeId: string, variantName: string) {
+    setSelectedNodeId(nodeId);
+    setComponentMode({ nodeId, variantName });
+  }
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center text-sm text-zinc-500">
@@ -216,6 +264,10 @@ export function EditorPage() {
     return null;
   }
 
+  const focusedNode = componentMode
+    ? document.nodes[componentMode.nodeId]
+    : undefined;
+
   return (
     <div className="h-screen flex flex-col bg-[var(--editor-app-bg)]">
       <Toolbar projectId={projectId} />
@@ -229,18 +281,84 @@ export function EditorPage() {
 
         <Canvas>
           <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div
+                data-editor-ignore
+                className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
+              >
+                <button
+                  type="button"
+                  onClick={() => setComponentMode(null)}
+                  className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium transition ${
+                    componentMode
+                      ? "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
+                      : "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+                  }`}
+                >
+                  <LayoutTemplate size={13} /> Designer
+                </button>
+                <button
+                  type="button"
+                  disabled={!componentMode}
+                  className={`inline-flex items-center gap-1.5 border-l border-[var(--editor-border)] px-3 text-xs font-medium transition ${
+                    componentMode
+                      ? "bg-violet-50 text-violet-700"
+                      : "cursor-default text-[var(--editor-text-muted)] opacity-40"
+                  }`}
+                >
+                  <Boxes size={13} /> Component
+                </button>
+              </div>
+
+              {componentMode && focusedNode ? (
+                <div
+                  data-editor-ignore
+                  className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
+                >
+                  <Palette size={13} />
+                  <span className="font-medium">{focusedNode.name}</span>
+                  <span className="opacity-50">/</span>
+                  <span className="font-mono">{componentMode.variantName}()</span>
+                </div>
+              ) : (
+                <div className="text-xs text-[var(--editor-text-muted)]">
+                  Designer mode
+                </div>
+              )}
+            </div>
+
             <div
               data-editor-canvas
-              className="min-h-full p-8 bg-[var(--editor-surface)] bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)] bg-[size:20px_20px]"
+              className={`min-h-[520px] bg-[var(--editor-surface)] bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)] bg-[size:20px_20px] ${
+                componentMode
+                  ? "flex items-center justify-center p-16"
+                  : "min-h-full p-8"
+              }`}
             >
-              <RendererRoot document={document} registry={editorRegistry} />
-              <EditorControls registry={editorRegistry} />
+              {componentMode ? (
+                <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
+                  <ComponentModeRenderer
+                    document={document}
+                    mode={componentMode}
+                  />
+                </div>
+              ) : (
+                <>
+                  <RendererRoot document={document} registry={editorRegistry} />
+                  <EditorControls registry={editorRegistry} />
+                </>
+              )}
             </div>
           </div>
         </Canvas>
 
         <RightSidebar>
-          <PropertyPanel document={document} />
+          <PropertyPanel
+            document={document}
+            componentMode={componentMode}
+            onEditVariant={editVariant}
+            onExitComponentMode={() => setComponentMode(null)}
+          />
         </RightSidebar>
       </div>
 

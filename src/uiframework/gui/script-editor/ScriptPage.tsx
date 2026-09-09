@@ -10,11 +10,9 @@ import {
   describeComponentApi,
   type ComponentApiDescription,
 } from "../../component-api";
-import { createComponentVariantSnapshot } from "../../component-variants";
 import type { UiDocument, UiNode } from "../../core/document";
-import { HandlerTree, type SelectedVariant } from "./HandlerTree";
+import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
-import { VariantEditor } from "./VariantEditor";
 
 export function ScriptPage() {
   const { scriptId, projectId } = useParams();
@@ -45,8 +43,6 @@ function ScriptEditor({
   const [projectName, setProjectName] = useState("");
   const [projectRevision, setProjectRevision] = useState<number | undefined>();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [selectedVariant, setSelectedVariant] =
-    useState<SelectedVariant | null>(null);
 
   const dirty = code !== savedCode;
   const componentApi = document
@@ -99,7 +95,6 @@ function ScriptEditor({
 
   function selectScript(nextScriptId: string) {
     preserveDirtyScript();
-    setSelectedVariant(null);
 
     if (nextScriptId === scriptId) {
       return;
@@ -108,11 +103,6 @@ function ScriptEditor({
     navigate(
       `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(nextScriptId)}`
     );
-  }
-
-  function selectVariant(nodeId: string, variantName: string) {
-    preserveDirtyScript();
-    setSelectedVariant({ nodeId, variantName });
   }
 
   async function persistNode(
@@ -202,92 +192,6 @@ function ScriptEditor({
     await persistMethod(nodeId, methodName, null);
   }
 
-  async function addComponentVariant(nodeId: string, variantName: string) {
-    await persistNode(nodeId, (node) => {
-      const variants = {
-        ...(node.variants ?? {}),
-        [variantName]: {
-          props: createComponentVariantSnapshot(node),
-        },
-      };
-
-      return {
-        ...node,
-        variants,
-        defaultVariant: node.defaultVariant ?? variantName,
-      };
-    });
-  }
-
-  async function removeComponentVariant(nodeId: string, variantName: string) {
-    await persistNode(nodeId, (node) => {
-      const variants = { ...(node.variants ?? {}) };
-      delete variants[variantName];
-
-      const remaining = Object.keys(variants);
-      const nextDefault =
-        node.defaultVariant === variantName
-          ? remaining[0]
-          : node.defaultVariant;
-
-      if (remaining.length === 0) {
-        return {
-          ...node,
-          variants: undefined,
-          defaultVariant: undefined,
-        };
-      }
-
-      return {
-        ...node,
-        variants,
-        defaultVariant: nextDefault ?? remaining[0],
-      };
-    });
-
-    if (
-      selectedVariant?.nodeId === nodeId &&
-      selectedVariant.variantName === variantName
-    ) {
-      setSelectedVariant(null);
-    }
-  }
-
-  async function saveComponentVariant(
-    nodeId: string,
-    variantName: string,
-    props: Record<string, unknown>
-  ) {
-    await persistNode(nodeId, (node) => {
-      if (!node.variants?.[variantName]) {
-        throw new Error(`Variant “${variantName}” no longer exists.`);
-      }
-
-      return {
-        ...node,
-        variants: {
-          ...node.variants,
-          [variantName]: {
-            props: { ...props },
-          },
-        },
-      };
-    });
-  }
-
-  async function setDefaultVariant(nodeId: string, variantName: string) {
-    await persistNode(nodeId, (node) => {
-      if (!node.variants?.[variantName]) {
-        throw new Error(`Variant “${variantName}” no longer exists.`);
-      }
-
-      return {
-        ...node,
-        defaultVariant: variantName,
-      };
-    });
-  }
-
   return (
     <div className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
       <header className="h-16 shrink-0 border-b border-zinc-200 bg-white px-6 flex items-center justify-between">
@@ -299,11 +203,9 @@ function ScriptEditor({
         </div>
 
         <div className="flex items-center gap-2">
-          {!selectedVariant ? (
-            <span className="text-xs text-zinc-400">
-              {dirty ? "Unsaved changes" : "Saved locally"}
-            </span>
-          ) : null}
+          <span className="text-xs text-zinc-400">
+            {dirty ? "Unsaved changes" : "Saved locally"}
+          </span>
 
           <button
             className="h-9 px-4 rounded-md border border-zinc-200 bg-white hover:bg-zinc-50 text-sm font-medium text-zinc-700 transition"
@@ -314,14 +216,12 @@ function ScriptEditor({
             Back to editor
           </button>
 
-          {!selectedVariant ? (
-            <button
-              className="h-9 px-4 rounded-md bg-sky-600 hover:bg-sky-500 text-sm font-medium text-white transition"
-              onClick={save}
-            >
-              Save Script
-            </button>
-          ) : null}
+          <button
+            className="h-9 px-4 rounded-md bg-sky-600 hover:bg-sky-500 text-sm font-medium text-white transition"
+            onClick={save}
+          >
+            Save Script
+          </button>
         </div>
       </header>
 
@@ -329,13 +229,9 @@ function ScriptEditor({
         <HandlerTree
           document={document}
           currentScriptId={scriptId}
-          selectedVariant={selectedVariant}
           onSelect={selectScript}
-          onSelectVariant={selectVariant}
           onAddMethod={addComponentMethod}
           onRemoveMethod={removeComponentMethod}
-          onAddVariant={addComponentVariant}
-          onRemoveVariant={removeComponentVariant}
         />
 
         <main className="min-w-0 flex-1 overflow-auto p-6">
@@ -346,79 +242,66 @@ function ScriptEditor({
               </div>
             ) : null}
 
-            {selectedVariant && document ? (
-              <VariantEditor
-                key={`${selectedVariant.nodeId}:${selectedVariant.variantName}`}
-                document={document}
-                nodeId={selectedVariant.nodeId}
-                variantName={selectedVariant.variantName}
-                onSave={saveComponentVariant}
-                onSetDefault={setDefaultVariant}
-              />
-            ) : (
-              <>
-                <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                    {scriptSelection?.kind === "method"
-                      ? "Method Script ID"
-                      : "Handler ID"}
-                  </div>
-                  <div className="mt-1 text-sm font-mono text-zinc-600">
-                    {scriptId}
-                  </div>
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                {scriptSelection?.kind === "method"
+                  ? "Method Script ID"
+                  : "Handler ID"}
+              </div>
+              <div className="mt-1 text-sm font-mono text-zinc-600">
+                {scriptId}
+              </div>
 
-                  <h1 className="mt-4 text-xl font-semibold text-zinc-900">
-                    {scriptSelection?.kind === "method"
-                      ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
-                      : "Runtime Handler"}
-                  </h1>
-                  <p className="mt-1 text-sm text-zinc-500">
-                    {scriptSelection?.kind === "method"
-                      ? "Component method executed synchronously inside the current handler context."
-                      : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
-                  </p>
-                </div>
+              <h1 className="mt-4 text-xl font-semibold text-zinc-900">
+                {scriptSelection?.kind === "method"
+                  ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
+                  : "Runtime Handler"}
+              </h1>
+              <p className="mt-1 text-sm text-zinc-500">
+                {scriptSelection?.kind === "method"
+                  ? "Component method executed synchronously inside the current handler context."
+                  : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
+              </p>
+            </div>
 
-                <JavaScriptCodeEditor
-                  value={code}
-                  onChange={setCode}
-                  components={componentApi}
-                  selfComponent={selfComponent}
-                />
+            <JavaScriptCodeEditor
+              value={code}
+              onChange={setCode}
+              components={componentApi}
+              selfComponent={selfComponent}
+            />
 
-                <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    ctx API
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
-                    <code>ctx.sourceNodeId</code>
-                    <code>ctx.eventName</code>
-                    <code>ctx.state.get(key, fallback?)</code>
-                    <code>ctx.state.set(key, value)</code>
-                    <code>ctx.ui.ComponentName</code>
-                    <code>ctx.ui.ComponentName.prop = value</code>
-                    <code>ctx.ui.ComponentName.setProp(prop, value)</code>
-                    <code>ctx.ui.ComponentName.setColor(color)</code>
-                    <code>ctx.ui.ComponentName.variant.enabled()</code>
-                    <code>ctx.ui.ComponentName.variant.current</code>
-                    {scriptSelection?.kind === "method" ? (
-                      <>
-                        <code>self.prop = value</code>
-                        <code>self.otherMethod()</code>
-                        <code>args[0], args[1], ...</code>
-                      </>
-                    ) : null}
-                    <code>ctx.emit(name, payload?)</code>
-                    <code>ctx.random.color()</code>
-                    <code>ctx.random.number(min, max)</code>
-                    <code>ctx.log(...args)</code>
-                  </div>
-                  <p className="mt-3 text-xs text-amber-700">
-                    Prototype only: handlers run with new Function and are not sandboxed.
-                  </p>
-                </div>
-              </>
-            )}
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                ctx API
+              </div>
+              <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
+                <code>ctx.sourceNodeId</code>
+                <code>ctx.eventName</code>
+                <code>ctx.state.get(key, fallback?)</code>
+                <code>ctx.state.set(key, value)</code>
+                <code>ctx.ui.ComponentName</code>
+                <code>ctx.ui.ComponentName.prop = value</code>
+                <code>ctx.ui.ComponentName.setProp(prop, value)</code>
+                <code>ctx.ui.ComponentName.setColor(color)</code>
+                <code>ctx.ui.ComponentName.variant.enabled()</code>
+                <code>ctx.ui.ComponentName.variant.current</code>
+                {scriptSelection?.kind === "method" ? (
+                  <>
+                    <code>self.prop = value</code>
+                    <code>self.otherMethod()</code>
+                    <code>args[0], args[1], ...</code>
+                  </>
+                ) : null}
+                <code>ctx.emit(name, payload?)</code>
+                <code>ctx.random.color()</code>
+                <code>ctx.random.number(min, max)</code>
+                <code>ctx.log(...args)</code>
+              </div>
+              <p className="mt-3 text-xs text-amber-700">
+                Prototype only: handlers run with new Function and are not sandboxed.
+              </p>
+            </div>
           </div>
         </main>
       </div>
