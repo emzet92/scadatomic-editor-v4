@@ -7,6 +7,7 @@ export function EventsEditor({
   definitions,
   events,
   setEvent,
+  handlerIdPrefix,
 }: {
   nodeId: string;
   nodeName: string;
@@ -17,6 +18,7 @@ export function EventsEditor({
     event: string,
     handler: HandlerRef | null
   ) => void;
+  handlerIdPrefix?: string;
 }) {
   const { projectId } = useParams();
 
@@ -33,7 +35,9 @@ export function EventsEditor({
 
       <div className="space-y-3">
         {Object.entries(definitions).map(([eventName, definition]) => {
-          const generatedHandlerId = `${nodeName}.${definition.defaultSuffix}`;
+          const generatedHandlerId = handlerIdPrefix
+            ? `${handlerIdPrefix}.${nodeName}.${definition.defaultSuffix}`
+            : `${nodeName}.${definition.defaultSuffix}`;
           const handler = events?.[eventName];
           const checked = !!handler;
           const handlerId = handler?.handlerId ?? generatedHandlerId;
@@ -63,8 +67,13 @@ export function EventsEditor({
               />
 
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-[var(--editor-text)]">
-                  {definition.label}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium text-[var(--editor-text)]">
+                    {definition.label}
+                  </div>
+                  <code className="rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[10px] text-[var(--editor-text-muted)]">
+                    {toReactEventName(eventName)}
+                  </code>
                 </div>
                 <div className="text-xs text-[var(--editor-text-muted)] truncate">
                   {handlerId}
@@ -94,4 +103,9 @@ export function EventsEditor({
       </div>
     </div>
   );
+}
+
+function toReactEventName(eventName: string) {
+  if (eventName.startsWith("on")) return eventName;
+  return `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
 }

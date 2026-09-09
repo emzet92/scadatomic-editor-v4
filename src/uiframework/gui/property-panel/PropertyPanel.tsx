@@ -7,14 +7,13 @@ import {
   ComponentInstancePanel,
 } from "../reusable-component/ReusableComponentPanels";
 import { getComponentDefinition } from "../../registry/component-definitions";
-import { BindingsEditor } from "./BindingsEditor";
-import { EventsEditor } from "./EventsEditor";
 import { PropertyPanelEmpty } from "./PropertyPanelEmpty";
 import { PropertyPanelHeader } from "./PropertyPanelHeader";
 import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
 import { MultiSelectionPanel } from "./MultiSelectionPanel";
 import { PageSettingsEditor } from "./PageSettingsEditor";
 import { PropsEditor } from "./PropsEditor";
+import { ComponentProperties } from "./ComponentProperties";
 import { VariantsEditor } from "./VariantsEditor";
 import type { UpdateNode } from "./property-panel-types";
 
@@ -235,11 +234,15 @@ export function PropertyPanel({
         ) : null}
 
         {definition ? (
-          <PropsEditor
-            nodeId={node.id}
+          <ComponentProperties
+            node={node}
             values={resolvedProps}
             controls={definition.inspector}
             updateNode={updateNode}
+            bindingDefinitions={definition.bindings}
+            setBinding={setBinding}
+            eventDefinitions={definition.events}
+            setEvent={setEvent}
           />
         ) : (
           <div className="text-xs text-amber-700">
@@ -280,24 +283,6 @@ export function PropertyPanel({
           </section>
         ) : null}
 
-        {definition?.bindings && (
-          <BindingsEditor
-            nodeId={node.id}
-            definitions={definition.bindings}
-            bindings={node.bindings}
-            setBinding={setBinding}
-          />
-        )}
-
-        {definition?.events && (
-          <EventsEditor
-            nodeId={node.id}
-            nodeName={node.name}
-            definitions={definition.events}
-            events={node.events}
-            setEvent={setEvent}
-          />
-        )}
       </div>
     </div>
   );

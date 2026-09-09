@@ -1,53 +1,28 @@
-# SCADAtomic Pages + Navigation patch
+# Shared component properties inspector
+
+This patch removes the duplicated/limited property editor used inside reusable component definition mode.
 
 ## What changed
 
-- `UiDocument` schema is now v4.
-- A project can contain multiple `Page` roots in a global node table.
-- `components` remain global per project and the existing `ProjectComponentRepository` is unchanged in scope.
-- New `Pages` tree in the Designer with:
-  - add top-level page,
-  - add subpage,
-  - switch active page.
-- Page names form navigation paths, e.g. `Page1/SubPage1`.
-- Runtime URL supports page paths: `/render/:projectId/Page1/SubPage1`.
-- New navigation module derives a tree directly from project pages.
-- New runtime script API:
-  - `ctx.navigateTo("Page1/SubPage1")`
-  - `ctx.nav.Page1.go()`
-  - `ctx.nav.Page1.SubPage1.go()`
-- Script Editor autocomplete generates the `ctx.nav` API from the current page tree.
-- Script Editor handler tree now shows scripts under all pages.
-- `ctx.ui` autocomplete is page-scoped for page handlers/methods.
-- New `Navigation` component in the Palette renders classic top-level page navigation.
-- The `Navigation` component highlights a top-level branch when a subpage is active.
-- Runtime Preview opens the page currently selected in the Designer.
-- Node names are now unique per page, matching the page-scoped `ctx.ui` runtime lookup.
+- Adds `ComponentProperties`, a shared inspector surface driven by the component registry.
+- Normal Page/primitive nodes and private nodes inside reusable component definitions now use the same property renderer.
+- The shared surface renders:
+  - serializable visual properties (`inspector`)
+  - tag bindings (`bindings`)
+  - runtime events (`events`)
+- Reusable component instances also reuse the same property surface for their public inputs.
+- Internal definition-node bindings/events are persisted directly into `UiComponentDefinition.nodes`.
+- Internal event handler ids are scoped with the component definition id to avoid collisions with normal page handlers.
+- Event rows now show the familiar React-style alias (`onClick`, `onDoubleClick`) next to the SCADAtomic event label.
 
-## Data model
+## Button behavior
 
-Pages are project-level metadata pointing at Page root nodes:
+A normal Button and a Button selected while editing a reusable component definition now expose the same registered API:
 
-```ts
-UiDocument {
-  schemaVersion: 4,
-  rootId,       // root node of the start page
-  startPageId,
-  pages: {
-    [pageId]: {
-      id,
-      name,
-      rootId,
-      parentPageId?
-    }
-  },
-  nodes,        // all page trees, globally unique node ids
-  components    // global reusable component repository
-}
-```
+- label
+- disabled
+- backgroundColor
+- Click / onClick
+- Double click / onDoubleClick
 
-The navigation tree is derived from `pages`; it is not duplicated in storage.
-
-## Prototype storage
-
-The mock project storage namespace was bumped to `scadatomic.mock.v5.project.*` because schema v4 intentionally has no legacy migration.
+`onClick` is intentionally an event in the document model (`events.click`), not a serializable visual prop.

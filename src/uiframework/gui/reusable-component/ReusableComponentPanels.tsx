@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
+  Binding,
   ComponentInputType,
+  HandlerRef,
   UiComponentDefinition,
   UiDocument,
   UiNode,
@@ -26,7 +28,7 @@ import {
   getComponentDefinition,
   type InspectorControl,
 } from "../../registry/component-definitions";
-import { PropsEditor } from "../property-panel/PropsEditor";
+import { ComponentProperties } from "../property-panel/ComponentProperties";
 import { PropertyPanelHeader } from "../property-panel/PropertyPanelHeader";
 import type { RenameNodeResult } from "../../editor-store";
 import type { UpdateNode } from "../property-panel/property-panel-types";
@@ -80,18 +82,13 @@ export function ComponentInstancePanel({
           <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
             Public properties
           </div>
-          {Object.keys(controls).length > 0 ? (
-            <PropsEditor
-              nodeId={node.id}
-              values={values}
-              controls={controls}
-              updateNode={updateNode}
-            />
-          ) : (
-            <div className="rounded-lg border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-muted)]">
-              This component exposes no input properties.
-            </div>
-          )}
+          <ComponentProperties
+            node={node}
+            values={values}
+            controls={controls}
+            updateNode={updateNode}
+            emptyMessage="This component exposes no input properties."
+          />
         </section>
 
         <section className="border-t border-[var(--editor-border)] pt-4">
@@ -148,6 +145,38 @@ export function ComponentDefinitionPanel({
     updateDefinitionNode(nodeId, updater);
   };
 
+  const setInternalBinding = (
+    nodeId: string,
+    property: string,
+    binding: Binding | null
+  ) => {
+    updateDefinitionNode(nodeId, (current) => {
+      const bindings = { ...(current.bindings ?? {}) };
+      if (binding) bindings[property] = binding;
+      else delete bindings[property];
+      return {
+        ...current,
+        bindings: Object.keys(bindings).length > 0 ? bindings : undefined,
+      };
+    });
+  };
+
+  const setInternalEvent = (
+    nodeId: string,
+    eventName: string,
+    handler: HandlerRef | null
+  ) => {
+    updateDefinitionNode(nodeId, (current) => {
+      const events = { ...(current.events ?? {}) };
+      if (handler) events[eventName] = handler;
+      else delete events[eventName];
+      return {
+        ...current,
+        events: Object.keys(events).length > 0 ? events : undefined,
+      };
+    });
+  };
+
   return (
     <div data-editor-ignore className="h-full flex flex-col">
       <div className="border-b border-[var(--editor-border)] px-4 py-4">
@@ -186,11 +215,16 @@ export function ComponentDefinitionPanel({
             Private implementation · {internalNode?.name ?? "No selection"}
           </div>
           {internalNode && primitiveDefinition ? (
-            <PropsEditor
-              nodeId={internalNode.id}
+            <ComponentProperties
+              node={internalNode}
               values={internalValues}
               controls={primitiveDefinition.inspector}
               updateNode={updateInternalNode}
+              bindingDefinitions={primitiveDefinition.bindings}
+              setBinding={setInternalBinding}
+              eventDefinitions={primitiveDefinition.events}
+              setEvent={setInternalEvent}
+              handlerIdPrefix={`component.${definition.id}`}
             />
           ) : (
             <div className="text-xs text-[var(--editor-text-muted)]">
