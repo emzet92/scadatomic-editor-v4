@@ -144,6 +144,7 @@ export function EditorControls({ registry }: Props) {
         state.insertNode(target.parentId, target.insertIndex, {
           type: state.dragPreview.type,
           props: state.dragPreview.props,
+          componentDefinitionId: state.dragPreview.componentDefinitionId,
         });
       } else if (target && state.draggedNodeId) {
         state.moveNode(

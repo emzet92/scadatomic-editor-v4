@@ -1,7 +1,11 @@
-import { ArrowLeft, Palette, Star } from "lucide-react";
+import { ArrowLeft, Box, Palette, Star } from "lucide-react";
 import { getComponentVariantProps } from "../../component-variants";
 import { useEditorStore } from "../../editor-store";
 import type { UiDocument, UiNode } from "../../core/document";
+import {
+  ComponentDefinitionPanel,
+  ComponentInstancePanel,
+} from "../reusable-component/ReusableComponentPanels";
 import { getComponentDefinition } from "../../registry/component-definitions";
 import { BindingsEditor } from "./BindingsEditor";
 import { EventsEditor } from "./EventsEditor";
@@ -17,17 +21,26 @@ export type ComponentEditorMode = {
   variantName: string;
 };
 
+export type ComponentDefinitionEditorMode = {
+  componentId: string;
+  selectedInternalNodeId: string;
+};
+
 type Props = {
   document: UiDocument;
   componentMode?: ComponentEditorMode | null;
+  componentDefinitionMode?: ComponentDefinitionEditorMode | null;
   onEditVariant: (nodeId: string, variantName: string) => void;
+  onEditComponentDefinition: (componentId: string) => void;
   onExitComponentMode: () => void;
 };
 
 export function PropertyPanel({
   document,
   componentMode = null,
+  componentDefinitionMode = null,
   onEditVariant,
+  onEditComponentDefinition,
   onExitComponentMode,
 }: Props) {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -35,6 +48,34 @@ export function PropertyPanel({
   const renameNode = useEditorStore((state) => state.renameNode);
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
+  const createReusableComponent = useEditorStore(
+    (state) => state.createReusableComponent
+  );
+  const updateComponentDefinition = useEditorStore(
+    (state) => state.updateComponentDefinition
+  );
+  const updateComponentDefinitionNode = useEditorStore(
+    (state) => state.updateComponentDefinitionNode
+  );
+
+  if (componentDefinitionMode) {
+    const definition = document.components?.[componentDefinitionMode.componentId];
+    if (!definition) return <PropertyPanelNodeNotFound />;
+
+    return (
+      <ComponentDefinitionPanel
+        definition={definition}
+        selectedInternalNodeId={componentDefinitionMode.selectedInternalNodeId}
+        updateDefinition={(updater) =>
+          updateComponentDefinition(definition.id, updater)
+        }
+        updateDefinitionNode={(nodeId, updater) =>
+          updateComponentDefinitionNode(definition.id, nodeId, updater)
+        }
+        onExit={onExitComponentMode}
+      />
+    );
+  }
 
   if (componentMode) {
     const node = document.nodes[componentMode.nodeId];
@@ -141,6 +182,18 @@ export function PropertyPanel({
     return <PropertyPanelNodeNotFound />;
   }
 
+  if (node.type === "ComponentInstance") {
+    return (
+      <ComponentInstancePanel
+        document={document}
+        node={node}
+        updateNode={updateNode}
+        onEditDefinition={onEditComponentDefinition}
+        renameNode={renameNode}
+      />
+    );
+  }
+
   const definition = getComponentDefinition(node.type);
   const resolvedProps = {
     ...(definition?.defaults ?? {}),
@@ -174,6 +227,31 @@ export function PropertyPanel({
           updateNode={updateNode}
           onEditVariant={onEditVariant}
         />
+
+        {node.id !== document.rootId ? (
+          <section className="border-t border-[var(--editor-border)] pt-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+                  <Box size={12} /> Component
+                </div>
+                <div className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
+                  Encapsulate this subtree behind a public API.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const componentId = createReusableComponent(node.id);
+                  if (componentId) onEditComponentDefinition(componentId);
+                }}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+              >
+                Create component
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         {definition?.bindings && (
           <BindingsEditor

@@ -8,11 +8,14 @@ import {
   type Binding,
   type HandlerRef,
   type MethodRef,
+  type ScopedMethodRef,
+  type UiComponentDefinition,
   type NodeId,
   type UiDocument,
   type UiNode,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
+import { createReusableComponentFromNode } from "./reusable-components";
 import {
   createUniqueNodeName,
   validateNodeName,
@@ -21,11 +24,13 @@ import {
 export type DragPreview = {
   type: string;
   props: Record<string, unknown>;
+  componentDefinitionId?: string | undefined;
 };
 
 export type NewNode = {
   type: UiNode["type"];
   props?: Record<string, unknown>;
+  componentDefinitionId?: string | undefined;
 };
 
 export type RenameNodeResult =
@@ -74,6 +79,22 @@ type EditorState = {
     nodeId: NodeId,
     method: string,
     script: MethodRef | null
+  ) => void;
+
+  createReusableComponent: (nodeId: NodeId) => string | null;
+  updateComponentDefinition: (
+    componentId: string,
+    updater: (definition: UiComponentDefinition) => UiComponentDefinition
+  ) => void;
+  updateComponentDefinitionNode: (
+    componentId: string,
+    nodeId: NodeId,
+    updater: (node: UiNode) => UiNode
+  ) => void;
+  setComponentDefinitionMethod: (
+    componentId: string,
+    methodName: string,
+    method: ScopedMethodRef | null
   ) => void;
 
   insertNode: (
@@ -230,6 +251,95 @@ export const useEditorStore = create<EditorState>((set) => ({
     }));
   },
 
+  createReusableComponent: (nodeId) => {
+    let componentId: string | null = null;
+
+    set((state) => {
+      try {
+        const result = createReusableComponentFromNode(state.document, nodeId);
+        componentId = result.componentId;
+        return {
+          document: result.document,
+          selectedNodeId: result.instanceNodeId,
+        };
+      } catch (error) {
+        console.error("Failed to create reusable component", error);
+        return state;
+      }
+    });
+
+    return componentId;
+  },
+
+  updateComponentDefinition: (componentId, updater) => {
+    set((state) => {
+      const current = state.document.components?.[componentId];
+      if (!current) return state;
+
+      return {
+        document: {
+          ...state.document,
+          components: {
+            ...(state.document.components ?? {}),
+            [componentId]: updater(current),
+          },
+        },
+      };
+    });
+  },
+
+  updateComponentDefinitionNode: (componentId, nodeId, updater) => {
+    set((state) => {
+      const current = state.document.components?.[componentId];
+      const node = current?.nodes[nodeId];
+      if (!current || !node) return state;
+
+      const nextDefinition = {
+        ...current,
+        nodes: {
+          ...current.nodes,
+          [nodeId]: updater(node),
+        },
+      };
+
+      return {
+        document: {
+          ...state.document,
+          components: {
+            ...(state.document.components ?? {}),
+            [componentId]: nextDefinition,
+          },
+        },
+      };
+    });
+  },
+
+  setComponentDefinitionMethod: (componentId, methodName, method) => {
+    set((state) => {
+      const current = state.document.components?.[componentId];
+      if (!current) return state;
+
+      const methods = { ...(current.methods ?? {}) };
+      if (method) methods[methodName] = method;
+      else delete methods[methodName];
+
+      const nextDefinition: UiComponentDefinition = {
+        ...current,
+        methods: Object.keys(methods).length > 0 ? methods : undefined,
+      };
+
+      return {
+        document: {
+          ...state.document,
+          components: {
+            ...(state.document.components ?? {}),
+            [componentId]: nextDefinition,
+          },
+        },
+      };
+    });
+  },
+
   insertNode: (parentId, insertIndex, node) => {
     set((state) => {
       const parent = state.document.nodes[parentId];
@@ -239,11 +349,18 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       const definition = getComponentDefinition(node.type);
       const id = crypto.randomUUID();
-      const name = createUniqueNodeName(state.document, node.type);
+      const reusableName = node.componentDefinitionId
+        ? state.document.components?.[node.componentDefinitionId]?.name
+        : undefined;
+      const name = createUniqueNodeName(
+        state.document,
+        reusableName ?? node.type
+      );
       const newNode: UiNode = {
         id,
         name,
         type: node.type,
+        componentDefinitionId: node.componentDefinitionId,
         props: { ...(node.props ?? {}) },
         children: definition?.acceptsChildren ? [] : undefined,
       };

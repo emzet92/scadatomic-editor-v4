@@ -135,6 +135,10 @@ class MockRuntimeSocket extends EventTarget {
             (node) => node.name === name
           );
         },
+        resolveComponentDefinition: (componentDefinitionId) => {
+          const document = this.getProjectDocument(projectId);
+          return document?.components?.[componentDefinitionId];
+        },
         emit: (customEventName, customPayload) => {
           this.handleScriptEvent(customEventName);
 

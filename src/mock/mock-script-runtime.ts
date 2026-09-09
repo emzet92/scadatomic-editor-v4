@@ -1,4 +1,4 @@
-import type { UiNode } from "../uiframework/core/document";
+import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
 import {
   getComponentApiMethodNames,
   getComponentApiPropertyNames,
@@ -30,6 +30,9 @@ export type MockScriptHost = {
   setNodeVariant(nodeId: string, variantName: string): void;
   getNodeVariant(nodeId: string): string | undefined;
   resolveUiNode(name: string): UiNode | undefined;
+  resolveComponentDefinition(
+    componentDefinitionId: string
+  ): UiComponentDefinition | undefined;
   emit(eventName: string, payload?: Record<string, unknown>): void;
 };
 
@@ -210,25 +213,56 @@ function createComponentApi(
   projectId: string,
   getContext: () => MockScriptContext
 ): UiComponentScriptApi {
-  const allowedProps = new Set(getComponentApiPropertyNames(node));
-  const allowedMethods = new Set(getComponentApiMethodNames(node));
-  const localProps = getResolvedComponentProps(node);
-  const colorProperty = getComponentColorProperty(node);
+  const reusableDefinition = node.componentDefinitionId
+    ? host.resolveComponentDefinition(node.componentDefinitionId)
+    : undefined;
+  const allowedProps = new Set(
+    reusableDefinition
+      ? Object.keys(reusableDefinition.inputs ?? {})
+      : getComponentApiPropertyNames(node)
+  );
+  const publicMethods = reusableDefinition
+    ? Object.entries(reusableDefinition.methods ?? {})
+        .filter(([, method]) => method.visibility === "public")
+        .map(([name]) => name)
+    : getComponentApiMethodNames(node);
+  const allMethods = reusableDefinition
+    ? Object.keys(reusableDefinition.methods ?? {})
+    : publicMethods;
+  const allowedMethods = new Set(publicMethods);
+  const allMethodNames = new Set(allMethods);
+  const localProps = reusableDefinition
+    ? {
+        ...Object.fromEntries(
+          Object.entries(reusableDefinition.inputs ?? {}).map(([name, input]) => [
+            name,
+            input.defaultValue,
+          ])
+        ),
+        ...(node.props ?? {}),
+      }
+    : getResolvedComponentProps(node);
+  const colorProperty = reusableDefinition
+    ? Object.entries(reusableDefinition.inputs ?? {}).find(
+        ([, input]) => input.type === "color"
+      )?.[0]
+    : getComponentColorProperty(node);
   const methodCache = new Map<string, (...args: unknown[]) => unknown>();
-  const variantNames = getComponentVariantNames(node);
+  const variantNames = reusableDefinition ? [] : getComponentVariantNames(node);
   const localWrites = new Map<string, unknown>();
-  const storedVariant = host.getNodeVariant(node.id);
+  const storedVariant = reusableDefinition ? undefined : host.getNodeVariant(node.id);
   let localVariant =
-    storedVariant && node.variants?.[storedVariant]
+    !reusableDefinition && storedVariant && node.variants?.[storedVariant]
       ? storedVariant
       : node.defaultVariant;
 
   let proxy: UiComponentScriptApi;
+  let componentSelfProxy: UiComponentScriptApi;
 
   function setProp(property: string, value: unknown) {
     if (!allowedProps.has(property)) {
       throw new Error(
-        `${node.name} (${node.type}) has no property “${property}”. Available: ${[
+        `${node.name} (${reusableDefinition?.name ?? node.type}) has no public property “${property}”. Available: ${[
           ...allowedProps,
         ].join(", ")}`
       );
@@ -239,50 +273,42 @@ function createComponentApi(
     host.setNodeProp(node.id, property, value);
   }
 
-  function getMethod(methodName: string) {
-    const cached = methodCache.get(methodName);
-    if (cached) {
-      return cached;
-    }
+  function getMethod(methodName: string, allowPrivate: boolean) {
+    if (!allowPrivate && !allowedMethods.has(methodName)) return undefined;
+    if (allowPrivate && !allMethodNames.has(methodName)) return undefined;
 
-    const methodRef = node.methods?.[methodName];
-    if (!methodRef) {
-      return undefined;
-    }
+    const cacheKey = `${allowPrivate ? "all" : "public"}:${methodName}`;
+    const cached = methodCache.get(cacheKey);
+    if (cached) return cached;
+
+    const methodRef = reusableDefinition
+      ? reusableDefinition.methods?.[methodName]
+      : node.methods?.[methodName];
+    if (!methodRef) return undefined;
 
     const callable = (...args: unknown[]) => {
       const script = getMockScript(projectId, methodRef.scriptId);
-
       return executeSource({
         code: script.code,
         ctx: getContext(),
-        self: proxy,
+        self: reusableDefinition ? componentSelfProxy : proxy,
         args,
         sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
       });
     };
 
-    methodCache.set(methodName, callable);
+    methodCache.set(cacheKey, callable);
     return callable;
   }
 
   function setVariant(variantName: string) {
     if (!node.variants?.[variantName]) {
-      throw new Error(
-        `${node.name} (${node.type}) has no variant “${variantName}”.`
-      );
+      throw new Error(`${node.name} (${node.type}) has no variant “${variantName}”.`);
     }
 
     localVariant = variantName;
-
     Object.assign(localProps, getComponentVariantProps(node, variantName));
-
-    // Explicit writes made by the current handler stay on top of the
-    // selected visual variant (read-your-writes semantics).
-    for (const [property, value] of localWrites) {
-      localProps[property] = value;
-    }
-
+    for (const [property, value] of localWrites) localProps[property] = value;
     host.setNodeVariant(node.id, variantName);
   }
 
@@ -298,44 +324,38 @@ function createComponentApi(
   const target = {
     id: node.id,
     name: node.name,
-    type: node.type,
+    type: reusableDefinition?.name ?? node.type,
     ...(variantApi ? { variant: variantApi } : {}),
     setProp,
     setColor(color: string) {
       if (!colorProperty) {
-        throw new Error(`${node.name} (${node.type}) has no color property.`);
+        throw new Error(
+          `${node.name} (${reusableDefinition?.name ?? node.type}) has no public color property.`
+        );
       }
-
       setProp(colorProperty, color);
     },
   } as UiComponentScriptApi;
 
-  proxy = new Proxy(target, {
-    get(apiTarget, property, receiver) {
-      if (typeof property !== "string" || hasOwn(apiTarget, property)) {
-        return Reflect.get(apiTarget, property, receiver);
-      }
+  function makeProxy(includePrivateMethods: boolean) {
+    return new Proxy(target, {
+      get(apiTarget, property, receiver) {
+        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+          return Reflect.get(apiTarget, property, receiver);
+        }
+        if (allowedProps.has(property)) return localProps[property];
+        return getMethod(property, includePrivateMethods);
+      },
+      set(_apiTarget, property, value) {
+        if (typeof property !== "string") return false;
+        setProp(property, value);
+        return true;
+      },
+    }) as UiComponentScriptApi;
+  }
 
-      if (allowedProps.has(property)) {
-        return localProps[property];
-      }
-
-      if (allowedMethods.has(property)) {
-        return getMethod(property);
-      }
-
-      return undefined;
-    },
-    set(_apiTarget, property, value) {
-      if (typeof property !== "string") {
-        return false;
-      }
-
-      setProp(property, value);
-      return true;
-    },
-  });
-
+  proxy = makeProxy(false);
+  componentSelfProxy = reusableDefinition ? makeProxy(true) : proxy;
   return proxy;
 }
 

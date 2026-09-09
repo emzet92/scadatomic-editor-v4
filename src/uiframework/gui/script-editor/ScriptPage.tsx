@@ -14,7 +14,12 @@ import {
   describeComponentApi,
   type ComponentApiDescription,
 } from "../../component-api";
-import type { UiDocument, UiNode } from "../../core/document";
+import type {
+  ScopedMethodRef,
+  UiComponentDefinition,
+  UiDocument,
+  UiNode,
+} from "../../core/document";
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
@@ -51,13 +56,19 @@ function ScriptEditor({
 
   const dirty = code !== savedCode;
   const componentApi = document
-    ? Object.values(document.nodes).map(describeComponentApi)
+    ? Object.values(document.nodes).map((node) =>
+        describeComponentApi(node, document)
+      )
     : [];
   const scriptSelection = document
     ? findScriptSelection(document, scriptId, componentApi)
     : null;
   const selfComponent =
-    scriptSelection?.kind === "method" ? scriptSelection.component : undefined;
+    scriptSelection?.kind === "method"
+      ? scriptSelection.component
+      : scriptSelection?.kind === "componentMethod"
+        ? describeDefinitionSelfApi(scriptSelection.definition)
+        : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +220,68 @@ function ScriptEditor({
     await persistMethod(nodeId, methodName, null);
   }
 
+  async function persistDefinitionMethod(
+    componentId: string,
+    methodName: string,
+    method: ScopedMethodRef | null
+  ) {
+    if (!document) throw new Error("Component API is not loaded yet.");
+    const definition = document.components?.[componentId];
+    if (!definition) throw new Error("Component definition no longer exists.");
+
+    const methods = { ...(definition.methods ?? {}) };
+    if (method) methods[methodName] = method;
+    else delete methods[methodName];
+
+    const nextDocument: UiDocument = {
+      ...document,
+      components: {
+        ...(document.components ?? {}),
+        [componentId]: {
+          ...definition,
+          methods: Object.keys(methods).length > 0 ? methods : undefined,
+        },
+      },
+    };
+
+    const saved = await updateProject(
+      projectId,
+      { name: projectName || projectId, tree: nextDocument },
+      projectRevision
+    );
+
+    setDocument(saved.tree);
+    setProjectName(saved.name);
+    setProjectRevision(saved.revision);
+  }
+
+  async function addDefinitionMethod(
+    componentId: string,
+    methodName: string,
+    visibility: "public" | "private"
+  ) {
+    const definition = document?.components?.[componentId];
+    if (!definition) throw new Error("Component definition no longer exists.");
+
+    const methodScriptId = `component-definition-method.${crypto.randomUUID()}`;
+    await persistDefinitionMethod(componentId, methodName, {
+      scriptId: methodScriptId,
+      visibility,
+    });
+
+    ensureMockScript(
+      projectId,
+      methodScriptId,
+      `// ${visibility} method: ${definition.name}.${methodName}()\n// self is the instance API. Private methods are available only inside component methods.\n\nctx.log("${definition.name}.${methodName}");`
+    );
+
+    return methodScriptId;
+  }
+
+  async function removeDefinitionMethod(componentId: string, methodName: string) {
+    await persistDefinitionMethod(componentId, methodName, null);
+  }
+
   return (
     <div className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
       <WorkspaceHeader
@@ -241,6 +314,8 @@ function ScriptEditor({
           onSelect={selectScript}
           onAddMethod={addComponentMethod}
           onRemoveMethod={removeComponentMethod}
+          onAddDefinitionMethod={addDefinitionMethod}
+          onRemoveDefinitionMethod={removeDefinitionMethod}
         />
 
         <main className="min-w-0 flex-1 overflow-auto p-6">
@@ -253,9 +328,9 @@ function ScriptEditor({
 
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                {scriptSelection?.kind === "method"
-                  ? "Method Script ID"
-                  : "Handler ID"}
+                {scriptSelection?.kind === "handler"
+                  ? "Handler ID"
+                  : "Method Script ID"}
               </div>
               <div className="mt-1 text-sm font-mono text-zinc-600">
                 {scriptId}
@@ -264,12 +339,16 @@ function ScriptEditor({
               <h1 className="mt-4 text-xl font-semibold text-zinc-900">
                 {scriptSelection?.kind === "method"
                   ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
-                  : "Runtime Handler"}
+                  : scriptSelection?.kind === "componentMethod"
+                    ? `${scriptSelection.definition.name}.${scriptSelection.memberName}()`
+                    : "Runtime Handler"}
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
-                {scriptSelection?.kind === "method"
-                  ? "Component method executed synchronously inside the current handler context."
-                  : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
+                {scriptSelection?.kind === "componentMethod"
+                  ? "Encapsulated component method. Public methods are exposed on component instances; private methods stay inside the definition."
+                  : scriptSelection?.kind === "method"
+                    ? "Component method executed synchronously inside the current handler context."
+                    : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
               </p>
             </div>
 
@@ -295,7 +374,8 @@ function ScriptEditor({
                 <code>ctx.ui.ComponentName.setColor(color)</code>
                 <code>ctx.ui.ComponentName.variant.enabled()</code>
                 <code>ctx.ui.ComponentName.variant.current</code>
-                {scriptSelection?.kind === "method" ? (
+                {scriptSelection?.kind === "method" ||
+                scriptSelection?.kind === "componentMethod" ? (
                   <>
                     <code>self.prop = value</code>
                     <code>self.otherMethod()</code>
@@ -328,6 +408,11 @@ type ScriptSelection =
       kind: "method";
       component: ComponentApiDescription;
       memberName: string;
+    }
+  | {
+      kind: "componentMethod";
+      definition: UiComponentDefinition;
+      memberName: string;
     };
 
 function findScriptSelection(
@@ -339,11 +424,21 @@ function findScriptSelection(
     components.map((component) => [component.nodeId, component])
   );
 
+  for (const definition of Object.values(document.components ?? {})) {
+    for (const [methodName, method] of Object.entries(definition.methods ?? {})) {
+      if (method.scriptId === scriptId) {
+        return {
+          kind: "componentMethod",
+          definition,
+          memberName: methodName,
+        };
+      }
+    }
+  }
+
   for (const node of Object.values(document.nodes)) {
     const component = componentByNodeId.get(node.id);
-    if (!component) {
-      continue;
-    }
+    if (!component) continue;
 
     for (const [eventName, handler] of Object.entries(node.events ?? {})) {
       if (handler.handlerId === scriptId) {
@@ -359,4 +454,26 @@ function findScriptSelection(
   }
 
   return null;
+}
+
+function describeDefinitionSelfApi(
+  definition: UiComponentDefinition
+): ComponentApiDescription {
+  return {
+    nodeId: `definition:${definition.id}`,
+    name: "self",
+    type: definition.name,
+    definitionName: definition.name,
+    properties: Object.entries(definition.inputs ?? {}).map(([name, input]) => ({
+      name,
+      valueType: input.type,
+    })),
+    methods: Object.entries(definition.methods ?? {})
+      .map(([name, method]) => ({ name, scriptId: method.scriptId }))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    variants: [],
+    colorProperty: Object.entries(definition.inputs ?? {}).find(
+      ([, input]) => input.type === "color"
+    )?.[0],
+  };
 }

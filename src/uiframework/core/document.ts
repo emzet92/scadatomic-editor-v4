@@ -1,4 +1,5 @@
 export type NodeId = string;
+export type ComponentDefinitionId = string;
 
 export type TagBinding = {
   kind: "tag";
@@ -15,14 +16,45 @@ export type MethodRef = {
   scriptId: string;
 };
 
+export type ScopedMethodRef = MethodRef & {
+  visibility: "public" | "private";
+};
+
 export type UiVariant = {
   props: Record<string, unknown>;
+};
+
+export type ComponentInputType =
+  | "string"
+  | "number"
+  | "boolean"
+  | "color"
+  | "tag";
+
+export type ComponentInputDefinition = {
+  type: ComponentInputType;
+  defaultValue?: unknown;
+  target: {
+    nodeId: NodeId;
+    property: string;
+    kind: "prop" | "binding";
+  };
+};
+
+export type UiComponentDefinition = {
+  id: ComponentDefinitionId;
+  name: string;
+  rootId: NodeId;
+  nodes: Record<NodeId, UiNode>;
+  inputs?: Record<string, ComponentInputDefinition> | undefined;
+  methods?: Record<string, ScopedMethodRef> | undefined;
 };
 
 export type UiNode = {
   id: NodeId;
   name: string;
   type: string;
+  componentDefinitionId?: ComponentDefinitionId | undefined;
   props?: Record<string, unknown> | undefined;
   bindings?: Record<string, Binding> | undefined;
   events?: Record<string, HandlerRef> | undefined;
@@ -36,6 +68,7 @@ export type UiDocument = {
   schemaVersion: 2;
   rootId: NodeId;
   nodes: Record<NodeId, UiNode>;
+  components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
 };
 
 export function createUiDocument(
@@ -69,9 +102,24 @@ export function isUiDocument(value: unknown): value is UiDocument {
     return false;
   }
 
-  return Object.entries(candidate.nodes).every(([id, node]) =>
-    isUiNode(node, id)
-  );
+  if (
+    !Object.entries(candidate.nodes).every(([id, node]) => isUiNode(node, id))
+  ) {
+    return false;
+  }
+
+  if (candidate.components !== undefined) {
+    if (
+      !isRecord(candidate.components) ||
+      !Object.entries(candidate.components).every(([id, definition]) =>
+        isComponentDefinition(definition, id)
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function parseUiDocument(value: unknown): UiDocument {
@@ -93,6 +141,20 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
     typeof node.name !== "string" ||
     node.name.trim().length === 0 ||
     typeof node.type !== "string"
+  ) {
+    return false;
+  }
+
+  if (
+    node.componentDefinitionId !== undefined &&
+    typeof node.componentDefinitionId !== "string"
+  ) {
+    return false;
+  }
+
+  if (
+    node.type === "ComponentInstance" &&
+    typeof node.componentDefinitionId !== "string"
   ) {
     return false;
   }
@@ -128,8 +190,7 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
     node.methods !== undefined &&
     (!isRecord(node.methods) ||
       !Object.entries(node.methods).every(
-        ([methodName, method]) =>
-          isJsIdentifier(methodName) && isMethodRef(method)
+        ([methodName, method]) => isJsIdentifier(methodName) && isMethodRef(method)
       ))
   ) {
     return false;
@@ -158,6 +219,71 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
   return true;
 }
 
+function isComponentDefinition(
+  value: unknown,
+  expectedId: string
+): value is UiComponentDefinition {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (
+    value.id !== expectedId ||
+    typeof value.name !== "string" ||
+    !isJsIdentifier(value.name) ||
+    typeof value.rootId !== "string" ||
+    !isRecord(value.nodes)
+  ) {
+    return false;
+  }
+
+  if (
+    !Object.entries(value.nodes).every(([id, node]) => isUiNode(node, id)) ||
+    !value.nodes[value.rootId]
+  ) {
+    return false;
+  }
+
+  if (value.inputs !== undefined) {
+    if (
+      !isRecord(value.inputs) ||
+      !Object.entries(value.inputs).every(
+        ([name, input]) => isJsIdentifier(name) && isComponentInput(input)
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (value.methods !== undefined) {
+    if (
+      !isRecord(value.methods) ||
+      !Object.entries(value.methods).every(
+        ([name, method]) => isJsIdentifier(name) && isScopedMethodRef(method)
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isComponentInput(value: unknown): value is ComponentInputDefinition {
+  if (!isRecord(value) || !isRecord(value.target)) {
+    return false;
+  }
+
+  return (
+    ["string", "number", "boolean", "color", "tag"].includes(
+      String(value.type)
+    ) &&
+    typeof value.target.nodeId === "string" &&
+    typeof value.target.property === "string" &&
+    (value.target.kind === "prop" || value.target.kind === "binding")
+  );
+}
+
 function isBinding(value: unknown): value is Binding {
   if (!isRecord(value)) {
     return false;
@@ -174,11 +300,19 @@ function isMethodRef(value: unknown): value is MethodRef {
   return isRecord(value) && typeof value.scriptId === "string";
 }
 
+function isScopedMethodRef(value: unknown): value is ScopedMethodRef {
+  return (
+    isRecord(value) &&
+    typeof value.scriptId === "string" &&
+    (value.visibility === "public" || value.visibility === "private")
+  );
+}
+
 function isUiVariant(value: unknown): value is UiVariant {
   return isRecord(value) && isRecord(value.props);
 }
 
-function isJsIdentifier(value: string) {
+export function isJsIdentifier(value: string) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value);
 }
 

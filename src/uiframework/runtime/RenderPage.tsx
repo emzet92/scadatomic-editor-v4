@@ -95,9 +95,13 @@ export function RenderPage() {
           id={document.rootId}
           document={document}
           registry={runtimeRegistry}
-          decorateProps={(node) => {
+          decorateComponentInternals
+          decorateProps={(node, context) => {
+            const runtimeNodeId = context.componentInstanceId
+              ? `${context.componentInstanceId}::${node.id}`
+              : node.id;
             const baseProps = {
-              "data-node-id": node.id,
+              "data-node-id": runtimeNodeId,
             };
 
             if (node.type === "Text" || node.type === "Chart") {

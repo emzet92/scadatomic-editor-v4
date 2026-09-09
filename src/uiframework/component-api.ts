@@ -1,6 +1,14 @@
-import type { UiNode } from "./core/document";
+import type {
+  UiComponentDefinition,
+  UiDocument,
+  UiNode,
+} from "./core/document";
 import { getComponentVariantNames } from "./component-variants";
 import { getComponentDefinition } from "./registry/component-definitions";
+import {
+  getComponentDefinitionForInstance,
+  getResolvedComponentInstanceProps,
+} from "./reusable-components";
 
 const METHOD_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const RESERVED_COMPONENT_API_NAMES = new Set([
@@ -31,6 +39,7 @@ export type ComponentApiDescription = {
   nodeId: string;
   name: string;
   type: string;
+  definitionName?: string | undefined;
   properties: ComponentApiProperty[];
   methods: ComponentApiMethod[];
   variants: ComponentApiVariant[];
@@ -41,26 +50,46 @@ export type ComponentMethodNameValidationResult =
   | { ok: true; name: string }
   | { ok: false; error: string };
 
-export function getComponentApiPropertyNames(node: UiNode): string[] {
+export function getComponentApiPropertyNames(
+  node: UiNode,
+  document?: UiDocument
+): string[] {
+  const reusable = document
+    ? getComponentDefinitionForInstance(document, node)
+    : undefined;
+
+  if (reusable) {
+    return Object.keys(reusable.inputs ?? {}).sort((left, right) =>
+      left.localeCompare(right)
+    );
+  }
+
   const definition = getComponentDefinition(node.type);
   const names = new Set<string>();
 
-  for (const key of Object.keys(definition?.defaults ?? {})) {
-    names.add(key);
-  }
-
-  for (const key of Object.keys(definition?.inspector ?? {})) {
-    names.add(key);
-  }
-
-  for (const key of Object.keys(node.props ?? {})) {
-    names.add(key);
-  }
+  for (const key of Object.keys(definition?.defaults ?? {})) names.add(key);
+  for (const key of Object.keys(definition?.inspector ?? {})) names.add(key);
+  for (const key of Object.keys(node.props ?? {})) names.add(key);
 
   return [...names].sort((left, right) => left.localeCompare(right));
 }
 
-export function getComponentApiMethodNames(node: UiNode): string[] {
+export function getComponentApiMethodNames(
+  node: UiNode,
+  document?: UiDocument,
+  includePrivate = false
+): string[] {
+  const reusable = document
+    ? getComponentDefinitionForInstance(document, node)
+    : undefined;
+
+  if (reusable) {
+    return Object.entries(reusable.methods ?? {})
+      .filter(([, method]) => includePrivate || method.visibility === "public")
+      .map(([name]) => name)
+      .sort((left, right) => left.localeCompare(right));
+  }
+
   return Object.keys(node.methods ?? {}).sort((left, right) =>
     left.localeCompare(right)
   );
@@ -72,9 +101,7 @@ export function validateComponentMethodName(
 ): ComponentMethodNameValidationResult {
   const name = value.trim();
 
-  if (!name) {
-    return { ok: false, error: "Method name is required." };
-  }
+  if (!name) return { ok: false, error: "Method name is required." };
 
   if (!METHOD_NAME_PATTERN.test(name)) {
     return {
@@ -98,75 +125,116 @@ export function validateComponentMethodName(
   }
 
   if (node.methods?.[name]) {
-    return {
-      ok: false,
-      error: `Method “${name}” already exists.`,
-    };
+    return { ok: false, error: `Method “${name}” already exists.` };
   }
 
   return { ok: true, name };
 }
 
-export function getComponentColorProperty(node: UiNode): string | undefined {
+export function validateDefinitionMethodName(
+  definition: UiComponentDefinition,
+  value: string
+): ComponentMethodNameValidationResult {
+  const name = value.trim();
+  if (!name) return { ok: false, error: "Method name is required." };
+  if (!METHOD_NAME_PATTERN.test(name)) {
+    return {
+      ok: false,
+      error: "Use a JS identifier, e.g. start, reset or syncStatus.",
+    };
+  }
+  if (RESERVED_COMPONENT_API_NAMES.has(name) || definition.inputs?.[name]) {
+    return {
+      ok: false,
+      error: `“${name}” conflicts with the component public API.`,
+    };
+  }
+  if (definition.methods?.[name]) {
+    return { ok: false, error: `Method “${name}” already exists.` };
+  }
+  return { ok: true, name };
+}
+
+export function getComponentColorProperty(
+  node: UiNode,
+  document?: UiDocument
+): string | undefined {
+  const reusable = document
+    ? getComponentDefinitionForInstance(document, node)
+    : undefined;
+
+  if (reusable) {
+    return Object.entries(reusable.inputs ?? {}).find(
+      ([, input]) => input.type === "color"
+    )?.[0];
+  }
+
   const names = new Set(getComponentApiPropertyNames(node));
-
-  if (names.has("backgroundColor")) {
-    return "backgroundColor";
-  }
-
-  if (names.has("color")) {
-    return "color";
-  }
-
+  if (names.has("backgroundColor")) return "backgroundColor";
+  if (names.has("color")) return "color";
   return undefined;
 }
 
-export function getResolvedComponentProps(node: UiNode): Record<string, unknown> {
-  const definition = getComponentDefinition(node.type);
+export function getResolvedComponentProps(
+  node: UiNode,
+  document?: UiDocument
+): Record<string, unknown> {
+  const reusable = document
+    ? getComponentDefinitionForInstance(document, node)
+    : undefined;
 
+  if (reusable) {
+    return getResolvedComponentInstanceProps(reusable, node);
+  }
+
+  const definition = getComponentDefinition(node.type);
   return {
     ...(definition?.defaults ?? {}),
     ...(node.props ?? {}),
   };
 }
 
-export function describeComponentApi(node: UiNode): ComponentApiDescription {
-  const resolved = getResolvedComponentProps(node);
+export function describeComponentApi(
+  node: UiNode,
+  document?: UiDocument
+): ComponentApiDescription {
+  const reusable = document
+    ? getComponentDefinitionForInstance(document, node)
+    : undefined;
+  const resolved = getResolvedComponentProps(node, document);
+
+  const methods = reusable
+    ? Object.entries(reusable.methods ?? {})
+        .filter(([, method]) => method.visibility === "public")
+        .map(([name, method]) => ({ name, scriptId: method.scriptId }))
+        .sort((left, right) => left.name.localeCompare(right.name))
+    : Object.entries(node.methods ?? {})
+        .map(([name, method]) => ({ name, scriptId: method.scriptId }))
+        .sort((left, right) => left.name.localeCompare(right.name));
 
   return {
     nodeId: node.id,
     name: node.name,
-    type: node.type,
-    properties: getComponentApiPropertyNames(node).map((name) => ({
+    type: reusable ? "Component" : node.type,
+    definitionName: reusable?.name,
+    properties: getComponentApiPropertyNames(node, document).map((name) => ({
       name,
-      valueType: describeValueType(resolved[name]),
+      valueType: reusable?.inputs?.[name]?.type ?? describeValueType(resolved[name]),
     })),
-    methods: Object.entries(node.methods ?? {})
-      .map(([name, method]) => ({
-        name,
-        scriptId: method.scriptId,
-      }))
-      .sort((left, right) => left.name.localeCompare(right.name)),
-    variants: getComponentVariantNames(node).map((name) => ({
-      name,
-      isDefault: node.defaultVariant === name,
-    })),
-    colorProperty: getComponentColorProperty(node),
+    methods,
+    variants: reusable
+      ? []
+      : getComponentVariantNames(node).map((name) => ({
+          name,
+          isDefault: node.defaultVariant === name,
+        })),
+    colorProperty: getComponentColorProperty(node, document),
   };
 }
 
 function describeValueType(value: unknown): string {
-  if (Array.isArray(value)) {
-    return "array";
-  }
-
-  if (value === null) {
-    return "null";
-  }
-
-  if (value === undefined) {
-    return "unknown";
-  }
-
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (value === undefined) return "unknown";
   return typeof value;
 }

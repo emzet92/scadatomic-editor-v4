@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
 import type { UiDocument } from "./core/document";
+import { createComponentDefinitionDocument } from "./reusable-components";
 import { EditorControls } from "./EditorControls";
 import {
   Canvas,
@@ -20,8 +21,10 @@ import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
 import {
   PropertyPanel,
+  type ComponentDefinitionEditorMode,
   type ComponentEditorMode,
 } from "./gui/property-panel/PropertyPanel";
+import { ComponentStructureTree } from "./gui/reusable-component/ComponentStructureTree";
 import { TreeView } from "./gui/tree-view/TreeView";
 import {
   editorRegistry,
@@ -84,6 +87,36 @@ function ComponentModeRenderer({
   );
 }
 
+function ComponentDefinitionRenderer({
+  document,
+  mode,
+  onSelectInternalNode,
+}: {
+  document: UiDocument;
+  mode: ComponentDefinitionEditorMode;
+  onSelectInternalNode: (nodeId: string) => void;
+}) {
+  const definition = document.components?.[mode.componentId];
+  if (!definition) return null;
+  const componentDocument = createComponentDefinitionDocument(document, definition);
+
+  return (
+    <RenderNode
+      id={definition.rootId}
+      document={componentDocument}
+      registry={editorRegistry}
+      decorateProps={(node) => ({
+        "data-component-node-id": node.id,
+        onPointerDown: (event: React.PointerEvent) => {
+          if (event.button !== 0) return;
+          event.stopPropagation();
+          onSelectInternalNode(node.id);
+        },
+      })}
+    />
+  );
+}
+
 export function EditorPage() {
   const { projectId } = useParams();
   const document = useEditorStore((state) => state.document);
@@ -95,6 +128,8 @@ export function EditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [componentMode, setComponentMode] =
     useState<ComponentEditorMode | null>(null);
+  const [componentDefinitionMode, setComponentDefinitionMode] =
+    useState<ComponentDefinitionEditorMode | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -163,6 +198,7 @@ export function EditorPage() {
         setError(null);
         setSaveStatus("idle");
         setComponentMode(null);
+        setComponentDefinitionMode(null);
         loadedRef.current = false;
         lastSavedSnapshotRef.current = null;
         revisionRef.current = undefined;
@@ -231,6 +267,21 @@ export function EditorPage() {
   }, [componentMode, document]);
 
   useEffect(() => {
+    if (!componentDefinitionMode) return;
+    const definition = document.components?.[componentDefinitionMode.componentId];
+    if (!definition) {
+      setComponentDefinitionMode(null);
+      return;
+    }
+    if (!definition.nodes[componentDefinitionMode.selectedInternalNodeId]) {
+      setComponentDefinitionMode({
+        componentId: definition.id,
+        selectedInternalNodeId: definition.rootId,
+      });
+    }
+  }, [componentDefinitionMode, document]);
+
+  useEffect(() => {
     if (
       !projectId ||
       !loadedRef.current ||
@@ -273,7 +324,23 @@ export function EditorPage() {
 
   function editVariant(nodeId: string, variantName: string) {
     setSelectedNodeId(nodeId);
+    setComponentDefinitionMode(null);
     setComponentMode({ nodeId, variantName });
+  }
+
+  function editComponentDefinition(componentId: string) {
+    const definition = document.components?.[componentId];
+    if (!definition) return;
+    setComponentMode(null);
+    setComponentDefinitionMode({
+      componentId,
+      selectedInternalNodeId: definition.rootId,
+    });
+  }
+
+  function exitComponentMode() {
+    setComponentMode(null);
+    setComponentDefinitionMode(null);
   }
 
   if (loading) {
@@ -299,6 +366,10 @@ export function EditorPage() {
   const focusedNode = componentMode
     ? document.nodes[componentMode.nodeId]
     : undefined;
+  const focusedDefinition = componentDefinitionMode
+    ? document.components?.[componentDefinitionMode.componentId]
+    : undefined;
+  const inComponentMode = !!componentMode || !!componentDefinitionMode;
 
   return (
     <div className="h-screen flex flex-col bg-[var(--editor-app-bg)]">
@@ -306,9 +377,24 @@ export function EditorPage() {
 
       <div className="flex-1 flex">
         <LeftSidebar>
-          <ComponentPalette />
-          <div className="border-t border-zinc-200" />
-          <TreeView />
+          {componentDefinitionMode && focusedDefinition ? (
+            <ComponentStructureTree
+              definition={focusedDefinition}
+              selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+              onSelect={(nodeId) =>
+                setComponentDefinitionMode({
+                  ...componentDefinitionMode,
+                  selectedInternalNodeId: nodeId,
+                })
+              }
+            />
+          ) : (
+            <>
+              <ComponentPalette />
+              <div className="border-t border-zinc-200" />
+              <TreeView />
+            </>
+          )}
         </LeftSidebar>
 
         <Canvas>
@@ -320,9 +406,9 @@ export function EditorPage() {
               >
                 <button
                   type="button"
-                  onClick={() => setComponentMode(null)}
+                  onClick={exitComponentMode}
                   className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium transition ${
-                    componentMode
+                    inComponentMode
                       ? "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
                       : "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
                   }`}
@@ -331,9 +417,9 @@ export function EditorPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={!componentMode}
+                  disabled={!inComponentMode}
                   className={`inline-flex items-center gap-1.5 border-l border-[var(--editor-border)] px-3 text-xs font-medium transition ${
-                    componentMode
+                    inComponentMode
                       ? "bg-violet-50 text-violet-700"
                       : "cursor-default text-[var(--editor-text-muted)] opacity-40"
                   }`}
@@ -342,7 +428,17 @@ export function EditorPage() {
                 </button>
               </div>
 
-              {componentMode && focusedNode ? (
+              {componentDefinitionMode && focusedDefinition ? (
+                <div
+                  data-editor-ignore
+                  className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
+                >
+                  <Boxes size={13} />
+                  <span className="font-medium">{focusedDefinition.name}</span>
+                  <span className="opacity-50">/</span>
+                  <span>private implementation</span>
+                </div>
+              ) : componentMode && focusedNode ? (
                 <div
                   data-editor-ignore
                   className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
@@ -362,12 +458,25 @@ export function EditorPage() {
             <div
               data-editor-canvas
               className={`min-h-[520px] bg-[var(--editor-surface)] bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)] bg-[size:20px_20px] ${
-                componentMode
+                inComponentMode
                   ? "flex items-center justify-center p-16"
                   : "min-h-full p-8"
               }`}
             >
-              {componentMode ? (
+              {componentDefinitionMode && focusedDefinition ? (
+                <div className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
+                  <ComponentDefinitionRenderer
+                    document={document}
+                    mode={componentDefinitionMode}
+                    onSelectInternalNode={(nodeId) =>
+                      setComponentDefinitionMode({
+                        ...componentDefinitionMode,
+                        selectedInternalNodeId: nodeId,
+                      })
+                    }
+                  />
+                </div>
+              ) : componentMode ? (
                 <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
                   <ComponentModeRenderer
                     document={document}
@@ -388,8 +497,10 @@ export function EditorPage() {
           <PropertyPanel
             document={document}
             componentMode={componentMode}
+            componentDefinitionMode={componentDefinitionMode}
             onEditVariant={editVariant}
-            onExitComponentMode={() => setComponentMode(null)}
+            onEditComponentDefinition={editComponentDefinition}
+            onExitComponentMode={exitComponentMode}
           />
         </RightSidebar>
       </div>
