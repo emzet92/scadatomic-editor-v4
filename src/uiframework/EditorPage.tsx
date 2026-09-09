@@ -11,6 +11,7 @@ import {
   Toolbar,
 } from "./EditorLayout";
 import { RenderNode } from "./Renderer";
+import { getDefaultComponentVariantProps } from "./component-variants";
 import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
 import { PropertyPanel } from "./gui/property-panel/PropertyPanel";
@@ -34,6 +35,7 @@ export function RendererRoot({
       document={document}
       registry={registry}
       decorateProps={(node) => ({
+        ...getDefaultComponentVariantProps(node),
         "data-node-id": node.id,
         onPointerDown: (event: React.PointerEvent) => {
           if (event.button !== 0) {

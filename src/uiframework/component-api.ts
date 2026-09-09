@@ -1,4 +1,5 @@
 import type { UiNode } from "./core/document";
+import { getComponentVariantNames } from "./component-variants";
 import { getComponentDefinition } from "./registry/component-definitions";
 
 const METHOD_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -8,6 +9,7 @@ const RESERVED_COMPONENT_API_NAMES = new Set([
   "type",
   "setProp",
   "setColor",
+  "variant",
 ]);
 
 export type ComponentApiProperty = {
@@ -20,12 +22,18 @@ export type ComponentApiMethod = {
   scriptId: string;
 };
 
+export type ComponentApiVariant = {
+  name: string;
+  isDefault: boolean;
+};
+
 export type ComponentApiDescription = {
   nodeId: string;
   name: string;
   type: string;
   properties: ComponentApiProperty[];
   methods: ComponentApiMethod[];
+  variants: ComponentApiVariant[];
   colorProperty?: string | undefined;
 };
 
@@ -139,6 +147,10 @@ export function describeComponentApi(node: UiNode): ComponentApiDescription {
         scriptId: method.scriptId,
       }))
       .sort((left, right) => left.name.localeCompare(right.name)),
+    variants: getComponentVariantNames(node).map((name) => ({
+      name,
+      isDefault: node.defaultVariant === name,
+    })),
     colorProperty: getComponentColorProperty(node),
   };
 }

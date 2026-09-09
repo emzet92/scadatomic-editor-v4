@@ -138,6 +138,29 @@ function buildComponentRoot(
         completionType: "method",
         detail: "component method",
       })),
+      ...(component.variants.length > 0
+        ? [
+            {
+              label: "variant",
+              completionType: "namespace",
+              detail: "generated visual variant API",
+              children: [
+                {
+                  label: "current",
+                  completionType: "property",
+                  detail: `${component.variants.map((variant) => `"${variant.name}"`).join(" | ")} · read only`,
+                },
+                ...component.variants.map((variant) => ({
+                  label: variant.name,
+                  completionType: "method",
+                  detail: variant.isDefault
+                    ? "visual variant · default"
+                    : "visual variant",
+                })),
+              ],
+            },
+          ]
+        : []),
       {
         label: "setProp",
         completionType: "method",

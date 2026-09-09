@@ -5,8 +5,11 @@ import { runtimeSignals } from "./runtime-signals";
 import { getWs } from "./websocket";
 import {
   applyMockRuntimeUiState,
+  getMockRuntimeNodeProps,
   setMockRuntimeNodeProp,
+  setMockRuntimeNodeVariant,
 } from "../mock/mock-runtime-ui-state";
+import { getComponentVariantProps } from "./component-variants";
 
 type RuntimeProviderProps = {
   projectId?: string | undefined;
@@ -73,6 +76,48 @@ export function RuntimeProvider({
               value: payload.value,
             })
           );
+
+          onNodeUpdated?.();
+          return;
+        }
+
+        if (payload.type === "node.variant") {
+          const nodeId = payload.nodeId;
+          const variantName = payload.variantName;
+
+          if (typeof nodeId !== "string" || typeof variantName !== "string") {
+            return;
+          }
+
+          if (projectId) {
+            setMockRuntimeNodeVariant(projectId, nodeId, variantName);
+          }
+
+          setDocument((current) => {
+            const node = current.nodes[nodeId];
+            if (!node?.variants?.[variantName]) {
+              return current;
+            }
+
+            const runtimeProps = projectId
+              ? getMockRuntimeNodeProps(projectId, nodeId)
+              : {};
+
+            return {
+              ...current,
+              nodes: {
+                ...current.nodes,
+                [nodeId]: {
+                  ...node,
+                  props: {
+                    ...(node.props ?? {}),
+                    ...getComponentVariantProps(node, variantName),
+                    ...runtimeProps,
+                  },
+                },
+              },
+            };
+          });
 
           onNodeUpdated?.();
           return;

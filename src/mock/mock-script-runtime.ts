@@ -5,6 +5,10 @@ import {
   getComponentColorProperty,
   getResolvedComponentProps,
 } from "../uiframework/component-api";
+import {
+  getComponentVariantNames,
+  getComponentVariantProps,
+} from "../uiframework/component-variants";
 import { getMockScript } from "./mock-script-store";
 import {
   clearMockSessionState,
@@ -23,14 +27,22 @@ export type MockScriptEvent = {
 
 export type MockScriptHost = {
   setNodeProp(nodeId: string, property: string, value: unknown): void;
+  setNodeVariant(nodeId: string, variantName: string): void;
+  getNodeVariant(nodeId: string): string | undefined;
   resolveUiNode(name: string): UiNode | undefined;
   emit(eventName: string, payload?: Record<string, unknown>): void;
+};
+
+export type UiComponentVariantScriptApi = {
+  readonly current: string | undefined;
+  [key: string]: unknown;
 };
 
 export type UiComponentScriptApi = {
   readonly id: string;
   readonly name: string;
   readonly type: string;
+  readonly variant?: UiComponentVariantScriptApi;
   setProp(property: string, value: unknown): void;
   setColor(color: string): void;
   [key: string]: unknown;
@@ -203,6 +215,13 @@ function createComponentApi(
   const localProps = getResolvedComponentProps(node);
   const colorProperty = getComponentColorProperty(node);
   const methodCache = new Map<string, (...args: unknown[]) => unknown>();
+  const variantNames = getComponentVariantNames(node);
+  const localWrites = new Map<string, unknown>();
+  const storedVariant = host.getNodeVariant(node.id);
+  let localVariant =
+    storedVariant && node.variants?.[storedVariant]
+      ? storedVariant
+      : node.defaultVariant;
 
   let proxy: UiComponentScriptApi;
 
@@ -216,6 +235,7 @@ function createComponentApi(
     }
 
     localProps[property] = value;
+    localWrites.set(property, value);
     host.setNodeProp(node.id, property, value);
   }
 
@@ -246,10 +266,34 @@ function createComponentApi(
     return callable;
   }
 
+  const variantApi =
+    variantNames.length > 0
+      ? createVariantApi({
+          node,
+          variantNames,
+          getCurrent: () => localVariant,
+          selectVariant(variantName) {
+            localVariant = variantName;
+
+            Object.assign(
+              localProps,
+              getComponentVariantProps(node, variantName)
+            );
+
+            for (const [property, value] of localWrites) {
+              localProps[property] = value;
+            }
+
+            host.setNodeVariant(node.id, variantName);
+          },
+        })
+      : undefined;
+
   const target = {
     id: node.id,
     name: node.name,
     type: node.type,
+    ...(variantApi ? { variant: variantApi } : {}),
     setProp,
     setColor(color: string) {
       if (!colorProperty) {
@@ -287,6 +331,56 @@ function createComponentApi(
   });
 
   return proxy;
+}
+
+function createVariantApi({
+  node,
+  variantNames,
+  getCurrent,
+  selectVariant,
+}: {
+  node: UiNode;
+  variantNames: string[];
+  getCurrent: () => string | undefined;
+  selectVariant: (variantName: string) => void;
+}): UiComponentVariantScriptApi {
+  const methods = new Map<string, () => void>();
+
+  const target = {
+    get current() {
+      return getCurrent();
+    },
+  } as UiComponentVariantScriptApi;
+
+  return new Proxy(target, {
+    get(apiTarget, property, receiver) {
+      if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+        return Reflect.get(apiTarget, property, receiver);
+      }
+
+      if (!variantNames.includes(property)) {
+        return undefined;
+      }
+
+      const cached = methods.get(property);
+      if (cached) {
+        return cached;
+      }
+
+      const callable = () => {
+        if (!node.variants?.[property]) {
+          throw new Error(
+            `${node.name} (${node.type}) has no variant “${property}”.`
+          );
+        }
+
+        selectVariant(property);
+      };
+
+      methods.set(property, callable);
+      return callable;
+    },
+  });
 }
 
 function executeSource({

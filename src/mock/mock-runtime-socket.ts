@@ -1,6 +1,9 @@
 import { parseUiDocument, type UiDocument } from "../uiframework/core/document";
 import { getMockProjectSnapshot } from "./mock-project-store";
-import { applyMockRuntimeUiState } from "./mock-runtime-ui-state";
+import {
+  applyMockRuntimeUiState,
+  getMockRuntimeNodeVariant,
+} from "./mock-runtime-ui-state";
 import { executeMockScript } from "./mock-script-runtime";
 
 type MockWsPayload = Record<string, unknown>;
@@ -115,6 +118,17 @@ class MockRuntimeSocket extends EventTarget {
             timestamp: Date.now(),
           });
         },
+        setNodeVariant: (nodeId, variantName) => {
+          this.emitMockResponse({
+            type: "node.variant",
+            projectId,
+            nodeId,
+            variantName,
+            timestamp: Date.now(),
+          });
+        },
+        getNodeVariant: (nodeId) =>
+          getMockRuntimeNodeVariant(projectId, nodeId),
         resolveUiNode: (name) => {
           const document = this.getProjectDocument(projectId);
           return Object.values(document?.nodes ?? {}).find(
