@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { applyDocumentCommand } from "./core/commands";
 import { parseUiDocument, type UiDocument } from "./core/document";
 import { runtimeSignals } from "./runtime-signals";
@@ -26,12 +26,27 @@ export function RuntimeProvider({
   onNodeUpdated,
   onNavigate,
 }: RuntimeProviderProps) {
+  const onScreenUpdatedRef = useRef(onScreenUpdated);
+  const onNodeUpdatedRef = useRef(onNodeUpdated);
+  const onNavigateRef = useRef(onNavigate);
+
+  onScreenUpdatedRef.current = onScreenUpdated;
+  onNodeUpdatedRef.current = onNodeUpdated;
+  onNavigateRef.current = onNavigate;
+
+  // Rehydrate session-scoped runtime UI state only when the runtime/project
+  // boundary changes. Do not couple this to render callbacks: they can change
+  // identity whenever the active document changes.
+  useEffect(() => {
+    if (!projectId) return;
+    setDocument((current) => applyMockRuntimeUiState(projectId, current));
+  }, [projectId, setDocument]);
+
+  // Keep one websocket subscription per project. The latest callbacks are read
+  // through refs so document/navigation updates do not tear down and recreate
+  // the subscription (and, importantly, do not rehydrate state in a loop).
   useEffect(() => {
     const ws = getWs();
-
-    if (projectId) {
-      setDocument((current) => applyMockRuntimeUiState(projectId, current));
-    }
 
     const handleMessage = (event: Event) => {
       const messageEvent = event as MessageEvent<string>;
@@ -54,13 +69,13 @@ export function RuntimeProvider({
               ? applyMockRuntimeUiState(projectId, publishedDocument)
               : publishedDocument
           );
-          onScreenUpdated?.();
+          onScreenUpdatedRef.current?.();
           return;
         }
 
         if (payload.type === "runtime.navigate") {
           if (typeof payload.path === "string") {
-            onNavigate?.(payload.path);
+            onNavigateRef.current?.(payload.path);
           }
           return;
         }
@@ -86,7 +101,7 @@ export function RuntimeProvider({
             })
           );
 
-          onNodeUpdated?.();
+          onNodeUpdatedRef.current?.();
           return;
         }
 
@@ -128,7 +143,7 @@ export function RuntimeProvider({
             };
           });
 
-          onNodeUpdated?.();
+          onNodeUpdatedRef.current?.();
           return;
         }
 
@@ -149,7 +164,7 @@ export function RuntimeProvider({
 
     ws.addEventListener("message", handleMessage);
     return () => ws.removeEventListener("message", handleMessage);
-  }, [projectId, setDocument, onScreenUpdated, onNodeUpdated, onNavigate]);
+  }, [projectId, setDocument]);
 
   return null;
 }
