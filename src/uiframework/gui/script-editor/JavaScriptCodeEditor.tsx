@@ -1,32 +1,45 @@
-import CodeMirror from "@uiw/react-codemirror";
 import { oneDark } from "@codemirror/theme-one-dark";
+import CodeMirror from "@uiw/react-codemirror";
+import { useMemo } from "react";
+import type { ComponentApiDescription } from "../../component-api";
+import { createCtxAutocompleteExtension } from "./ctx-completions";
 
 type JavaScriptCodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
+  components: ComponentApiDescription[];
 };
 
 export function JavaScriptCodeEditor({
   value,
   onChange,
+  components,
 }: JavaScriptCodeEditorProps) {
+  const autocompleteExtension = useMemo(
+    () => createCtxAutocompleteExtension(components),
+    [components]
+  );
+
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
         <div className="text-xs font-medium text-zinc-300">JavaScript</div>
-        <div className="text-[11px] text-zinc-500">prototype handler</div>
+        <div className="text-[11px] text-zinc-500">
+          ctx autocomplete · prototype handler
+        </div>
       </div>
 
       <CodeMirror
         value={value}
-        height="360px"
+        height="420px"
         theme={oneDark}
+        extensions={[autocompleteExtension]}
         basicSetup={{
           lineNumbers: true,
           foldGutter: true,
           highlightActiveLine: true,
           highlightSelectionMatches: true,
-          autocompletion: true,
+          autocompletion: false,
         }}
         onChange={onChange}
       />

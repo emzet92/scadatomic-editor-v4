@@ -10,6 +10,7 @@ import {
   type ComponentApiDescription,
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
+import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
 
 export function ScriptPage() {
@@ -75,6 +76,20 @@ function ScriptEditor({
     setSavedCode(code);
   }
 
+  function selectHandler(handlerId: string) {
+    if (handlerId === scriptId) {
+      return;
+    }
+
+    if (dirty) {
+      saveMockScript(projectId, scriptId, code);
+    }
+
+    navigate(
+      `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(handlerId)}`
+    );
+  }
+
   return (
     <div className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
       <header className="h-16 shrink-0 border-b border-zinc-200 bg-white px-6 flex items-center justify-between">
@@ -108,52 +123,64 @@ function ScriptEditor({
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-6xl mx-auto space-y-4">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-              Handler ID
-            </div>
-            <div className="mt-1 text-sm font-mono text-zinc-600">
-              {scriptId}
+      <div className="min-h-0 flex-1 flex">
+        <HandlerTree
+          document={document}
+          currentScriptId={scriptId}
+          onSelect={selectHandler}
+        />
+
+        <main className="min-w-0 flex-1 overflow-auto p-6">
+          <div className="max-w-6xl mx-auto space-y-4">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+                Handler ID
+              </div>
+              <div className="mt-1 text-sm font-mono text-zinc-600">
+                {scriptId}
+              </div>
+
+              <h1 className="mt-4 text-xl font-semibold text-zinc-900">
+                Runtime Handler
+              </h1>
+              <p className="mt-1 text-sm text-zinc-500">
+                Prototype-only JavaScript executed locally with a SCADAtomic context API.
+              </p>
             </div>
 
-            <h1 className="mt-4 text-xl font-semibold text-zinc-900">
-              Runtime Handler
-            </h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              Prototype-only JavaScript executed locally with a SCADAtomic context API.
-            </p>
+            <JavaScriptCodeEditor
+              value={code}
+              onChange={setCode}
+              components={componentApi}
+            />
+
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                ctx API
+              </div>
+              <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
+                <code>ctx.sourceNodeId</code>
+                <code>ctx.eventName</code>
+                <code>ctx.state.get(key, fallback?)</code>
+                <code>ctx.state.set(key, value)</code>
+                <code>ctx.ui.ComponentName</code>
+                <code>ctx.ui.ComponentName.prop = value</code>
+                <code>ctx.ui.ComponentName.setProp(prop, value)</code>
+                <code>ctx.ui.ComponentName.setColor(color)</code>
+                <code>ctx.emit(name, payload?)</code>
+                <code>ctx.random.color()</code>
+                <code>ctx.random.number(min, max)</code>
+                <code>ctx.log(...args)</code>
+              </div>
+              <p className="mt-3 text-xs text-amber-700">
+                Prototype only: handlers run with new Function and are not sandboxed.
+              </p>
+            </div>
+
+            <ComponentApiSection components={componentApi} error={apiError} />
           </div>
-
-          <JavaScriptCodeEditor value={code} onChange={setCode} />
-
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              ctx API
-            </div>
-            <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
-              <code>ctx.sourceNodeId</code>
-              <code>ctx.eventName</code>
-              <code>ctx.state.get(key, fallback?)</code>
-              <code>ctx.state.set(key, value)</code>
-              <code>ctx.ui.ComponentName</code>
-              <code>ctx.ui.ComponentName.prop = value</code>
-              <code>ctx.ui.ComponentName.setProp(prop, value)</code>
-              <code>ctx.ui.ComponentName.setColor(color)</code>
-              <code>ctx.emit(name, payload?)</code>
-              <code>ctx.random.color()</code>
-              <code>ctx.random.number(min, max)</code>
-              <code>ctx.log(...args)</code>
-            </div>
-            <p className="mt-3 text-xs text-amber-700">
-              Prototype only: handlers run with new Function and are not sandboxed.
-            </p>
-          </div>
-
-          <ComponentApiSection components={componentApi} error={apiError} />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
