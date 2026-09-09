@@ -266,26 +266,32 @@ function createComponentApi(
     return callable;
   }
 
+  function setVariant(variantName: string) {
+    if (!node.variants?.[variantName]) {
+      throw new Error(
+        `${node.name} (${node.type}) has no variant “${variantName}”.`
+      );
+    }
+
+    localVariant = variantName;
+
+    Object.assign(localProps, getComponentVariantProps(node, variantName));
+
+    // Explicit writes made by the current handler stay on top of the
+    // selected visual variant (read-your-writes semantics).
+    for (const [property, value] of localWrites) {
+      localProps[property] = value;
+    }
+
+    host.setNodeVariant(node.id, variantName);
+  }
+
   const variantApi =
     variantNames.length > 0
       ? createVariantApi({
-          node,
           variantNames,
           getCurrent: () => localVariant,
-          selectVariant(variantName) {
-            localVariant = variantName;
-
-            Object.assign(
-              localProps,
-              getComponentVariantProps(node, variantName)
-            );
-
-            for (const [property, value] of localWrites) {
-              localProps[property] = value;
-            }
-
-            host.setNodeVariant(node.id, variantName);
-          },
+          setVariant,
         })
       : undefined;
 
@@ -334,15 +340,13 @@ function createComponentApi(
 }
 
 function createVariantApi({
-  node,
   variantNames,
   getCurrent,
-  selectVariant,
+  setVariant,
 }: {
-  node: UiNode;
   variantNames: string[];
   getCurrent: () => string | undefined;
-  selectVariant: (variantName: string) => void;
+  setVariant: (variantName: string) => void;
 }): UiComponentVariantScriptApi {
   const methods = new Map<string, () => void>();
 
@@ -367,14 +371,10 @@ function createVariantApi({
         return cached;
       }
 
+      // Every generated variant method is only syntactic sugar over the
+      // component-level setVariant(). The Proxy decides the variant name.
       const callable = () => {
-        if (!node.variants?.[property]) {
-          throw new Error(
-            `${node.name} (${node.type}) has no variant “${property}”.`
-          );
-        }
-
-        selectVariant(property);
+        setVariant(property);
       };
 
       methods.set(property, callable);
