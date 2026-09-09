@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
 import { getPage, type UiDocument } from "./core/document";
 import { createComponentDefinitionDocument } from "./reusable-components";
-import { EditorControls } from "./EditorControls";
+import { PageDesignerSurface } from "./designer/PageDesignerSurface";
 import {
   Canvas,
   LeftSidebar,
@@ -29,7 +29,7 @@ import {
   type ComponentEditorMode,
 } from "./gui/property-panel/PropertyPanel";
 import { ComponentStructureTree } from "./gui/reusable-component/ComponentStructureTree";
-import { ComponentDefinitionControls } from "./gui/reusable-component/ComponentDefinitionControls";
+import { ComponentDesignerSurface } from "./designer/ComponentDesignerSurface";
 import { TreeView } from "./gui/tree-view/TreeView";
 import {
   editorRegistry,
@@ -59,25 +59,6 @@ export function RendererRoot({
             }
           : {}),
         "data-node-id": node.id,
-        onPointerDown: (event: React.PointerEvent) => {
-          if (
-            event.button !== 0 ||
-            event.metaKey ||
-            event.ctrlKey ||
-            event.shiftKey
-          ) {
-            return;
-          }
-
-          event.stopPropagation();
-          useEditorStore
-            .getState()
-            .startNodeDragCandidate(
-              node.id,
-              event.clientX,
-              event.clientY
-            );
-        },
       })}
     />
   );
@@ -107,11 +88,9 @@ function ComponentModeRenderer({
 function ComponentDefinitionRenderer({
   document,
   mode,
-  onSelectInternalNode,
 }: {
   document: UiDocument;
   mode: ComponentDefinitionEditorMode;
-  onSelectInternalNode: (nodeId: string) => void;
 }) {
   const definition = document.components?.[mode.componentId];
   if (!definition) return null;
@@ -127,20 +106,6 @@ function ComponentDefinitionRenderer({
           ? getComponentVariantProps(node, mode.variantName)
           : getDefaultComponentVariantProps(node)),
         "data-component-node-id": node.id,
-        onPointerDown: (event: React.PointerEvent) => {
-          if (event.button !== 0) return;
-          event.stopPropagation();
-          onSelectInternalNode(node.id);
-          if (!event.metaKey && !event.ctrlKey && !event.shiftKey) {
-            useEditorStore
-              .getState()
-              .startNodeDragCandidate(
-                node.id,
-                event.clientX,
-                event.clientY
-              );
-          }
-        },
       })}
     />
   );
@@ -565,17 +530,10 @@ export function EditorPage() {
                     <ComponentDefinitionRenderer
                       document={document}
                       mode={componentDefinitionMode}
-                      onSelectInternalNode={(nodeId) =>
-                        setComponentDefinitionMode({
-                          componentId: componentDefinitionMode.componentId,
-                          selectedInternalNodeId: nodeId,
-                        })
-                      }
                     />
                   </div>
-                  <ComponentDefinitionControls
-                    projectDocument={document}
-                    definition={focusedDefinition}
+                  <ComponentDesignerSurface
+                    componentId={focusedDefinition.id}
                     registry={editorRegistry}
                     selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
                     onSelectNode={(nodeId) =>
@@ -602,7 +560,7 @@ export function EditorPage() {
                   >
                     <RendererRoot document={activeDocument} registry={editorRegistry} />
                   </PageViewportFrame>
-                  <EditorControls registry={editorRegistry} />
+                  <PageDesignerSurface registry={editorRegistry} />
                 </>
               )}
               </NavigationRuntimeProvider>
