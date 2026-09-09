@@ -29,6 +29,7 @@ import {
   type ComponentEditorMode,
 } from "./gui/property-panel/PropertyPanel";
 import { ComponentStructureTree } from "./gui/reusable-component/ComponentStructureTree";
+import { ComponentDefinitionControls } from "./gui/reusable-component/ComponentDefinitionControls";
 import { TreeView } from "./gui/tree-view/TreeView";
 import {
   editorRegistry,
@@ -122,11 +123,23 @@ function ComponentDefinitionRenderer({
       document={componentDocument}
       registry={editorRegistry}
       decorateProps={(node) => ({
+        ...(node.id === mode.selectedInternalNodeId && mode.variantName
+          ? getComponentVariantProps(node, mode.variantName)
+          : getDefaultComponentVariantProps(node)),
         "data-component-node-id": node.id,
         onPointerDown: (event: React.PointerEvent) => {
           if (event.button !== 0) return;
           event.stopPropagation();
           onSelectInternalNode(node.id);
+          if (!event.metaKey && !event.ctrlKey && !event.shiftKey) {
+            useEditorStore
+              .getState()
+              .startNodeDragCandidate(
+                node.id,
+                event.clientX,
+                event.clientY
+              );
+          }
         },
       })}
     />
@@ -296,10 +309,22 @@ export function EditorPage() {
       setComponentDefinitionMode(null);
       return;
     }
-    if (!definition.nodes[componentDefinitionMode.selectedInternalNodeId]) {
+    const selectedInternalNode =
+      definition.nodes[componentDefinitionMode.selectedInternalNodeId];
+    if (!selectedInternalNode) {
       setComponentDefinitionMode({
         componentId: definition.id,
         selectedInternalNodeId: definition.rootId,
+      });
+      return;
+    }
+    if (
+      componentDefinitionMode.variantName &&
+      !selectedInternalNode.variants?.[componentDefinitionMode.variantName]
+    ) {
+      setComponentDefinitionMode({
+        componentId: definition.id,
+        selectedInternalNodeId: selectedInternalNode.id,
       });
     }
   }, [componentDefinitionMode, document]);
@@ -361,6 +386,21 @@ export function EditorPage() {
     });
   }
 
+  function editComponentDefinitionVariant(
+    componentId: string,
+    nodeId: string,
+    variantName: string
+  ) {
+    const definition = document.components?.[componentId];
+    if (!definition?.nodes[nodeId]?.variants?.[variantName]) return;
+    setComponentMode(null);
+    setComponentDefinitionMode({
+      componentId,
+      selectedInternalNodeId: nodeId,
+      variantName,
+    });
+  }
+
   function exitComponentMode() {
     setComponentMode(null);
     setComponentDefinitionMode(null);
@@ -408,16 +448,20 @@ export function EditorPage() {
       <div className="flex-1 flex">
         <LeftSidebar>
           {componentDefinitionMode && focusedDefinition ? (
-            <ComponentStructureTree
-              definition={focusedDefinition}
-              selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
-              onSelect={(nodeId) =>
-                setComponentDefinitionMode({
-                  ...componentDefinitionMode,
-                  selectedInternalNodeId: nodeId,
-                })
-              }
-            />
+            <>
+              <ComponentStructureTree
+                definition={focusedDefinition}
+                selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                onSelect={(nodeId) =>
+                  setComponentDefinitionMode({
+                    componentId: componentDefinitionMode.componentId,
+                    selectedInternalNodeId: nodeId,
+                  })
+                }
+              />
+              <div className="border-t border-zinc-200" />
+              <ComponentPalette ownerComponentId={focusedDefinition.id} />
+            </>
           ) : (
             <>
               <PageTree />
@@ -468,7 +512,14 @@ export function EditorPage() {
                   <Boxes size={13} />
                   <span className="font-medium">{focusedDefinition.name}</span>
                   <span className="opacity-50">/</span>
-                  <span>private implementation</span>
+                  {componentDefinitionMode.variantName ? (
+                    <span className="font-mono">
+                      {focusedDefinition.nodes[componentDefinitionMode.selectedInternalNodeId]?.name}.
+                      {componentDefinitionMode.variantName}()
+                    </span>
+                  ) : (
+                    <span>private implementation</span>
+                  )}
                 </div>
               ) : componentMode && focusedNode ? (
                 <div
@@ -506,18 +557,35 @@ export function EditorPage() {
                 }}
               >
               {componentDefinitionMode && focusedDefinition ? (
-                <div className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
-                  <ComponentDefinitionRenderer
-                    document={document}
-                    mode={componentDefinitionMode}
-                    onSelectInternalNode={(nodeId) =>
+                <>
+                  <div
+                    data-editor-component-canvas
+                    className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm"
+                  >
+                    <ComponentDefinitionRenderer
+                      document={document}
+                      mode={componentDefinitionMode}
+                      onSelectInternalNode={(nodeId) =>
+                        setComponentDefinitionMode({
+                          componentId: componentDefinitionMode.componentId,
+                          selectedInternalNodeId: nodeId,
+                        })
+                      }
+                    />
+                  </div>
+                  <ComponentDefinitionControls
+                    projectDocument={document}
+                    definition={focusedDefinition}
+                    registry={editorRegistry}
+                    selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                    onSelectNode={(nodeId) =>
                       setComponentDefinitionMode({
-                        ...componentDefinitionMode,
+                        componentId: componentDefinitionMode.componentId,
                         selectedInternalNodeId: nodeId,
                       })
                     }
                   />
-                </div>
+                </>
               ) : componentMode ? (
                 <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
                   <ComponentModeRenderer
@@ -549,6 +617,7 @@ export function EditorPage() {
             componentDefinitionMode={componentDefinitionMode}
             onEditVariant={editVariant}
             onEditComponentDefinition={editComponentDefinition}
+            onEditComponentDefinitionVariant={editComponentDefinitionVariant}
             onExitComponentMode={exitComponentMode}
           />
         </RightSidebar>

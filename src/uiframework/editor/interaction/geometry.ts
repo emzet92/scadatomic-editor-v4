@@ -28,13 +28,14 @@ export type DropIndicatorRect = {
 
 export function collectNodeRects(
   document: UiDocument,
-  root: ParentNode
+  root: ParentNode,
+  nodeAttribute = "data-node-id"
 ): RectInfo[] {
   const index = buildDocumentIndex(document);
   const result: RectInfo[] = [];
 
-  root.querySelectorAll<HTMLElement>("[data-node-id]").forEach((element) => {
-    const id = element.dataset.nodeId;
+  root.querySelectorAll<HTMLElement>(`[${nodeAttribute}]`).forEach((element) => {
+    const id = element.getAttribute(nodeAttribute) ?? undefined;
     if (!id) {
       return;
     }

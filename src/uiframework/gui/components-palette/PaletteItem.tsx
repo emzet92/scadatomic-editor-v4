@@ -10,7 +10,10 @@ import {
   Type,
 } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
-import { createProjectComponentRepository } from "../../component-repository";
+import {
+  createProjectComponentRepository,
+  wouldCreateComponentCycle,
+} from "../../component-repository";
 import {
   componentDefinitions,
   type RegisteredComponentType,
@@ -25,7 +28,11 @@ const icons = {
   Navigation: Menu,
 } satisfies Record<RegisteredComponentType, typeof Box>;
 
-export function ComponentPalette() {
+export function ComponentPalette({
+  ownerComponentId,
+}: {
+  ownerComponentId?: string | undefined;
+} = {}) {
   const [search, setSearch] = useState("");
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
   const document = useEditorStore((s) => s.document);
@@ -41,7 +48,9 @@ export function ComponentPalette() {
       item.label.toLowerCase().includes(normalizedSearch)
   );
   const reusableItems = reusableComponents.filter((item) =>
-    item.name.toLowerCase().includes(normalizedSearch)
+    item.name.toLowerCase().includes(normalizedSearch) &&
+    (!ownerComponentId ||
+      !wouldCreateComponentCycle(document, ownerComponentId, item.id))
   );
 
   return (
@@ -82,6 +91,7 @@ export function ComponentPalette() {
                 startComponentDrag({
                   type: "ComponentInstance",
                   componentDefinitionId: item.id,
+                  label: item.name,
                   props: Object.fromEntries(
                     Object.entries(item.inputs ?? {}).map(([name, input]) => [
                       name,
@@ -124,6 +134,7 @@ export function ComponentPalette() {
                 event.preventDefault();
                 startComponentDrag({
                   type: item.type,
+                  label: item.label,
                   props: {},
                 });
               }}

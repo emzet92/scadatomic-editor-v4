@@ -18,10 +18,14 @@ import {
   type UiNode,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
-import { createProjectComponentRepository } from "./component-repository";
+import {
+  createProjectComponentRepository,
+  wouldCreateComponentCycle,
+} from "./component-repository";
 import {
   createReusableComponentFromNode,
   createReusableComponentFromSelection,
+  createComponentDefinitionDocument,
 } from "./reusable-components";
 import {
   createUniqueNodeName,
@@ -32,6 +36,7 @@ export type DragPreview = {
   type: string;
   props: Record<string, unknown>;
   componentDefinitionId?: string | undefined;
+  label?: string | undefined;
 };
 
 export type NewNode = {
@@ -111,6 +116,23 @@ type EditorState = {
     componentId: string,
     methodName: string,
     method: ScopedMethodRef | null
+  ) => void;
+
+  insertComponentDefinitionNode: (
+    componentId: string,
+    parentId: NodeId,
+    insertIndex: number,
+    node: NewNode
+  ) => NodeId | null;
+  deleteComponentDefinitionNode: (
+    componentId: string,
+    nodeId: NodeId
+  ) => void;
+  moveComponentDefinitionNode: (
+    componentId: string,
+    nodeId: NodeId,
+    targetParentId: NodeId,
+    targetIndex: number
   ) => void;
 
   insertNode: (
@@ -523,6 +545,149 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: createProjectComponentRepository(state.document).upsert(
           nextDefinition
         ),
+      };
+    });
+  },
+
+  insertComponentDefinitionNode: (componentId, parentId, insertIndex, node) => {
+    let insertedId: NodeId | null = null;
+
+    set((state) => {
+      const definition = state.document.components?.[componentId];
+      const parent = definition?.nodes[parentId];
+      if (!definition || !parent) return state;
+
+      const parentDefinition = getComponentDefinition(parent.type);
+      if (!parentDefinition?.acceptsChildren) return state;
+
+      if (
+        node.componentDefinitionId &&
+        wouldCreateComponentCycle(
+          state.document,
+          componentId,
+          node.componentDefinitionId
+        )
+      ) {
+        console.warn("Ignoring component insertion that would create a recursive component graph.");
+        return state;
+      }
+
+      const syntheticDocument = createComponentDefinitionDocument(
+        state.document,
+        definition
+      );
+      const registeredDefinition = getComponentDefinition(node.type);
+      const id = crypto.randomUUID();
+      const reusableName = node.componentDefinitionId
+        ? state.document.components?.[node.componentDefinitionId]?.name
+        : undefined;
+      const name = createUniqueNodeName(
+        syntheticDocument,
+        reusableName ?? node.type,
+        definition.rootId
+      );
+      const newNode: UiNode = {
+        id,
+        name,
+        type: node.type,
+        componentDefinitionId: node.componentDefinitionId,
+        props: { ...(node.props ?? {}) },
+        children: registeredDefinition?.acceptsChildren ? [] : undefined,
+      };
+      const updatedSynthetic = applyDocumentCommand(
+        syntheticDocument,
+        {
+          type: "node.insert",
+          parentId,
+          insertIndex,
+          node: newNode,
+        },
+        definition.rootId
+      );
+
+      if (!updatedSynthetic.nodes[id]) return state;
+      insertedId = id;
+
+      return {
+        document: createProjectComponentRepository(state.document).upsert({
+          ...definition,
+          nodes: updatedSynthetic.nodes,
+        }),
+        dragPreview: null,
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+      };
+    });
+
+    return insertedId;
+  },
+
+  deleteComponentDefinitionNode: (componentId, nodeId) => {
+    set((state) => {
+      const definition = state.document.components?.[componentId];
+      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
+        return state;
+      }
+
+      const syntheticDocument = createComponentDefinitionDocument(
+        state.document,
+        definition
+      );
+      const updatedSynthetic = applyDocumentCommand(
+        syntheticDocument,
+        { type: "node.delete", nodeId },
+        definition.rootId
+      );
+
+      if (updatedSynthetic.nodes === syntheticDocument.nodes) return state;
+
+      return {
+        document: createProjectComponentRepository(state.document).upsert({
+          ...definition,
+          nodes: updatedSynthetic.nodes,
+        }),
+      };
+    });
+  },
+
+  moveComponentDefinitionNode: (
+    componentId,
+    nodeId,
+    targetParentId,
+    targetIndex
+  ) => {
+    set((state) => {
+      const definition = state.document.components?.[componentId];
+      if (!definition) return state;
+
+      const targetParent = definition.nodes[targetParentId];
+      const targetDefinition = targetParent
+        ? getComponentDefinition(targetParent.type)
+        : undefined;
+      if (!targetParent || !targetDefinition?.acceptsChildren) return state;
+
+      const syntheticDocument = createComponentDefinitionDocument(
+        state.document,
+        definition
+      );
+      const updatedSynthetic = applyDocumentCommand(
+        syntheticDocument,
+        {
+          type: "node.move",
+          nodeId,
+          targetParentId,
+          targetIndex,
+        },
+        definition.rootId
+      );
+
+      return {
+        document: createProjectComponentRepository(state.document).upsert({
+          ...definition,
+          nodes: updatedSynthetic.nodes,
+        }),
+        draggedNodeId: null,
+        nodeDragCandidate: null,
       };
     });
   },

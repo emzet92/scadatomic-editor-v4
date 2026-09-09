@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useEditorStore } from "./editor-store";
-import { getPage } from "./core/document";
-import type { ComponentRegistry } from "./registry/editor-registry";
-import { getComponentDefinition } from "./registry/component-definitions";
+import type { UiComponentDefinition, UiDocument } from "../../core/document";
+import { useEditorStore } from "../../editor-store";
 import {
   collectNodeRects,
   findContainerInsertIndex,
@@ -11,37 +9,41 @@ import {
   getDropIndicatorRect,
   type DropTarget,
   type RectInfo,
-} from "./editor/interaction/geometry";
-import { DragPreview } from "./editor/overlay/DragPreview";
+} from "../../editor/interaction/geometry";
+import { DragPreview } from "../../editor/overlay/DragPreview";
 import {
   DropIndicator,
   NodeBoundsOverlay,
-} from "./editor/overlay/DropOverlay";
-import { SelectionOverlay } from "./editor/overlay/SelectionOverlay";
+} from "../../editor/overlay/DropOverlay";
+import { SelectionOverlay } from "../../editor/overlay/SelectionOverlay";
+import { getComponentDefinition } from "../../registry/component-definitions";
+import type { ComponentRegistry } from "../../registry/editor-registry";
+import { createComponentDefinitionDocument } from "../../reusable-components";
 
-type Props = {
+export function ComponentDefinitionControls({
+  projectDocument,
+  definition,
+  registry,
+  selectedNodeId,
+  onSelectNode,
+}: {
+  projectDocument: UiDocument;
+  definition: UiComponentDefinition;
   registry: ComponentRegistry;
-};
-
-export function EditorControls({ registry }: Props) {
-  const document = useEditorStore((state) => state.document);
-  const activePageId = useEditorStore((state) => state.activePageId);
-  const activeRootId = getPage(document, activePageId).rootId;
-  const activeDocument = useMemo(
-    () => ({ ...document, rootId: activeRootId }),
-    [document, activeRootId]
-  );
-  const selectedId = useEditorStore((state) => state.selectedNodeId);
-  const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
-  const selectNode = useEditorStore((state) => state.selectNode);
+  selectedNodeId: string;
+  onSelectNode: (nodeId: string) => void;
+}) {
   const dragPreview = useEditorStore((state) => state.dragPreview);
   const dragX = useEditorStore((state) => state.dragX);
   const dragY = useEditorStore((state) => state.dragY);
+  const document = useMemo(
+    () => createComponentDefinitionDocument(projectDocument, definition),
+    [projectDocument, definition]
+  );
 
   const [rects, setRects] = useState<RectInfo[]>([]);
   const [hoverDropTarget, setHoverDropTargetState] =
     useState<DropTarget | null>(null);
-
   const rectsRef = useRef<RectInfo[]>([]);
   const hoverDropTargetRef = useRef<DropTarget | null>(null);
 
@@ -51,7 +53,9 @@ export function EditorControls({ registry }: Props) {
   }
 
   function collectRects() {
-    const canvas = window.document.querySelector("[data-editor-canvas]");
+    const canvas = window.document.querySelector(
+      "[data-editor-component-canvas]"
+    );
     if (!canvas) {
       rectsRef.current = [];
       setRects([]);
@@ -59,13 +63,13 @@ export function EditorControls({ registry }: Props) {
     }
 
     const next = collectNodeRects(
-      (() => {
-        const state = useEditorStore.getState();
-        return { ...state.document, rootId: getPage(state.document, state.activePageId).rootId };
-      })(),
-      canvas
+      createComponentDefinitionDocument(
+        useEditorStore.getState().document,
+        useEditorStore.getState().document.components?.[definition.id] ?? definition
+      ),
+      canvas,
+      "data-component-node-id"
     );
-
     rectsRef.current = next;
     setRects(next);
   }
@@ -73,23 +77,9 @@ export function EditorControls({ registry }: Props) {
   useEffect(() => {
     const frame = requestAnimationFrame(collectRects);
     return () => cancelAnimationFrame(frame);
-  }, [document, activePageId]);
+  }, [definition, projectDocument]);
 
   useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      const target = event.target as HTMLElement | null;
-      if (!target || target.closest("[data-editor-ignore]")) {
-        return;
-      }
-
-      const node = target.closest<HTMLElement>("[data-node-id]");
-      const id = node?.dataset.nodeId;
-      selectNode(id ?? null, id ? {
-        toggle: event.metaKey || event.ctrlKey,
-        additive: event.shiftKey,
-      } : undefined);
-    }
-
     function handlePointerMove(event: PointerEvent) {
       const initialState = useEditorStore.getState();
       const isPotentialDrag =
@@ -104,12 +94,17 @@ export function EditorControls({ registry }: Props) {
 
       initialState.moveDrag(event.clientX, event.clientY);
       const state = useEditorStore.getState();
-
       if (!state.dragPreview && !state.draggedNodeId) {
         setHoverDropTarget(null);
         return;
       }
 
+      const currentDefinition = state.document.components?.[definition.id];
+      if (!currentDefinition) return;
+      const currentDocument = createComponentDefinitionDocument(
+        state.document,
+        currentDefinition
+      );
       const hoveredRect = findDeepestRect(
         rectsRef.current,
         event.clientX,
@@ -121,7 +116,7 @@ export function EditorControls({ registry }: Props) {
         return;
       }
 
-      const hoveredNode = state.document.nodes[hoveredRect.id];
+      const hoveredNode = currentDocument.nodes[hoveredRect.id];
       const hoveredDefinition = hoveredNode
         ? getComponentDefinition(hoveredNode.type)
         : undefined;
@@ -130,7 +125,7 @@ export function EditorControls({ registry }: Props) {
         setHoverDropTarget({
           parentId: hoveredNode.id,
           insertIndex: findContainerInsertIndex(
-            { ...state.document, rootId: getPage(state.document, state.activePageId).rootId },
+            currentDocument,
             rectsRef.current,
             hoveredNode.id,
             event.clientX,
@@ -142,7 +137,7 @@ export function EditorControls({ registry }: Props) {
 
       setHoverDropTarget(
         findSiblingDropTarget(
-          { ...state.document, rootId: getPage(state.document, state.activePageId).rootId },
+          currentDocument,
           hoveredRect,
           event.clientX,
           event.clientY
@@ -155,17 +150,29 @@ export function EditorControls({ registry }: Props) {
       const target = hoverDropTargetRef.current;
 
       if (target && state.dragPreview) {
-        state.insertNode(target.parentId, target.insertIndex, {
-          type: state.dragPreview.type,
-          props: state.dragPreview.props,
-          componentDefinitionId: state.dragPreview.componentDefinitionId,
-        });
-      } else if (target && state.draggedNodeId) {
-        state.moveNode(
+        const insertedId = state.insertComponentDefinitionNode(
+          definition.id,
+          target.parentId,
+          target.insertIndex,
+          {
+            type: state.dragPreview.type,
+            props: state.dragPreview.props,
+            componentDefinitionId: state.dragPreview.componentDefinitionId,
+          }
+        );
+        if (insertedId) onSelectNode(insertedId);
+      } else if (
+        target &&
+        state.draggedNodeId &&
+        state.draggedNodeId !== definition.rootId
+      ) {
+        state.moveComponentDefinitionNode(
+          definition.id,
           state.draggedNodeId,
           target.parentId,
           target.insertIndex
         );
+        onSelectNode(state.draggedNodeId);
       }
 
       state.endComponentDrag();
@@ -174,60 +181,41 @@ export function EditorControls({ registry }: Props) {
     }
 
     let collectFrame: number | null = null;
-
     function scheduleCollectRects() {
-      if (collectFrame !== null) {
-        cancelAnimationFrame(collectFrame);
-      }
-
+      if (collectFrame !== null) cancelAnimationFrame(collectFrame);
       collectFrame = requestAnimationFrame(() => {
         collectFrame = null;
         collectRects();
       });
     }
 
-    window.document.addEventListener("click", handleClick, true);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("resize", scheduleCollectRects);
     window.addEventListener("scroll", scheduleCollectRects, true);
 
     return () => {
-      window.document.removeEventListener("click", handleClick, true);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("resize", scheduleCollectRects);
       window.removeEventListener("scroll", scheduleCollectRects, true);
-
-      if (collectFrame !== null) {
-        cancelAnimationFrame(collectFrame);
-      }
+      if (collectFrame !== null) cancelAnimationFrame(collectFrame);
     };
-  }, [selectNode]);
+  }, [definition.id, definition.rootId, onSelectNode]);
 
   const selectedRect = useMemo(
-    () => rects.find((rect) => rect.id === selectedId) ?? null,
-    [rects, selectedId]
+    () => rects.find((rect) => rect.id === selectedNodeId) ?? null,
+    [rects, selectedNodeId]
   );
-
-  const secondarySelectedRects = useMemo(
-    () =>
-      rects.filter(
-        (rect) => rect.id !== selectedId && selectedNodeIds.includes(rect.id)
-      ),
-    [rects, selectedId, selectedNodeIds]
-  );
-
+  const selectedNode = definition.nodes[selectedNodeId];
   const dropIndicatorRect = useMemo(
-    () => getDropIndicatorRect(activeDocument, rects, hoverDropTarget),
-    [activeDocument, rects, hoverDropTarget]
+    () => getDropIndicatorRect(document, rects, hoverDropTarget),
+    [document, rects, hoverDropTarget]
   );
-
-  const selectedNode = selectedId ? document.nodes[selectedId] : undefined;
 
   return (
     <>
-      {dragPreview && (
+      {dragPreview ? (
         <DragPreview
           registry={registry}
           type={dragPreview.type}
@@ -236,37 +224,23 @@ export function EditorControls({ registry }: Props) {
           x={dragX}
           y={dragY}
         />
-      )}
+      ) : null}
 
       <NodeBoundsOverlay rects={rects} dropTarget={hoverDropTarget} />
       <DropIndicator rect={dropIndicatorRect} />
-      {secondarySelectedRects.map((rect) => (
-        <div
-          key={rect.id}
-          style={{
-            position: "fixed",
-            left: rect.left,
-            top: rect.top,
-            width: rect.width,
-            height: rect.height,
-            border: "1.5px solid #8b5cf6",
-            boxShadow: "0 0 0 2px rgba(139,92,246,.10)",
-            boxSizing: "border-box",
-            pointerEvents: "none",
-            zIndex: 9999,
-          }}
-        />
-      ))}
       <SelectionOverlay
         rect={selectedRect}
         nodeType={selectedNode?.type}
-        canDelete={!!selectedId && selectedId !== activeRootId}
+        canDelete={selectedNodeId !== definition.rootId}
         onDelete={() => {
-          if (selectedId) {
-            useEditorStore.getState().deleteNode(selectedId);
-          }
+          if (selectedNodeId === definition.rootId) return;
+          useEditorStore
+            .getState()
+            .deleteComponentDefinitionNode(definition.id, selectedNodeId);
+          onSelectNode(definition.rootId);
         }}
       />
+
     </>
   );
 }

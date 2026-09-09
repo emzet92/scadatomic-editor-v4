@@ -1,7 +1,6 @@
 import { ArrowLeft, Box, Palette, Star } from "lucide-react";
-import { getComponentVariantProps } from "../../component-variants";
 import { useEditorStore } from "../../editor-store";
-import type { UiDocument, UiNode } from "../../core/document";
+import type { UiDocument } from "../../core/document";
 import {
   ComponentDefinitionPanel,
   ComponentInstancePanel,
@@ -12,9 +11,9 @@ import { PropertyPanelHeader } from "./PropertyPanelHeader";
 import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
 import { MultiSelectionPanel } from "./MultiSelectionPanel";
 import { PageSettingsEditor } from "./PageSettingsEditor";
-import { PropsEditor } from "./PropsEditor";
 import { ComponentProperties } from "./ComponentProperties";
 import { VariantsEditor } from "./VariantsEditor";
+import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
 import type { UpdateNode } from "./property-panel-types";
 
 export type ComponentEditorMode = {
@@ -25,6 +24,7 @@ export type ComponentEditorMode = {
 export type ComponentDefinitionEditorMode = {
   componentId: string;
   selectedInternalNodeId: string;
+  variantName?: string | undefined;
 };
 
 type Props = {
@@ -33,6 +33,11 @@ type Props = {
   componentDefinitionMode?: ComponentDefinitionEditorMode | null;
   onEditVariant: (nodeId: string, variantName: string) => void;
   onEditComponentDefinition: (componentId: string) => void;
+  onEditComponentDefinitionVariant: (
+    componentId: string,
+    nodeId: string,
+    variantName: string
+  ) => void;
   onExitComponentMode: () => void;
 };
 
@@ -42,6 +47,7 @@ export function PropertyPanel({
   componentDefinitionMode = null,
   onEditVariant,
   onEditComponentDefinition,
+  onEditComponentDefinitionVariant,
   onExitComponentMode,
 }: Props) {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
@@ -69,6 +75,7 @@ export function PropertyPanel({
 
     return (
       <ComponentDefinitionPanel
+        projectDocument={document}
         definition={definition}
         selectedInternalNodeId={componentDefinitionMode.selectedInternalNodeId}
         updateDefinition={(updater) =>
@@ -76,6 +83,14 @@ export function PropertyPanel({
         }
         updateDefinitionNode={(nodeId, updater) =>
           updateComponentDefinitionNode(definition.id, nodeId, updater)
+        }
+        editingVariantName={componentDefinitionMode.variantName}
+        onEditVariant={(nodeId, variantName) =>
+          onEditComponentDefinitionVariant(
+            definition.id,
+            nodeId,
+            variantName
+          )
         }
         onExit={onExitComponentMode}
       />
@@ -89,38 +104,6 @@ export function PropertyPanel({
     if (!node || !variant) {
       return <PropertyPanelNodeNotFound />;
     }
-
-    const definition = getComponentDefinition(node.type);
-    const variantValues = {
-      ...(definition?.defaults ?? {}),
-      ...getComponentVariantProps(node, componentMode.variantName),
-    };
-
-    const updateVariantNode: UpdateNode = (nodeId, updater) => {
-      updateNode(nodeId, (currentNode) => {
-        const currentVariant = currentNode.variants?.[componentMode.variantName];
-        if (!currentVariant) {
-          return currentNode;
-        }
-
-        const syntheticNode: UiNode = {
-          ...currentNode,
-          props: { ...currentVariant.props },
-          defaultVariant: undefined,
-        };
-        const updated = updater(syntheticNode);
-
-        return {
-          ...currentNode,
-          variants: {
-            ...(currentNode.variants ?? {}),
-            [componentMode.variantName]: {
-              props: { ...(updated.props ?? {}) },
-            },
-          },
-        };
-      });
-    };
 
     return (
       <div data-editor-ignore className="h-full flex flex-col">
@@ -154,21 +137,9 @@ export function PropertyPanel({
         </div>
 
         <div className="flex-1 overflow-auto p-4 space-y-6">
-          {definition ? (
-            <PropsEditor
-              nodeId={node.id}
-              values={variantValues}
-              controls={definition.inspector}
-              updateNode={updateVariantNode}
-            />
-          ) : (
-            <div className="text-xs text-amber-700">
-              No component definition for {node.type}.
-            </div>
-          )}
-
-          <VariantsEditor
+          <VariantPropertiesEditor
             node={node}
+            variantName={componentMode.variantName}
             updateNode={updateNode}
             onEditVariant={onEditVariant}
           />

@@ -29,6 +29,8 @@ import {
   type InspectorControl,
 } from "../../registry/component-definitions";
 import { ComponentProperties } from "../property-panel/ComponentProperties";
+import { VariantsEditor } from "../property-panel/VariantsEditor";
+import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
 import { PropertyPanelHeader } from "../property-panel/PropertyPanelHeader";
 import type { RenameNodeResult } from "../../editor-store";
 import type { UpdateNode } from "../property-panel/property-panel-types";
@@ -116,29 +118,43 @@ export function ComponentInstancePanel({
 }
 
 export function ComponentDefinitionPanel({
+  projectDocument,
   definition,
   selectedInternalNodeId,
   updateDefinition,
   updateDefinitionNode,
+  editingVariantName,
+  onEditVariant,
   onExit,
 }: {
+  projectDocument: UiDocument;
   definition: UiComponentDefinition;
   selectedInternalNodeId: string;
   updateDefinition: (
     updater: (definition: UiComponentDefinition) => UiComponentDefinition
   ) => void;
   updateDefinitionNode: (nodeId: string, updater: (node: UiNode) => UiNode) => void;
+  editingVariantName?: string | undefined;
+  onEditVariant: (nodeId: string, variantName: string) => void;
   onExit: () => void;
 }) {
   const internalNode = definition.nodes[selectedInternalNodeId] ?? definition.nodes[definition.rootId];
   const primitiveDefinition = internalNode
     ? getComponentDefinition(internalNode.type)
     : undefined;
+  const nestedDefinition = internalNode
+    ? getComponentDefinitionForInstance(projectDocument, internalNode)
+    : undefined;
+  const internalControls = nestedDefinition
+    ? createInputControls(nestedDefinition)
+    : primitiveDefinition?.inspector;
   const internalValues = internalNode
-    ? {
-        ...(primitiveDefinition?.defaults ?? {}),
-        ...(internalNode.props ?? {}),
-      }
+    ? nestedDefinition
+      ? getResolvedComponentInstanceProps(nestedDefinition, internalNode)
+      : {
+          ...(primitiveDefinition?.defaults ?? {}),
+          ...(internalNode.props ?? {}),
+        }
     : {};
 
   const updateInternalNode: UpdateNode = (nodeId, updater) => {
@@ -202,6 +218,7 @@ export function ComponentDefinitionPanel({
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
         <PublicInputsEditor
+          projectDocument={projectDocument}
           definition={definition}
           selectedNode={internalNode}
           updateDefinition={updateDefinition}
@@ -214,21 +231,40 @@ export function ComponentDefinitionPanel({
           <div className="mb-3 text-[10px] text-[var(--editor-text-muted)]">
             Private implementation · {internalNode?.name ?? "No selection"}
           </div>
-          {internalNode && primitiveDefinition ? (
-            <ComponentProperties
-              node={internalNode}
-              values={internalValues}
-              controls={primitiveDefinition.inspector}
-              updateNode={updateInternalNode}
-              bindingDefinitions={primitiveDefinition.bindings}
-              setBinding={setInternalBinding}
-              eventDefinitions={primitiveDefinition.events}
-              setEvent={setInternalEvent}
-              handlerIdPrefix={`component.${definition.id}`}
-            />
+          {internalNode && internalControls ? (
+            editingVariantName && primitiveDefinition ? (
+              <VariantPropertiesEditor
+                node={internalNode}
+                variantName={editingVariantName}
+                updateNode={updateInternalNode}
+                onEditVariant={onEditVariant}
+              />
+            ) : (
+              <>
+                <ComponentProperties
+                  node={internalNode}
+                  values={internalValues}
+                  controls={internalControls}
+                  updateNode={updateInternalNode}
+                  bindingDefinitions={primitiveDefinition?.bindings}
+                  setBinding={primitiveDefinition ? setInternalBinding : undefined}
+                  eventDefinitions={primitiveDefinition?.events}
+                  setEvent={primitiveDefinition ? setInternalEvent : undefined}
+                  handlerIdPrefix={`component.${definition.id}`}
+                />
+
+                {primitiveDefinition ? (
+                  <VariantsEditor
+                    node={internalNode}
+                    updateNode={updateInternalNode}
+                    onEditVariant={onEditVariant}
+                  />
+                ) : null}
+              </>
+            )
           ) : (
             <div className="text-xs text-[var(--editor-text-muted)]">
-              Select an internal primitive to edit its properties.
+              Select an internal component to edit its properties.
             </div>
           )}
         </section>
@@ -238,10 +274,12 @@ export function ComponentDefinitionPanel({
 }
 
 function PublicInputsEditor({
+  projectDocument,
   definition,
   selectedNode,
   updateDefinition,
 }: {
+  projectDocument: UiDocument;
   definition: UiComponentDefinition;
   selectedNode: UiNode | undefined;
   updateDefinition: (
@@ -254,8 +292,11 @@ function PublicInputsEditor({
   const [type, setType] = useState<ComponentInputType>("string");
   const [error, setError] = useState<string | null>(null);
   const properties = useMemo(
-    () => (selectedNode ? getComponentApiPropertyNames(selectedNode) : []),
-    [selectedNode]
+    () =>
+      selectedNode
+        ? getComponentApiPropertyNames(selectedNode, projectDocument)
+        : [],
+    [selectedNode, projectDocument]
   );
 
   function beginAdd() {

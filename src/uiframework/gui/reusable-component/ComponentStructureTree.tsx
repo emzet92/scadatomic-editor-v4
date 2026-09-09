@@ -11,7 +11,7 @@ export function ComponentStructureTree({
   onSelect: (nodeId: string) => void;
 }) {
   return (
-    <div data-editor-ignore className="h-full overflow-auto bg-[var(--editor-surface)]">
+    <div data-editor-ignore className="max-h-[42vh] overflow-auto bg-[var(--editor-surface)]">
       <div className="border-b border-[var(--editor-border)] px-4 py-3">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
           <Layers3 size={13} /> Component structure
