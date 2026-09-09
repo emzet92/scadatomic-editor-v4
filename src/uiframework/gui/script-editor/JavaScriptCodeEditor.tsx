@@ -8,16 +8,18 @@ type JavaScriptCodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
   components: ComponentApiDescription[];
+  selfComponent?: ComponentApiDescription | undefined;
 };
 
 export function JavaScriptCodeEditor({
   value,
   onChange,
   components,
+  selfComponent,
 }: JavaScriptCodeEditorProps) {
   const autocompleteExtension = useMemo(
-    () => createCtxAutocompleteExtension(components),
-    [components]
+    () => createCtxAutocompleteExtension(components, selfComponent),
+    [components, selfComponent]
   );
 
   return (
@@ -25,7 +27,7 @@ export function JavaScriptCodeEditor({
       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
         <div className="text-xs font-medium text-zinc-300">JavaScript</div>
         <div className="text-[11px] text-zinc-500">
-          ctx autocomplete · prototype handler
+          ctx autocomplete · component API
         </div>
       </div>
 

@@ -94,6 +94,11 @@ const nodes: Record<string, UiNode> = {
         handlerId: "startButton.Clicked",
       },
     },
+    methods: {
+      enable: {
+        scriptId: "startButton.method.enable",
+      },
+    },
   },
 
   stopButton: {

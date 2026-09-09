@@ -45,6 +45,11 @@ function ScriptEditor({
   const componentApi = document
     ? Object.values(document.nodes).map(describeComponentApi)
     : [];
+  const scriptSelection = document
+    ? findScriptSelection(document, scriptId, componentApi)
+    : null;
+  const selfComponent =
+    scriptSelection?.kind === "method" ? scriptSelection.component : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -76,8 +81,8 @@ function ScriptEditor({
     setSavedCode(code);
   }
 
-  function selectHandler(handlerId: string) {
-    if (handlerId === scriptId) {
+  function selectScript(nextScriptId: string) {
+    if (nextScriptId === scriptId) {
       return;
     }
 
@@ -86,7 +91,7 @@ function ScriptEditor({
     }
 
     navigate(
-      `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(handlerId)}`
+      `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(nextScriptId)}`
     );
   }
 
@@ -127,24 +132,28 @@ function ScriptEditor({
         <HandlerTree
           document={document}
           currentScriptId={scriptId}
-          onSelect={selectHandler}
+          onSelect={selectScript}
         />
 
         <main className="min-w-0 flex-1 overflow-auto p-6">
           <div className="max-w-6xl mx-auto space-y-4">
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                Handler ID
+                {scriptSelection?.kind === "method" ? "Method Script ID" : "Handler ID"}
               </div>
               <div className="mt-1 text-sm font-mono text-zinc-600">
                 {scriptId}
               </div>
 
               <h1 className="mt-4 text-xl font-semibold text-zinc-900">
-                Runtime Handler
+                {scriptSelection?.kind === "method"
+                  ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
+                  : "Runtime Handler"}
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
-                Prototype-only JavaScript executed locally with a SCADAtomic context API.
+                {scriptSelection?.kind === "method"
+                  ? "Component method executed synchronously inside the current handler context."
+                  : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
               </p>
             </div>
 
@@ -152,6 +161,7 @@ function ScriptEditor({
               value={code}
               onChange={setCode}
               components={componentApi}
+              selfComponent={selfComponent}
             />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -167,6 +177,13 @@ function ScriptEditor({
                 <code>ctx.ui.ComponentName.prop = value</code>
                 <code>ctx.ui.ComponentName.setProp(prop, value)</code>
                 <code>ctx.ui.ComponentName.setColor(color)</code>
+                {scriptSelection?.kind === "method" ? (
+                  <>
+                    <code>self.prop = value</code>
+                    <code>self.otherMethod()</code>
+                    <code>args[0], args[1], ...</code>
+                  </>
+                ) : null}
                 <code>ctx.emit(name, payload?)</code>
                 <code>ctx.random.color()</code>
                 <code>ctx.random.number(min, max)</code>
@@ -266,6 +283,25 @@ function ComponentApiCard({
         ))}
       </div>
 
+      {component.methods.length > 0 ? (
+        <>
+          <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+            Methods
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {component.methods.map((method) => (
+              <code
+                key={method.name}
+                className="rounded border border-sky-200 bg-sky-50 px-1.5 py-1 text-xs text-sky-700"
+                title={`ctx.ui.${component.name}.${method.name}()`}
+              >
+                .{method.name}()
+              </code>
+            ))}
+          </div>
+        </>
+      ) : null}
+
       <div className="mt-3 space-y-1 text-xs font-mono text-zinc-600">
         <div>.setProp(prop, value)</div>
         {component.colorProperty ? (
@@ -280,4 +316,48 @@ function ComponentApiCard({
       ) : null}
     </div>
   );
+}
+
+
+type ScriptSelection =
+  | {
+      kind: "handler";
+      component: ComponentApiDescription;
+      memberName: string;
+    }
+  | {
+      kind: "method";
+      component: ComponentApiDescription;
+      memberName: string;
+    };
+
+function findScriptSelection(
+  document: UiDocument,
+  scriptId: string,
+  components: ComponentApiDescription[]
+): ScriptSelection | null {
+  const componentByNodeId = new Map(
+    components.map((component) => [component.nodeId, component])
+  );
+
+  for (const node of Object.values(document.nodes)) {
+    const component = componentByNodeId.get(node.id);
+    if (!component) {
+      continue;
+    }
+
+    for (const [eventName, handler] of Object.entries(node.events ?? {})) {
+      if (handler.handlerId === scriptId) {
+        return { kind: "handler", component, memberName: eventName };
+      }
+    }
+
+    for (const [methodName, method] of Object.entries(node.methods ?? {})) {
+      if (method.scriptId === scriptId) {
+        return { kind: "method", component, memberName: methodName };
+      }
+    }
+  }
+
+  return null;
 }

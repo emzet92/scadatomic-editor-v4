@@ -6,7 +6,7 @@ import { getComponentDefinition } from "../../registry/component-definitions";
 type HandlerTreeProps = {
   document: UiDocument | null;
   currentScriptId: string;
-  onSelect: (handlerId: string) => void;
+  onSelect: (scriptId: string) => void;
 };
 
 export function HandlerTree({
@@ -14,8 +14,8 @@ export function HandlerTree({
   currentScriptId,
   onSelect,
 }: HandlerTreeProps) {
-  const handlerCount = useMemo(
-    () => (document ? countHandlers(document) : 0),
+  const scriptCount = useMemo(
+    () => (document ? countScripts(document) : 0),
     [document]
   );
 
@@ -25,24 +25,24 @@ export function HandlerTree({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Handlers
+              Handlers & Methods
             </div>
             <div className="mt-1 text-xs text-zinc-400">
-              Project event scripts
+              Project component scripts
             </div>
           </div>
           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
-            {handlerCount}
+            {scriptCount}
           </span>
         </div>
       </div>
 
       <div className="p-2">
         {!document ? (
-          <div className="px-2 py-3 text-sm text-zinc-400">Loading handlers…</div>
-        ) : handlerCount === 0 ? (
+          <div className="px-2 py-3 text-sm text-zinc-400">Loading scripts…</div>
+        ) : scriptCount === 0 ? (
           <div className="px-2 py-3 text-sm text-zinc-400">
-            No component handlers yet.
+            No component scripts yet.
           </div>
         ) : (
           <HandlerNode
@@ -62,7 +62,7 @@ type HandlerNodeProps = {
   document: UiDocument;
   nodeId: string;
   currentScriptId: string;
-  onSelect: (handlerId: string) => void;
+  onSelect: (scriptId: string) => void;
   depth: number;
 };
 
@@ -74,13 +74,14 @@ function HandlerNode({
   depth,
 }: HandlerNodeProps) {
   const node = document.nodes[nodeId];
-  if (!node || !subtreeHasHandler(document, nodeId, new Set())) {
+  if (!node || !subtreeHasScript(document, nodeId, new Set())) {
     return null;
   }
 
   const eventEntries = Object.entries(node.events ?? {});
+  const methodEntries = Object.entries(node.methods ?? {});
   const childIds = (node.children ?? []).filter((childId) =>
-    subtreeHasHandler(document, childId, new Set())
+    subtreeHasScript(document, childId, new Set())
   );
 
   return (
@@ -101,33 +102,29 @@ function HandlerNode({
         </summary>
 
         <div>
-          {eventEntries.map(([eventName, handler]) => {
-            const active = handler.handlerId === currentScriptId;
-            return (
-              <button
-                key={`${node.id}:${eventName}`}
-                type="button"
-                onClick={() => onSelect(handler.handlerId)}
-                className={`flex w-full items-start gap-2 rounded-md py-2 pr-2 text-left transition ${
-                  active
-                    ? "bg-sky-50 text-sky-700"
-                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
-                }`}
-                style={{ paddingLeft: `${28 + depth * 12}px` }}
-                title={handler.handlerId}
-              >
-                <Code2 size={13} className="mt-0.5 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block text-xs font-medium">
-                    {getEventLabel(node, eventName)}
-                  </span>
-                  <span className="block truncate text-[11px] opacity-65">
-                    {handler.handlerId}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
+          {eventEntries.map(([eventName, handler]) => (
+            <ScriptButton
+              key={`event:${node.id}:${eventName}`}
+              active={handler.handlerId === currentScriptId}
+              depth={depth}
+              label={getEventLabel(node, eventName)}
+              kind="Event"
+              scriptId={handler.handlerId}
+              onSelect={onSelect}
+            />
+          ))}
+
+          {methodEntries.map(([methodName, method]) => (
+            <ScriptButton
+              key={`method:${node.id}:${methodName}`}
+              active={method.scriptId === currentScriptId}
+              depth={depth}
+              label={`${methodName}()`}
+              kind="Method"
+              scriptId={method.scriptId}
+              onSelect={onSelect}
+            />
+          ))}
 
           {childIds.map((childId) => (
             <HandlerNode
@@ -145,18 +142,60 @@ function HandlerNode({
   );
 }
 
+function ScriptButton({
+  active,
+  depth,
+  label,
+  kind,
+  scriptId,
+  onSelect,
+}: {
+  active: boolean;
+  depth: number;
+  label: string;
+  kind: "Event" | "Method";
+  scriptId: string;
+  onSelect: (scriptId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(scriptId)}
+      className={`flex w-full items-start gap-2 rounded-md py-2 pr-2 text-left transition ${
+        active
+          ? "bg-sky-50 text-sky-700"
+          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+      }`}
+      style={{ paddingLeft: `${28 + depth * 12}px` }}
+      title={scriptId}
+    >
+      <Code2 size={13} className="mt-0.5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-medium">{label}</span>
+        <span className="block truncate text-[11px] opacity-65">{scriptId}</span>
+      </span>
+      <span className="mt-0.5 shrink-0 text-[9px] uppercase tracking-wide opacity-50">
+        {kind}
+      </span>
+    </button>
+  );
+}
+
 function getEventLabel(node: UiNode, eventName: string) {
   return getComponentDefinition(node.type)?.events?.[eventName]?.label ?? eventName;
 }
 
-function countHandlers(document: UiDocument) {
+function countScripts(document: UiDocument) {
   return Object.values(document.nodes).reduce(
-    (total, node) => total + Object.keys(node.events ?? {}).length,
+    (total, node) =>
+      total +
+      Object.keys(node.events ?? {}).length +
+      Object.keys(node.methods ?? {}).length,
     0
   );
 }
 
-function subtreeHasHandler(
+function subtreeHasScript(
   document: UiDocument,
   nodeId: string,
   visited: Set<string>
@@ -171,11 +210,14 @@ function subtreeHasHandler(
     return false;
   }
 
-  if (Object.keys(node.events ?? {}).length > 0) {
+  if (
+    Object.keys(node.events ?? {}).length > 0 ||
+    Object.keys(node.methods ?? {}).length > 0
+  ) {
     return true;
   }
 
   return (node.children ?? []).some((childId) =>
-    subtreeHasHandler(document, childId, visited)
+    subtreeHasScript(document, childId, visited)
   );
 }

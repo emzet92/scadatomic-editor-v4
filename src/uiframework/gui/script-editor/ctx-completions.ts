@@ -15,13 +15,18 @@ type ApiNode = {
 };
 
 export function createCtxAutocompleteExtension(
-  components: ComponentApiDescription[]
+  components: ComponentApiDescription[],
+  selfComponent?: ComponentApiDescription
 ): Extension {
-  const root = buildCtxApiTree(components);
+  const roots = [buildCtxApiTree(components)];
+
+  if (selfComponent) {
+    roots.push(buildComponentRoot("self", selfComponent));
+  }
 
   return autocompletion({
     activateOnTyping: true,
-    override: [(context) => completeCtxApi(context, root)],
+    override: [(context) => completeApi(context, roots)],
   });
 }
 
@@ -29,47 +34,7 @@ function buildCtxApiTree(components: ComponentApiDescription[]): ApiNode {
   const uiComponents: ApiNode[] = components
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name))
-    .map((component) => ({
-      label: component.name,
-      completionType: "class",
-      detail: component.type,
-      children: [
-        {
-          label: "id",
-          completionType: "property",
-          detail: "string · read only",
-        },
-        {
-          label: "name",
-          completionType: "property",
-          detail: "string · read only",
-        },
-        {
-          label: "type",
-          completionType: "property",
-          detail: "string · read only",
-        },
-        ...component.properties.map((property) => ({
-          label: property.name,
-          completionType: "property",
-          detail: `${property.valueType} · read/write`,
-        })),
-        {
-          label: "setProp",
-          completionType: "method",
-          detail: "(prop, value)",
-        },
-        ...(component.colorProperty
-          ? [
-              {
-                label: "setColor",
-                completionType: "method",
-                detail: `(color) → ${component.colorProperty}`,
-              },
-            ]
-          : []),
-      ],
-    }));
+    .map((component) => buildComponentRoot(component.name, component));
 
   return {
     label: "ctx",
@@ -139,17 +104,74 @@ function buildCtxApiTree(components: ComponentApiDescription[]): ApiNode {
   };
 }
 
-function completeCtxApi(
+function buildComponentRoot(
+  label: string,
+  component: ComponentApiDescription
+): ApiNode {
+  return {
+    label,
+    completionType: "class",
+    detail: component.type,
+    children: [
+      {
+        label: "id",
+        completionType: "property",
+        detail: "string · read only",
+      },
+      {
+        label: "name",
+        completionType: "property",
+        detail: "string · read only",
+      },
+      {
+        label: "type",
+        completionType: "property",
+        detail: "string · read only",
+      },
+      ...component.properties.map((property) => ({
+        label: property.name,
+        completionType: "property",
+        detail: `${property.valueType} · read/write`,
+      })),
+      ...component.methods.map((method) => ({
+        label: method.name,
+        completionType: "method",
+        detail: "component method",
+      })),
+      {
+        label: "setProp",
+        completionType: "method",
+        detail: "(prop, value)",
+      },
+      ...(component.colorProperty
+        ? [
+            {
+              label: "setColor",
+              completionType: "method",
+              detail: `(color) → ${component.colorProperty}`,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+function completeApi(
   context: CompletionContext,
-  root: ApiNode
+  roots: ApiNode[]
 ): CompletionResult | null {
-  const candidate = findCtxCandidate(context);
+  const candidate = findApiCandidate(context, roots.map((root) => root.label));
   if (!candidate) {
     return null;
   }
 
-  const { chain, from } = candidate;
-  if (chain === "ctx") {
+  const { chain, from, rootLabel } = candidate;
+  if (chain === rootLabel) {
+    return null;
+  }
+
+  const root = roots.find((entry) => entry.label === rootLabel);
+  if (!root) {
     return null;
   }
 
@@ -161,7 +183,7 @@ function completeCtxApi(
     segments.pop();
   }
 
-  if (segments[0] !== "ctx") {
+  if (segments[0] !== rootLabel) {
     return null;
   }
 
@@ -186,31 +208,48 @@ function completeCtxApi(
   };
 }
 
-function findCtxCandidate(
-  context: CompletionContext
-): { chain: string; from: number } | null {
+function findApiCandidate(
+  context: CompletionContext,
+  rootLabels: string[]
+): { chain: string; from: number; rootLabel: string } | null {
   const scanFrom = Math.max(0, context.pos - 240);
   const before = context.state.sliceDoc(scanFrom, context.pos);
-  const relativeStart = before.lastIndexOf("ctx");
+  const candidates = rootLabels
+    .map((rootLabel) => ({
+      rootLabel,
+      relativeStart: before.lastIndexOf(rootLabel),
+    }))
+    .filter((entry) => entry.relativeStart >= 0)
+    .sort((left, right) => right.relativeStart - left.relativeStart);
 
-  if (relativeStart < 0) {
-    return null;
+  for (const candidate of candidates) {
+    const previous = before[candidate.relativeStart - 1];
+    if (previous && /[A-Za-z0-9_$]/.test(previous)) {
+      continue;
+    }
+
+    const chain = before.slice(candidate.relativeStart);
+    const escaped = escapeRegExp(candidate.rootLabel);
+    const pattern = new RegExp(
+      `^${escaped}(?:\\.[A-Za-z_$][\\w$]*)*\\.?[A-Za-z_$\\w$]*$`
+    );
+
+    if (!pattern.test(chain)) {
+      continue;
+    }
+
+    return {
+      chain,
+      from: scanFrom + candidate.relativeStart,
+      rootLabel: candidate.rootLabel,
+    };
   }
 
-  const previous = before[relativeStart - 1];
-  if (previous && /[A-Za-z0-9_$]/.test(previous)) {
-    return null;
-  }
+  return null;
+}
 
-  const chain = before.slice(relativeStart);
-  if (!/^ctx(?:\.[A-Za-z_$][\w$]*)*\.?[A-Za-z_$\w$]*$/.test(chain)) {
-    return null;
-  }
-
-  return {
-    chain,
-    from: scanFrom + relativeStart,
-  };
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function toCompletion(node: ApiNode): Completion {

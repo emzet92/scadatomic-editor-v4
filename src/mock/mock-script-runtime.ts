@@ -1,5 +1,6 @@
 import type { UiNode } from "../uiframework/core/document";
 import {
+  getComponentApiMethodNames,
   getComponentApiPropertyNames,
   getComponentColorProperty,
   getResolvedComponentProps,
@@ -77,12 +78,13 @@ export function executeMockScript(
   const ctx = createContext(event, host);
 
   try {
-    const execute = new Function(
-      "ctx",
-      `"use strict";\n${script.code}\n//# sourceURL=scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`
-    ) as (context: MockScriptContext) => unknown;
-
-    execute(ctx);
+    executeSource({
+      code: script.code,
+      ctx,
+      self: undefined,
+      args: [],
+      sourceUrl: `scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`,
+    });
   } catch (error) {
     console.error(
       `[mock-script-runtime] Handler ${event.handlerId} failed`,
@@ -101,7 +103,10 @@ function createContext(
   event: MockScriptEvent,
   host: MockScriptHost
 ): MockScriptContext {
-  return Object.freeze({
+  let ctx: MockScriptContext;
+  const ui = createUiApi(host, event.projectId, () => ctx);
+
+  ctx = Object.freeze({
     projectId: event.projectId,
     handlerId: event.handlerId,
     sourceNodeId: event.sourceNodeId,
@@ -121,7 +126,7 @@ function createContext(
         clearMockSessionState(event.projectId);
       },
     }),
-    ui: createUiApi(host),
+    ui,
     emit(eventName: string, payload?: Record<string, unknown>) {
       host.emit(eventName, payload);
     },
@@ -137,9 +142,15 @@ function createContext(
       console.log(`[script:${event.handlerId}]`, ...args);
     },
   });
+
+  return ctx;
 }
 
-function createUiApi(host: MockScriptHost): MockScriptUiApi {
+function createUiApi(
+  host: MockScriptHost,
+  projectId: string,
+  getContext: () => MockScriptContext
+): MockScriptUiApi {
   const componentCache = new Map<string, UiComponentScriptApi>();
 
   const baseApi = {
@@ -165,7 +176,7 @@ function createUiApi(host: MockScriptHost): MockScriptUiApi {
       throw new Error(`Unknown UI component: ${name}`);
     }
 
-    const api = createComponentApi(node, host);
+    const api = createComponentApi(node, host, projectId, getContext);
     componentCache.set(name, api);
     return api;
   }
@@ -183,11 +194,17 @@ function createUiApi(host: MockScriptHost): MockScriptUiApi {
 
 function createComponentApi(
   node: UiNode,
-  host: MockScriptHost
+  host: MockScriptHost,
+  projectId: string,
+  getContext: () => MockScriptContext
 ): UiComponentScriptApi {
   const allowedProps = new Set(getComponentApiPropertyNames(node));
+  const allowedMethods = new Set(getComponentApiMethodNames(node));
   const localProps = getResolvedComponentProps(node);
   const colorProperty = getComponentColorProperty(node);
+  const methodCache = new Map<string, (...args: unknown[]) => unknown>();
+
+  let proxy: UiComponentScriptApi;
 
   function setProp(property: string, value: unknown) {
     if (!allowedProps.has(property)) {
@@ -200,6 +217,33 @@ function createComponentApi(
 
     localProps[property] = value;
     host.setNodeProp(node.id, property, value);
+  }
+
+  function getMethod(methodName: string) {
+    const cached = methodCache.get(methodName);
+    if (cached) {
+      return cached;
+    }
+
+    const methodRef = node.methods?.[methodName];
+    if (!methodRef) {
+      return undefined;
+    }
+
+    const callable = (...args: unknown[]) => {
+      const script = getMockScript(projectId, methodRef.scriptId);
+
+      return executeSource({
+        code: script.code,
+        ctx: getContext(),
+        self: proxy,
+        args,
+        sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
+      });
+    };
+
+    methodCache.set(methodName, callable);
+    return callable;
   }
 
   const target = {
@@ -216,7 +260,7 @@ function createComponentApi(
     },
   } as UiComponentScriptApi;
 
-  return new Proxy(target, {
+  proxy = new Proxy(target, {
     get(apiTarget, property, receiver) {
       if (typeof property !== "string" || hasOwn(apiTarget, property)) {
         return Reflect.get(apiTarget, property, receiver);
@@ -224,6 +268,10 @@ function createComponentApi(
 
       if (allowedProps.has(property)) {
         return localProps[property];
+      }
+
+      if (allowedMethods.has(property)) {
+        return getMethod(property);
       }
 
       return undefined;
@@ -237,6 +285,35 @@ function createComponentApi(
       return true;
     },
   });
+
+  return proxy;
+}
+
+function executeSource({
+  code,
+  ctx,
+  self,
+  args,
+  sourceUrl,
+}: {
+  code: string;
+  ctx: MockScriptContext;
+  self: UiComponentScriptApi | undefined;
+  args: unknown[];
+  sourceUrl: string;
+}) {
+  const execute = new Function(
+    "ctx",
+    "self",
+    "args",
+    `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
+  ) as (
+    context: MockScriptContext,
+    self: UiComponentScriptApi | undefined,
+    args: unknown[]
+  ) => unknown;
+
+  return execute(ctx, self, args);
 }
 
 function hasOwn(target: object, property: string) {

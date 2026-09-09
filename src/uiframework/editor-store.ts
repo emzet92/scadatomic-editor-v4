@@ -7,6 +7,7 @@ import {
   createEmptyUiDocument,
   type Binding,
   type HandlerRef,
+  type MethodRef,
   type NodeId,
   type UiDocument,
   type UiNode,
@@ -67,6 +68,12 @@ type EditorState = {
     nodeId: NodeId,
     event: string,
     handler: HandlerRef | null
+  ) => void;
+
+  setMethod: (
+    nodeId: NodeId,
+    method: string,
+    script: MethodRef | null
   ) => void;
 
   insertNode: (
@@ -208,6 +215,17 @@ export const useEditorStore = create<EditorState>((set) => ({
         nodeId,
         event,
         handler,
+      }),
+    }));
+  },
+
+  setMethod: (nodeId, method, script) => {
+    set((state) => ({
+      document: applyDocumentCommand(state.document, {
+        type: "node.setMethod",
+        nodeId,
+        method,
+        script,
       }),
     }));
   },

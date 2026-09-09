@@ -11,6 +11,10 @@ export type HandlerRef = {
   handlerId: string;
 };
 
+export type MethodRef = {
+  scriptId: string;
+};
+
 export type UiNode = {
   id: NodeId;
   name: string;
@@ -18,6 +22,7 @@ export type UiNode = {
   props?: Record<string, unknown> | undefined;
   bindings?: Record<string, Binding> | undefined;
   events?: Record<string, HandlerRef> | undefined;
+  methods?: Record<string, MethodRef> | undefined;
   children?: NodeId[] | undefined;
 };
 
@@ -113,6 +118,17 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
     return false;
   }
 
+  if (
+    node.methods !== undefined &&
+    (!isRecord(node.methods) ||
+      !Object.entries(node.methods).every(
+        ([methodName, method]) =>
+          isJsIdentifier(methodName) && isMethodRef(method)
+      ))
+  ) {
+    return false;
+  }
+
   return true;
 }
 
@@ -126,6 +142,14 @@ function isBinding(value: unknown): value is Binding {
 
 function isHandlerRef(value: unknown): value is HandlerRef {
   return isRecord(value) && typeof value.handlerId === "string";
+}
+
+function isMethodRef(value: unknown): value is MethodRef {
+  return isRecord(value) && typeof value.scriptId === "string";
+}
+
+function isJsIdentifier(value: string) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

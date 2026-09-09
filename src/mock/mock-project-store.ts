@@ -181,6 +181,12 @@ function seedPrototypeScripts(projectId: string) {
     "randomColorButton.RandomColorClicked",
     `ctx.ui.Button3.backgroundColor = ctx.random.color();`
   );
+
+  ensureMockScript(
+    projectId,
+    "startButton.method.enable",
+    `self.disabled = false;`
+  );
 }
 
 function storageKey(id: MockProjectId) {

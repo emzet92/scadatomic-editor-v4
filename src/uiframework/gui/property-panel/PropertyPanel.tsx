@@ -6,6 +6,7 @@ import { EventsEditor } from "./EventsEditor";
 import { PropertyPanelEmpty } from "./PropertyPanelEmpty";
 import { PropertyPanelHeader } from "./PropertyPanelHeader";
 import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
+import { MethodsEditor } from "./MethodsEditor";
 import { PropsEditor } from "./PropsEditor";
 
 type Props = {
@@ -18,6 +19,7 @@ export function PropertyPanel({ document }: Props) {
   const renameNode = useEditorStore((state) => state.renameNode);
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
+  const setMethod = useEditorStore((state) => state.setMethod);
 
   if (!selectedNodeId) {
     return <PropertyPanelEmpty />;
@@ -75,6 +77,8 @@ export function PropertyPanel({ document }: Props) {
             setEvent={setEvent}
           />
         )}
+
+        <MethodsEditor node={node} setMethod={setMethod} />
       </div>
     </div>
   );

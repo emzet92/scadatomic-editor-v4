@@ -2,6 +2,7 @@ import { buildDocumentIndex } from "./document-index";
 import type {
   Binding,
   HandlerRef,
+  MethodRef,
   NodeId,
   UiDocument,
   UiNode,
@@ -50,6 +51,12 @@ export type DocumentCommand =
       nodeId: NodeId;
       event: string;
       handler: HandlerRef | null;
+    }
+  | {
+      type: "node.setMethod";
+      nodeId: NodeId;
+      method: string;
+      script: MethodRef | null;
     };
 
 export function applyDocumentCommand(
@@ -80,6 +87,9 @@ export function applyDocumentCommand(
 
     case "node.setEvent":
       return setEvent(document, command);
+
+    case "node.setMethod":
+      return setMethod(document, command);
   }
 }
 
@@ -347,6 +357,31 @@ function setEvent(
   return replaceNode(document, {
     ...node,
     events: Object.keys(events).length > 0 ? events : undefined,
+  });
+}
+
+function setMethod(
+  document: UiDocument,
+  command: Extract<DocumentCommand, { type: "node.setMethod" }>
+): UiDocument {
+  const node = document.nodes[command.nodeId];
+  if (!node) {
+    return document;
+  }
+
+  const methods = {
+    ...(node.methods ?? {}),
+  };
+
+  if (command.script) {
+    methods[command.method] = command.script;
+  } else {
+    delete methods[command.method];
+  }
+
+  return replaceNode(document, {
+    ...node,
+    methods: Object.keys(methods).length > 0 ? methods : undefined,
   });
 }
 
