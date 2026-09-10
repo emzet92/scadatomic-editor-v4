@@ -212,6 +212,8 @@ export function describeComponentApi(
         .map(([name, method]) => ({ name, scriptId: method.scriptId }))
         .sort((left, right) => left.name.localeCompare(right.name));
 
+  const variantSource = reusable?.nodes[reusable.rootId] ?? node;
+
   return {
     nodeId: node.id,
     name: node.name,
@@ -222,12 +224,13 @@ export function describeComponentApi(
       valueType: reusable?.inputs?.[name]?.type ?? describeValueType(resolved[name]),
     })),
     methods,
-    variants: reusable
-      ? []
-      : getComponentVariantNames(node).map((name) => ({
-          name,
-          isDefault: node.defaultVariant === name,
-        })),
+    // A reusable component exposes the variants defined on its private root.
+    // This keeps the generated ctx.ui.<instance>.variant API aligned with the
+    // visual definition without copying variants onto every instance.
+    variants: getComponentVariantNames(variantSource).map((name) => ({
+      name,
+      isDefault: variantSource.defaultVariant === name,
+    })),
     colorProperty: getComponentColorProperty(node, document),
   };
 }

@@ -71,7 +71,8 @@ function ScriptEditor({
   const selfComponent =
     scriptSelection?.kind === "method"
       ? scriptSelection.component
-      : scriptSelection?.kind === "componentMethod"
+      : scriptSelection?.kind === "componentMethod" ||
+          scriptSelection?.kind === "componentHandler"
         ? describeDefinitionSelfApi(scriptSelection.definition)
         : undefined;
 
@@ -333,7 +334,8 @@ function ScriptEditor({
 
             <div>
               <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                {scriptSelection?.kind === "handler"
+                {scriptSelection?.kind === "handler" ||
+                scriptSelection?.kind === "componentHandler"
                   ? "Handler ID"
                   : "Method Script ID"}
               </div>
@@ -346,14 +348,18 @@ function ScriptEditor({
                   ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
                   : scriptSelection?.kind === "componentMethod"
                     ? `${scriptSelection.definition.name}.${scriptSelection.memberName}()`
-                    : "Runtime Handler"}
+                    : scriptSelection?.kind === "componentHandler"
+                      ? `${scriptSelection.definition.name}.${scriptSelection.node.name}.${scriptSelection.memberName}`
+                      : "Runtime Handler"}
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
                 {scriptSelection?.kind === "componentMethod"
                   ? "Encapsulated component method. Public methods are exposed on component instances; private methods stay inside the definition."
-                  : scriptSelection?.kind === "method"
-                    ? "Component method executed synchronously inside the current handler context."
-                    : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
+                  : scriptSelection?.kind === "componentHandler"
+                    ? "Private handler owned by the reusable component definition. self resolves to the current component instance."
+                    : scriptSelection?.kind === "method"
+                      ? "Component method executed synchronously inside the current handler context."
+                      : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
               </p>
             </div>
 
@@ -383,7 +389,8 @@ function ScriptEditor({
                 <code>ctx.navigateTo("Page/SubPage")</code>
                 <code>ctx.nav.Page1.go()</code>
                 {scriptSelection?.kind === "method" ||
-                scriptSelection?.kind === "componentMethod" ? (
+                scriptSelection?.kind === "componentMethod" ||
+                scriptSelection?.kind === "componentHandler" ? (
                   <>
                     <code>self.prop = value</code>
                     <code>self.otherMethod()</code>
@@ -421,6 +428,12 @@ type ScriptSelection =
       kind: "componentMethod";
       definition: UiComponentDefinition;
       memberName: string;
+    }
+  | {
+      kind: "componentHandler";
+      definition: UiComponentDefinition;
+      node: UiNode;
+      memberName: string;
     };
 
 function findScriptSelection(
@@ -440,6 +453,22 @@ function findScriptSelection(
           definition,
           memberName: methodName,
         };
+      }
+    }
+
+    // Internal component handlers are real scripts too, but they live in the
+    // private definition tree rather than document.nodes. Only enabled events
+    // exist in node.events, so disabled handlers never appear here.
+    for (const node of Object.values(definition.nodes)) {
+      for (const [eventName, handler] of Object.entries(node.events ?? {})) {
+        if (handler.handlerId === scriptId) {
+          return {
+            kind: "componentHandler",
+            definition,
+            node,
+            memberName: eventName,
+          };
+        }
       }
     }
   }
@@ -469,7 +498,11 @@ function getScopedComponentApi(
   selection: ScriptSelection | null,
   components: ComponentApiDescription[]
 ) {
-  if (!selection || selection.kind === "componentMethod") {
+  if (
+    !selection ||
+    selection.kind === "componentMethod" ||
+    selection.kind === "componentHandler"
+  ) {
     return components;
   }
 
@@ -509,6 +542,11 @@ function collectSubtreeNodeIds(document: UiDocument, rootId: string) {
 function describeDefinitionSelfApi(
   definition: UiComponentDefinition
 ): ComponentApiDescription {
+  const root = definition.nodes[definition.rootId];
+  const variantNames = Object.keys(root?.variants ?? {}).sort((left, right) =>
+    left.localeCompare(right)
+  );
+
   return {
     nodeId: `definition:${definition.id}`,
     name: "self",
@@ -521,7 +559,10 @@ function describeDefinitionSelfApi(
     methods: Object.entries(definition.methods ?? {})
       .map(([name, method]) => ({ name, scriptId: method.scriptId }))
       .sort((left, right) => left.name.localeCompare(right.name)),
-    variants: [],
+    variants: variantNames.map((name) => ({
+      name,
+      isDefault: root?.defaultVariant === name,
+    })),
     colorProperty: Object.entries(definition.inputs ?? {}).find(
       ([, input]) => input.type === "color"
     )?.[0],

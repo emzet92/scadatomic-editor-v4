@@ -425,13 +425,16 @@ export function EditorPage() {
                 }
               />
               <div className="border-t border-zinc-200" />
-              <ComponentPalette ownerComponentId={focusedDefinition.id} />
+              <ComponentPalette
+                ownerComponentId={focusedDefinition.id}
+                onEditComponentDefinition={editComponentDefinition}
+              />
             </>
           ) : (
             <>
               <PageTree />
               <div className="border-t border-zinc-200" />
-              <ComponentPalette />
+              <ComponentPalette onEditComponentDefinition={editComponentDefinition} />
               <div className="border-t border-zinc-200" />
               <TreeView />
             </>

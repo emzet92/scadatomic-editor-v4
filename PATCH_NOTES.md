@@ -1,14 +1,26 @@
-# Create component click regression fix
+# SCADAtomic — component scripts polish
 
-Fixes a regression introduced by Designer Surface Architecture.
+This patch contains three UX/runtime fixes:
 
-`DesignerSurface` used a document-level capture-phase click listener and treated every click outside a rendered node as canvas deselection. Clicking controls in the right inspector (including `Create component`) therefore cleared the current selection before React handled the button click.
+1. **Reusable component internal handlers in Script Editor**
+   - enabled internal events (e.g. Button `onClick`) are shown under the reusable component definition,
+   - disabled events are not listed because only actual `node.events` entries are rendered,
+   - the currently opened handler is highlighted,
+   - Script Editor recognizes the handler as owned by the reusable component definition,
+   - internal component handlers receive `self` at runtime.
 
-The selection event handling is now scoped to the adapter's canvas:
+2. **Reusable component variant autocomplete/runtime**
+   - variants defined on the reusable component definition root are exposed through generated APIs,
+   - `ctx.ui.MyComponent1.variant.running()` now appears in autocomplete,
+   - `self.variant.running()` is available in component methods/internal handlers,
+   - runtime variant switching is scoped to `instanceId::definitionRootId`, so one instance does not mutate the shared component definition.
 
-- clicks outside the active designer canvas are ignored,
-- `[data-editor-ignore]` regions are ignored,
-- clicking an empty area inside the canvas still clears selection,
-- clicking a node inside the canvas still selects/multiselects it.
+3. **Open a user component directly from Component Library**
+   - clicking a reusable component card opens its definition directly,
+   - dragging remains available through the grip handle on the right side of the card,
+   - the same behavior works while editing another reusable component (subject to existing cycle filtering).
 
-Only `src/uiframework/designer/DesignerSurface.tsx` changes.
+## Validation
+
+All 10 changed TypeScript/TSX files passed a TypeScript `transpileModule` syntax check.
+A full `npm run build` cannot complete in this sandbox because the local install is missing `vite/client` and `node` type definitions.

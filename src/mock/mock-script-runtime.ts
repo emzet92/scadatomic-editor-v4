@@ -35,6 +35,9 @@ export type MockScriptHost = {
   resolveComponentDefinition(
     componentDefinitionId: string
   ): UiComponentDefinition | undefined;
+  resolveComponentInstanceForRuntimeNode(
+    runtimeNodeId: string
+  ): UiNode | undefined;
   getNavigationTree(): NavigationTreeNode[];
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
@@ -108,12 +111,18 @@ export function executeMockScript(
 ): void {
   const script = getMockScript(event.projectId, event.handlerId);
   const ctx = createContext(event, host);
+  const ownerComponent = host.resolveComponentInstanceForRuntimeNode(
+    event.sourceNodeId
+  );
+  const self = ownerComponent
+    ? createComponentApi(ownerComponent, host, event.projectId, () => ctx)
+    : undefined;
 
   try {
     executeSource({
       code: script.code,
       ctx,
-      self: undefined,
+      self,
       args: [],
       sourceUrl: `scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`,
     });
@@ -311,13 +320,17 @@ function createComponentApi(
       )?.[0]
     : getComponentColorProperty(node);
   const methodCache = new Map<string, (...args: unknown[]) => unknown>();
-  const variantNames = reusableDefinition ? [] : getComponentVariantNames(node);
+  const variantSource = reusableDefinition?.nodes[reusableDefinition.rootId] ?? node;
+  const variantNames = getComponentVariantNames(variantSource);
+  const variantRuntimeNodeId = reusableDefinition
+    ? `${node.id}::${variantSource.id}`
+    : node.id;
   const localWrites = new Map<string, unknown>();
-  const storedVariant = reusableDefinition ? undefined : host.getNodeVariant(node.id);
+  const storedVariant = host.getNodeVariant(variantRuntimeNodeId);
   let localVariant =
-    !reusableDefinition && storedVariant && node.variants?.[storedVariant]
+    storedVariant && variantSource.variants?.[storedVariant]
       ? storedVariant
-      : node.defaultVariant;
+      : variantSource.defaultVariant;
 
   let proxy: UiComponentScriptApi;
   let componentSelfProxy: UiComponentScriptApi;
@@ -365,14 +378,23 @@ function createComponentApi(
   }
 
   function setVariant(variantName: string) {
-    if (!node.variants?.[variantName]) {
-      throw new Error(`${node.name} (${node.type}) has no variant “${variantName}”.`);
+    if (!variantSource.variants?.[variantName]) {
+      throw new Error(
+        `${node.name} (${reusableDefinition?.name ?? node.type}) has no variant “${variantName}”.`
+      );
     }
 
     localVariant = variantName;
-    Object.assign(localProps, getComponentVariantProps(node, variantName));
-    for (const [property, value] of localWrites) localProps[property] = value;
-    host.setNodeVariant(node.id, variantName);
+
+    // Primitive variants affect the same public prop bag. Reusable component
+    // variants belong to the private definition root, so the renderer applies
+    // them to the scoped internal runtime node instead.
+    if (!reusableDefinition) {
+      Object.assign(localProps, getComponentVariantProps(variantSource, variantName));
+      for (const [property, value] of localWrites) localProps[property] = value;
+    }
+
+    host.setNodeVariant(variantRuntimeNodeId, variantName);
   }
 
   const variantApi =

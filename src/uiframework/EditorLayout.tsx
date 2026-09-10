@@ -66,6 +66,13 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
 
 function getFirstScriptId(document: UiDocument) {
   for (const definition of Object.values(document.components ?? {})) {
+    for (const node of Object.values(definition.nodes)) {
+      const firstInternalHandler = Object.values(node.events ?? {})[0];
+      if (firstInternalHandler) {
+        return firstInternalHandler.handlerId;
+      }
+    }
+
     const firstDefinitionMethod = Object.values(definition.methods ?? {})[0];
     if (firstDefinitionMethod) {
       return firstDefinitionMethod.scriptId;

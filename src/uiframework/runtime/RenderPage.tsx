@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProjectById } from "../../http/projects-api";
+import { getMockRuntimeNodeVariant } from "../../mock/mock-runtime-ui-state";
 import {
   createEmptyUiDocument,
   getPage,
@@ -14,6 +15,7 @@ import {
 import { NavigationRuntimeProvider } from "../navigation/navigation-context";
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
+import { getComponentVariantProps } from "../component-variants";
 
 export function RenderPage() {
   const { projectId, "*": routePath = "" } = useParams();
@@ -155,7 +157,15 @@ export function RenderPage() {
               const runtimeNodeId = context.componentInstanceId
                 ? `${context.componentInstanceId}::${node.id}`
                 : node.id;
+              const runtimeVariantName = projectId
+                ? getMockRuntimeNodeVariant(projectId, runtimeNodeId)
+                : undefined;
+              const runtimeVariantProps =
+                runtimeVariantName && node.variants?.[runtimeVariantName]
+                  ? getComponentVariantProps(node, runtimeVariantName)
+                  : {};
               const baseProps = {
+                ...runtimeVariantProps,
                 "data-node-id": runtimeNodeId,
               };
 

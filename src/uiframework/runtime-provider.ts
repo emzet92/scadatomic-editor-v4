@@ -119,7 +119,17 @@ export function RuntimeProvider({
 
           setDocument((current) => {
             const node = current.nodes[nodeId];
-            if (!node?.variants?.[variantName]) {
+
+            // Internal reusable-component runtime nodes use the scoped
+            // "instanceId::internalNodeId" id. They do not live in
+            // document.nodes, but the runtime variant store already changed;
+            // return a shallow document snapshot so RenderPage can re-read the
+            // scoped variant and repaint that private node only.
+            if (!node) {
+              return nodeId.includes("::") ? { ...current } : current;
+            }
+
+            if (!node.variants?.[variantName]) {
               return current;
             }
 

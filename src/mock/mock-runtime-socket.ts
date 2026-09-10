@@ -147,6 +147,15 @@ class MockRuntimeSocket extends EventTarget {
           const document = this.getProjectDocument(projectId);
           return document?.components?.[componentDefinitionId];
         },
+        resolveComponentInstanceForRuntimeNode: (runtimeNodeId) => {
+          const separatorIndex = runtimeNodeId.indexOf("::");
+          if (separatorIndex <= 0) return undefined;
+
+          const instanceId = runtimeNodeId.slice(0, separatorIndex);
+          const document = this.getProjectDocument(projectId);
+          const node = document?.nodes[instanceId];
+          return node?.type === "ComponentInstance" ? node : undefined;
+        },
         getNavigationTree: () => {
           const document = this.getProjectDocument(projectId);
           return document ? buildNavigationTree(document) : [];

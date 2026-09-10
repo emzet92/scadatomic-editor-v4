@@ -268,6 +268,7 @@ function ComponentDefinitionRow({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const methods = Object.entries(definition.methods ?? {});
+  const internalHandlerCount = countDefinitionHandlers(definition);
 
   async function addMethod() {
     const validation = validateDefinitionMethodName(definition, draft);
@@ -341,6 +342,23 @@ function ComponentDefinitionRow({
           </div>
         ))}
 
+        {internalHandlerCount > 0 ? (
+          <TreeSection
+            depth={0}
+            icon={<Zap size={12} />}
+            label="Internal handlers"
+            count={internalHandlerCount}
+          >
+            <DefinitionHandlerNode
+              definition={definition}
+              nodeId={definition.rootId}
+              currentScriptId={currentScriptId}
+              onSelect={onSelect}
+              depth={1}
+            />
+          </TreeSection>
+        ) : null}
+
         {adding ? (
           <div className="mx-2 ml-7 rounded-md border border-violet-200 bg-white p-2">
             <div className="mb-2 inline-flex rounded border border-zinc-200 bg-zinc-50 p-0.5 text-[10px]">
@@ -399,6 +417,91 @@ function ComponentDefinitionRow({
   );
 }
 
+function DefinitionHandlerNode({
+  definition,
+  nodeId,
+  currentScriptId,
+  onSelect,
+  depth,
+}: {
+  definition: UiComponentDefinition;
+  nodeId: string;
+  currentScriptId: string;
+  onSelect: (scriptId: string) => void;
+  depth: number;
+}) {
+  const node = definition.nodes[nodeId];
+  if (!node || !definitionSubtreeHasHandlers(definition, nodeId)) {
+    return null;
+  }
+
+  const events = Object.entries(node.events ?? {});
+  const children = (node.children ?? []).filter((childId) =>
+    definitionSubtreeHasHandlers(definition, childId)
+  );
+
+  return (
+    <details open className="group/definition-node">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-2 text-xs text-zinc-600 hover:bg-violet-50/60"
+        style={{ paddingLeft: `${30 + depth * 12}px` }}
+      >
+        <ChevronRight
+          size={11}
+          className="shrink-0 text-zinc-300 transition-transform group-open/definition-node:rotate-90"
+        />
+        <span className="min-w-0 flex-1 truncate">{node.name}</span>
+        <span className="text-[9px] uppercase tracking-wide text-zinc-400">
+          {node.type}
+        </span>
+      </summary>
+
+      <div>
+        {events.map(([eventName, handler]) => (
+          <ScriptButton
+            key={`definition-event:${definition.id}:${node.id}:${eventName}`}
+            active={handler.handlerId === currentScriptId}
+            depth={depth + 1}
+            label={getEventLabel(node, eventName)}
+            scriptId={handler.handlerId}
+            onSelect={onSelect}
+          />
+        ))}
+
+        {children.map((childId) => (
+          <DefinitionHandlerNode
+            key={childId}
+            definition={definition}
+            nodeId={childId}
+            currentScriptId={currentScriptId}
+            onSelect={onSelect}
+            depth={depth + 1}
+          />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function definitionSubtreeHasHandlers(
+  definition: UiComponentDefinition,
+  nodeId: string
+): boolean {
+  const node = definition.nodes[nodeId];
+  if (!node) return false;
+  if (Object.keys(node.events ?? {}).length > 0) return true;
+  return (node.children ?? []).some((childId) =>
+    definitionSubtreeHasHandlers(definition, childId)
+  );
+}
+
+function countDefinitionHandlers(definition: UiComponentDefinition): number {
+  return Object.values(definition.nodes).reduce(
+    (total, node) => total + Object.keys(node.events ?? {}).length,
+    0
+  );
+}
+
 type HandlerNodeProps = {
   document: UiDocument;
   nodeId: string;
@@ -437,7 +540,8 @@ function HandlerNode({
   const publicDefinitionMethods = Object.entries(reusableDefinition?.methods ?? {}).filter(
     ([, method]) => method.visibility === "public"
   );
-  const variantEntries = Object.entries(currentNode.variants ?? {});
+  const variantSource = reusableDefinition?.nodes[reusableDefinition.rootId] ?? currentNode;
+  const variantEntries = Object.entries(variantSource.variants ?? {});
   const childIds = currentNode.children ?? [];
 
   async function addMethod() {
@@ -580,7 +684,7 @@ function HandlerNode({
                 key={`variant:${node.id}:${variantName}`}
                 depth={depth}
                 label={variantName}
-                isDefault={node.defaultVariant === variantName}
+                isDefault={variantSource.defaultVariant === variantName}
                 apiPath={`ctx.ui.${currentNode.name}.variant.${variantName}()`}
               />
             ))}
@@ -886,7 +990,10 @@ function countApiEntries(document: UiDocument) {
     0
   );
   const definitionEntries = Object.values(document.components ?? {}).reduce(
-    (total, definition) => total + Object.keys(definition.methods ?? {}).length,
+    (total, definition) =>
+      total +
+      Object.keys(definition.methods ?? {}).length +
+      countDefinitionHandlers(definition),
     0
   );
   return nodeEntries + definitionEntries;

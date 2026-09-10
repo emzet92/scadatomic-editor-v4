@@ -4,6 +4,7 @@ import {
   Boxes,
   ChartLine,
   LayoutTemplate,
+  GripVertical,
   Menu,
   RectangleHorizontal,
   Search,
@@ -30,8 +31,10 @@ const icons = {
 
 export function ComponentPalette({
   ownerComponentId,
+  onEditComponentDefinition,
 }: {
   ownerComponentId?: string | undefined;
+  onEditComponentDefinition?: ((componentId: string) => void) | undefined;
 } = {}) {
   const [search, setSearch] = useState("");
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
@@ -83,29 +86,25 @@ export function ComponentPalette({
 
         {reusableItems.length > 0 ? (
           reusableItems.map((item) => (
-            <button
+            <div
               key={item.id}
               data-editor-ignore
-              onPointerDown={(event) => {
-                event.preventDefault();
-                startComponentDrag({
-                  type: "ComponentInstance",
-                  componentDefinitionId: item.id,
-                  label: item.name,
-                  props: Object.fromEntries(
-                    Object.entries(item.inputs ?? {}).map(([name, input]) => [
-                      name,
-                      input.defaultValue,
-                    ])
-                  ),
-                });
+              role="button"
+              tabIndex={0}
+              onClick={() => onEditComponentDefinition?.(item.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onEditComponentDefinition?.(item.id);
+                }
               }}
-              className="w-full p-3 rounded-xl border border-violet-200 bg-violet-50/50 hover:bg-violet-50 transition-all flex items-start gap-3 text-left cursor-grab select-none"
+              className="group w-full p-3 rounded-xl border border-violet-200 bg-violet-50/50 hover:bg-violet-50 transition-all flex items-start gap-3 text-left cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-violet-200"
+              title={`Open ${item.name} definition`}
             >
               <div className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
                 <Boxes size={18} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-[var(--editor-text)]">
                   {item.name}
                 </div>
@@ -113,7 +112,32 @@ export function ComponentPalette({
                   Reusable project component
                 </div>
               </div>
-            </button>
+              <button
+                type="button"
+                data-editor-ignore
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  startComponentDrag({
+                    type: "ComponentInstance",
+                    componentDefinitionId: item.id,
+                    label: item.name,
+                    props: Object.fromEntries(
+                      Object.entries(item.inputs ?? {}).map(([name, input]) => [
+                        name,
+                        input.defaultValue,
+                      ])
+                    ),
+                  });
+                }}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-violet-400 opacity-70 transition hover:bg-white hover:text-violet-700 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
+                title="Drag component to canvas"
+                aria-label={`Drag ${item.name} to canvas`}
+              >
+                <GripVertical size={16} />
+              </button>
+            </div>
           ))
         ) : (
           <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 px-3 py-3 text-[10px] leading-4 text-violet-700/80">
