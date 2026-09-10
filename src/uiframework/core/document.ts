@@ -1,3 +1,5 @@
+import { createEmptyProjectData, type ProjectData } from "../data/tags/TagDefinition";
+import { isProjectData } from "../data/serialization/project-data";
 export type NodeId = string;
 export type PageId = string;
 export type ComponentDefinitionId = string;
@@ -85,6 +87,8 @@ export type UiDocument = {
   /** All page nodes. Components remain global per project below. */
   nodes: Record<NodeId, UiNode>;
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
+  /** Project-local data definitions and persisted designer values. */
+  data?: ProjectData | undefined;
 };
 
 export function createUiDocument(
@@ -106,6 +110,7 @@ export function createUiDocument(
       },
     },
     nodes,
+    data: createEmptyProjectData(),
   };
 }
 
@@ -212,6 +217,10 @@ export function isUiDocument(value: unknown): value is UiDocument {
     ) {
       return false;
     }
+  }
+
+  if (candidate.data !== undefined && !isProjectData(candidate.data)) {
+    return false;
   }
 
   return true;

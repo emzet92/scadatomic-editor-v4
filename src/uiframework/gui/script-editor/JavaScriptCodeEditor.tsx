@@ -3,7 +3,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
 import type { ComponentApiDescription } from "../../component-api";
 import type { NavigationTreeNode } from "../../navigation/navigation";
-import { createCtxAutocompleteExtension } from "./ctx-completions";
+import { createCtxAutocompleteExtension, type AutocompleteApiNode } from "./ctx-completions";
 
 type JavaScriptCodeEditorProps = {
   value: string;
@@ -12,6 +12,9 @@ type JavaScriptCodeEditorProps = {
   selfComponent?: ComponentApiDescription | undefined;
   internalComponents?: ComponentApiDescription[] | undefined;
   navigation?: NavigationTreeNode[] | undefined;
+  extraAutocompleteRoots?: AutocompleteApiNode[] | undefined;
+  autocompleteHint?: string | undefined;
+  height?: string | undefined;
 };
 
 export function JavaScriptCodeEditor({
@@ -21,6 +24,9 @@ export function JavaScriptCodeEditor({
   selfComponent,
   internalComponents = [],
   navigation = [],
+  extraAutocompleteRoots = [],
+  autocompleteHint = "ctx · self · internal autocomplete",
+  height = "420px",
 }: JavaScriptCodeEditorProps) {
   const autocompleteExtension = useMemo(
     () =>
@@ -28,9 +34,10 @@ export function JavaScriptCodeEditor({
         components,
         selfComponent,
         internalComponents,
-        navigation
+        navigation,
+        extraAutocompleteRoots
       ),
-    [components, selfComponent, internalComponents, navigation]
+    [components, selfComponent, internalComponents, navigation, extraAutocompleteRoots]
   );
 
   return (
@@ -38,13 +45,13 @@ export function JavaScriptCodeEditor({
       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
         <div className="text-xs font-medium text-zinc-300">JavaScript</div>
         <div className="text-[11px] text-zinc-500">
-          ctx · self · internal autocomplete
+          {autocompleteHint}
         </div>
       </div>
 
       <CodeMirror
         value={value}
-        height="420px"
+        height={height}
         theme={oneDark}
         extensions={[autocompleteExtension]}
         basicSetup={{

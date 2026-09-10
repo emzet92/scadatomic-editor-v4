@@ -8,20 +8,21 @@ import type { Extension } from "@codemirror/state";
 import type { ComponentApiDescription } from "../../component-api";
 import type { NavigationTreeNode } from "../../navigation/navigation";
 
-type ApiNode = {
+export type AutocompleteApiNode = {
   label: string;
   completionType: string;
   detail?: string;
-  children?: ApiNode[];
+  children?: AutocompleteApiNode[];
 };
 
 export function createCtxAutocompleteExtension(
   components: ComponentApiDescription[],
   selfComponent?: ComponentApiDescription,
   internalComponents: ComponentApiDescription[] = [],
-  navigation: NavigationTreeNode[] = []
+  navigation: NavigationTreeNode[] = [],
+  extraRoots: AutocompleteApiNode[] = []
 ): Extension {
-  const roots = [buildCtxApiTree(components, navigation)];
+  const roots: AutocompleteApiNode[] = [buildCtxApiTree(components, navigation), ...extraRoots];
 
   if (selfComponent) {
     roots.push(buildComponentRoot("self", selfComponent));
@@ -48,8 +49,8 @@ export function createCtxAutocompleteExtension(
 function buildCtxApiTree(
   components: ComponentApiDescription[],
   navigation: NavigationTreeNode[]
-): ApiNode {
-  const uiComponents: ApiNode[] = components
+): AutocompleteApiNode {
+  const uiComponents: AutocompleteApiNode[] = components
     .slice()
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((component) => buildComponentRoot(component.name, component));
@@ -133,7 +134,7 @@ function buildCtxApiTree(
   };
 }
 
-function buildNavigationNode(node: NavigationTreeNode): ApiNode {
+function buildNavigationNode(node: NavigationTreeNode): AutocompleteApiNode {
   return {
     label: node.name,
     completionType: "class",
@@ -149,7 +150,7 @@ function buildNavigationNode(node: NavigationTreeNode): ApiNode {
 function buildComponentRoot(
   label: string,
   component: ComponentApiDescription
-): ApiNode {
+): AutocompleteApiNode {
   return {
     label,
     completionType: "class",
@@ -231,7 +232,7 @@ function buildComponentRoot(
 
 function completeApi(
   context: CompletionContext,
-  roots: ApiNode[]
+  roots: AutocompleteApiNode[]
 ): CompletionResult | null {
   const candidate = findApiCandidate(context);
 
@@ -324,7 +325,7 @@ function findApiCandidate(
   };
 }
 
-function toCompletion(node: ApiNode): Completion {
+function toCompletion(node: AutocompleteApiNode): Completion {
   const completion: Completion = {
     label: node.label,
     type: node.completionType,

@@ -1,4 +1,6 @@
 import type { Binding } from "../../core/document";
+import { flattenTagValues } from "../../data/runtime/UdtRuntime";
+import { useEditorStore } from "../../editor-store";
 import { FormField, SectionHeader, TextInput } from "../ui";
 
 export function BindingsEditor({
@@ -16,8 +18,15 @@ export function BindingsEditor({
     binding: Binding | null
   ) => void;
 }) {
+  const projectData = useEditorStore((state) => state.document.data);
+  const knownTagPaths = flattenTagValues(projectData ?? { udts: {}, tags: {} }).map(([path]) => path);
+  const dataListId = `tag-paths-${nodeId}`;
+
   return (
     <div className="pt-4 border-t border-[var(--editor-border)] space-y-3">
+      <datalist id={dataListId}>
+        {knownTagPaths.map((path) => <option key={path} value={path} />)}
+      </datalist>
       <SectionHeader
         title="Bindings"
         description="Bind component properties to runtime tags."
@@ -34,6 +43,7 @@ export function BindingsEditor({
           >
             <TextInput
               type="text"
+              list={dataListId}
               value={value}
               placeholder="pump.speed"
               onChange={(event) => {

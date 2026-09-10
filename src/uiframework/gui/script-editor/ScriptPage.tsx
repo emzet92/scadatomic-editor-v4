@@ -29,6 +29,7 @@ import type {
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
+import { createUdtTagAutocompleteRoots } from "../data/udt-autocomplete";
 
 export function ScriptPage() {
   const { scriptId, projectId } = useParams();
@@ -377,6 +378,7 @@ function ScriptEditor({
               selfComponent={selfComponent}
               internalComponents={internalComponents}
               navigation={navigationTree}
+              extraAutocompleteRoots={createUdtTagAutocompleteRoots(document?.data)}
             />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">

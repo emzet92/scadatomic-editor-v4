@@ -15,6 +15,7 @@ import {
   executeMockScript,
   type MockRuntimeComponentScope,
 } from "./mock-script-runtime";
+import { getMockTagStore, replaceMockTagStoreData } from "./mock-tag-runtime";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -73,10 +74,9 @@ class MockRuntimeSocket extends EventTarget {
     }
 
     try {
-      this.publishedDocuments.set(
-        message.projectId,
-        structuredClone(parseUiDocument(message.document))
-      );
+      const document = structuredClone(parseUiDocument(message.document));
+      this.publishedDocuments.set(message.projectId, document);
+      replaceMockTagStoreData(message.projectId, document.data);
     } catch (error) {
       console.warn("[mock-ws] Ignoring invalid published document", error);
     }
@@ -110,6 +110,19 @@ class MockRuntimeSocket extends EventTarget {
       console.warn("[mock-ws] Invalid runtime.event", payload);
       return;
     }
+
+    const projectDocument = this.getProjectDocument(projectId);
+    const tagStore = getMockTagStore(projectId, projectDocument?.data);
+    const unsubscribeTagChanges = tagStore.subscribe("*", (tagEvent) => {
+      this.emitMockResponse({
+        type: "runtime.signal",
+        projectId,
+        source: tagEvent.path,
+        value: tagEvent.newValue,
+        tagEvent,
+        timestamp: Date.now(),
+      });
+    });
 
     executeMockScript(
       {
@@ -163,6 +176,7 @@ class MockRuntimeSocket extends EventTarget {
             ? resolveComponentScopeForRuntimeNode(document, runtimeNodeId)
             : undefined;
         },
+        getTagStore: () => tagStore,
         getNavigationTree: () => {
           const document = this.getProjectDocument(projectId);
           return document ? buildNavigationTree(document) : [];
@@ -189,6 +203,7 @@ class MockRuntimeSocket extends EventTarget {
         },
       }
     );
+    unsubscribeTagChanges();
 
     console.info("[mock-ws] runtime.event", payload);
   }

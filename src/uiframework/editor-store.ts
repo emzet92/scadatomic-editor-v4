@@ -33,6 +33,9 @@ import {
   validateNodeName,
 } from "./core/node-name";
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
+import type { ProjectData } from "./data/tags/TagDefinition";
+import type { TagStoreSetResult } from "./data/tags/TagStore";
+import { designerTagStore, replaceDesignerTagData } from "./data/tags/designer-tag-store";
 
 export type DragPreview = {
   type: string;
@@ -62,6 +65,9 @@ type EditorState = {
   selectedNodeId: NodeId | null;
   selectedNodeIds: NodeId[];
   document: UiDocument;
+
+  updateProjectData: (updater: (data: ProjectData) => ProjectData) => void;
+  setTagValue: (path: string, value: unknown) => TagStoreSetResult;
 
   dragPreview: DragPreview | null;
   dragX: number;
@@ -170,6 +176,7 @@ type EditorState = {
 const NODE_DRAG_THRESHOLD_PX = 4;
 
 const initialEditorDocument = createEmptyUiDocument();
+replaceDesignerTagData(initialEditorDocument.data);
 
 function getActiveRootId(state: Pick<EditorState, "document" | "activePageId">) {
   return getPage(state.document, state.activePageId).rootId;
@@ -197,6 +204,27 @@ export const useEditorStore = create<EditorState>((set) => ({
   selectedNodeId: null,
   selectedNodeIds: [],
   document: initialEditorDocument,
+
+  updateProjectData: (updater) => {
+    set((state) => {
+      const current = state.document.data ?? { udts: {}, tags: {} };
+      const next = updater(current);
+      if (next === current) return state;
+      replaceDesignerTagData(next);
+      return { document: { ...state.document, data: next } };
+    });
+  },
+
+  setTagValue: (path, value) => {
+    let result: TagStoreSetResult = { ok: false, error: "Tag store is not ready." };
+    set((state) => {
+      replaceDesignerTagData(state.document.data);
+      result = designerTagStore.set(path, value);
+      if (!result.ok || !result.changed) return state;
+      return { document: { ...state.document, data: designerTagStore.snapshot() } };
+    });
+    return result;
+  },
 
   dragPreview: null,
   dragX: 0,
@@ -360,6 +388,7 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setDocument: (document) => {
     const startPage = getPage(document, document.startPageId);
+    replaceDesignerTagData(document.data);
     set({
       document,
       activePageId: startPage.id,

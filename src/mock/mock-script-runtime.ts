@@ -1,3 +1,5 @@
+import type { TagStore } from "../uiframework/data/tags/TagStore";
+import { createUdtRuntimeGlobals } from "../uiframework/data/runtime/UdtRuntime";
 import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
 import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
 import {
@@ -50,6 +52,7 @@ export type MockScriptHost = {
   resolveComponentScopeForRuntimeNode(
     runtimeNodeId: string
   ): MockRuntimeComponentScope | undefined;
+  getTagStore(): TagStore | undefined;
   getNavigationTree(): NavigationTreeNode[];
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
@@ -166,6 +169,7 @@ export function executeMockScript(
       self,
       internal,
       args: [],
+      globals: createTagGlobals(host, ctx),
       sourceUrl: `scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`,
     });
   } catch (error) {
@@ -485,6 +489,7 @@ function createComponentApi(
         self: reusableDefinition ? componentSelfProxy : publicProxy,
         internal: getInternalApi(),
         args,
+        globals: createTagGlobals(host, getContext()),
         sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
       });
     };
@@ -608,6 +613,7 @@ function executeSource({
   self,
   internal,
   args,
+  globals = {},
   sourceUrl,
 }: {
   code: string;
@@ -615,37 +621,48 @@ function executeSource({
   self: UiComponentScriptApi | undefined;
   internal?: MockScriptInternalApi | undefined;
   args: unknown[];
+  globals?: Record<string, unknown> | undefined;
   sourceUrl: string;
 }) {
+  const reserved = new Set(["ctx", "self", "internal", "args"]);
+  const globalEntries = Object.entries(globals).filter(
+    ([name]) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !reserved.has(name)
+  );
+  const globalNames = globalEntries.map(([name]) => name);
+  const globalValues = globalEntries.map(([, value]) => value);
+
   if (internal) {
     const execute = new Function(
       "ctx",
       "self",
       "internal",
       "args",
+      ...globalNames,
       `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
-    ) as (
-      context: MockScriptContext,
-      self: UiComponentScriptApi | undefined,
-      internal: MockScriptInternalApi,
-      args: unknown[]
-    ) => unknown;
+    ) as (...values: unknown[]) => unknown;
 
-    return execute(ctx, self, internal, args);
+    return execute(ctx, self, internal, args, ...globalValues);
   }
 
   const execute = new Function(
     "ctx",
     "self",
     "args",
+    ...globalNames,
     `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
-  ) as (
-    context: MockScriptContext,
-    self: UiComponentScriptApi | undefined,
-    args: unknown[]
-  ) => unknown;
+  ) as (...values: unknown[]) => unknown;
 
-  return execute(ctx, self, args);
+  return execute(ctx, self, args, ...globalValues);
+}
+
+function createTagGlobals(host: MockScriptHost, ctx: MockScriptContext) {
+  const tagStore = host.getTagStore();
+  return tagStore
+    ? createUdtRuntimeGlobals(tagStore, {
+        log: (...values) => ctx.log(...values),
+        emit: (eventName, payload) => ctx.emit(eventName, payload),
+      })
+    : {};
 }
 
 function hasOwn(target: object, property: string) {

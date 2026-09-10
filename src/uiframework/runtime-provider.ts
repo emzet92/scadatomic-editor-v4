@@ -10,6 +10,8 @@ import {
   setMockRuntimeNodeVariant,
 } from "../mock/mock-runtime-ui-state";
 import { getComponentVariantProps } from "./component-variants";
+import { flattenTagValues } from "./data/runtime/UdtRuntime";
+import { replaceMockTagStoreData } from "../mock/mock-tag-runtime";
 
 type RuntimeProviderProps = {
   projectId?: string | undefined;
@@ -41,7 +43,13 @@ export function RuntimeProvider({
   // identity whenever the active document changes.
   useEffect(() => {
     if (!projectId) return;
-    setDocument((current) => applyMockRuntimeUiState(projectId, current));
+    setDocument((current) => {
+      replaceMockTagStoreData(projectId, current.data);
+      for (const [path, value] of flattenTagValues(current.data ?? { udts: {}, tags: {} })) {
+        runtimeSignals.set(path, value);
+      }
+      return applyMockRuntimeUiState(projectId, current);
+    });
   }, [projectId, setDocument]);
 
   // Keep one websocket subscription per project. The latest callbacks are read
@@ -66,6 +74,14 @@ export function RuntimeProvider({
 
         if (payload.type === "screen.publish") {
           const publishedDocument = parseUiDocument(payload.document);
+          if (projectId) {
+            replaceMockTagStoreData(projectId, publishedDocument.data);
+            for (const [path, value] of flattenTagValues(
+              publishedDocument.data ?? { udts: {}, tags: {} }
+            )) {
+              runtimeSignals.set(path, value);
+            }
+          }
           setDocument(
             projectId
               ? applyMockRuntimeUiState(projectId, publishedDocument)
