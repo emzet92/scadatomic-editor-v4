@@ -4,6 +4,7 @@ import { Chart } from "../components/Chart";
 import { Container } from "../components/Container";
 import { Page } from "../components/Page";
 import { Navigation } from "../components/Navigation";
+import { Image } from "../components/Image";
 import { RuntimeButton } from "../components/RuntimeButton";
 import { RuntimeChart } from "../components/RuntimeChart";
 import { RuntimeText } from "../components/RuntimeText";
@@ -15,6 +16,7 @@ import {
   defaultContainerProps,
   defaultTextProps,
   defaultNavigationProps,
+  defaultImageProps,
 } from "../component-props";
 
 export type InspectorControl =
@@ -22,6 +24,7 @@ export type InspectorControl =
   | { kind: "number"; min?: number; max?: number; step?: number }
   | { kind: "color" }
   | { kind: "toggle" }
+  | { kind: "image-asset" }
   | { kind: "text-format" }
   | { kind: "text-align" }
   | { kind: "border-size"; min?: number; max?: number; step?: number }
@@ -137,6 +140,23 @@ export const componentDefinitions = {
     events: {
       click: { label: "Click", defaultSuffix: "Clicked" },
       doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },
+    },
+  },
+  Image: {
+    type: "Image",
+    label: "Image",
+    description: "Local image asset",
+    editor: Image,
+    runtime: Image,
+    defaults: defaultImageProps,
+    inspector: {
+      assetId: { kind: "image-asset" },
+      width: { kind: "text" },
+      height: { kind: "text" },
+      fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
+      alt: { kind: "text" },
+      borderRadius: { kind: "number", min: 0 },
+      backgroundColor: { kind: "color" },
     },
   },
   Chart: {

@@ -1,5 +1,6 @@
 import type { InspectorControl } from "../../registry/component-definitions";
 import type { UpdateNode } from "./property-panel-types";
+import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
   FormField,
@@ -43,6 +44,17 @@ export function PropInput({
         [propName]: nextValue,
       },
     }));
+  }
+
+  if (control.kind === "image-asset") {
+    return (
+      <FormField label="Source">
+        <ImageAssetPicker
+          assetId={typeof value === "string" && value ? value : undefined}
+          onChange={(assetId) => updateProp(assetId)}
+        />
+      </FormField>
+    );
   }
 
   if (control.kind === "text-format") {

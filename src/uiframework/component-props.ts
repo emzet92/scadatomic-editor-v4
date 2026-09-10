@@ -120,6 +120,27 @@ export const defaultButtonProps = {
   backgroundColor: "#0284c7",
 } satisfies ButtonNodeProps;
 
+export type ImageFit = "contain" | "cover" | "fill" | "none" | "scale-down";
+
+export type ImageNodeProps = {
+  assetId?: string;
+  width?: CssSize;
+  height?: CssSize;
+  fit?: ImageFit;
+  alt?: string;
+  borderRadius?: number;
+  backgroundColor?: string;
+};
+
+export const defaultImageProps = {
+  width: 320,
+  height: 180,
+  fit: "contain",
+  alt: "",
+  borderRadius: 0,
+  backgroundColor: "#f4f4f5",
+} satisfies ImageNodeProps;
+
 export type ChartKind = "line" | "bar";
 
 export type ChartPoint = {
