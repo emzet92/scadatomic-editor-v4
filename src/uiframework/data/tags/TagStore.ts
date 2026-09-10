@@ -1,4 +1,4 @@
-import type { DataType } from "../types/DataType";
+import type { DataType, PrimitiveDataType } from "../types/DataType";
 import { TypeRegistry } from "../types/TypeRegistry";
 import type { UdtDefinition, UdtFieldDefinition } from "../udt/UdtDefinition";
 import { isPrimitiveTag, isUdtTag, type ProjectData, type TagDefinition, type UdtTag } from "./TagDefinition";
@@ -14,6 +14,11 @@ export type ResolvedTagPath = {
   type: DataType;
   value: unknown;
   field?: UdtFieldDefinition | undefined;
+};
+
+
+export type ResolvedPrimitiveTagPath = Omit<ResolvedTagPath, "type"> & {
+  type: PrimitiveDataType;
 };
 
 export class TagStore {
@@ -154,8 +159,24 @@ export class TagStore {
     return this.data.udts[tag.type.udtId];
   }
 
+  getUdtDefinitionById(udtId: string): UdtDefinition | undefined {
+    return this.data.udts[udtId];
+  }
+
   listTags() {
     return Object.values(this.data.tags);
+  }
+
+  /**
+   * Flat primitive runtime leaves. Useful for simulator/drivers and later
+   * data-driven components without exposing TagStore's mutable backing data.
+   */
+  listPrimitivePaths(): ResolvedPrimitiveTagPath[] {
+    const paths: ResolvedPrimitiveTagPath[] = [];
+    for (const tag of this.listTags()) {
+      collectPrimitivePaths(this, tag.name, paths);
+    }
+    return paths;
   }
 
   private emit(event: TagChangedEvent) {
@@ -182,4 +203,20 @@ function setNestedValue(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function collectPrimitivePaths(
+  store: TagStore,
+  path: string,
+  output: ResolvedPrimitiveTagPath[]
+) {
+  const resolved = store.resolve(path);
+  if (!resolved) return;
+  if (resolved.type.kind !== "udt") {
+    output.push({ ...resolved, type: resolved.type });
+    return;
+  }
+  for (const childPath of store.children(path)) {
+    collectPrimitivePaths(store, childPath, output);
+  }
 }

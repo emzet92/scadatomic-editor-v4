@@ -1,5 +1,9 @@
 import type { TagStore } from "../uiframework/data/tags/TagStore";
-import { createUdtRuntimeGlobals } from "../uiframework/data/runtime/UdtRuntime";
+import {
+  createTagRuntimeGlobals,
+  createTagRuntimeProxy,
+  type TagRuntimeApi,
+} from "../uiframework/data/runtime/TagRuntimeProxy";
 import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
 import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
 import {
@@ -111,6 +115,8 @@ export type MockScriptContext = {
   /** Public API of components on the current runtime page. */
   ui: MockScriptUiApi;
   nav: MockScriptNavigationApi;
+  /** Dynamic typed tag namespace. All writes are routed through TagStore. */
+  tags?: TagRuntimeApi | undefined;
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
   random: {
@@ -192,6 +198,14 @@ function createContext(
 ): MockScriptContext {
   const ui = createUiApi(host, event.projectId, () => ctx);
   const nav = createNavigationApi(host);
+  const tagStore = host.getTagStore();
+  const contextRef: { current?: MockScriptContext } = {};
+  const tags = tagStore
+    ? createTagRuntimeProxy(tagStore, {
+        log: (...values) => contextRef.current?.log(...values),
+        emit: (eventName, payload) => contextRef.current?.emit(eventName, payload),
+      })
+    : undefined;
 
   const ctx: MockScriptContext = Object.freeze({
     projectId: event.projectId,
@@ -215,6 +229,7 @@ function createContext(
     }),
     ui,
     nav,
+    ...(tags ? { tags } : {}),
     navigateTo(path: string) {
       host.navigateTo(path);
     },
@@ -233,6 +248,7 @@ function createContext(
       console.log(`[script:${event.handlerId}]`, ...args);
     },
   });
+  contextRef.current = ctx;
 
   return ctx;
 }
@@ -658,7 +674,7 @@ function executeSource({
 function createTagGlobals(host: MockScriptHost, ctx: MockScriptContext) {
   const tagStore = host.getTagStore();
   return tagStore
-    ? createUdtRuntimeGlobals(tagStore, {
+    ? createTagRuntimeGlobals(tagStore, {
         log: (...values) => ctx.log(...values),
         emit: (eventName, payload) => ctx.emit(eventName, payload),
       })

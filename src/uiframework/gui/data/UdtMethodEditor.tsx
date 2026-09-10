@@ -8,7 +8,7 @@ import { useEditorStore } from "../../editor-store";
 import { Button, FormField, PanelCard, Select, TextInput } from "../ui";
 import { JavaScriptCodeEditor } from "../script-editor/JavaScriptCodeEditor";
 import type { AutocompleteApiNode } from "../script-editor/ctx-completions";
-import { createUdtSelfAutocompleteRoot, createUdtTagAutocompleteRoots } from "./udt-autocomplete";
+import { createUdtSelfAutocompleteRoot } from "./udt-autocomplete";
 
 export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; udtId: string; methodId: string }) {
   const definition = data.udts[udtId];
@@ -22,13 +22,9 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; 
   );
   const selectedInstance = instances.find((tag) => tag.id === selectedTagId) ?? instances[0];
 
-  const autocompleteRoots = useMemo<AutocompleteApiNode[]>(() => {
-    if (!definition) return createUdtTagAutocompleteRoots(data);
-    return [
-      createUdtSelfAutocompleteRoot(definition),
-      ...createUdtTagAutocompleteRoots(data),
-    ];
-  }, [data, definition]);
+  const autocompleteRoots = useMemo<AutocompleteApiNode[]>(() =>
+    definition ? [createUdtSelfAutocompleteRoot(definition, data)] : [],
+  [data, definition]);
 
   if (!definition || !method) return <div className="p-8 text-sm text-[var(--editor-text-muted)]">UDT method no longer exists.</div>;
   const udt = definition;
@@ -67,7 +63,7 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; 
       <FormField label="Method name"><TextInput mono value={name} onChange={(event) => setName(event.target.value)} /></FormField>
       <div className="flex items-end"><Button onClick={renameMethod}><Save size={13} /> Rename</Button></div>
     </PanelCard>
-    <JavaScriptCodeEditor value={selectedMethod.source} onChange={(source) => updateProjectData((current) => updateUdtMethod(current, udt.id, selectedMethod.id, (currentMethod) => ({ ...currentMethod, source })))} components={[]} extraAutocompleteRoots={autocompleteRoots} autocompleteHint="self · UDT fields · UDT methods" height="460px" />
+    <JavaScriptCodeEditor value={selectedMethod.source} onChange={(source) => updateProjectData((current) => updateUdtMethod(current, udt.id, selectedMethod.id, (currentMethod) => ({ ...currentMethod, source })))} components={[]} projectData={data} extraAutocompleteRoots={autocompleteRoots} autocompleteHint="self · tags · UDT fields · UDT methods" height="460px" />
     <PanelCard className="space-y-3">
       <div><div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Test method</div><p className="mt-1 text-xs text-[var(--editor-text-soft)]">Runs locally in Designer against the selected persisted tag instance.</p></div>
       <div className="flex flex-wrap items-end gap-2"><FormField label="Instance" compact className="min-w-56"><Select controlSize="sm" value={selectedInstance?.id ?? ""} onChange={(event) => setSelectedTagId(event.target.value)} disabled={instances.length === 0}>{instances.length === 0 ? <option value="">No instances</option> : instances.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</Select></FormField><Button variant="primary" onClick={run} disabled={!selectedInstance}><Play size={13} /> Run {selectedMethod.name}()</Button></div>

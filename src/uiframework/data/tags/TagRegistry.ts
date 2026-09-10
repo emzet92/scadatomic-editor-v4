@@ -3,7 +3,7 @@ import { TypeRegistry } from "../types/TypeRegistry";
 import { createUdtTag } from "../udt/UdtInstanceFactory";
 import type { ProjectData, PrimitiveTag, TagDefinition } from "./TagDefinition";
 
-export const RESERVED_DATA_NAMES = new Set(["ctx", "self", "internal", "args"]);
+export const RESERVED_DATA_NAMES = new Set(["ctx", "self", "internal", "args", "tags", "$get", "$set", "$children"]);
 
 export function validateDataName(
   data: ProjectData,

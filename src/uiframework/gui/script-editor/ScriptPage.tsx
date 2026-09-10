@@ -29,7 +29,6 @@ import type {
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
-import { createUdtTagAutocompleteRoots } from "../data/udt-autocomplete";
 
 export function ScriptPage() {
   const { scriptId, projectId } = useParams();
@@ -378,7 +377,7 @@ function ScriptEditor({
               selfComponent={selfComponent}
               internalComponents={internalComponents}
               navigation={navigationTree}
-              extraAutocompleteRoots={createUdtTagAutocompleteRoots(document?.data)}
+              projectData={document?.data}
             />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-4">
@@ -396,6 +395,11 @@ function ScriptEditor({
                 <code>ctx.ui.ComponentName.variant.current</code>
                 <code>ctx.navigateTo("Page/SubPage")</code>
                 <code>ctx.nav.Page1.go()</code>
+                <code>tags.LineSpeed</code>
+                <code>tags.LineSpeed = 1200</code>
+                <code>tags.Pump1.speed = 1450</code>
+                <code>tags.Pump1.start()</code>
+                <code>ctx.tags.Pump1.running</code>
                 {scriptSelection?.kind === "method" ||
                 scriptSelection?.kind === "componentMethod" ||
                 scriptSelection?.kind === "componentHandler" ? (

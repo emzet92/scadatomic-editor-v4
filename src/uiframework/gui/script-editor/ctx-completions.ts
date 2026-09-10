@@ -20,9 +20,13 @@ export function createCtxAutocompleteExtension(
   selfComponent?: ComponentApiDescription,
   internalComponents: ComponentApiDescription[] = [],
   navigation: NavigationTreeNode[] = [],
-  extraRoots: AutocompleteApiNode[] = []
+  extraRoots: AutocompleteApiNode[] = [],
+  extraCtxChildren: AutocompleteApiNode[] = []
 ): Extension {
-  const roots: AutocompleteApiNode[] = [buildCtxApiTree(components, navigation), ...extraRoots];
+  const roots: AutocompleteApiNode[] = [
+    buildCtxApiTree(components, navigation, extraCtxChildren),
+    ...extraRoots,
+  ];
 
   if (selfComponent) {
     roots.push(buildComponentRoot("self", selfComponent));
@@ -48,7 +52,8 @@ export function createCtxAutocompleteExtension(
 
 function buildCtxApiTree(
   components: ComponentApiDescription[],
-  navigation: NavigationTreeNode[]
+  navigation: NavigationTreeNode[],
+  extraChildren: AutocompleteApiNode[] = []
 ): AutocompleteApiNode {
   const uiComponents: AutocompleteApiNode[] = components
     .slice()
@@ -130,6 +135,7 @@ function buildCtxApiTree(
         completionType: "property",
         detail: "string · read only",
       },
+      ...extraChildren,
     ],
   };
 }

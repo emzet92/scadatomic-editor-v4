@@ -15,7 +15,12 @@ import {
   executeMockScript,
   type MockRuntimeComponentScope,
 } from "./mock-script-runtime";
-import { getMockTagStore, replaceMockTagStoreData } from "./mock-tag-runtime";
+import {
+  getMockTagStore,
+  listMockTagStores,
+  replaceMockTagStoreData,
+} from "./mock-tag-runtime";
+import { BasicMockTagSimulator } from "./mock-tag-simulator";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -27,6 +32,8 @@ class MockRuntimeSocket extends EventTarget {
 
   private readonly channel = createBroadcastChannel();
   private readonly publishedDocuments = new Map<string, UiDocument>();
+  private readonly tagSimulator = new BasicMockTagSimulator();
+  private readonly tagEventBridges = new Map<string, () => void>();
   private signalTimer: number | null = null;
   private process = {
     levelPercent: 62,
@@ -76,7 +83,8 @@ class MockRuntimeSocket extends EventTarget {
     try {
       const document = structuredClone(parseUiDocument(message.document));
       this.publishedDocuments.set(message.projectId, document);
-      replaceMockTagStoreData(message.projectId, document.data);
+      const tagStore = replaceMockTagStoreData(message.projectId, document.data);
+      this.ensureTagEventBridge(message.projectId, tagStore);
     } catch (error) {
       console.warn("[mock-ws] Ignoring invalid published document", error);
     }
@@ -113,16 +121,7 @@ class MockRuntimeSocket extends EventTarget {
 
     const projectDocument = this.getProjectDocument(projectId);
     const tagStore = getMockTagStore(projectId, projectDocument?.data);
-    const unsubscribeTagChanges = tagStore.subscribe("*", (tagEvent) => {
-      this.emitMockResponse({
-        type: "runtime.signal",
-        projectId,
-        source: tagEvent.path,
-        value: tagEvent.newValue,
-        tagEvent,
-        timestamp: Date.now(),
-      });
-    });
+    this.ensureTagEventBridge(projectId, tagStore);
 
     executeMockScript(
       {
@@ -203,7 +202,6 @@ class MockRuntimeSocket extends EventTarget {
         },
       }
     );
-    unsubscribeTagChanges();
 
     console.info("[mock-ws] runtime.event", payload);
   }
@@ -245,7 +243,43 @@ class MockRuntimeSocket extends EventTarget {
       );
 
       this.emitProcessSignals();
+      this.simulateProjectTags();
     }, SIGNAL_INTERVAL_MS);
+  }
+
+  private simulateProjectTags() {
+    const activeProjectId = getRuntimeProjectIdFromLocation();
+    if (!activeProjectId) return;
+
+    const activeStore = listMockTagStores().find(
+      ([projectId]) => projectId === activeProjectId
+    );
+    if (!activeStore) return;
+
+    const [projectId, tagStore] = activeStore;
+    this.ensureTagEventBridge(projectId, tagStore);
+    this.tagSimulator.tick(projectId, tagStore);
+  }
+
+  private ensureTagEventBridge(
+    projectId: string,
+    tagStore: ReturnType<typeof getMockTagStore>
+  ) {
+    if (this.tagEventBridges.has(projectId)) return;
+
+    const unsubscribe = tagStore.subscribe("*", (tagEvent) => {
+      // Tag runtime is intentionally local in this prototype. Distributed state
+      // is out of scope, so do not bounce simulator ticks through BroadcastChannel.
+      this.dispatchPayload({
+        type: "runtime.signal",
+        projectId,
+        source: tagEvent.path,
+        value: tagEvent.newValue,
+        tagEvent,
+        timestamp: Date.now(),
+      });
+    });
+    this.tagEventBridges.set(projectId, unsubscribe);
   }
 
   private emitProcessSignals() {
@@ -387,4 +421,14 @@ function clamp(value: number, min: number, max: number) {
 function round(value: number, digits: number) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function getRuntimeProjectIdFromLocation() {
+  const match = window.location.pathname.match(/^\/render\/([^/]+)/);
+  if (!match?.[1]) return undefined;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
 }

@@ -17,3 +17,7 @@ export function replaceMockTagStoreData(projectId: string, data?: ProjectData) {
   store.replaceData(data ?? createEmptyProjectData());
   return store;
 }
+
+export function listMockTagStores(): Array<[string, TagStore]> {
+  return Array.from(stores.entries());
+}
