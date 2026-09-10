@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cx } from "./cx";
 
 export type ButtonVariant =
@@ -36,15 +36,19 @@ const sizeClassNames: Record<ButtonSize, string> = {
   icon: "size-8",
 };
 
-export function Button({
-  variant = "secondary",
-  size = "sm",
-  className,
-  type = "button",
-  ...props
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = "secondary",
+    size = "sm",
+    className,
+    type = "button",
+    ...props
+  },
+  ref
+) {
   return (
     <button
+      ref={ref}
       data-editor-ignore
       type={type}
       className={cx(
@@ -56,7 +60,7 @@ export function Button({
       {...props}
     />
   );
-}
+});
 
 type IconButtonProps = Omit<ButtonProps, "children" | "aria-label"> & {
   "aria-label": string;

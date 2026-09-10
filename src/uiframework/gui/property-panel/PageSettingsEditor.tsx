@@ -1,7 +1,7 @@
-import { Monitor, Smartphone, Tablet } from "lucide-react";
+import { Home, Monitor, Smartphone, Tablet } from "lucide-react";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
-import { FormField, SectionHeader, TextInput } from "../ui";
+import { Button, FormField, PanelCard, SectionHeader, TextInput } from "../ui";
 
 const presets = [
   { mode: "desktop", label: "Desktop", width: 1440, height: 900, icon: Monitor },
@@ -12,9 +12,13 @@ const presets = [
 export function PageSettingsEditor({
   node,
   updateNode,
+  isStartPage = false,
+  onSetStartPage,
 }: {
   node: UiNode;
   updateNode: UpdateNode;
+  isStartPage?: boolean | undefined;
+  onSetStartPage?: (() => void) | undefined;
 }) {
   const mode = String(node.props?.deviceMode ?? "desktop");
   const width = Number(node.props?.width ?? 1440);
@@ -28,8 +32,34 @@ export function PageSettingsEditor({
   }
 
   return (
-    <section>
-      <SectionHeader title="Page viewport" className="mb-2" />
+    <div className="space-y-6">
+      {onSetStartPage ? (
+        <section>
+          <SectionHeader
+            title="Runtime entry"
+            description="The start page is rendered when runtime opens without an explicit navigation path."
+            className="mb-2"
+          />
+          <PanelCard className="flex items-center justify-between gap-3 p-2.5">
+            <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--editor-text)]">
+              <Home size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
+              <span className="truncate">{isStartPage ? "Default start page" : "Not the start page"}</span>
+            </div>
+            {isStartPage ? (
+              <span className="rounded bg-[var(--editor-accent-soft)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-accent)]">
+                start
+              </span>
+            ) : (
+              <Button size="xs" variant="secondary" onClick={onSetStartPage}>
+                Set as start
+              </Button>
+            )}
+          </PanelCard>
+        </section>
+      ) : null}
+
+      <section>
+        <SectionHeader title="Page viewport" className="mb-2" />
 
       <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)]">
         {presets.map((preset) => {
@@ -95,6 +125,7 @@ export function PageSettingsEditor({
           />
         </FormField>
       </div>
-    </section>
+      </section>
+    </div>
   );
 }

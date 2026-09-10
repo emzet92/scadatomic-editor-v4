@@ -1,6 +1,6 @@
 import { ArrowLeft, Box, Palette, Star } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
-import type { UiDocument } from "../../core/document";
+import { getPageByRootId, type UiDocument } from "../../core/document";
 import type {
   ComponentDefinitionEditorMode,
   ComponentEditorMode,
@@ -53,6 +53,7 @@ export function PropertyPanel({
   const renameNode = useEditorStore((state) => state.renameNode);
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
+  const setStartPage = useEditorStore((state) => state.setStartPage);
   const createReusableComponent = useEditorStore(
     (state) => state.createReusableComponent
   );
@@ -182,6 +183,7 @@ export function PropertyPanel({
     );
   }
 
+  const page = node.type === "Page" ? getPageByRootId(document, node.id) : undefined;
   const definition = getComponentDefinition(node.type);
   const resolvedProps = {
     ...(definition?.defaults ?? {}),
@@ -198,7 +200,12 @@ export function PropertyPanel({
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
         {node.type === "Page" ? (
-          <PageSettingsEditor node={node} updateNode={updateNode} />
+          <PageSettingsEditor
+            node={node}
+            updateNode={updateNode}
+            isStartPage={page?.id === document.startPageId}
+            onSetStartPage={page ? () => setStartPage(page.id) : undefined}
+          />
         ) : null}
 
         {definition ? (

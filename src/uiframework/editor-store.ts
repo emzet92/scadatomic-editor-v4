@@ -32,6 +32,7 @@ import {
   createUniqueNodeName,
   validateNodeName,
 } from "./core/node-name";
+import { createPageDeletionPlan, withStartPage } from "./core/pages";
 
 export type DragPreview = {
   type: string;
@@ -69,7 +70,9 @@ type EditorState = {
   nodeDragCandidate: NodeDragCandidate | null;
 
   setActivePageId: (pageId: PageId) => void;
+  setStartPage: (pageId: PageId) => void;
   addPage: (parentPageId?: PageId | undefined) => PageId | null;
+  deletePage: (pageId: PageId) => boolean;
   setSelectedNodeId: (id: NodeId | null) => void;
   selectNode: (
     id: NodeId | null,
@@ -216,6 +219,13 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
   },
 
+  setStartPage: (pageId) => {
+    set((state) => {
+      if (!state.document.pages[pageId]) return state;
+      return { document: withStartPage(state.document, pageId) };
+    });
+  },
+
   addPage: (parentPageId) => {
     let createdPageId: PageId | null = null;
 
@@ -251,6 +261,64 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
 
     return createdPageId;
+  },
+
+  deletePage: (pageId) => {
+    let deleted = false;
+
+    set((state) => {
+      const plan = createPageDeletionPlan(state.document, pageId);
+      if (!plan?.fallbackPageId) return state;
+
+      const deletedPageIds = new Set(plan.pageIds);
+      const deletedNodeIds = new Set(plan.nodeIds);
+      const pages = { ...state.document.pages };
+      const nodes = { ...state.document.nodes };
+
+      for (const deletedPageId of plan.pageIds) delete pages[deletedPageId];
+      for (const deletedNodeId of plan.nodeIds) delete nodes[deletedNodeId];
+
+      const startPageId = deletedPageIds.has(state.document.startPageId)
+        ? plan.fallbackPageId
+        : state.document.startPageId;
+      const startPage = pages[startPageId];
+      const activePageId = deletedPageIds.has(state.activePageId)
+        ? plan.fallbackPageId
+        : state.activePageId;
+      const activePage = pages[activePageId];
+
+      if (!startPage || !activePage) return state;
+      deleted = true;
+
+      const activePageChanged = activePageId !== state.activePageId;
+      const selectedNodeIds = activePageChanged
+        ? [activePage.rootId]
+        : state.selectedNodeIds.filter((id) => !deletedNodeIds.has(id) && !!nodes[id]);
+      const selectedNodeId = activePageChanged
+        ? activePage.rootId
+        : state.selectedNodeId && nodes[state.selectedNodeId]
+          ? state.selectedNodeId
+          : selectedNodeIds.at(-1) ?? activePage.rootId;
+
+      return {
+        document: {
+          ...state.document,
+          pages,
+          nodes,
+          startPageId,
+          rootId: startPage.rootId,
+        },
+        activePageId,
+        selectedNodeId,
+        selectedNodeIds:
+          selectedNodeIds.length > 0 ? selectedNodeIds : [activePage.rootId],
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+        dragPreview: null,
+      };
+    });
+
+    return deleted;
   },
 
   setSelectedNodeId: (id) => {

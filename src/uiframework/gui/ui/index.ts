@@ -10,3 +10,6 @@ export type {
 export { EmptyAction, PanelCard, SectionHeader } from "./Panel";
 export { cx } from "./cx";
 export * from "./SegmentedControl";
+
+export { ConfirmDialog } from "./ConfirmDialog";
+export type { ConfirmDialogProps } from "./ConfirmDialog";
