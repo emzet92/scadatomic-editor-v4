@@ -21,6 +21,7 @@ import type {
 import {
   createComponentInput,
   getComponentDefinitionForInstance,
+  getComponentInputTargetType,
   getResolvedComponentInstanceProps,
 } from "../../reusable-components";
 import { getComponentApiPropertyNames } from "../../component-api";
@@ -304,7 +305,12 @@ function PublicInputsEditor({
     setAdding(true);
     setProperty(first);
     setName(first);
-    setType(inferTypeFromProperty(first));
+    setType(
+      selectedNode
+        ? getComponentInputTargetType(projectDocument, selectedNode, first) ??
+            inferTypeFromProperty(first)
+        : inferTypeFromProperty(first)
+    );
     setError(null);
   }
 
@@ -316,7 +322,8 @@ function PublicInputsEditor({
         selectedNode,
         property,
         name,
-        type
+        type,
+        projectDocument
       );
       const inputName = name.trim();
       updateDefinition((current) => ({
@@ -427,7 +434,15 @@ function PublicInputsEditor({
                 const next = event.target.value;
                 setProperty(next);
                 if (!name) setName(next);
-                setType(inferTypeFromProperty(next));
+                setType(
+                  selectedNode
+                    ? getComponentInputTargetType(
+                        projectDocument,
+                        selectedNode,
+                        next
+                      ) ?? inferTypeFromProperty(next)
+                    : inferTypeFromProperty(next)
+                );
               }}
               className="h-8 w-full rounded border border-zinc-200 bg-white px-2 font-mono text-xs outline-none focus:border-violet-400"
             >

@@ -287,7 +287,8 @@ export function createComponentInput(
   internalNode: UiNode,
   property: string,
   requestedName: string,
-  requestedType?: ComponentInputType
+  requestedType?: ComponentInputType,
+  projectDocument?: UiDocument
 ): ComponentInputDefinition {
   const name = requestedName.trim();
   if (!isJsIdentifier(name)) {
@@ -298,6 +299,50 @@ export function createComponentInput(
   }
   if (definition.methods?.[name] || ["id", "name", "type", "setProp", "setColor", "variant"].includes(name)) {
     throw new Error(`“${name}” conflicts with the component API.`);
+  }
+
+  const nestedDefinition = projectDocument
+    ? getComponentDefinitionForInstance(projectDocument, internalNode)
+    : undefined;
+
+  if (internalNode.type === "ComponentInstance") {
+    if (!nestedDefinition) {
+      throw new Error(
+        `Missing component definition for nested component “${internalNode.name}”.`
+      );
+    }
+
+    const nestedInput = nestedDefinition.inputs?.[property];
+    if (!nestedInput) {
+      throw new Error(
+        `Unknown public property “${property}” on ${internalNode.name}.`
+      );
+    }
+
+    if (requestedType && requestedType !== nestedInput.type) {
+      throw new Error(
+        `“${internalNode.name}.${property}” is ${nestedInput.type}; the mapped public input must use the same type.`
+      );
+    }
+
+    const resolvedProps = getResolvedComponentInstanceProps(
+      nestedDefinition,
+      internalNode
+    );
+
+    return {
+      type: nestedInput.type,
+      defaultValue: resolvedProps[property],
+      target: {
+        nodeId: internalNode.id,
+        property,
+        // A nested user component receives its public contract through the
+        // ComponentInstance props. Even a `tag` input must be forwarded as a
+        // prop; the child definition is responsible for mapping that value to
+        // its own primitive binding target.
+        kind: "prop",
+      },
+    };
   }
 
   const definitionForNode = getComponentDefinition(internalNode.type);
@@ -329,6 +374,30 @@ export function createComponentInput(
       kind: inferredType === "tag" ? "binding" : "prop",
     },
   };
+}
+
+export function getComponentInputTargetType(
+  document: UiDocument,
+  internalNode: UiNode,
+  property: string
+): ComponentInputType | undefined {
+  const nestedDefinition = getComponentDefinitionForInstance(document, internalNode);
+  if (nestedDefinition) {
+    return nestedDefinition.inputs?.[property]?.type;
+  }
+
+  const primitiveDefinition = getComponentDefinition(internalNode.type);
+  const hasProperty = new Set([
+    ...Object.keys(primitiveDefinition?.defaults ?? {}),
+    ...Object.keys(primitiveDefinition?.inspector ?? {}),
+    ...Object.keys(internalNode.props ?? {}),
+  ]).has(property);
+
+  if (!hasProperty) return undefined;
+
+  const value =
+    internalNode.props?.[property] ?? primitiveDefinition?.defaults?.[property];
+  return inferInputType(property, value);
 }
 
 export function inferInputType(
