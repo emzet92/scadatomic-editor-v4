@@ -18,11 +18,17 @@ export type RenderNodeDecorator = (
   context: RenderNodeContext
 ) => Record<string, unknown>;
 
+export type RenderNodeResolver = (
+  node: UiNode,
+  context: RenderNodeContext
+) => UiNode;
+
 export type RenderNodeProps = {
   id: NodeId;
   document: UiDocument;
   registry: ComponentRegistry;
   decorateProps?: RenderNodeDecorator | undefined;
+  resolveNode?: RenderNodeResolver | undefined;
   decorateComponentInternals?: boolean | undefined;
   visited?: ReadonlySet<NodeId>;
   context?: RenderNodeContext;
@@ -33,13 +39,15 @@ export function RenderNode({
   document,
   registry,
   decorateProps,
+  resolveNode,
   decorateComponentInternals = false,
   visited = new Set<NodeId>(),
   context = {},
 }: RenderNodeProps): ReactNode {
-  const node = document.nodes[id];
+  const sourceNode = document.nodes[id];
 
-  if (!node) return <UnknownNode message={`Missing node: ${id}`} />;
+  if (!sourceNode) return <UnknownNode message={`Missing node: ${id}`} />;
+  const node = resolveNode?.(sourceNode, context) ?? sourceNode;
   if (visited.has(id)) return <UnknownNode message={`Recursive node: ${id}`} />;
 
   if (node.type === "ComponentInstance") {
@@ -53,14 +61,19 @@ export function RenderNode({
       definition,
       node
     );
+    const runtimeInstanceId = context.componentInstanceId
+      ? `${context.componentInstanceId}::${node.id}`
+      : node.id;
     const instanceContext: RenderNodeContext = {
-      componentInstanceId: node.id,
+      componentInstanceId: runtimeInstanceId,
       componentDefinitionId: definition.id,
       internal: true,
     };
 
     const internalDecorator: RenderNodeDecorator = (internalNode, internalContext) => ({
-      ...getDefaultComponentVariantProps(internalNode),
+      // Runtime node resolvers already fold default/runtime variant props into
+      // node.props. Only the pure Designer path needs this fallback decorator.
+      ...(resolveNode ? {} : getDefaultComponentVariantProps(internalNode)),
       ...(decorateComponentInternals
         ? decorateProps?.(internalNode, internalContext) ?? {}
         : {}),
@@ -75,6 +88,7 @@ export function RenderNode({
           document={componentDocument}
           registry={registry}
           decorateProps={internalDecorator}
+          resolveNode={resolveNode}
           decorateComponentInternals={decorateComponentInternals}
           visited={new Set<NodeId>()}
           context={instanceContext}
@@ -99,6 +113,7 @@ export function RenderNode({
           document={document}
           registry={registry}
           decorateProps={decorateProps}
+          resolveNode={resolveNode}
           decorateComponentInternals={decorateComponentInternals}
           visited={nextVisited}
           context={context}

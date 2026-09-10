@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getProjectById } from "../../http/projects-api";
-import { getMockRuntimeNodeVariant } from "../../mock/mock-runtime-ui-state";
+import {
+  getMockRuntimeNodeProps,
+  getMockRuntimeNodeVariant,
+} from "../../mock/mock-runtime-ui-state";
 import {
   createEmptyUiDocument,
   getPage,
@@ -153,19 +156,44 @@ export function RenderPage() {
             document={document}
             registry={runtimeRegistry}
             decorateComponentInternals
+            resolveNode={(node, context) => {
+              if (!projectId) return node;
+
+              const runtimeNodeId = context.componentInstanceId
+                ? `${context.componentInstanceId}::${node.id}`
+                : node.id;
+              const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
+              const runtimeVariantName = getMockRuntimeNodeVariant(
+                projectId,
+                runtimeNodeId
+              );
+              const variantName =
+                runtimeVariantName && node.variants?.[runtimeVariantName]
+                  ? runtimeVariantName
+                  : node.defaultVariant;
+              const variantProps = getComponentVariantProps(node, variantName);
+
+              if (
+                Object.keys(runtimeProps).length === 0 &&
+                Object.keys(variantProps).length === 0
+              ) {
+                return node;
+              }
+
+              return {
+                ...node,
+                props: {
+                  ...(node.props ?? {}),
+                  ...variantProps,
+                  ...runtimeProps,
+                },
+              };
+            }}
             decorateProps={(node, context) => {
               const runtimeNodeId = context.componentInstanceId
                 ? `${context.componentInstanceId}::${node.id}`
                 : node.id;
-              const runtimeVariantName = projectId
-                ? getMockRuntimeNodeVariant(projectId, runtimeNodeId)
-                : undefined;
-              const runtimeVariantProps =
-                runtimeVariantName && node.variants?.[runtimeVariantName]
-                  ? getComponentVariantProps(node, runtimeVariantName)
-                  : {};
               const baseProps = {
-                ...runtimeVariantProps,
                 "data-node-id": runtimeNodeId,
               };
 

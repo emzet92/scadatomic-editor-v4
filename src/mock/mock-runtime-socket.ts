@@ -1,11 +1,20 @@
-import { parseUiDocument, type UiDocument } from "../uiframework/core/document";
+import {
+  parseUiDocument,
+  type UiComponentDefinition,
+  type UiDocument,
+  type UiNode,
+} from "../uiframework/core/document";
 import { buildNavigationTree } from "../uiframework/navigation/navigation";
 import { getMockProjectSnapshot } from "./mock-project-store";
 import {
   applyMockRuntimeUiState,
+  getMockRuntimeNodeProps,
   getMockRuntimeNodeVariant,
 } from "./mock-runtime-ui-state";
-import { executeMockScript } from "./mock-script-runtime";
+import {
+  executeMockScript,
+  type MockRuntimeComponentScope,
+} from "./mock-script-runtime";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -121,6 +130,7 @@ class MockRuntimeSocket extends EventTarget {
             timestamp: Date.now(),
           });
         },
+        getNodeProps: (nodeId) => getMockRuntimeNodeProps(projectId, nodeId),
         setNodeVariant: (nodeId, variantName) => {
           this.emitMockResponse({
             type: "node.variant",
@@ -147,14 +157,11 @@ class MockRuntimeSocket extends EventTarget {
           const document = this.getProjectDocument(projectId);
           return document?.components?.[componentDefinitionId];
         },
-        resolveComponentInstanceForRuntimeNode: (runtimeNodeId) => {
-          const separatorIndex = runtimeNodeId.indexOf("::");
-          if (separatorIndex <= 0) return undefined;
-
-          const instanceId = runtimeNodeId.slice(0, separatorIndex);
+        resolveComponentScopeForRuntimeNode: (runtimeNodeId) => {
           const document = this.getProjectDocument(projectId);
-          const node = document?.nodes[instanceId];
-          return node?.type === "ComponentInstance" ? node : undefined;
+          return document
+            ? resolveComponentScopeForRuntimeNode(document, runtimeNodeId)
+            : undefined;
         },
         getNavigationTree: () => {
           const document = this.getProjectDocument(projectId);
@@ -280,6 +287,51 @@ function findNodeByNameInSubtree(
   }
 
   return undefined;
+}
+
+function resolveComponentScopeForRuntimeNode(
+  document: UiDocument,
+  runtimeNodeId: string
+): MockRuntimeComponentScope | undefined {
+  const parts = runtimeNodeId.split("::").filter(Boolean);
+  if (parts.length < 2) return undefined;
+
+  let instance = document.nodes[parts[0]!];
+  if (instance?.type !== "ComponentInstance" || !instance.componentDefinitionId) {
+    return undefined;
+  }
+
+  let definition: UiComponentDefinition | undefined =
+    document.components?.[instance.componentDefinitionId];
+  if (!definition) return undefined;
+
+  const runtimeInstanceParts = [instance.id];
+
+  // The last segment is the source runtime node. Every preceding segment after
+  // the page-level instance must therefore be a nested ComponentInstance.
+  for (const localNodeId of parts.slice(1, -1)) {
+    const nestedInstance: UiNode | undefined = definition.nodes[localNodeId];
+    if (
+      nestedInstance?.type !== "ComponentInstance" ||
+      !nestedInstance.componentDefinitionId
+    ) {
+      return undefined;
+    }
+
+    const nestedDefinition: UiComponentDefinition | undefined =
+      document.components?.[nestedInstance.componentDefinitionId];
+    if (!nestedDefinition) return undefined;
+
+    instance = nestedInstance;
+    definition = nestedDefinition;
+    runtimeInstanceParts.push(nestedInstance.id);
+  }
+
+  return {
+    instance,
+    definition,
+    runtimeInstanceId: runtimeInstanceParts.join("::"),
+  };
 }
 
 let socket: MockRuntimeSocket | null = null;

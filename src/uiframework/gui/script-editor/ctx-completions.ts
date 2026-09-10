@@ -18,12 +18,25 @@ type ApiNode = {
 export function createCtxAutocompleteExtension(
   components: ComponentApiDescription[],
   selfComponent?: ComponentApiDescription,
+  internalComponents: ComponentApiDescription[] = [],
   navigation: NavigationTreeNode[] = []
 ): Extension {
   const roots = [buildCtxApiTree(components, navigation)];
 
   if (selfComponent) {
     roots.push(buildComponentRoot("self", selfComponent));
+  }
+
+  if (internalComponents.length > 0) {
+    roots.push({
+      label: "internal",
+      completionType: "namespace",
+      detail: "private component implementation",
+      children: internalComponents
+        .slice()
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((component) => buildComponentRoot(component.name, component)),
+    });
   }
 
   return autocompletion({

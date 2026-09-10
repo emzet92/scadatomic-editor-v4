@@ -92,14 +92,21 @@ export function RuntimeProvider({
             setMockRuntimeNodeProp(projectId, nodeId, property, payload.value);
           }
 
-          setDocument((current) =>
-            applyDocumentCommand(current, {
+          setDocument((current) => {
+            if (!current.nodes[nodeId] && nodeId.includes("::")) {
+              // Scoped reusable-component internals live in definition trees,
+              // not document.nodes. Runtime state is already persisted above;
+              // force a lightweight repaint so RenderNode can re-resolve it.
+              return { ...current };
+            }
+
+            return applyDocumentCommand(current, {
               type: "node.setProp",
               nodeId,
               property,
               value: payload.value,
-            })
-          );
+            });
+          });
 
           onNodeUpdatedRef.current?.();
           return;

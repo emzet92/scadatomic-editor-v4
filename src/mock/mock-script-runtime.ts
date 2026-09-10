@@ -27,17 +27,29 @@ export type MockScriptEvent = {
   payload?: Record<string, unknown> | undefined;
 };
 
+/**
+ * A concrete reusable-component instance that owns a scoped runtime node.
+ * runtimeInstanceId is cumulative for nested user components, e.g.
+ * "PumpCard1::AlarmBadge1".
+ */
+export type MockRuntimeComponentScope = {
+  instance: UiNode;
+  definition: UiComponentDefinition;
+  runtimeInstanceId: string;
+};
+
 export type MockScriptHost = {
   setNodeProp(nodeId: string, property: string, value: unknown): void;
+  getNodeProps(nodeId: string): Record<string, unknown>;
   setNodeVariant(nodeId: string, variantName: string): void;
   getNodeVariant(nodeId: string): string | undefined;
   resolveUiNode(name: string): UiNode | undefined;
   resolveComponentDefinition(
     componentDefinitionId: string
   ): UiComponentDefinition | undefined;
-  resolveComponentInstanceForRuntimeNode(
+  resolveComponentScopeForRuntimeNode(
     runtimeNodeId: string
-  ): UiNode | undefined;
+  ): MockRuntimeComponentScope | undefined;
   getNavigationTree(): NavigationTreeNode[];
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
@@ -60,8 +72,12 @@ export type UiComponentScriptApi = {
 
 export type MockScriptUiApi = {
   get(name: string): UiComponentScriptApi;
-  setProp(nodeId: string, property: string, value: unknown): void;
-  setColor(nodeId: string, color: string): void;
+  [key: string]: unknown;
+};
+
+/** Private component-definition tree, injected only into component-owned code. */
+export type MockScriptInternalApi = {
+  get(name: string): UiComponentScriptApi;
   [key: string]: unknown;
 };
 
@@ -88,6 +104,7 @@ export type MockScriptContext = {
     delete(key: string): void;
     clear(): void;
   };
+  /** Public API of components on the current runtime page. */
   ui: MockScriptUiApi;
   nav: MockScriptNavigationApi;
   navigateTo(path: string): void;
@@ -97,6 +114,13 @@ export type MockScriptContext = {
     number(min?: number, max?: number): number;
   };
   log(...args: unknown[]): void;
+};
+
+type CreateComponentApiOptions = {
+  /** Runtime identity used for scoped props/variants. Defaults to node.id. */
+  runtimeNodeId?: string;
+  /** Component-owned scripts receive private methods through self. */
+  includePrivateMethods?: boolean;
 };
 
 /**
@@ -111,11 +135,27 @@ export function executeMockScript(
 ): void {
   const script = getMockScript(event.projectId, event.handlerId);
   const ctx = createContext(event, host);
-  const ownerComponent = host.resolveComponentInstanceForRuntimeNode(
-    event.sourceNodeId
-  );
-  const self = ownerComponent
-    ? createComponentApi(ownerComponent, host, event.projectId, () => ctx)
+  const ownerScope = host.resolveComponentScopeForRuntimeNode(event.sourceNodeId);
+  const self = ownerScope
+    ? createComponentApi(
+        ownerScope.instance,
+        host,
+        event.projectId,
+        () => ctx,
+        {
+          runtimeNodeId: ownerScope.runtimeInstanceId,
+          includePrivateMethods: true,
+        }
+      )
+    : undefined;
+  const internal = ownerScope
+    ? createInternalUiApi(
+        ownerScope.definition,
+        ownerScope.runtimeInstanceId,
+        host,
+        event.projectId,
+        () => ctx
+      )
     : undefined;
 
   try {
@@ -123,6 +163,7 @@ export function executeMockScript(
       code: script.code,
       ctx,
       self,
+      internal,
       args: [],
       sourceUrl: `scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`,
     });
@@ -233,6 +274,7 @@ function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
   });
 }
 
+/** Public scene facade. Reusable components expose public inputs/methods only. */
 function createUiApi(
   host: MockScriptHost,
   projectId: string,
@@ -244,24 +286,14 @@ function createUiApi(
     get(name: string) {
       return resolveComponent(name);
     },
-    setProp(nodeId: string, property: string, value: unknown) {
-      host.setNodeProp(nodeId, property, value);
-    },
-    setColor(nodeId: string, color: string) {
-      host.setNodeProp(nodeId, "backgroundColor", color);
-    },
   };
 
   function resolveComponent(name: string): UiComponentScriptApi {
     const cached = componentCache.get(name);
-    if (cached) {
-      return cached;
-    }
+    if (cached) return cached;
 
     const node = host.resolveUiNode(name);
-    if (!node) {
-      throw new Error(`Unknown UI component: ${name}`);
-    }
+    if (!node) throw new Error(`Unknown UI component on current scene: ${name}`);
 
     const api = createComponentApi(node, host, projectId, getContext);
     componentCache.set(name, api);
@@ -279,12 +311,78 @@ function createUiApi(
   });
 }
 
+/**
+ * Private facade for a reusable component definition.
+ *
+ * It contains only nodes physically owned by this definition. Nested reusable
+ * components are deliberately represented by their PUBLIC facade, so a parent
+ * component cannot pierce the private tree of a child component.
+ */
+function createInternalUiApi(
+  definition: UiComponentDefinition,
+  runtimeInstanceId: string,
+  host: MockScriptHost,
+  projectId: string,
+  getContext: () => MockScriptContext
+): MockScriptInternalApi {
+  const nodesByName = new Map<string, UiNode>();
+  const duplicateNames = new Set<string>();
+  const cache = new Map<string, UiComponentScriptApi>();
+
+  for (const node of Object.values(definition.nodes)) {
+    if (nodesByName.has(node.name)) duplicateNames.add(node.name);
+    else nodesByName.set(node.name, node);
+  }
+
+  function resolveInternal(name: string): UiComponentScriptApi {
+    if (duplicateNames.has(name)) {
+      throw new Error(
+        `Ambiguous internal component name “${name}” in ${definition.name}. Rename internal nodes to unique API names.`
+      );
+    }
+
+    const cached = cache.get(name);
+    if (cached) return cached;
+
+    const node = nodesByName.get(name);
+    if (!node) {
+      throw new Error(
+        `Unknown internal component: ${definition.name}.${name}`
+      );
+    }
+
+    const runtimeNodeId = `${runtimeInstanceId}::${node.id}`;
+    const api = createComponentApi(node, host, projectId, getContext, {
+      runtimeNodeId,
+    });
+    cache.set(name, api);
+    return api;
+  }
+
+  const baseApi = {
+    get(name: string) {
+      return resolveInternal(name);
+    },
+  } as MockScriptInternalApi;
+
+  return new Proxy(baseApi, {
+    get(target, property, receiver) {
+      if (typeof property !== "string" || hasOwn(target, property)) {
+        return Reflect.get(target, property, receiver);
+      }
+      return resolveInternal(property);
+    },
+  });
+}
+
 function createComponentApi(
   node: UiNode,
   host: MockScriptHost,
   projectId: string,
-  getContext: () => MockScriptContext
+  getContext: () => MockScriptContext,
+  options: CreateComponentApiOptions = {}
 ): UiComponentScriptApi {
+  const runtimeNodeId = options.runtimeNodeId ?? node.id;
   const reusableDefinition = node.componentDefinitionId
     ? host.resolveComponentDefinition(node.componentDefinitionId)
     : undefined;
@@ -312,8 +410,12 @@ function createComponentApi(
           ])
         ),
         ...(node.props ?? {}),
+        ...host.getNodeProps(runtimeNodeId),
       }
-    : getResolvedComponentProps(node);
+    : {
+        ...getResolvedComponentProps(node),
+        ...host.getNodeProps(runtimeNodeId),
+      };
   const colorProperty = reusableDefinition
     ? Object.entries(reusableDefinition.inputs ?? {}).find(
         ([, input]) => input.type === "color"
@@ -323,8 +425,8 @@ function createComponentApi(
   const variantSource = reusableDefinition?.nodes[reusableDefinition.rootId] ?? node;
   const variantNames = getComponentVariantNames(variantSource);
   const variantRuntimeNodeId = reusableDefinition
-    ? `${node.id}::${variantSource.id}`
-    : node.id;
+    ? `${runtimeNodeId}::${variantSource.id}`
+    : runtimeNodeId;
   const localWrites = new Map<string, unknown>();
   const storedVariant = host.getNodeVariant(variantRuntimeNodeId);
   let localVariant =
@@ -332,8 +434,9 @@ function createComponentApi(
       ? storedVariant
       : variantSource.defaultVariant;
 
-  let proxy: UiComponentScriptApi;
+  let publicProxy: UiComponentScriptApi;
   let componentSelfProxy: UiComponentScriptApi;
+  let internalApi: MockScriptInternalApi | undefined;
 
   function setProp(property: string, value: unknown) {
     if (!allowedProps.has(property)) {
@@ -346,7 +449,19 @@ function createComponentApi(
 
     localProps[property] = value;
     localWrites.set(property, value);
-    host.setNodeProp(node.id, property, value);
+    host.setNodeProp(runtimeNodeId, property, value);
+  }
+
+  function getInternalApi() {
+    if (!reusableDefinition) return undefined;
+    internalApi ??= createInternalUiApi(
+      reusableDefinition,
+      runtimeNodeId,
+      host,
+      projectId,
+      getContext
+    );
+    return internalApi;
   }
 
   function getMethod(methodName: string, allowPrivate: boolean) {
@@ -367,7 +482,8 @@ function createComponentApi(
       return executeSource({
         code: script.code,
         ctx: getContext(),
-        self: reusableDefinition ? componentSelfProxy : proxy,
+        self: reusableDefinition ? componentSelfProxy : publicProxy,
+        internal: getInternalApi(),
         args,
         sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
       });
@@ -386,9 +502,6 @@ function createComponentApi(
 
     localVariant = variantName;
 
-    // Primitive variants affect the same public prop bag. Reusable component
-    // variants belong to the private definition root, so the renderer applies
-    // them to the scoped internal runtime node instead.
     if (!reusableDefinition) {
       Object.assign(localProps, getComponentVariantProps(variantSource, variantName));
       for (const [property, value] of localWrites) localProps[property] = value;
@@ -407,7 +520,7 @@ function createComponentApi(
       : undefined;
 
   const target = {
-    id: node.id,
+    id: runtimeNodeId,
     name: node.name,
     type: reusableDefinition?.name ?? node.type,
     ...(variantApi ? { variant: variantApi } : {}),
@@ -439,9 +552,9 @@ function createComponentApi(
     }) as UiComponentScriptApi;
   }
 
-  proxy = makeProxy(false);
-  componentSelfProxy = reusableDefinition ? makeProxy(true) : proxy;
-  return proxy;
+  publicProxy = makeProxy(false);
+  componentSelfProxy = reusableDefinition ? makeProxy(true) : publicProxy;
+  return options.includePrivateMethods ? componentSelfProxy : publicProxy;
 }
 
 function createVariantApi({
@@ -467,17 +580,11 @@ function createVariantApi({
         return Reflect.get(apiTarget, property, receiver);
       }
 
-      if (!variantNames.includes(property)) {
-        return undefined;
-      }
+      if (!variantNames.includes(property)) return undefined;
 
       const cached = methods.get(property);
-      if (cached) {
-        return cached;
-      }
+      if (cached) return cached;
 
-      // Every generated variant method is only syntactic sugar over the
-      // component-level setVariant(). The Proxy decides the variant name.
       const callable = () => {
         setVariant(property);
       };
@@ -492,15 +599,34 @@ function executeSource({
   code,
   ctx,
   self,
+  internal,
   args,
   sourceUrl,
 }: {
   code: string;
   ctx: MockScriptContext;
   self: UiComponentScriptApi | undefined;
+  internal?: MockScriptInternalApi | undefined;
   args: unknown[];
   sourceUrl: string;
 }) {
+  if (internal) {
+    const execute = new Function(
+      "ctx",
+      "self",
+      "internal",
+      "args",
+      `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
+    ) as (
+      context: MockScriptContext,
+      self: UiComponentScriptApi | undefined,
+      internal: MockScriptInternalApi,
+      args: unknown[]
+    ) => unknown;
+
+    return execute(ctx, self, internal, args);
+  }
+
   const execute = new Function(
     "ctx",
     "self",

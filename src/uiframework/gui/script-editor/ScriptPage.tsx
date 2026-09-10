@@ -14,6 +14,10 @@ import {
   describeComponentApi,
   type ComponentApiDescription,
 } from "../../component-api";
+import {
+  describeComponentScriptInternalApi,
+  describeComponentScriptSelfApi,
+} from "../../component-script-api";
 import { buildNavigationTree } from "../../navigation/navigation";
 import type {
   ScopedMethodRef,
@@ -68,13 +72,21 @@ function ScriptEditor({
   const componentApi = document
     ? getScopedComponentApi(document, scriptSelection, allComponentApi)
     : [];
+  const componentScriptDefinition =
+    scriptSelection?.kind === "componentMethod" ||
+    scriptSelection?.kind === "componentHandler"
+      ? scriptSelection.definition
+      : undefined;
   const selfComponent =
     scriptSelection?.kind === "method"
       ? scriptSelection.component
-      : scriptSelection?.kind === "componentMethod" ||
-          scriptSelection?.kind === "componentHandler"
-        ? describeDefinitionSelfApi(scriptSelection.definition)
+      : componentScriptDefinition
+        ? describeComponentScriptSelfApi(componentScriptDefinition)
         : undefined;
+  const internalComponents =
+    document && componentScriptDefinition
+      ? describeComponentScriptInternalApi(document, componentScriptDefinition)
+      : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -278,7 +290,7 @@ function ScriptEditor({
     ensureMockScript(
       projectId,
       methodScriptId,
-      `// ${visibility} method: ${definition.name}.${methodName}()\n// self is the instance API. Private methods are available only inside component methods.\n\nctx.log("${definition.name}.${methodName}");`
+      `// ${visibility} method: ${definition.name}.${methodName}()\n// self     = current component API (private methods allowed here)\n// internal = private nodes owned by this component definition\n// ctx.ui   = public API of components on the current runtime scene\n\nctx.log("${definition.name}.${methodName}");`
     );
 
     return methodScriptId;
@@ -354,9 +366,9 @@ function ScriptEditor({
               </h1>
               <p className="mt-1 text-sm text-zinc-500">
                 {scriptSelection?.kind === "componentMethod"
-                  ? "Encapsulated component method. Public methods are exposed on component instances; private methods stay inside the definition."
+                  ? "Encapsulated component method. self sees this component, internal sees its private tree, and ctx.ui sees only scene-public APIs."
                   : scriptSelection?.kind === "componentHandler"
-                    ? "Private handler owned by the reusable component definition. self resolves to the current component instance."
+                    ? "Private handler owned by the reusable component definition. self + internal are instance-scoped; ctx.ui stays scene-public."
                     : scriptSelection?.kind === "method"
                       ? "Component method executed synchronously inside the current handler context."
                       : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
@@ -368,6 +380,7 @@ function ScriptEditor({
               onChange={setCode}
               components={componentApi}
               selfComponent={selfComponent}
+              internalComponents={internalComponents}
               navigation={navigationTree}
             />
 
@@ -394,6 +407,13 @@ function ScriptEditor({
                   <>
                     <code>self.prop = value</code>
                     <code>self.otherMethod()</code>
+                    {componentScriptDefinition ? (
+                      <>
+                        <code>internal.Button1.disabled = true</code>
+                        <code>internal.NestedComponent.publicMethod()</code>
+                        <code>ctx.ui.OtherComponent.publicMethod()</code>
+                      </>
+                    ) : null}
                     <code>args[0], args[1], ...</code>
                   </>
                 ) : null}
@@ -537,34 +557,4 @@ function collectSubtreeNodeIds(document: UiDocument, rootId: string) {
   }
 
   return ids;
-}
-
-function describeDefinitionSelfApi(
-  definition: UiComponentDefinition
-): ComponentApiDescription {
-  const root = definition.nodes[definition.rootId];
-  const variantNames = Object.keys(root?.variants ?? {}).sort((left, right) =>
-    left.localeCompare(right)
-  );
-
-  return {
-    nodeId: `definition:${definition.id}`,
-    name: "self",
-    type: definition.name,
-    definitionName: definition.name,
-    properties: Object.entries(definition.inputs ?? {}).map(([name, input]) => ({
-      name,
-      valueType: input.type,
-    })),
-    methods: Object.entries(definition.methods ?? {})
-      .map(([name, method]) => ({ name, scriptId: method.scriptId }))
-      .sort((left, right) => left.name.localeCompare(right.name)),
-    variants: variantNames.map((name) => ({
-      name,
-      isDefault: root?.defaultVariant === name,
-    })),
-    colorProperty: Object.entries(definition.inputs ?? {}).find(
-      ([, input]) => input.type === "color"
-    )?.[0],
-  };
 }

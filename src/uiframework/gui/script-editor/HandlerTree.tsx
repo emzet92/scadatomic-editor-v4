@@ -60,10 +60,10 @@ export function HandlerTree({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              Component API
+              Scripts & Component API
             </div>
             <div className="mt-1 text-xs text-zinc-400">
-              Events, methods and visual variants
+              Scene-public APIs + encapsulated component scopes
             </div>
           </div>
           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
@@ -220,7 +220,7 @@ function ComponentDefinitionsSection({
           className="text-violet-400 transition-transform group-open:rotate-90"
         />
         <Boxes size={13} />
-        <span className="flex-1">Reusable components</span>
+        <span className="flex-1">Component scripts</span>
         <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-violet-500">
           {definitions.length}
         </span>
@@ -264,7 +264,7 @@ function ComponentDefinitionRow({
 }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
-  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [visibility, setVisibility] = useState<"public" | "private">("private");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const methods = Object.entries(definition.methods ?? {});
