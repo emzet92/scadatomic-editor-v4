@@ -30,9 +30,11 @@ export function RuntimeProvider({
   const onNodeUpdatedRef = useRef(onNodeUpdated);
   const onNavigateRef = useRef(onNavigate);
 
-  onScreenUpdatedRef.current = onScreenUpdated;
-  onNodeUpdatedRef.current = onNodeUpdated;
-  onNavigateRef.current = onNavigate;
+  useEffect(() => {
+    onScreenUpdatedRef.current = onScreenUpdated;
+    onNodeUpdatedRef.current = onNodeUpdated;
+    onNavigateRef.current = onNavigate;
+  }, [onNavigate, onNodeUpdated, onScreenUpdated]);
 
   // Rehydrate session-scoped runtime UI state only when the runtime/project
   // boundary changes. Do not couple this to render callbacks: they can change

@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import type { HandlerRef } from "../../core/document";
+import { Checkbox, SectionHeader } from "../ui";
 
 export function EventsEditor({
   nodeId,
@@ -24,14 +25,10 @@ export function EventsEditor({
 
   return (
     <div className="pt-4 border-t border-[var(--editor-border)] space-y-3">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          Events
-        </div>
-        <div className="mt-1 text-xs text-[var(--editor-text-soft)]">
-          Runtime handlers emitted by this component.
-        </div>
-      </div>
+      <SectionHeader
+        title="Events"
+        description="Runtime handlers emitted by this component."
+      />
 
       <div className="space-y-3">
         {Object.entries(definitions).map(([eventName, definition]) => {
@@ -50,9 +47,7 @@ export function EventsEditor({
               key={eventName}
               className="flex items-center gap-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] px-3 py-3 transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]"
             >
-              <input
-                data-editor-ignore
-                type="checkbox"
+              <Checkbox
                 checked={checked}
                 onChange={(event) => {
                   setEvent(
@@ -63,7 +58,6 @@ export function EventsEditor({
                       : null
                   );
                 }}
-                className="h-4 w-4 rounded border-[var(--editor-border-strong)] text-[var(--editor-accent)] focus:ring-[var(--editor-accent-soft)]"
               />
 
               <div className="min-w-0 flex-1">

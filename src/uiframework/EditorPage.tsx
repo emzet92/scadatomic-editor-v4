@@ -21,13 +21,17 @@ import { useEditorStore } from "./editor-store";
 import { ComponentPalette } from "./gui/components-palette/PaletteItem";
 import { PageTree } from "./gui/pages/PageTree";
 import { PageViewportFrame } from "./gui/page/PageViewportFrame";
-import { NavigationRuntimeProvider } from "./navigation/navigation-context";
+import { NavigationRuntimeProvider } from "./navigation/NavigationRuntimeProvider";
 import { buildNavigationTree, resolveNavigationPath } from "./navigation/navigation";
+import { PropertyPanel } from "./gui/property-panel/PropertyPanel";
 import {
-  PropertyPanel,
+  resolveComponentDefinitionEditorMode,
+  resolveComponentEditorMode,
+  scopeMode,
   type ComponentDefinitionEditorMode,
   type ComponentEditorMode,
-} from "./gui/property-panel/PropertyPanel";
+  type PageScopedMode,
+} from "./editor/component-mode";
 import { ComponentStructureTree } from "./gui/reusable-component/ComponentStructureTree";
 import { ComponentDesignerSurface } from "./designer/ComponentDesignerSurface";
 import { TreeView } from "./gui/tree-view/TreeView";
@@ -122,10 +126,10 @@ export function EditorPage() {
   const [projectName, setProjectName] = useState("Untitled Project");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [componentMode, setComponentMode] =
-    useState<ComponentEditorMode | null>(null);
-  const [componentDefinitionMode, setComponentDefinitionMode] =
-    useState<ComponentDefinitionEditorMode | null>(null);
+  const [scopedComponentMode, setScopedComponentMode] =
+    useState<PageScopedMode<ComponentEditorMode> | null>(null);
+  const [scopedComponentDefinitionMode, setScopedComponentDefinitionMode] =
+    useState<PageScopedMode<ComponentDefinitionEditorMode> | null>(null);
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -193,8 +197,8 @@ export function EditorPage() {
         setLoading(true);
         setError(null);
         setSaveStatus("idle");
-        setComponentMode(null);
-        setComponentDefinitionMode(null);
+        setScopedComponentMode(null);
+        setScopedComponentDefinitionMode(null);
         loadedRef.current = false;
         lastSavedSnapshotRef.current = null;
         revisionRef.current = undefined;
@@ -251,48 +255,6 @@ export function EditorPage() {
     };
   }, [projectId, setDocument, flushPendingSave]);
 
-  useEffect(() => {
-    setComponentMode(null);
-    setComponentDefinitionMode(null);
-  }, [activePageId]);
-
-  useEffect(() => {
-    if (!componentMode) {
-      return;
-    }
-
-    const node = document.nodes[componentMode.nodeId];
-    if (!node?.variants?.[componentMode.variantName]) {
-      setComponentMode(null);
-    }
-  }, [componentMode, document]);
-
-  useEffect(() => {
-    if (!componentDefinitionMode) return;
-    const definition = document.components?.[componentDefinitionMode.componentId];
-    if (!definition) {
-      setComponentDefinitionMode(null);
-      return;
-    }
-    const selectedInternalNode =
-      definition.nodes[componentDefinitionMode.selectedInternalNodeId];
-    if (!selectedInternalNode) {
-      setComponentDefinitionMode({
-        componentId: definition.id,
-        selectedInternalNodeId: definition.rootId,
-      });
-      return;
-    }
-    if (
-      componentDefinitionMode.variantName &&
-      !selectedInternalNode.variants?.[componentDefinitionMode.variantName]
-    ) {
-      setComponentDefinitionMode({
-        componentId: definition.id,
-        selectedInternalNodeId: selectedInternalNode.id,
-      });
-    }
-  }, [componentDefinitionMode, document]);
 
   useEffect(() => {
     if (
@@ -334,6 +296,18 @@ export function EditorPage() {
       }
     };
   }, [projectId, projectName, document, loading, flushPendingSave]);
+
+  function setComponentMode(mode: ComponentEditorMode | null) {
+    setScopedComponentMode(mode ? scopeMode(activePageId, mode) : null);
+  }
+
+  function setComponentDefinitionMode(
+    mode: ComponentDefinitionEditorMode | null
+  ) {
+    setScopedComponentDefinitionMode(
+      mode ? scopeMode(activePageId, mode) : null
+    );
+  }
 
   function editVariant(nodeId: string, variantName: string) {
     setSelectedNodeId(nodeId);
@@ -392,6 +366,16 @@ export function EditorPage() {
   }
 
   const activePage = getPage(document, activePageId);
+  const componentMode = resolveComponentEditorMode(
+    document,
+    activePageId,
+    scopedComponentMode
+  );
+  const componentDefinitionMode = resolveComponentDefinitionEditorMode(
+    document,
+    activePageId,
+    scopedComponentDefinitionMode
+  );
   const activeDocument: UiDocument = { ...document, rootId: activePage.rootId };
   const focusedNode = componentMode
     ? document.nodes[componentMode.nodeId]

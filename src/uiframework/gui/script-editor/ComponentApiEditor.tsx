@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Code2, Plus, Trash2, X } from "lucide-react";
+import { Code2, Plus, Trash2 } from "lucide-react";
 import {
   validateComponentMethodName,
   type ComponentApiDescription,
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
+import { MethodCreateForm } from "../component-api/MethodCreateForm";
+import { Button, EmptyAction, IconButton } from "../ui";
 
 type Props = {
   document: UiDocument | null;
@@ -106,18 +108,16 @@ export function ComponentApiEditor({
                   </div>
 
                   {component.apiSurface === "primitive" ? (
-                    <button
-                      type="button"
+                    <Button
                       onClick={() => {
                         setAddingNodeId(component.nodeId);
                         setDraftName("");
                         setFormError(null);
                       }}
-                      className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:border-sky-300 hover:text-sky-700"
                     >
                       <Plus size={13} />
                       Method
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-[10px] font-medium text-violet-600">
                       Definition-owned API
@@ -154,78 +154,20 @@ export function ComponentApiEditor({
                   </div>
 
                   {adding && component.apiSurface === "primitive" ? (
-                    <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-medium text-zinc-800">
-                          New public method
-                        </div>
-                        <button
-                          type="button"
-                          aria-label="Cancel adding method"
-                          onClick={closeAddForm}
-                          className="flex size-6 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-
-                      <div className="mt-2 flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="relative">
-                            <input
-                              autoFocus
-                              value={draftName}
-                              placeholder="enable"
-                              spellCheck={false}
-                              autoComplete="off"
-                              disabled={saving}
-                              onChange={(event) => {
-                                setDraftName(event.target.value);
-                                setFormError(null);
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  void addMethod(component.nodeId);
-                                }
-
-                                if (event.key === "Escape") {
-                                  event.preventDefault();
-                                  closeAddForm();
-                                }
-                              }}
-                              className={`h-8 w-full rounded-md border bg-white px-2.5 pr-7 font-mono text-xs text-zinc-800 outline-none transition focus:ring-2 focus:ring-sky-500/15 ${
-                                formError
-                                  ? "border-red-400 focus:border-red-500"
-                                  : "border-zinc-200 focus:border-sky-500"
-                              }`}
-                            />
-                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-zinc-400">
-                              ()
-                            </span>
-                          </div>
-
-                          {formError ? (
-                            <div className="mt-1 text-[11px] leading-4 text-red-600">
-                              {formError}
-                            </div>
-                          ) : (
-                            <div className="mt-1 truncate text-[10px] text-zinc-400">
-                              ctx.ui.{component.name}.{draftName || "method"}()
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => void addMethod(component.nodeId)}
-                          className="h-8 shrink-0 rounded-md bg-sky-600 px-2.5 text-[11px] font-semibold text-white transition hover:bg-sky-500 disabled:opacity-50"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
+                    <MethodCreateForm
+                      title="New public method"
+                      value={draftName}
+                      error={formError}
+                      disabled={saving}
+                      hint={`ctx.ui.${component.name}.${draftName || "method"}()`}
+                      onChange={(value) => {
+                        setDraftName(value);
+                        setFormError(null);
+                      }}
+                      onSubmit={() => void addMethod(component.nodeId)}
+                      onCancel={closeAddForm}
+                      className="mt-2"
+                    />
                   ) : null}
 
                   {component.methods.length > 0 ? (
@@ -262,35 +204,34 @@ export function ComponentApiEditor({
                             </button>
 
                             {component.apiSurface === "primitive" ? (
-                              <button
-                                type="button"
+                              <IconButton
+                                variant="danger"
                                 aria-label={`Remove ${method.name} method`}
                                 title="Remove method"
                                 onClick={() => {
                                   void onRemoveMethod(component.nodeId, method.name);
                                 }}
-                                className="flex size-7 shrink-0 items-center justify-center rounded text-zinc-400 opacity-60 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                                className="opacity-60 group-hover:opacity-100"
                               >
                                 <Trash2 size={13} />
-                              </button>
+                              </IconButton>
                             ) : null}
                           </div>
                         );
                       })}
                     </div>
                   ) : !adding && component.apiSurface === "primitive" ? (
-                    <button
-                      type="button"
+                    <EmptyAction
                       onClick={() => {
                         setAddingNodeId(component.nodeId);
                         setDraftName("");
                         setFormError(null);
                       }}
-                      className="mt-2 flex w-full items-center gap-2 rounded-md border border-dashed border-zinc-200 bg-white/60 px-2.5 py-2 text-left text-xs text-zinc-500 transition hover:border-sky-300 hover:text-sky-700"
+                      className="mt-2 py-2"
                     >
                       <Plus size={13} />
                       Add first method
-                    </button>
+                    </EmptyAction>
                   ) : null}
 
                   {component.apiSurface === "primitive" ? (

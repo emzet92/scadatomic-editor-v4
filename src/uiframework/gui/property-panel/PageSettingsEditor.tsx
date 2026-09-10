@@ -1,6 +1,7 @@
 import { Monitor, Smartphone, Tablet } from "lucide-react";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
+import { FormField, SectionHeader, TextInput } from "../ui";
 
 const presets = [
   { mode: "desktop", label: "Desktop", width: 1440, height: 900, icon: Monitor },
@@ -28,9 +29,7 @@ export function PageSettingsEditor({
 
   return (
     <section>
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-        Page viewport
-      </div>
+      <SectionHeader title="Page viewport" className="mb-2" />
 
       <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)]">
         {presets.map((preset) => {
@@ -65,26 +64,36 @@ export function PageSettingsEditor({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <label className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 py-2">
-          <span className="block text-[9px] uppercase tracking-wide text-[var(--editor-text-muted)]">Width</span>
-          <input
+        <FormField
+          label="Width"
+          compact
+          className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 py-2"
+        >
+          <TextInput
             type="number"
             min={240}
             value={width}
-            onChange={(event) => setSize("width", Math.max(240, Number(event.target.value) || 240))}
-            className="mt-1 w-full bg-transparent text-xs font-medium text-[var(--editor-text)] outline-none"
+            onChange={(event) =>
+              setSize("width", Math.max(240, Number(event.target.value) || 240))
+            }
+            className="h-auto border-0 bg-transparent p-0 text-xs font-medium focus:ring-0"
           />
-        </label>
-        <label className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 py-2">
-          <span className="block text-[9px] uppercase tracking-wide text-[var(--editor-text-muted)]">Height</span>
-          <input
+        </FormField>
+        <FormField
+          label="Height"
+          compact
+          className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 py-2"
+        >
+          <TextInput
             type="number"
             min={240}
             value={height}
-            onChange={(event) => setSize("height", Math.max(240, Number(event.target.value) || 240))}
-            className="mt-1 w-full bg-transparent text-xs font-medium text-[var(--editor-text)] outline-none"
+            onChange={(event) =>
+              setSize("height", Math.max(240, Number(event.target.value) || 240))
+            }
+            className="h-auto border-0 bg-transparent p-0 text-xs font-medium focus:ring-0"
           />
-        </label>
+        </FormField>
       </div>
     </section>
   );

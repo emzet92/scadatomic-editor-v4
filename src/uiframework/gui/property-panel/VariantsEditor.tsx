@@ -6,6 +6,14 @@ import {
 } from "../../component-variants";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
+import {
+  Button,
+  EmptyAction,
+  IconButton,
+  PanelCard,
+  SectionHeader,
+  TextInput,
+} from "../ui";
 
 export function VariantsEditor({
   node,
@@ -83,40 +91,34 @@ export function VariantsEditor({
 
   return (
     <section className="space-y-3 border-t border-[var(--editor-border)] pt-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-            Variants
-          </div>
-          <div className="mt-1 text-[11px] text-[var(--editor-text-muted)] opacity-70">
-            Visual states exposed as generated API methods.
-          </div>
-        </div>
-
-        {!adding ? (
-          <button
-            type="button"
-            data-editor-ignore
-            onClick={() => {
-              setAdding(true);
-              setDraft("");
-              setError(null);
-            }}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 text-xs font-medium text-[var(--editor-text)] transition hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)]"
-          >
-            <Plus size={13} /> Add
-          </button>
-        ) : null}
-      </div>
+      <SectionHeader
+        title="Variants"
+        description="Visual states exposed as generated API methods."
+        action={
+          !adding ? (
+            <Button
+              onClick={() => {
+                setAdding(true);
+                setDraft("");
+                setError(null);
+              }}
+            >
+              <Plus size={13} /> Add
+            </Button>
+          ) : null
+        }
+      />
 
       {adding ? (
-        <div className="rounded-lg border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-3">
+        <PanelCard accent>
           <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
-              <input
+              <TextInput
                 autoFocus
-                data-editor-ignore
+                controlSize="sm"
+                mono
                 value={draft}
+                invalid={!!error}
                 placeholder="enabled"
                 spellCheck={false}
                 autoComplete="off"
@@ -135,37 +137,32 @@ export function VariantsEditor({
                     setError(null);
                   }
                 }}
-                className={`h-8 w-full rounded-md border bg-[var(--editor-surface)] px-2 pr-7 font-mono text-xs text-[var(--editor-text)] outline-none ${
-                  error
-                    ? "border-red-400"
-                    : "border-[var(--editor-border)] focus:border-[var(--editor-accent-border)]"
-                }`}
+                className="pr-7"
               />
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[var(--editor-text-muted)]">
                 ()
               </span>
             </div>
-            <button
-              type="button"
-              data-editor-ignore
+            <IconButton
+              variant="primary"
+              size="icon"
+              aria-label="Add variant"
               onClick={addVariant}
-              className="flex size-8 items-center justify-center rounded-md bg-[var(--editor-accent)] text-white hover:bg-[var(--editor-accent-hover)]"
               title="Add variant"
             >
               <Check size={13} />
-            </button>
-            <button
-              type="button"
-              data-editor-ignore
+            </IconButton>
+            <IconButton
+              size="icon"
+              aria-label="Cancel adding variant"
               onClick={() => {
                 setAdding(false);
                 setError(null);
               }}
-              className="flex size-8 items-center justify-center rounded-md text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface)]"
               title="Cancel"
             >
               <X size={13} />
-            </button>
+            </IconButton>
           </div>
           {error ? (
             <div className="mt-1.5 text-[10px] leading-4 text-red-600">{error}</div>
@@ -174,18 +171,13 @@ export function VariantsEditor({
               ctx.ui.{node.name}.variant.{draft || "enabled"}()
             </div>
           )}
-        </div>
+        </PanelCard>
       ) : null}
 
       {variants.length === 0 ? (
-        <button
-          type="button"
-          data-editor-ignore
-          onClick={() => setAdding(true)}
-          className="flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--editor-border)] px-3 py-3 text-left text-xs text-[var(--editor-text-muted)] transition hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)]"
-        >
+        <EmptyAction onClick={() => setAdding(true)}>
           <Palette size={14} /> Add the first visual variant
-        </button>
+        </EmptyAction>
       ) : (
         <div className="space-y-1.5">
           {variants.map((variantName) => {
@@ -217,36 +209,35 @@ export function VariantsEditor({
                 </button>
 
                 {!isDefault ? (
-                  <button
-                    type="button"
-                    data-editor-ignore
+                  <IconButton
+                    aria-label={`Set ${variantName} as default variant`}
                     onClick={() => setDefaultVariant(variantName)}
-                    className="flex size-7 shrink-0 items-center justify-center rounded text-[var(--editor-text-muted)] opacity-60 transition hover:bg-amber-50 hover:text-amber-700"
+                    className="opacity-60 hover:bg-amber-50 hover:text-amber-700"
                     title="Set as default variant"
                   >
                     <Star size={12} />
-                  </button>
+                  </IconButton>
                 ) : null}
 
-                <button
-                  type="button"
-                  data-editor-ignore
+                <IconButton
+                  variant="text"
+                  aria-label={`Edit ${variantName} variant`}
                   onClick={() => onEditVariant(node.id, variantName)}
-                  className="flex size-7 shrink-0 items-center justify-center rounded text-[var(--editor-text-muted)] opacity-60 transition hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-accent)]"
+                  className="opacity-60"
                   title="Edit variant in Component mode"
                 >
                   <Pencil size={12} />
-                </button>
+                </IconButton>
 
-                <button
-                  type="button"
-                  data-editor-ignore
+                <IconButton
+                  variant="danger"
+                  aria-label={`Delete ${variantName} variant`}
                   onClick={() => removeVariant(variantName)}
-                  className="flex size-7 shrink-0 items-center justify-center rounded text-[var(--editor-text-muted)] opacity-40 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                  className="opacity-40 group-hover:opacity-100"
                   title="Delete variant"
                 >
                   <Trash2 size={12} />
-                </button>
+                </IconButton>
               </div>
             );
           })}

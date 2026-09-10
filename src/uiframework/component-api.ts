@@ -1,24 +1,16 @@
-import type {
-  UiComponentDefinition,
-  UiDocument,
-  UiNode,
+import {
+  isJsIdentifier,
+  type UiComponentDefinition,
+  type UiDocument,
+  type UiNode,
 } from "./core/document";
 import { getComponentVariantNames } from "./component-variants";
+import { isReservedComponentApiName } from "./component-api-names";
 import { getComponentDefinition } from "./registry/component-definitions";
 import {
   getComponentDefinitionForInstance,
   getResolvedComponentInstanceProps,
 } from "./reusable-components";
-
-const METHOD_NAME_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const RESERVED_COMPONENT_API_NAMES = new Set([
-  "id",
-  "name",
-  "type",
-  "setProp",
-  "setColor",
-  "variant",
-]);
 
 export type ComponentApiProperty = {
   name: string;
@@ -116,14 +108,14 @@ export function validateComponentMethodName(
 
   if (!name) return { ok: false, error: "Method name is required." };
 
-  if (!METHOD_NAME_PATTERN.test(name)) {
+  if (!isJsIdentifier(name)) {
     return {
       ok: false,
       error: "Use a JS identifier, e.g. enable or setSpeed.",
     };
   }
 
-  if (RESERVED_COMPONENT_API_NAMES.has(name)) {
+  if (isReservedComponentApiName(name)) {
     return {
       ok: false,
       error: `“${name}” is reserved by the component API.`,
@@ -150,13 +142,13 @@ export function validateDefinitionMethodName(
 ): ComponentMethodNameValidationResult {
   const name = value.trim();
   if (!name) return { ok: false, error: "Method name is required." };
-  if (!METHOD_NAME_PATTERN.test(name)) {
+  if (!isJsIdentifier(name)) {
     return {
       ok: false,
       error: "Use a JS identifier, e.g. start, reset or syncStatus.",
     };
   }
-  if (RESERVED_COMPONENT_API_NAMES.has(name) || definition.inputs?.[name]) {
+  if (isReservedComponentApiName(name) || definition.inputs?.[name]) {
     return {
       ok: false,
       error: `“${name}” conflicts with the component public API.`,

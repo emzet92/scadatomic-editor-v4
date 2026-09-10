@@ -18,6 +18,7 @@ import {
   type UiNode,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
+import { setOptionalRecordEntry } from "./core/optional-record";
 import {
   createProjectComponentRepository,
   wouldCreateComponentCycle,
@@ -532,13 +533,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       const current = state.document.components?.[componentId];
       if (!current) return state;
 
-      const methods = { ...(current.methods ?? {}) };
-      if (method) methods[methodName] = method;
-      else delete methods[methodName];
-
       const nextDefinition: UiComponentDefinition = {
         ...current,
-        methods: Object.keys(methods).length > 0 ? methods : undefined,
+        methods: setOptionalRecordEntry(current.methods, methodName, method),
       };
 
       return {

@@ -20,9 +20,10 @@ export function PageViewportFrame({
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const observedHost = host;
 
     function updateScale() {
-      const availableWidth = Math.max(1, host.clientWidth - 40);
+      const availableWidth = Math.max(1, observedHost.clientWidth - 40);
       const widthScale = availableWidth / Math.max(1, width);
       const nextScale =
         deviceMode === "desktop"
@@ -37,7 +38,7 @@ export function PageViewportFrame({
     updateScale();
 
     const observer = new ResizeObserver(updateScale);
-    observer.observe(host);
+    observer.observe(observedHost);
 
     return () => observer.disconnect();
   }, [deviceMode, width]);

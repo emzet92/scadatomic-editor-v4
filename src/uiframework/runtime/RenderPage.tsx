@@ -15,7 +15,7 @@ import {
   buildNavigationTree,
   resolveNavigationPath,
 } from "../navigation/navigation";
-import { NavigationRuntimeProvider } from "../navigation/navigation-context";
+import { NavigationRuntimeProvider } from "../navigation/NavigationRuntimeProvider";
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
 import { getComponentVariantProps } from "../component-variants";
@@ -26,7 +26,6 @@ export function RenderPage() {
   const [document, setDocument] = useState<UiDocument>(() =>
     createEmptyUiDocument()
   );
-  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateToastVisible, setUpdateToastVisible] = useState(false);
@@ -53,7 +52,6 @@ export function RenderPage() {
         const project = await getProjectById(projectId);
         if (!cancelled) {
           setDocument(project.tree);
-          setCurrentPageId(project.tree.startPageId);
         }
       } catch (error) {
         if (!cancelled) {
@@ -74,16 +72,6 @@ export function RenderPage() {
     };
   }, [projectId]);
 
-  useEffect(() => {
-    if (loading) return;
-    const target = resolveNavigationPath(document, routePath);
-    if (target) {
-      setCurrentPageId(target.pageId);
-    } else if (!currentPageId || !document.pages[currentPageId]) {
-      setCurrentPageId(document.startPageId);
-    }
-  }, [routePath, document, currentPageId, loading]);
-
   const navigateTo = useCallback(
     (path: string) => {
       if (!projectId) return;
@@ -93,7 +81,6 @@ export function RenderPage() {
         return;
       }
 
-      setCurrentPageId(target.pageId);
       const encodedPath = target.path
         .split("/")
         .map((segment) => encodeURIComponent(segment))
@@ -124,7 +111,11 @@ export function RenderPage() {
     );
   }
 
-  const currentPage = getPage(document, currentPageId ?? document.startPageId);
+  const routeTarget = resolveNavigationPath(document, routePath);
+  const currentPage = getPage(
+    document,
+    routeTarget?.pageId ?? document.startPageId
+  );
   if (!document.nodes[currentPage.rootId]) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">

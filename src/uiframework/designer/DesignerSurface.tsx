@@ -37,7 +37,10 @@ export function DesignerSurface({
   const adapterRef = useRef(adapter);
   const rectsRef = useRef<RectInfo[]>([]);
   const hoverDropTargetRef = useRef<DropTarget | null>(null);
-  adapterRef.current = adapter;
+
+  useEffect(() => {
+    adapterRef.current = adapter;
+  }, [adapter]);
 
   function setHoverDropTarget(next: DropTarget | null) {
     hoverDropTargetRef.current = next;

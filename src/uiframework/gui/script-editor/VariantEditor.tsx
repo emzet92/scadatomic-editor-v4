@@ -72,9 +72,11 @@ export function VariantEditor({
     );
   }
 
+  const stableNode = node;
+
   const updateDraft: UpdateNode = (_ignoredNodeId, updater) => {
     const next = updater({
-      ...node,
+      ...stableNode,
       props: draftProps,
     });
 
@@ -84,7 +86,7 @@ export function VariantEditor({
   async function save() {
     setSaving(true);
     try {
-      await onSave(node.id, variantName, draftProps);
+      await onSave(stableNode.id, variantName, draftProps);
       setSavedProps({ ...draftProps });
     } finally {
       setSaving(false);
@@ -94,7 +96,7 @@ export function VariantEditor({
   async function makeDefault() {
     setSettingDefault(true);
     try {
-      await onSetDefault(node.id, variantName);
+      await onSetDefault(stableNode.id, variantName);
     } finally {
       setSettingDefault(false);
     }

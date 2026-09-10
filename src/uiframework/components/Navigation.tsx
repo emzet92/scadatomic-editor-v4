@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState, type HTMLAttributes } from "react";
 import type { NavigationTreeNode } from "../navigation/navigation";
-import { useNavigationRuntime } from "../navigation/navigation-context";
+import { useNavigationRuntime } from "../navigation/useNavigationRuntime";
 import type { NavigationNodeProps } from "../component-props";
 
 type NavigationProps = HTMLAttributes<HTMLElement> & NavigationNodeProps;

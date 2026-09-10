@@ -19,6 +19,7 @@ import {
   describeComponentScriptSelfApi,
 } from "../../component-script-api";
 import { buildNavigationTree } from "../../navigation/navigation";
+import { setOptionalRecordEntry } from "../../core/optional-record";
 import type {
   ScopedMethodRef,
   UiComponentDefinition,
@@ -199,19 +200,13 @@ function ScriptEditor({
     methodScriptId: string | null
   ) {
     return persistNode(nodeId, (node) => {
-      const methods = { ...(node.methods ?? {}) };
-
-      if (methodScriptId) {
-        methods[methodName] = { scriptId: methodScriptId };
-      } else {
-        delete methods[methodName];
-      }
-
       return {
         ...node,
-        ...(Object.keys(methods).length > 0
-          ? { methods }
-          : { methods: undefined }),
+        methods: setOptionalRecordEntry(
+          node.methods,
+          methodName,
+          methodScriptId ? { scriptId: methodScriptId } : null
+        ),
       };
     });
   }
@@ -247,17 +242,17 @@ function ScriptEditor({
     const definition = document.components?.[componentId];
     if (!definition) throw new Error("Component definition no longer exists.");
 
-    const methods = { ...(definition.methods ?? {}) };
-    if (method) methods[methodName] = method;
-    else delete methods[methodName];
-
     const nextDocument: UiDocument = {
       ...document,
       components: {
         ...(document.components ?? {}),
         [componentId]: {
           ...definition,
-          methods: Object.keys(methods).length > 0 ? methods : undefined,
+          methods: setOptionalRecordEntry(
+            definition.methods,
+            methodName,
+            method
+          ),
         },
       },
     };

@@ -1,6 +1,15 @@
 import { ArrowLeft, Box, Palette, Star } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import type { UiDocument } from "../../core/document";
+import type {
+  ComponentDefinitionEditorMode,
+  ComponentEditorMode,
+} from "../../editor/component-mode";
+
+export type {
+  ComponentDefinitionEditorMode,
+  ComponentEditorMode,
+} from "../../editor/component-mode";
 import {
   ComponentDefinitionPanel,
   ComponentInstancePanel,
@@ -14,18 +23,6 @@ import { PageSettingsEditor } from "./PageSettingsEditor";
 import { ComponentProperties } from "./ComponentProperties";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
-import type { UpdateNode } from "./property-panel-types";
-
-export type ComponentEditorMode = {
-  nodeId: string;
-  variantName: string;
-};
-
-export type ComponentDefinitionEditorMode = {
-  componentId: string;
-  selectedInternalNodeId: string;
-  variantName?: string | undefined;
-};
 
 type Props = {
   document: UiDocument;

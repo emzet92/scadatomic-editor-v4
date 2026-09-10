@@ -1,6 +1,13 @@
-import type { ReactNode } from "react";
 import type { InspectorControl } from "../../registry/component-definitions";
 import type { UpdateNode } from "./property-panel-types";
+import {
+  Checkbox,
+  FormField,
+  SegmentedControl,
+  SegmentedControlItem,
+  Select,
+  TextInput,
+} from "../ui";
 
 const namedColors: Record<string, string> = {
   black: "#000000",
@@ -64,34 +71,37 @@ export function PropInput({
     }
 
     return (
-      <PropertyField label="format">
-        <div
-          data-editor-ignore
-          className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
-        >
-          <FormatButton
-            label="B"
+      <FormField label="format">
+        <SegmentedControl>
+          <SegmentedControlItem
+            aria-label="Bold"
             title="Bold"
             active={bold}
             className="font-bold"
             onClick={() => toggleTextStyle("fontWeight", !bold)}
-          />
-          <FormatButton
-            label="I"
+          >
+            B
+          </SegmentedControlItem>
+          <SegmentedControlItem
+            aria-label="Italic"
             title="Italic"
             active={italic}
             className="italic"
             onClick={() => toggleTextStyle("italic", !italic)}
-          />
-          <FormatButton
-            label="U"
+          >
+            I
+          </SegmentedControlItem>
+          <SegmentedControlItem
+            aria-label="Underline"
             title="Underline"
             active={underline}
             className="underline"
             onClick={() => toggleTextStyle("underline", !underline)}
-          />
-        </div>
-      </PropertyField>
+          >
+            U
+          </SegmentedControlItem>
+        </SegmentedControl>
+      </FormField>
     );
   }
 
@@ -100,23 +110,21 @@ export function PropInput({
       value === "center" || value === "right" ? value : "left";
 
     return (
-      <PropertyField label="alignment">
-        <div
-          data-editor-ignore
-          className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
-        >
+      <FormField label="alignment">
+        <SegmentedControl>
           {(["left", "center", "right"] as const).map((nextAlignment) => (
-            <IconToggleButton
+            <SegmentedControlItem
               key={nextAlignment}
               active={alignment === nextAlignment}
+              aria-label={`Align ${nextAlignment}`}
               title={`Align ${nextAlignment}`}
               onClick={() => updateProp(nextAlignment)}
             >
               <TextAlignIcon alignment={nextAlignment} />
-            </IconToggleButton>
+            </SegmentedControlItem>
           ))}
-        </div>
-      </PropertyField>
+        </SegmentedControl>
+      </FormField>
     );
   }
 
@@ -125,7 +133,7 @@ export function PropInput({
       typeof value === "number" ? value : Number(value ?? control.min ?? 0);
 
     return (
-      <PropertyField label="border">
+      <FormField label="border">
         <div
           data-editor-ignore
           className="flex h-9 w-full items-center overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
@@ -148,7 +156,7 @@ export function PropInput({
           />
           <span className="pr-3 text-xs text-[var(--editor-text-muted)] opacity-70">px</span>
         </div>
-      </PropertyField>
+      </FormField>
     );
   }
 
@@ -157,7 +165,7 @@ export function PropInput({
       typeof value === "string" && value ? value : "#18181b";
 
     return (
-      <PropertyField label={propName}>
+      <FormField label={propName}>
         <div className="flex items-center gap-2">
           <input
             data-editor-ignore
@@ -166,34 +174,29 @@ export function PropInput({
             onChange={(event) => updateProp(event.target.value)}
             className="h-9 w-12 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
           />
-          <input
-            data-editor-ignore
-            type="text"
+          <TextInput
             value={textColorValue}
             onChange={(event) => updateProp(event.target.value)}
-            className={inputClassName}
           />
         </div>
-      </PropertyField>
+      </FormField>
     );
   }
 
   if (control.kind === "select") {
     return (
-      <PropertyField label={propName}>
-        <select
-          data-editor-ignore
+      <FormField label={propName}>
+        <Select
           value={String(value ?? control.options[0] ?? "")}
           onChange={(event) => updateProp(event.target.value)}
-          className={inputClassName}
         >
           {control.options.map((option) => (
             <option key={option} value={option}>
               {option}
             </option>
           ))}
-        </select>
-      </PropertyField>
+        </Select>
+      </FormField>
     );
   }
 
@@ -201,119 +204,42 @@ export function PropInput({
     const checked = Boolean(value);
 
     return (
-      <PropertyField label={propName}>
+      <FormField label={propName}>
         <label className="flex items-center gap-3 h-9 px-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
-          <input
-            data-editor-ignore
-            type="checkbox"
+          <Checkbox
             checked={checked}
             onChange={(event) => updateProp(event.target.checked)}
-            className="h-4 w-4 rounded border-[var(--editor-border-strong)] text-[var(--editor-accent)] focus:ring-[var(--editor-accent-soft)]"
           />
           <span className="text-sm text-[var(--editor-text-muted)]">
             {checked ? "Enabled" : "Disabled"}
           </span>
         </label>
-      </PropertyField>
+      </FormField>
     );
   }
 
   if (control.kind === "number") {
     return (
-      <PropertyField label={propName}>
-        <input
-          data-editor-ignore
+      <FormField label={propName}>
+        <TextInput
           type="number"
           value={typeof value === "number" ? value : Number(value ?? 0)}
           min={control.min}
           max={control.max}
           step={control.step}
           onChange={(event) => updateProp(Number(event.target.value))}
-          className={inputClassName}
         />
-      </PropertyField>
+      </FormField>
     );
   }
 
   return (
-    <PropertyField label={propName}>
-      <input
-        data-editor-ignore
-        type="text"
+    <FormField label={propName}>
+      <TextInput
         value={String(value ?? "")}
         onChange={(event) => updateProp(event.target.value)}
-        className={inputClassName}
       />
-    </PropertyField>
-  );
-}
-
-function FormatButton({
-  label,
-  title,
-  active,
-  className,
-  onClick,
-}: {
-  label: string;
-  title: string;
-  active: boolean;
-  className?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={title}
-      aria-pressed={active}
-      title={title}
-      onClick={onClick}
-      className={`
-        h-9 min-w-10 border-r border-[var(--editor-border)] px-3 text-sm
-        transition last:border-r-0
-        ${
-          active
-            ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
-            : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-text)]"
-        }
-        ${className ?? ""}
-      `}
-    >
-      {label}
-    </button>
-  );
-}
-
-function IconToggleButton({
-  active,
-  title,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  title: string;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={title}
-      aria-pressed={active}
-      title={title}
-      onClick={onClick}
-      className={`
-        flex h-9 min-w-10 items-center justify-center border-r border-[var(--editor-border)] px-2
-        transition last:border-r-0
-        ${
-          active
-            ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
-            : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-text)]"
-        }
-      `}
-    >
-      {children}
-    </button>
+    </FormField>
   );
 }
 
@@ -386,40 +312,6 @@ function BorderAllIcon() {
     </svg>
   );
 }
-
-function PropertyField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-[var(--editor-text-muted)]">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-const inputClassName = `
-  h-9
-  w-full
-  rounded-md
-  border
-  border-[var(--editor-border)]
-  bg-[var(--editor-surface)]
-  px-3
-  text-sm
-  text-[var(--editor-text)]
-  outline-none
-  transition
-  focus:border-[var(--editor-accent-border)]
-  focus:ring-2
-  focus:ring-[var(--editor-accent-soft)]
-`;
 
 function normalizeColorForInput(value: string) {
   const normalized = namedColors[value.toLowerCase()] ?? value;

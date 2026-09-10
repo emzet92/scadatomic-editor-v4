@@ -85,7 +85,7 @@ export function ComponentProperties({
           definitions={eventDefinitions}
           events={node.events}
           setEvent={setEvent}
-          handlerIdPrefix={handlerIdPrefix}
+          {...(handlerIdPrefix ? { handlerIdPrefix } : {})}
         />
       ) : null}
     </div>

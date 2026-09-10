@@ -7,10 +7,11 @@ import {
   ExternalLink,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import { validateComponentMethodName } from "../../component-api";
 import type { MethodRef, UiNode } from "../../core/document";
+import { MethodCreateForm } from "../component-api/MethodCreateForm";
+import { Button, EmptyAction, IconButton } from "../ui";
 
 export function MethodsEditor({
   node,
@@ -89,9 +90,9 @@ export function MethodsEditor({
           />
         </button>
 
-        <button
-          data-editor-ignore
-          type="button"
+        <IconButton
+          size="icon"
+          variant="text"
           aria-label="Add component method"
           title="Add method"
           onClick={() => {
@@ -99,10 +100,9 @@ export function MethodsEditor({
             setAdding(true);
             setError(null);
           }}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-accent)]"
         >
           <Plus size={16} />
-        </button>
+        </IconButton>
       </div>
 
       {expanded ? (
@@ -112,94 +112,33 @@ export function MethodsEditor({
               Methods
             </div>
             {!adding ? (
-              <button
-                data-editor-ignore
-                type="button"
+              <Button
+                variant="text"
+                size="xs"
                 onClick={() => {
                   setAdding(true);
                   setError(null);
                 }}
-                className="flex items-center gap-1 text-[11px] font-medium text-[var(--editor-accent)] hover:underline"
               >
                 <Plus size={12} />
                 Add method
-              </button>
+              </Button>
             ) : null}
           </div>
 
           {adding ? (
-            <div className="mb-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-background)] p-2.5">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="text-xs font-medium text-[var(--editor-text)]">
-                  New method
-                </div>
-                <button
-                  data-editor-ignore
-                  type="button"
-                  aria-label="Cancel adding method"
-                  onClick={resetAddForm}
-                  className="flex size-6 items-center justify-center rounded text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface)] hover:text-[var(--editor-text)]"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="relative">
-                    <input
-                      data-editor-ignore
-                      autoFocus
-                      value={draftName}
-                      placeholder="enable"
-                      spellCheck={false}
-                      autoComplete="off"
-                      onChange={(event) => {
-                        setDraftName(event.target.value);
-                        setError(null);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          addMethod();
-                        }
-
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          resetAddForm();
-                        }
-                      }}
-                      className={`h-8 w-full rounded-md border bg-[var(--editor-surface)] px-2.5 pr-7 font-mono text-xs text-[var(--editor-text)] outline-none transition focus:ring-2 focus:ring-blue-500/15 ${
-                        error
-                          ? "border-red-500 focus:border-red-500"
-                          : "border-[var(--editor-border)] focus:border-blue-500"
-                      }`}
-                    />
-                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--editor-text-soft)]">
-                      ()
-                    </span>
-                  </div>
-                  {error ? (
-                    <div className="mt-1 text-[11px] leading-4 text-red-600">
-                      {error}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-[10px] text-[var(--editor-text-soft)]">
-                      Available as ctx.ui.{node.name}.{draftName || "method"}()
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  data-editor-ignore
-                  type="button"
-                  onClick={addMethod}
-                  className="h-8 shrink-0 rounded-md bg-[var(--editor-accent)] px-2.5 text-[11px] font-semibold text-white transition hover:opacity-90"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
+            <MethodCreateForm
+              value={draftName}
+              error={error}
+              hint={`Available as ctx.ui.${node.name}.${draftName || "method"}()`}
+              onChange={(value) => {
+                setDraftName(value);
+                setError(null);
+              }}
+              onSubmit={addMethod}
+              onCancel={resetAddForm}
+              className="mb-3 bg-[var(--editor-background)]"
+            />
           ) : null}
 
           {methods.length > 0 ? (
@@ -240,28 +179,21 @@ export function MethodsEditor({
                         </Link>
                       ) : null}
 
-                      <button
-                        data-editor-ignore
-                        type="button"
+                      <IconButton
+                        variant="danger"
                         aria-label={`Remove ${methodName} method`}
                         title="Remove method"
                         onClick={() => setMethod(node.id, methodName, null)}
-                        className="flex size-7 items-center justify-center rounded-md text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 size={13} />
-                      </button>
+                      </IconButton>
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : !adding ? (
-            <button
-              data-editor-ignore
-              type="button"
-              onClick={() => setAdding(true)}
-              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-[var(--editor-border)] px-3 py-3 text-left transition hover:border-[var(--editor-accent)] hover:bg-[var(--editor-accent-soft)]"
-            >
+            <EmptyAction onClick={() => setAdding(true)}>
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--editor-background)] text-[var(--editor-text-muted)]">
                 <Plus size={14} />
               </span>
@@ -273,7 +205,7 @@ export function MethodsEditor({
                   Create reusable behavior for this component.
                 </span>
               </span>
-            </button>
+            </EmptyAction>
           ) : null}
         </div>
       ) : null}

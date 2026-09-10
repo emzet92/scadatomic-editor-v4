@@ -186,11 +186,10 @@ function createContext(
   event: MockScriptEvent,
   host: MockScriptHost
 ): MockScriptContext {
-  let ctx: MockScriptContext;
   const ui = createUiApi(host, event.projectId, () => ctx);
   const nav = createNavigationApi(host);
 
-  ctx = Object.freeze({
+  const ctx: MockScriptContext = Object.freeze({
     projectId: event.projectId,
     handlerId: event.handlerId,
     sourceNodeId: event.sourceNodeId,
@@ -437,8 +436,6 @@ function createComponentApi(
       ? storedVariant
       : variantSource.defaultVariant;
 
-  let publicProxy: UiComponentScriptApi;
-  let componentSelfProxy: UiComponentScriptApi;
   let internalApi: MockScriptInternalApi | undefined;
 
   function setProp(property: string, value: unknown) {
@@ -562,8 +559,8 @@ function createComponentApi(
     }) as UiComponentScriptApi;
   }
 
-  publicProxy = makeProxy(false);
-  componentSelfProxy = reusableDefinition ? makeProxy(true) : publicProxy;
+  const publicProxy = makeProxy(false);
+  const componentSelfProxy = reusableDefinition ? makeProxy(true) : publicProxy;
   return options.includePrivateMethods ? componentSelfProxy : publicProxy;
 }
 

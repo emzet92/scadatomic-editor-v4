@@ -1,4 +1,5 @@
 import { buildDocumentIndex } from "./document-index";
+import { setOptionalRecordEntry } from "./optional-record";
 import type {
   Binding,
   HandlerRef,
@@ -323,19 +324,13 @@ function setBinding(
     return document;
   }
 
-  const bindings = {
-    ...(node.bindings ?? {}),
-  };
-
-  if (command.binding) {
-    bindings[command.property] = command.binding;
-  } else {
-    delete bindings[command.property];
-  }
-
   return replaceNode(document, {
     ...node,
-    bindings: Object.keys(bindings).length > 0 ? bindings : undefined,
+    bindings: setOptionalRecordEntry(
+      node.bindings,
+      command.property,
+      command.binding
+    ),
   });
 }
 
@@ -348,19 +343,9 @@ function setEvent(
     return document;
   }
 
-  const events = {
-    ...(node.events ?? {}),
-  };
-
-  if (command.handler) {
-    events[command.event] = command.handler;
-  } else {
-    delete events[command.event];
-  }
-
   return replaceNode(document, {
     ...node,
-    events: Object.keys(events).length > 0 ? events : undefined,
+    events: setOptionalRecordEntry(node.events, command.event, command.handler),
   });
 }
 
@@ -373,19 +358,9 @@ function setMethod(
     return document;
   }
 
-  const methods = {
-    ...(node.methods ?? {}),
-  };
-
-  if (command.script) {
-    methods[command.method] = command.script;
-  } else {
-    delete methods[command.method];
-  }
-
   return replaceNode(document, {
     ...node,
-    methods: Object.keys(methods).length > 0 ? methods : undefined,
+    methods: setOptionalRecordEntry(node.methods, command.method, command.script),
   });
 }
 
