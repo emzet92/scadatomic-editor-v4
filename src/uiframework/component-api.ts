@@ -39,6 +39,8 @@ export type ComponentApiDescription = {
   nodeId: string;
   name: string;
   type: string;
+  /** Reusable components expose only their explicitly declared public contract. */
+  apiSurface: "primitive" | "reusable";
   definitionName?: string | undefined;
   properties: ComponentApiProperty[];
   methods: ComponentApiMethod[];
@@ -62,6 +64,13 @@ export function getComponentApiPropertyNames(
     return Object.keys(reusable.inputs ?? {}).sort((left, right) =>
       left.localeCompare(right)
     );
+  }
+
+  // A reusable instance never falls back to its storage props. Its external
+  // contract is definition-driven; a missing definition therefore exposes
+  // nothing instead of leaking instance/framework implementation details.
+  if (node.type === "ComponentInstance" || node.componentDefinitionId) {
+    return [];
   }
 
   const definition = getComponentDefinition(node.type);
@@ -88,6 +97,10 @@ export function getComponentApiMethodNames(
       .filter(([, method]) => includePrivate || method.visibility === "public")
       .map(([name]) => name)
       .sort((left, right) => left.localeCompare(right));
+  }
+
+  if (node.type === "ComponentInstance" || node.componentDefinitionId) {
+    return [];
   }
 
   return Object.keys(node.methods ?? {}).sort((left, right) =>
@@ -187,6 +200,10 @@ export function getResolvedComponentProps(
     return getResolvedComponentInstanceProps(reusable, node);
   }
 
+  if (node.type === "ComponentInstance" || node.componentDefinitionId) {
+    return {};
+  }
+
   const definition = getComponentDefinition(node.type);
   return {
     ...(definition?.defaults ?? {}),
@@ -208,16 +225,22 @@ export function describeComponentApi(
         .filter(([, method]) => method.visibility === "public")
         .map(([name, method]) => ({ name, scriptId: method.scriptId }))
         .sort((left, right) => left.name.localeCompare(right.name))
-    : Object.entries(node.methods ?? {})
-        .map(([name, method]) => ({ name, scriptId: method.scriptId }))
-        .sort((left, right) => left.name.localeCompare(right.name));
+    : node.type === "ComponentInstance" || node.componentDefinitionId
+      ? []
+      : Object.entries(node.methods ?? {})
+          .map(([name, method]) => ({ name, scriptId: method.scriptId }))
+          .sort((left, right) => left.name.localeCompare(right.name));
 
-  const variantSource = reusable?.nodes[reusable.rootId] ?? node;
+  const variantSource = reusable?.nodes[reusable.rootId] ??
+    (node.type === "ComponentInstance" || node.componentDefinitionId ? undefined : node);
 
   return {
     nodeId: node.id,
     name: node.name,
     type: reusable ? "Component" : node.type,
+    apiSurface: reusable || node.type === "ComponentInstance" || node.componentDefinitionId
+      ? "reusable"
+      : "primitive",
     definitionName: reusable?.name,
     properties: getComponentApiPropertyNames(node, document).map((name) => ({
       name,
@@ -227,10 +250,12 @@ export function describeComponentApi(
     // A reusable component exposes the variants defined on its private root.
     // This keeps the generated ctx.ui.<instance>.variant API aligned with the
     // visual definition without copying variants onto every instance.
-    variants: getComponentVariantNames(variantSource).map((name) => ({
-      name,
-      isDefault: variantSource.defaultVariant === name,
-    })),
+    variants: variantSource
+      ? getComponentVariantNames(variantSource).map((name) => ({
+          name,
+          isDefault: variantSource.defaultVariant === name,
+        }))
+      : [],
     colorProperty: getComponentColorProperty(node, document),
   };
 }

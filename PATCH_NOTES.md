@@ -1,66 +1,29 @@
-# Encapsulated Component Script Scope
+# Strict Component API + Scoped Identity
 
-This patch introduces an explicit script scope for reusable UI components.
+## Public user-component contract
+Reusable `ComponentInstance` facades now expose only:
+- explicitly exposed public inputs
+- public methods
+- variants
 
-## Component-owned scripts
+Framework implementation members (`id`, `name`, `type`, `setProp`, `setColor`) are no longer emitted by autocomplete and no longer exist on reusable-component runtime facades.
 
-Component definition methods and internal handlers receive three separate APIs:
+Primitive/internal nodes keep their low-level framework API.
 
-```js
-self       // current reusable-component instance
-internal   // private tree owned by this component definition
-ctx.ui     // public API of components on the current runtime page
-```
+A reusable instance with a missing definition now exposes an empty contract instead of falling back to storage props/methods.
 
-Example:
+## Name collisions / identity
+API names are scoped:
+- `ctx.ui.Button1` resolves inside the current Page scope
+- `internal.Button1` resolves inside the current reusable-component definition
 
-```js
-internal.StartButton.disabled = true;
-internal.StatusText.label = "STARTING";
-self.syncPermissions();
-ctx.ui.Header1.setProp("label", "Pump starting");
-```
+The same display name may therefore exist in both scopes.
+Runtime state identity is based on stable node ids, not display names:
+- page node: `<nodeId>`
+- internal node: `<componentInstanceId>::<definitionNodeId>`
+- nested node: `<parentInstanceId>::<nestedInstanceId>::<definitionNodeId>`
 
-`self` exposes public inputs, public variants and all methods of the current
-definition, including private methods. `internal` exposes normal APIs of private
-primitive nodes. Nested reusable components are represented only by their public
-facade, so the parent cannot access the child's private nodes or private methods.
+Facade caches are keyed by node id rather than display name. Duplicate names inside one Page scope or one component-definition scope are treated as ambiguous instead of silently selecting one node.
 
-## External scripts
-
-Page scripts continue to receive only `ctx.ui`. Reusable component instances
-expose their public inputs, public methods and variants. `internal` is not injected
-into non-component scripts.
-
-The raw `ctx.ui.setProp(nodeId, ...)` / `ctx.ui.setColor(nodeId, ...)` escape hatch
-was removed so code cannot bypass a reusable component facade by guessing a node id.
-
-## Nested runtime scopes
-
-Runtime node ids are now cumulative:
-
-```text
-OuterInstance::NestedInstance::InternalButton
-```
-
-This avoids collisions between multiple instances of nested reusable components.
-Scoped runtime property writes are resolved before rendering, so calls such as
-`internal.Button1.disabled = true` and writes to public inputs of nested components
-are visible immediately without mutating the reusable definition.
-
-## Script editor
-
-Autocomplete now has three roots for component-owned scripts:
-
-- `self.*`
-- `internal.*`
-- `ctx.ui.*`
-
-New component methods default to `private`; visibility still controls the external
-facade.
-
-## Validation
-
-Changed TS/TSX files pass TypeScript syntax/transpile diagnostics. A full project
-build cannot be run in this container because the provided `node_modules` directory
-contains no installed frontend dependencies (`vite/client`, React types, etc.).
+## Script Editor
+Reusable component cards no longer advertise primitive-only helpers or per-instance method editing. Their API is definition-owned.

@@ -155,21 +155,25 @@ function buildComponentRoot(
     completionType: "class",
     detail: component.type,
     children: [
-      {
-        label: "id",
-        completionType: "property",
-        detail: "string · read only",
-      },
-      {
-        label: "name",
-        completionType: "property",
-        detail: "string · read only",
-      },
-      {
-        label: "type",
-        completionType: "property",
-        detail: "string · read only",
-      },
+      ...(component.apiSurface === "primitive"
+        ? [
+            {
+              label: "id",
+              completionType: "property",
+              detail: "string · read only",
+            },
+            {
+              label: "name",
+              completionType: "property",
+              detail: "string · read only",
+            },
+            {
+              label: "type",
+              completionType: "property",
+              detail: "string · read only",
+            },
+          ]
+        : []),
       ...component.properties.map((property) => ({
         label: property.name,
         completionType: "property",
@@ -203,18 +207,22 @@ function buildComponentRoot(
             },
           ]
         : []),
-      {
-        label: "setProp",
-        completionType: "method",
-        detail: "(prop, value)",
-      },
-      ...(component.colorProperty
+      ...(component.apiSurface === "primitive"
         ? [
             {
-              label: "setColor",
+              label: "setProp",
               completionType: "method",
-              detail: `(color) → ${component.colorProperty}`,
+              detail: "(prop, value)",
             },
+            ...(component.colorProperty
+              ? [
+                  {
+                    label: "setColor",
+                    completionType: "method",
+                    detail: `(color) → ${component.colorProperty}`,
+                  },
+                ]
+              : []),
           ]
         : []),
     ],

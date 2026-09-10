@@ -105,18 +105,24 @@ export function ComponentApiEditor({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingNodeId(component.nodeId);
-                      setDraftName("");
-                      setFormError(null);
-                    }}
-                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:border-sky-300 hover:text-sky-700"
-                  >
-                    <Plus size={13} />
-                    Method
-                  </button>
+                  {component.apiSurface === "primitive" ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingNodeId(component.nodeId);
+                        setDraftName("");
+                        setFormError(null);
+                      }}
+                      className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 transition hover:border-sky-300 hover:text-sky-700"
+                    >
+                      <Plus size={13} />
+                      Method
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-medium text-violet-600">
+                      Definition-owned API
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-3">
@@ -147,7 +153,7 @@ export function ComponentApiEditor({
                     </span>
                   </div>
 
-                  {adding ? (
+                  {adding && component.apiSurface === "primitive" ? (
                     <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2.5">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs font-medium text-zinc-800">
@@ -255,22 +261,24 @@ export function ComponentApiEditor({
                               {method.name}()
                             </button>
 
-                            <button
-                              type="button"
-                              aria-label={`Remove ${method.name} method`}
-                              title="Remove method"
-                              onClick={() => {
-                                void onRemoveMethod(component.nodeId, method.name);
-                              }}
-                              className="flex size-7 shrink-0 items-center justify-center rounded text-zinc-400 opacity-60 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {component.apiSurface === "primitive" ? (
+                              <button
+                                type="button"
+                                aria-label={`Remove ${method.name} method`}
+                                title="Remove method"
+                                onClick={() => {
+                                  void onRemoveMethod(component.nodeId, method.name);
+                                }}
+                                className="flex size-7 shrink-0 items-center justify-center rounded text-zinc-400 opacity-60 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            ) : null}
                           </div>
                         );
                       })}
                     </div>
-                  ) : !adding ? (
+                  ) : !adding && component.apiSurface === "primitive" ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -285,10 +293,16 @@ export function ComponentApiEditor({
                     </button>
                   ) : null}
 
-                  <div className="mt-3 text-[10px] font-mono text-zinc-400">
-                    .setProp(prop, value)
-                    {component.colorProperty ? " · .setColor(color)" : ""}
-                  </div>
+                  {component.apiSurface === "primitive" ? (
+                    <div className="mt-3 text-[10px] font-mono text-zinc-400">
+                      .setProp(prop, value)
+                      {component.colorProperty ? " · .setColor(color)" : ""}
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-[10px] text-violet-500">
+                      Only explicitly exposed inputs, public methods and variants are visible.
+                    </div>
+                  )}
                 </div>
               </article>
             );

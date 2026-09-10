@@ -61,12 +61,13 @@ export type UiComponentVariantScriptApi = {
 };
 
 export type UiComponentScriptApi = {
-  readonly id: string;
-  readonly name: string;
-  readonly type: string;
+  /** Framework metadata/helpers exist on primitive nodes only. */
+  readonly id?: string;
+  readonly name?: string;
+  readonly type?: string;
   readonly variant?: UiComponentVariantScriptApi;
-  setProp(property: string, value: unknown): void;
-  setColor(color: string): void;
+  setProp?(property: string, value: unknown): void;
+  setColor?(color: string): void;
   [key: string]: unknown;
 };
 
@@ -280,6 +281,8 @@ function createUiApi(
   projectId: string,
   getContext: () => MockScriptContext
 ): MockScriptUiApi {
+  // Names are only API aliases. Stable node ids are the actual identity, so
+  // Button1 on a page and Button1 inside a component never share a cache slot.
   const componentCache = new Map<string, UiComponentScriptApi>();
 
   const baseApi = {
@@ -289,14 +292,14 @@ function createUiApi(
   };
 
   function resolveComponent(name: string): UiComponentScriptApi {
-    const cached = componentCache.get(name);
-    if (cached) return cached;
-
     const node = host.resolveUiNode(name);
     if (!node) throw new Error(`Unknown UI component on current scene: ${name}`);
 
+    const cached = componentCache.get(node.id);
+    if (cached) return cached;
+
     const api = createComponentApi(node, host, projectId, getContext);
-    componentCache.set(name, api);
+    componentCache.set(node.id, api);
     return api;
   }
 
@@ -341,9 +344,6 @@ function createInternalUiApi(
       );
     }
 
-    const cached = cache.get(name);
-    if (cached) return cached;
-
     const node = nodesByName.get(name);
     if (!node) {
       throw new Error(
@@ -351,11 +351,14 @@ function createInternalUiApi(
       );
     }
 
+    const cached = cache.get(node.id);
+    if (cached) return cached;
+
     const runtimeNodeId = `${runtimeInstanceId}::${node.id}`;
     const api = createComponentApi(node, host, projectId, getContext, {
       runtimeNodeId,
     });
-    cache.set(name, api);
+    cache.set(node.id, api);
     return api;
   }
 
@@ -519,21 +522,28 @@ function createComponentApi(
         })
       : undefined;
 
-  const target = {
-    id: runtimeNodeId,
-    name: node.name,
-    type: reusableDefinition?.name ?? node.type,
-    ...(variantApi ? { variant: variantApi } : {}),
-    setProp,
-    setColor(color: string) {
-      if (!colorProperty) {
-        throw new Error(
-          `${node.name} (${reusableDefinition?.name ?? node.type}) has no public color property.`
-        );
-      }
-      setProp(colorProperty, color);
-    },
-  } as UiComponentScriptApi;
+  // Reusable components are strict facades: only explicitly declared inputs,
+  // public methods and variants are visible externally. Primitive nodes keep
+  // framework metadata/helpers for low-level component scripting.
+  const target = reusableDefinition
+    ? ({
+        ...(variantApi ? { variant: variantApi } : {}),
+      } as UiComponentScriptApi)
+    : ({
+        id: runtimeNodeId,
+        name: node.name,
+        type: node.type,
+        ...(variantApi ? { variant: variantApi } : {}),
+        setProp,
+        setColor(color: string) {
+          if (!colorProperty) {
+            throw new Error(
+              `${node.name} (${node.type}) has no color property.`
+            );
+          }
+          setProp(colorProperty, color);
+        },
+      } as UiComponentScriptApi);
 
   function makeProxy(includePrivateMethods: boolean) {
     return new Proxy(target, {

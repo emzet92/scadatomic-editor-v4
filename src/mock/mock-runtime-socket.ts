@@ -274,6 +274,7 @@ function findNodeByNameInSubtree(
 ) {
   const stack = [rootId];
   const visited = new Set<string>();
+  let match: UiNode | undefined;
 
   while (stack.length > 0) {
     const nodeId = stack.pop();
@@ -282,11 +283,18 @@ function findNodeByNameInSubtree(
 
     const node = document.nodes[nodeId];
     if (!node) continue;
-    if (node.name === name) return node;
+    if (node.name === name) {
+      if (match && match.id !== node.id) {
+        throw new Error(
+          `Ambiguous scene component name “${name}”. Names must be unique inside a page scope.`
+        );
+      }
+      match = node;
+    }
     stack.push(...(node.children ?? []));
   }
 
-  return undefined;
+  return match;
 }
 
 function resolveComponentScopeForRuntimeNode(

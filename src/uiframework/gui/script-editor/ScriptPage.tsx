@@ -395,8 +395,6 @@ function ScriptEditor({
                 <code>ctx.state.set(key, value)</code>
                 <code>ctx.ui.ComponentName</code>
                 <code>ctx.ui.ComponentName.prop = value</code>
-                <code>ctx.ui.ComponentName.setProp(prop, value)</code>
-                <code>ctx.ui.ComponentName.setColor(color)</code>
                 <code>ctx.ui.ComponentName.variant.enabled()</code>
                 <code>ctx.ui.ComponentName.variant.current</code>
                 <code>ctx.navigateTo("Page/SubPage")</code>

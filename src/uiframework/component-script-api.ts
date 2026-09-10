@@ -26,6 +26,7 @@ export function describeComponentScriptSelfApi(
     nodeId: `definition:${definition.id}`,
     name: "self",
     type: definition.name,
+    apiSurface: "reusable",
     definitionName: definition.name,
     properties: Object.entries(definition.inputs ?? {}).map(([name, input]) => ({
       name,
