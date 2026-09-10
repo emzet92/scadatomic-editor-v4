@@ -233,96 +233,95 @@ function completeApi(
   context: CompletionContext,
   roots: ApiNode[]
 ): CompletionResult | null {
-  const candidate = findApiCandidate(context, roots.map((root) => root.label));
+  const candidate = findApiCandidate(context);
+
   if (!candidate) {
-    return null;
+    if (!context.explicit) return null;
+
+    return {
+      from: context.pos,
+      options: roots.map(toCompletion),
+      validFor: /^[A-Za-z0-9_$]*$/,
+    };
   }
 
-  const { chain, from, rootLabel } = candidate;
-  if (chain === rootLabel) {
-    return null;
-  }
+  const { chain, from } = candidate;
+  const firstDot = chain.indexOf(".");
 
-  const root = roots.find((entry) => entry.label === rootLabel);
-  if (!root) {
-    return null;
+  // Top-level completion. This is important for component-local namespaces:
+  // typing `int` must actually offer `internal` instead of requiring the user
+  // to know and type the whole magic word first.
+  if (firstDot < 0) {
+    const options = roots
+      .filter((root) => root.label.startsWith(chain))
+      .map(toCompletion);
+
+    if (options.length === 0) return null;
+
+    return {
+      from,
+      options,
+      validFor: /^[A-Za-z0-9_$]*$/,
+    };
   }
 
   const trailingDot = chain.endsWith(".");
-  const segments = chain.split(".");
-  const prefix = trailingDot ? "" : segments.pop() ?? "";
+  const rawSegments = chain.split(".");
+  const rootLabel = rawSegments[0];
+  const root = roots.find((entry) => entry.label === rootLabel);
+  if (!root) return null;
 
-  if (trailingDot) {
-    segments.pop();
-  }
-
-  if (segments[0] !== rootLabel) {
-    return null;
-  }
+  const prefix = trailingDot ? "" : rawSegments[rawSegments.length - 1] ?? "";
+  const pathSegments = rawSegments.slice(1, -1);
 
   let parent = root;
-  for (const segment of segments.slice(1)) {
+  for (const segment of pathSegments) {
+    if (!segment) continue;
     const child = parent.children?.find((entry) => entry.label === segment);
-    if (!child) {
-      return null;
-    }
+    if (!child) return null;
     parent = child;
   }
 
   const options = (parent.children ?? []).map(toCompletion);
-  if (options.length === 0) {
-    return null;
-  }
+  if (options.length === 0) return null;
 
   return {
-    from: trailingDot ? context.pos : from + chain.length - prefix.length,
+    from: trailingDot ? context.pos : context.pos - prefix.length,
     options,
     validFor: /^[A-Za-z0-9_$]*$/,
   };
 }
 
+/**
+ * Returns the dotted API expression immediately before the cursor.
+ *
+ * Supported examples:
+ *   int
+ *   internal.
+ *   internal.Button3.ba
+ *   self.variant.
+ *   ctx.ui.Pump1.
+ *
+ * We deliberately parse only the suffix at the cursor. Looking for the last
+ * occurrence of a complete root name made `internal` brittle because partial
+ * top-level names (`int`, `inter...`) could never participate in completion.
+ */
 function findApiCandidate(
-  context: CompletionContext,
-  rootLabels: string[]
-): { chain: string; from: number; rootLabel: string } | null {
+  context: CompletionContext
+): { chain: string; from: number } | null {
   const scanFrom = Math.max(0, context.pos - 240);
   const before = context.state.sliceDoc(scanFrom, context.pos);
-  const candidates = rootLabels
-    .map((rootLabel) => ({
-      rootLabel,
-      relativeStart: before.lastIndexOf(rootLabel),
-    }))
-    .filter((entry) => entry.relativeStart >= 0)
-    .sort((left, right) => right.relativeStart - left.relativeStart);
+  const match = before.match(/[A-Za-z_$][A-Za-z0-9_$.]*$/);
 
-  for (const candidate of candidates) {
-    const previous = before[candidate.relativeStart - 1];
-    if (previous && /[A-Za-z0-9_$]/.test(previous)) {
-      continue;
-    }
+  if (!match || match.index == null) return null;
 
-    const chain = before.slice(candidate.relativeStart);
-    const escaped = escapeRegExp(candidate.rootLabel);
-    const pattern = new RegExp(
-      `^${escaped}(?:\\.[A-Za-z_$][\\w$]*)*\\.?[A-Za-z_$\\w$]*$`
-    );
+  const chain = match[0];
+  if (!chain || chain.includes("..")) return null;
 
-    if (!pattern.test(chain)) {
-      continue;
-    }
-
-    return {
-      chain,
-      from: scanFrom + candidate.relativeStart,
-      rootLabel: candidate.rootLabel,
-    };
-  }
-
-  return null;
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return {
+    chain,
+    from: scanFrom + match.index,
+  };
 }
 
 function toCompletion(node: ApiNode): Completion {
