@@ -1,0 +1,8 @@
+PASS: TypeScript project check (`node node_modules/typescript/bin/tsc -b`)
+PASS: ESLint on all changed/new source files
+PASS: git diff --check
+PASS: runtime proxy/simulator behavior test
+PASS: autocomplete generation test
+PASS: git apply --check on latest Tag/UDT baseline
+PASS: git apply --check on original project baseline
+BLOCKED: Vite bundle only because supplied node_modules lacks @rolldown/binding-linux-x64-gnu

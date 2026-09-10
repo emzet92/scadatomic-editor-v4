@@ -1,0 +1,1107 @@
+diff --git a/src/mock/mock-runtime-socket.ts b/src/mock/mock-runtime-socket.ts
+index d76b370..75bdc77 100644
+--- a/src/mock/mock-runtime-socket.ts
++++ b/src/mock/mock-runtime-socket.ts
+@@ -15,7 +15,12 @@ import {
+   executeMockScript,
+   type MockRuntimeComponentScope,
+ } from "./mock-script-runtime";
+-import { getMockTagStore, replaceMockTagStoreData } from "./mock-tag-runtime";
++import {
++  getMockTagStore,
++  listMockTagStores,
++  replaceMockTagStoreData,
++} from "./mock-tag-runtime";
++import { BasicMockTagSimulator } from "./mock-tag-simulator";
+ 
+ type MockWsPayload = Record<string, unknown>;
+ 
+@@ -27,6 +32,8 @@ class MockRuntimeSocket extends EventTarget {
+ 
+   private readonly channel = createBroadcastChannel();
+   private readonly publishedDocuments = new Map<string, UiDocument>();
++  private readonly tagSimulator = new BasicMockTagSimulator();
++  private readonly tagEventBridges = new Map<string, () => void>();
+   private signalTimer: number | null = null;
+   private process = {
+     levelPercent: 62,
+@@ -76,7 +83,8 @@ class MockRuntimeSocket extends EventTarget {
+     try {
+       const document = structuredClone(parseUiDocument(message.document));
+       this.publishedDocuments.set(message.projectId, document);
+-      replaceMockTagStoreData(message.projectId, document.data);
++      const tagStore = replaceMockTagStoreData(message.projectId, document.data);
++      this.ensureTagEventBridge(message.projectId, tagStore);
+     } catch (error) {
+       console.warn("[mock-ws] Ignoring invalid published document", error);
+     }
+@@ -113,16 +121,7 @@ class MockRuntimeSocket extends EventTarget {
+ 
+     const projectDocument = this.getProjectDocument(projectId);
+     const tagStore = getMockTagStore(projectId, projectDocument?.data);
+-    const unsubscribeTagChanges = tagStore.subscribe("*", (tagEvent) => {
+-      this.emitMockResponse({
+-        type: "runtime.signal",
+-        projectId,
+-        source: tagEvent.path,
+-        value: tagEvent.newValue,
+-        tagEvent,
+-        timestamp: Date.now(),
+-      });
+-    });
++    this.ensureTagEventBridge(projectId, tagStore);
+ 
+     executeMockScript(
+       {
+@@ -203,7 +202,6 @@ class MockRuntimeSocket extends EventTarget {
+         },
+       }
+     );
+-    unsubscribeTagChanges();
+ 
+     console.info("[mock-ws] runtime.event", payload);
+   }
+@@ -245,9 +243,45 @@ class MockRuntimeSocket extends EventTarget {
+       );
+ 
+       this.emitProcessSignals();
++      this.simulateProjectTags();
+     }, SIGNAL_INTERVAL_MS);
+   }
+ 
++  private simulateProjectTags() {
++    const activeProjectId = getRuntimeProjectIdFromLocation();
++    if (!activeProjectId) return;
++
++    const activeStore = listMockTagStores().find(
++      ([projectId]) => projectId === activeProjectId
++    );
++    if (!activeStore) return;
++
++    const [projectId, tagStore] = activeStore;
++    this.ensureTagEventBridge(projectId, tagStore);
++    this.tagSimulator.tick(projectId, tagStore);
++  }
++
++  private ensureTagEventBridge(
++    projectId: string,
++    tagStore: ReturnType<typeof getMockTagStore>
++  ) {
++    if (this.tagEventBridges.has(projectId)) return;
++
++    const unsubscribe = tagStore.subscribe("*", (tagEvent) => {
++      // Tag runtime is intentionally local in this prototype. Distributed state
++      // is out of scope, so do not bounce simulator ticks through BroadcastChannel.
++      this.dispatchPayload({
++        type: "runtime.signal",
++        projectId,
++        source: tagEvent.path,
++        value: tagEvent.newValue,
++        tagEvent,
++        timestamp: Date.now(),
++      });
++    });
++    this.tagEventBridges.set(projectId, unsubscribe);
++  }
++
+   private emitProcessSignals() {
+     const levelPercent = round(this.process.levelPercent, 1);
+     const liters = Math.round(levelPercent * 20);
+@@ -388,3 +422,13 @@ function round(value: number, digits: number) {
+   const factor = 10 ** digits;
+   return Math.round(value * factor) / factor;
+ }
++
++function getRuntimeProjectIdFromLocation() {
++  const match = window.location.pathname.match(/^\/render\/([^/]+)/);
++  if (!match?.[1]) return undefined;
++  try {
++    return decodeURIComponent(match[1]);
++  } catch {
++    return match[1];
++  }
++}
+diff --git a/src/mock/mock-script-runtime.ts b/src/mock/mock-script-runtime.ts
+index 31639fe..64cd9eb 100644
+--- a/src/mock/mock-script-runtime.ts
++++ b/src/mock/mock-script-runtime.ts
+@@ -1,5 +1,9 @@
+ import type { TagStore } from "../uiframework/data/tags/TagStore";
+-import { createUdtRuntimeGlobals } from "../uiframework/data/runtime/UdtRuntime";
++import {
++  createTagRuntimeGlobals,
++  createTagRuntimeProxy,
++  type TagRuntimeApi,
++} from "../uiframework/data/runtime/TagRuntimeProxy";
+ import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
+ import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
+ import {
+@@ -111,6 +115,8 @@ export type MockScriptContext = {
+   /** Public API of components on the current runtime page. */
+   ui: MockScriptUiApi;
+   nav: MockScriptNavigationApi;
++  /** Dynamic typed tag namespace. All writes are routed through TagStore. */
++  tags?: TagRuntimeApi | undefined;
+   navigateTo(path: string): void;
+   emit(eventName: string, payload?: Record<string, unknown>): void;
+   random: {
+@@ -192,6 +198,14 @@ function createContext(
+ ): MockScriptContext {
+   const ui = createUiApi(host, event.projectId, () => ctx);
+   const nav = createNavigationApi(host);
++  const tagStore = host.getTagStore();
++  const contextRef: { current?: MockScriptContext } = {};
++  const tags = tagStore
++    ? createTagRuntimeProxy(tagStore, {
++        log: (...values) => contextRef.current?.log(...values),
++        emit: (eventName, payload) => contextRef.current?.emit(eventName, payload),
++      })
++    : undefined;
+ 
+   const ctx: MockScriptContext = Object.freeze({
+     projectId: event.projectId,
+@@ -215,6 +229,7 @@ function createContext(
+     }),
+     ui,
+     nav,
++    ...(tags ? { tags } : {}),
+     navigateTo(path: string) {
+       host.navigateTo(path);
+     },
+@@ -233,6 +248,7 @@ function createContext(
+       console.log(`[script:${event.handlerId}]`, ...args);
+     },
+   });
++  contextRef.current = ctx;
+ 
+   return ctx;
+ }
+@@ -658,7 +674,7 @@ function executeSource({
+ function createTagGlobals(host: MockScriptHost, ctx: MockScriptContext) {
+   const tagStore = host.getTagStore();
+   return tagStore
+-    ? createUdtRuntimeGlobals(tagStore, {
++    ? createTagRuntimeGlobals(tagStore, {
+         log: (...values) => ctx.log(...values),
+         emit: (eventName, payload) => ctx.emit(eventName, payload),
+       })
+diff --git a/src/mock/mock-tag-runtime.ts b/src/mock/mock-tag-runtime.ts
+index 40c5649..0159133 100644
+--- a/src/mock/mock-tag-runtime.ts
++++ b/src/mock/mock-tag-runtime.ts
+@@ -17,3 +17,7 @@ export function replaceMockTagStoreData(projectId: string, data?: ProjectData) {
+   store.replaceData(data ?? createEmptyProjectData());
+   return store;
+ }
++
++export function listMockTagStores(): Array<[string, TagStore]> {
++  return Array.from(stores.entries());
++}
+diff --git a/src/mock/mock-tag-simulator.ts b/src/mock/mock-tag-simulator.ts
+new file mode 100644
+index 0000000..5c8bf01
+--- /dev/null
++++ b/src/mock/mock-tag-simulator.ts
+@@ -0,0 +1,72 @@
++import type { TagStore } from "../uiframework/data/tags/TagStore";
++
++type NumericSimulationState = {
++  baseline: number;
++  lastSimulated: number | undefined;
++};
++
++/**
++ * Lightweight type-aware simulator for project tags.
++ *
++ * It deliberately knows nothing about PLC/device protocols. It only produces
++ * candidate values and writes them through TagStore.set(), so the exact same
++ * validation/event/subscription pipeline is exercised as with user scripts.
++ */
++export class BasicMockTagSimulator {
++  private readonly tickByProject = new Map<string, number>();
++  private readonly numericState = new Map<string, NumericSimulationState>();
++
++  tick(projectId: string, tagStore: TagStore) {
++    const tick = (this.tickByProject.get(projectId) ?? 0) + 1;
++    this.tickByProject.set(projectId, tick);
++
++    for (const entry of tagStore.listPrimitivePaths()) {
++      if (entry.type.kind === "string") continue;
++
++      if (entry.type.kind === "bool") {
++        // Stagger boolean transitions so every bool does not flip together.
++        const cadence = 9 + (stableHash(entry.path) % 5);
++        if ((tick + stableHash(entry.path)) % cadence !== 0) continue;
++        tagStore.set(entry.path, entry.value !== true);
++        continue;
++      }
++
++      const current = typeof entry.value === "number" ? entry.value : 0;
++      const stateKey = `${projectId}:${entry.path}`;
++      const existing = this.numericState.get(stateKey);
++      const state = existing ?? {
++        baseline: current,
++        lastSimulated: undefined,
++      };
++
++      // If a script/user changed the tag since our previous tick, treat that
++      // value as the new operating point instead of immediately snapping back.
++      if (
++        state.lastSimulated !== undefined &&
++        !Object.is(current, state.lastSimulated)
++      ) {
++        state.baseline = current;
++      }
++
++      const amplitude = Math.max(
++        2,
++        Math.min(120, Math.round(Math.max(Math.abs(state.baseline), 25) * 0.08))
++      );
++      const phase = (stableHash(entry.path) % 31) / 7;
++      const wave = Math.sin(tick * 0.42 + phase);
++      const next = Math.round(state.baseline + wave * amplitude);
++
++      state.lastSimulated = next;
++      this.numericState.set(stateKey, state);
++      tagStore.set(entry.path, next);
++    }
++  }
++}
++
++function stableHash(value: string) {
++  let hash = 0;
++  for (let index = 0; index < value.length; index += 1) {
++    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
++  }
++  return hash;
++}
+diff --git a/src/uiframework/data/runtime/TagRuntimeProxy.ts b/src/uiframework/data/runtime/TagRuntimeProxy.ts
+new file mode 100644
+index 0000000..c8baf64
+--- /dev/null
++++ b/src/uiframework/data/runtime/TagRuntimeProxy.ts
+@@ -0,0 +1,245 @@
++import type { TagStore } from "../tags/TagStore";
++import { isPrimitiveTag, isUdtTag } from "../tags/TagDefinition";
++import type { UdtDefinition, UdtMethodDefinition } from "../udt/UdtDefinition";
++
++export type TagRuntimeContext = {
++  log?: (...args: unknown[]) => void;
++  emit?: (eventName: string, payload?: Record<string, unknown>) => void;
++};
++
++export type TagRuntimeApi = Record<string, unknown> & {
++  $get(path: string): unknown;
++  $set(path: string, value: unknown): void;
++  $children(path: string): string[];
++};
++
++export type UdtInstanceApi = Record<string, unknown>;
++
++const TAG_RUNTIME_HELPERS = new Set(["$get", "$set", "$children"]);
++
++/**
++ * Dynamic project-tag namespace used by scripts.
++ *
++ * Examples:
++ *   tags.LineSpeed
++ *   tags.LineSpeed = 1200
++ *   tags.Pump1.speed
++ *   tags.Pump1.speed = 1450
++ *   tags.Pump1.start()
++ *
++ * Every write is routed through TagStore.set(), so validation, tag.changed and
++ * subscriptions remain the single mutation pipeline.
++ */
++export function createTagRuntimeProxy(
++  tagStore: TagStore,
++  context: TagRuntimeContext = {}
++): TagRuntimeApi {
++  const udtProxyCache = new Map<string, UdtInstanceApi>();
++
++  function createScopedUdtProxy(
++    path: string,
++    definitionId: string
++  ): UdtInstanceApi {
++    const cacheKey = `${definitionId}:${path}`;
++    const cached = udtProxyCache.get(cacheKey);
++    if (cached) return cached;
++
++    const methodCache = new Map<string, (...args: unknown[]) => unknown>();
++    const proxy = new Proxy({} as UdtInstanceApi, {
++      get(_target, property) {
++        if (typeof property !== "string") return undefined;
++        const definition = getDefinition(tagStore, definitionId);
++        if (!definition) return undefined;
++
++        const field = definition.fields.find(
++          (candidate) => candidate.name === property
++        );
++        if (field) {
++          const fieldPath = `${path}.${field.name}`;
++          return field.type.kind === "udt"
++            ? createScopedUdtProxy(fieldPath, field.type.udtId)
++            : tagStore.get(fieldPath);
++        }
++
++        const method = definition.methods.find(
++          (candidate) => candidate.name === property
++        );
++        if (!method) return undefined;
++
++        const callable = methodCache.get(method.id);
++        if (callable) return callable;
++
++        const nextCallable = (...args: unknown[]) =>
++          executeUdtMethod(method, proxy, args, context);
++        methodCache.set(method.id, nextCallable);
++        return nextCallable;
++      },
++      set(_target, property, value) {
++        if (typeof property !== "string") return false;
++        const definition = getDefinition(tagStore, definitionId);
++        const field = definition?.fields.find(
++          (candidate) => candidate.name === property
++        );
++        if (!field) {
++          throw new TypeError(`Unknown UDT member: ${path}.${property}`);
++        }
++        if (field.type.kind === "udt") {
++          throw new TypeError(
++            `Cannot assign an entire UDT value: ${path}.${property}`
++          );
++        }
++        setOrThrow(tagStore, `${path}.${property}`, value);
++        return true;
++      },
++      ownKeys() {
++        const definition = getDefinition(tagStore, definitionId);
++        return definition
++          ? [
++              ...definition.fields.map((field) => field.name),
++              ...definition.methods.map((method) => method.name),
++            ]
++          : [];
++      },
++      has(_target, property) {
++        if (typeof property !== "string") return false;
++        const definition = getDefinition(tagStore, definitionId);
++        return !!definition?.fields.some((field) => field.name === property) ||
++          !!definition?.methods.some((method) => method.name === property);
++      },
++      getOwnPropertyDescriptor() {
++        return { enumerable: true, configurable: true };
++      },
++    });
++
++    udtProxyCache.set(cacheKey, proxy);
++    return proxy;
++  }
++
++  const root = new Proxy({} as TagRuntimeApi, {
++    get(_target, property) {
++      if (typeof property !== "string") return undefined;
++
++      if (property === "$get") {
++        return (path: string) => tagStore.get(path);
++      }
++      if (property === "$set") {
++        return (path: string, value: unknown) => setOrThrow(tagStore, path, value);
++      }
++      if (property === "$children") {
++        return (path: string) => tagStore.children(path);
++      }
++
++      const tag = tagStore.getTagByName(property);
++      if (!tag) return undefined;
++      return isUdtTag(tag)
++        ? createScopedUdtProxy(tag.name, tag.type.udtId)
++        : tagStore.get(tag.name);
++    },
++    set(_target, property, value) {
++      if (typeof property !== "string") return false;
++      if (TAG_RUNTIME_HELPERS.has(property)) {
++        throw new TypeError(`${property} is a read-only tag runtime helper.`);
++      }
++      const tag = tagStore.getTagByName(property);
++      if (!tag) throw new TypeError(`Unknown tag: ${property}`);
++      if (!isPrimitiveTag(tag)) {
++        throw new TypeError(`Cannot assign an entire UDT value: ${tag.name}`);
++      }
++      setOrThrow(tagStore, tag.name, value);
++      return true;
++    },
++    ownKeys() {
++      return [
++        ...TAG_RUNTIME_HELPERS,
++        ...tagStore.listTags().map((tag) => tag.name),
++      ];
++    },
++    has(_target, property) {
++      return (
++        typeof property === "string" &&
++        (TAG_RUNTIME_HELPERS.has(property) || !!tagStore.getTagByName(property))
++      );
++    },
++    getOwnPropertyDescriptor() {
++      return { enumerable: true, configurable: true };
++    },
++  });
++
++  return root;
++}
++
++/**
++ * Backwards-compatible direct UDT globals plus the canonical `tags` namespace.
++ * Primitive tags intentionally live under `tags` because assigning a primitive
++ * JavaScript function parameter cannot be intercepted by a Proxy.
++ */
++export function createTagRuntimeGlobals(
++  tagStore: TagStore,
++  context: TagRuntimeContext = {}
++): Record<string, unknown> {
++  const tags = createTagRuntimeProxy(tagStore, context);
++  const globals: Record<string, unknown> = { tags };
++
++  for (const tag of tagStore.listTags()) {
++    if (isUdtTag(tag)) {
++      globals[tag.name] = tags[tag.name];
++    }
++  }
++
++  return globals;
++}
++
++export function createUdtInstanceApi(
++  tagName: string,
++  tagStore: TagStore,
++  context: TagRuntimeContext = {}
++): UdtInstanceApi {
++  const tag = tagStore.getTagByName(tagName);
++  if (!tag || !isUdtTag(tag)) {
++    throw new Error(`Unknown UDT tag: ${tagName}`);
++  }
++  const tags = createTagRuntimeProxy(tagStore, context);
++  const api = tags[tagName];
++  if (!api || typeof api !== "object") {
++    throw new Error(`Cannot create UDT runtime proxy for: ${tagName}`);
++  }
++  return api as UdtInstanceApi;
++}
++
++function executeUdtMethod(
++  method: UdtMethodDefinition,
++  self: UdtInstanceApi,
++  args: unknown[],
++  context: TagRuntimeContext
++) {
++  const ctx = Object.freeze({
++    log: (...values: unknown[]) => context.log?.(...values),
++    emit: (eventName: string, payload?: Record<string, unknown>) =>
++      context.emit?.(eventName, payload),
++  });
++
++  const execute = new Function(
++    "self",
++    "ctx",
++    "args",
++    `"use strict";\n${method.source}\n//# sourceURL=scadatomic://udt-method/${encodeURIComponent(method.name)}.js`
++  ) as (
++    self: UdtInstanceApi,
++    contextApi: typeof ctx,
++    args: unknown[]
++  ) => unknown;
++
++  return execute(self, ctx, args);
++}
++
++function setOrThrow(tagStore: TagStore, path: string, value: unknown) {
++  const result = tagStore.set(path, value);
++  if (!result.ok) throw new TypeError(result.error);
++}
++
++function getDefinition(
++  tagStore: TagStore,
++  definitionId: string
++): UdtDefinition | undefined {
++  return tagStore.getUdtDefinitionById(definitionId);
++}
+diff --git a/src/uiframework/data/runtime/UdtRuntime.ts b/src/uiframework/data/runtime/UdtRuntime.ts
+index 38e6e76..3460e7b 100644
+--- a/src/uiframework/data/runtime/UdtRuntime.ts
++++ b/src/uiframework/data/runtime/UdtRuntime.ts
+@@ -1,108 +1,14 @@
+-import { TagStore } from "../tags/TagStore";
+-import { isPrimitiveTag, isUdtTag, type ProjectData } from "../tags/TagDefinition";
+-import type { UdtDefinition, UdtMethodDefinition } from "../udt/UdtDefinition";
+-
+-export type UdtMethodContext = {
+-  log?: (...args: unknown[]) => void;
+-  emit?: (eventName: string, payload?: Record<string, unknown>) => void;
+-};
+-
+-export type UdtInstanceApi = Record<string, unknown>;
+-
+-export function createUdtRuntimeGlobals(
+-  tagStore: TagStore,
+-  context: UdtMethodContext = {}
+-): Record<string, UdtInstanceApi> {
+-  const globals: Record<string, UdtInstanceApi> = {};
+-  for (const tag of tagStore.listTags()) {
+-    if (tag.type.kind !== "udt") continue;
+-    globals[tag.name] = createUdtInstanceApi(tag.name, tagStore, context);
+-  }
+-  return globals;
+-}
+-
+-export function createUdtInstanceApi(
+-  tagName: string,
+-  tagStore: TagStore,
+-  context: UdtMethodContext = {}
+-): UdtInstanceApi {
+-  const methodCache = new Map<string, (...args: unknown[]) => unknown>();
+-  const proxy = new Proxy({} as UdtInstanceApi, {
+-    get(_target, property) {
+-      if (typeof property !== "string") return undefined;
+-      const tag = tagStore.getTagByName(tagName);
+-      if (!tag || !isUdtTag(tag)) return undefined;
+-      const definition = tagStore.getUdtDefinition(tag);
+-      if (!definition) return undefined;
+-
+-      const field = definition.fields.find((candidate) => candidate.name === property);
+-      if (field) return tagStore.get(`${tagName}.${property}`);
+-
+-      const method = definition.methods.find((candidate) => candidate.name === property);
+-      if (!method) return undefined;
+-      const cached = methodCache.get(method.id);
+-      if (cached) return cached;
+-
+-      const callable = (...args: unknown[]) =>
+-        executeUdtMethod(method, proxy, args, context);
+-      methodCache.set(method.id, callable);
+-      return callable;
+-    },
+-    set(_target, property, value) {
+-      if (typeof property !== "string") return false;
+-      const result = tagStore.set(`${tagName}.${property}`, value);
+-      if (!result.ok) throw new TypeError(result.error);
+-      return true;
+-    },
+-    ownKeys() {
+-      const tag = tagStore.getTagByName(tagName);
+-      if (!tag || !isUdtTag(tag)) return [];
+-      const definition = tagStore.getUdtDefinition(tag);
+-      return definition
+-        ? [...definition.fields.map((field) => field.name), ...definition.methods.map((method) => method.name)]
+-        : [];
+-    },
+-    getOwnPropertyDescriptor() {
+-      return { enumerable: true, configurable: true };
+-    },
+-  });
+-
+-  return proxy;
+-}
+-
+-export function getUdtApiDescription(data: ProjectData, definition: UdtDefinition) {
+-  return {
+-    fields: definition.fields.map((field) => ({
+-      name: field.name,
+-      type: field.type.kind === "udt" ? data.udts[field.type.udtId]?.name ?? "UDT" : field.type.kind,
+-    })),
+-    methods: definition.methods.map((method) => ({ name: method.name })),
+-  };
+-}
+-
+-function executeUdtMethod(
+-  method: UdtMethodDefinition,
+-  self: UdtInstanceApi,
+-  args: unknown[],
+-  context: UdtMethodContext
+-) {
+-  const ctx: {
+-    log: (...values: unknown[]) => void;
+-    emit: (eventName: string, payload?: Record<string, unknown>) => void;
+-  } = Object.freeze({
+-    log: (...values: unknown[]) => { context.log?.(...values); },
+-    emit: (eventName: string, payload?: Record<string, unknown>) => { context.emit?.(eventName, payload); },
+-  });
+-
+-  const execute = new Function(
+-    "self",
+-    "ctx",
+-    "args",
+-    `"use strict";\n${method.source}\n//# sourceURL=scadatomic://udt-method/${encodeURIComponent(method.name)}.js`
+-  ) as (self: UdtInstanceApi, contextApi: { log: (...values: unknown[]) => void; emit: (eventName: string, payload?: Record<string, unknown>) => void }, args: unknown[]) => unknown;
+-
+-  return execute(self, ctx, args);
+-}
++import { isPrimitiveTag, type ProjectData } from "../tags/TagDefinition";
++import type { UdtDefinition } from "../udt/UdtDefinition";
++export {
++  createTagRuntimeGlobals,
++  createTagRuntimeProxy,
++  createUdtInstanceApi,
++  createTagRuntimeGlobals as createUdtRuntimeGlobals,
++  type TagRuntimeApi,
++  type TagRuntimeContext as UdtMethodContext,
++  type UdtInstanceApi,
++} from "./TagRuntimeProxy";
+ 
+ export function flattenTagValues(data: ProjectData): Array<[string, unknown]> {
+   const values: Array<[string, unknown]> = [];
+diff --git a/src/uiframework/data/runtime/index.ts b/src/uiframework/data/runtime/index.ts
+index 53a765d..5cb8400 100644
+--- a/src/uiframework/data/runtime/index.ts
++++ b/src/uiframework/data/runtime/index.ts
+@@ -1 +1,2 @@
++export * from "./TagRuntimeProxy";
+ export * from "./UdtRuntime";
+diff --git a/src/uiframework/data/tags/TagRegistry.ts b/src/uiframework/data/tags/TagRegistry.ts
+index 8d24351..fd78ffd 100644
+--- a/src/uiframework/data/tags/TagRegistry.ts
++++ b/src/uiframework/data/tags/TagRegistry.ts
+@@ -3,7 +3,7 @@ import { TypeRegistry } from "../types/TypeRegistry";
+ import { createUdtTag } from "../udt/UdtInstanceFactory";
+ import type { ProjectData, PrimitiveTag, TagDefinition } from "./TagDefinition";
+ 
+-export const RESERVED_DATA_NAMES = new Set(["ctx", "self", "internal", "args"]);
++export const RESERVED_DATA_NAMES = new Set(["ctx", "self", "internal", "args", "tags", "$get", "$set", "$children"]);
+ 
+ export function validateDataName(
+   data: ProjectData,
+diff --git a/src/uiframework/data/tags/TagStore.ts b/src/uiframework/data/tags/TagStore.ts
+index 4a4f8cc..7e6c74b 100644
+--- a/src/uiframework/data/tags/TagStore.ts
++++ b/src/uiframework/data/tags/TagStore.ts
+@@ -1,4 +1,4 @@
+-import type { DataType } from "../types/DataType";
++import type { DataType, PrimitiveDataType } from "../types/DataType";
+ import { TypeRegistry } from "../types/TypeRegistry";
+ import type { UdtDefinition, UdtFieldDefinition } from "../udt/UdtDefinition";
+ import { isPrimitiveTag, isUdtTag, type ProjectData, type TagDefinition, type UdtTag } from "./TagDefinition";
+@@ -16,6 +16,11 @@ export type ResolvedTagPath = {
+   field?: UdtFieldDefinition | undefined;
+ };
+ 
++
++export type ResolvedPrimitiveTagPath = Omit<ResolvedTagPath, "type"> & {
++  type: PrimitiveDataType;
++};
++
+ export class TagStore {
+   private data: ProjectData;
+   private readonly listeners = new Map<string, Set<TagChangedListener>>();
+@@ -154,10 +159,26 @@ export class TagStore {
+     return this.data.udts[tag.type.udtId];
+   }
+ 
++  getUdtDefinitionById(udtId: string): UdtDefinition | undefined {
++    return this.data.udts[udtId];
++  }
++
+   listTags() {
+     return Object.values(this.data.tags);
+   }
+ 
++  /**
++   * Flat primitive runtime leaves. Useful for simulator/drivers and later
++   * data-driven components without exposing TagStore's mutable backing data.
++   */
++  listPrimitivePaths(): ResolvedPrimitiveTagPath[] {
++    const paths: ResolvedPrimitiveTagPath[] = [];
++    for (const tag of this.listTags()) {
++      collectPrimitivePaths(this, tag.name, paths);
++    }
++    return paths;
++  }
++
+   private emit(event: TagChangedEvent) {
+     for (const listener of this.listeners.get(event.path) ?? []) listener(event);
+     for (const listener of this.listeners.get("*") ?? []) listener(event);
+@@ -183,3 +204,19 @@ function setNestedValue(
+ function isRecord(value: unknown): value is Record<string, unknown> {
+   return !!value && typeof value === "object" && !Array.isArray(value);
+ }
++
++function collectPrimitivePaths(
++  store: TagStore,
++  path: string,
++  output: ResolvedPrimitiveTagPath[]
++) {
++  const resolved = store.resolve(path);
++  if (!resolved) return;
++  if (resolved.type.kind !== "udt") {
++    output.push({ ...resolved, type: resolved.type });
++    return;
++  }
++  for (const childPath of store.children(path)) {
++    collectPrimitivePaths(store, childPath, output);
++  }
++}
+diff --git a/src/uiframework/gui/data/UdtMethodEditor.tsx b/src/uiframework/gui/data/UdtMethodEditor.tsx
+index 9c76174..e6adfaa 100644
+--- a/src/uiframework/gui/data/UdtMethodEditor.tsx
++++ b/src/uiframework/gui/data/UdtMethodEditor.tsx
+@@ -8,7 +8,7 @@ import { useEditorStore } from "../../editor-store";
+ import { Button, FormField, PanelCard, Select, TextInput } from "../ui";
+ import { JavaScriptCodeEditor } from "../script-editor/JavaScriptCodeEditor";
+ import type { AutocompleteApiNode } from "../script-editor/ctx-completions";
+-import { createUdtSelfAutocompleteRoot, createUdtTagAutocompleteRoots } from "./udt-autocomplete";
++import { createUdtSelfAutocompleteRoot } from "./udt-autocomplete";
+ 
+ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; udtId: string; methodId: string }) {
+   const definition = data.udts[udtId];
+@@ -22,13 +22,9 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData;
+   );
+   const selectedInstance = instances.find((tag) => tag.id === selectedTagId) ?? instances[0];
+ 
+-  const autocompleteRoots = useMemo<AutocompleteApiNode[]>(() => {
+-    if (!definition) return createUdtTagAutocompleteRoots(data);
+-    return [
+-      createUdtSelfAutocompleteRoot(definition),
+-      ...createUdtTagAutocompleteRoots(data),
+-    ];
+-  }, [data, definition]);
++  const autocompleteRoots = useMemo<AutocompleteApiNode[]>(() =>
++    definition ? [createUdtSelfAutocompleteRoot(definition, data)] : [],
++  [data, definition]);
+ 
+   if (!definition || !method) return <div className="p-8 text-sm text-[var(--editor-text-muted)]">UDT method no longer exists.</div>;
+   const udt = definition;
+@@ -67,7 +63,7 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData;
+       <FormField label="Method name"><TextInput mono value={name} onChange={(event) => setName(event.target.value)} /></FormField>
+       <div className="flex items-end"><Button onClick={renameMethod}><Save size={13} /> Rename</Button></div>
+     </PanelCard>
+-    <JavaScriptCodeEditor value={selectedMethod.source} onChange={(source) => updateProjectData((current) => updateUdtMethod(current, udt.id, selectedMethod.id, (currentMethod) => ({ ...currentMethod, source })))} components={[]} extraAutocompleteRoots={autocompleteRoots} autocompleteHint="self · UDT fields · UDT methods" height="460px" />
++    <JavaScriptCodeEditor value={selectedMethod.source} onChange={(source) => updateProjectData((current) => updateUdtMethod(current, udt.id, selectedMethod.id, (currentMethod) => ({ ...currentMethod, source })))} components={[]} projectData={data} extraAutocompleteRoots={autocompleteRoots} autocompleteHint="self · tags · UDT fields · UDT methods" height="460px" />
+     <PanelCard className="space-y-3">
+       <div><div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Test method</div><p className="mt-1 text-xs text-[var(--editor-text-soft)]">Runs locally in Designer against the selected persisted tag instance.</p></div>
+       <div className="flex flex-wrap items-end gap-2"><FormField label="Instance" compact className="min-w-56"><Select controlSize="sm" value={selectedInstance?.id ?? ""} onChange={(event) => setSelectedTagId(event.target.value)} disabled={instances.length === 0}>{instances.length === 0 ? <option value="">No instances</option> : instances.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</Select></FormField><Button variant="primary" onClick={run} disabled={!selectedInstance}><Play size={13} /> Run {selectedMethod.name}()</Button></div>
+diff --git a/src/uiframework/gui/data/udt-autocomplete.ts b/src/uiframework/gui/data/udt-autocomplete.ts
+index 2d23d73..8167e06 100644
+--- a/src/uiframework/gui/data/udt-autocomplete.ts
++++ b/src/uiframework/gui/data/udt-autocomplete.ts
+@@ -1,43 +1,133 @@
+-import { isUdtTag, type ProjectData } from "../../data/tags/TagDefinition";
++import {
++  isPrimitiveTag,
++  isUdtTag,
++  type ProjectData,
++  type TagDefinition,
++} from "../../data/tags/TagDefinition";
+ import type { UdtDefinition } from "../../data/udt/UdtDefinition";
+ import type { AutocompleteApiNode } from "../script-editor/ctx-completions";
+ 
+ export function createUdtSelfAutocompleteRoot(
+-  definition: UdtDefinition
++  definition: UdtDefinition,
++  data?: ProjectData
+ ): AutocompleteApiNode {
+   return {
+     label: "self",
+     completionType: "class",
+     detail: definition.name,
+-    children: createUdtMemberNodes(definition),
++    children: createUdtMemberNodes(data, definition, new Set([definition.id])),
+   };
+ }
+ 
+-export function createUdtTagAutocompleteRoots(
++/**
++ * Canonical tag completion surface for script editors.
++ *
++ * - `tags.*` contains every primitive/UDT tag and mirrors the runtime Proxy.
++ * - UDT instances are also exposed as direct globals for backwards-compatible
++ *   `Pump1.start()` / `Pump1.speed` syntax.
++ */
++export function createTagAutocompleteRoots(
+   data: ProjectData | undefined
+ ): AutocompleteApiNode[] {
+   if (!data) return [];
+-  return Object.values(data.tags)
++
++  const tags = Object.values(data.tags).sort((left, right) =>
++    left.name.localeCompare(right.name)
++  );
++  const namespace: AutocompleteApiNode = {
++    label: "tags",
++    completionType: "namespace",
++    detail: "typed project tag proxy",
++    children: [
++      {
++        label: "$get",
++        completionType: "method",
++        detail: "(path) → value",
++      },
++      {
++        label: "$set",
++        completionType: "method",
++        detail: "(path, value) → void",
++      },
++      {
++        label: "$children",
++        completionType: "method",
++        detail: "(path) → string[]",
++      },
++      ...tags.map((tag) => createTagNode(data, tag)),
++    ],
++  };
++
++  const directUdtGlobals = tags
+     .filter(isUdtTag)
+-    .flatMap((tag): AutocompleteApiNode[] => {
+-      const definition = data.udts[tag.type.udtId];
+-      if (!definition) return [];
+-      return [{
+-        label: tag.name,
+-        completionType: "class",
+-        detail: `${definition.name} tag`,
+-        children: createUdtMemberNodes(definition),
+-      }];
+-    });
++    .map((tag) => createTagNode(data, tag));
++
++  return [namespace, ...directUdtGlobals];
+ }
+ 
+-function createUdtMemberNodes(definition: UdtDefinition): AutocompleteApiNode[] {
+-  return [
+-    ...definition.fields.map((field) => ({
+-      label: field.name,
++/** @deprecated use createTagAutocompleteRoots */
++export const createUdtTagAutocompleteRoots = createTagAutocompleteRoots;
++
++export function getTagNamespaceAutocompleteRoot(
++  data: ProjectData | undefined
++): AutocompleteApiNode | undefined {
++  return createTagAutocompleteRoots(data).find((root) => root.label === "tags");
++}
++
++function createTagNode(
++  data: ProjectData,
++  tag: TagDefinition
++): AutocompleteApiNode {
++  if (isPrimitiveTag(tag)) {
++    return {
++      label: tag.name,
+       completionType: "property",
+-      detail: `${field.type.kind} · read/write`,
+-    })),
++      detail: `${tag.type.kind} tag · read/write`,
++    };
++  }
++
++  const definition = data.udts[tag.type.udtId];
++  return {
++    label: tag.name,
++    completionType: "class",
++    detail: definition ? `${definition.name} tag` : "missing UDT",
++    children: definition
++      ? createUdtMemberNodes(data, definition, new Set([definition.id]))
++      : [],
++  };
++}
++
++function createUdtMemberNodes(
++  data: ProjectData | undefined,
++  definition: UdtDefinition,
++  visited: Set<string>
++): AutocompleteApiNode[] {
++  return [
++    ...definition.fields.map((field): AutocompleteApiNode => {
++      if (field.type.kind !== "udt") {
++        return {
++          label: field.name,
++          completionType: "property",
++          detail: `${field.type.kind} · read/write`,
++        };
++      }
++
++      const nestedDefinition = data?.udts[field.type.udtId];
++      const circular = visited.has(field.type.udtId);
++      return {
++        label: field.name,
++        completionType: "class",
++        detail: `${nestedDefinition?.name ?? "UDT"} · nested tag`,
++        children:
++          nestedDefinition && !circular
++            ? createUdtMemberNodes(
++                data,
++                nestedDefinition,
++                new Set([...visited, nestedDefinition.id])
++              )
++            : [],
++      };
++    }),
+     ...definition.methods.map((method) => ({
+       label: method.name,
+       completionType: "method",
+diff --git a/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx b/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
+index b503f9a..749d755 100644
+--- a/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
++++ b/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
+@@ -2,8 +2,16 @@ import { oneDark } from "@codemirror/theme-one-dark";
+ import CodeMirror from "@uiw/react-codemirror";
+ import { useMemo } from "react";
+ import type { ComponentApiDescription } from "../../component-api";
++import type { ProjectData } from "../../data/tags/TagDefinition";
+ import type { NavigationTreeNode } from "../../navigation/navigation";
+-import { createCtxAutocompleteExtension, type AutocompleteApiNode } from "./ctx-completions";
++import {
++  createTagAutocompleteRoots,
++  getTagNamespaceAutocompleteRoot,
++} from "../data/udt-autocomplete";
++import {
++  createCtxAutocompleteExtension,
++  type AutocompleteApiNode,
++} from "./ctx-completions";
+ 
+ type JavaScriptCodeEditorProps = {
+   value: string;
+@@ -12,6 +20,7 @@ type JavaScriptCodeEditorProps = {
+   selfComponent?: ComponentApiDescription | undefined;
+   internalComponents?: ComponentApiDescription[] | undefined;
+   navigation?: NavigationTreeNode[] | undefined;
++  projectData?: ProjectData | undefined;
+   extraAutocompleteRoots?: AutocompleteApiNode[] | undefined;
+   autocompleteHint?: string | undefined;
+   height?: string | undefined;
+@@ -24,10 +33,19 @@ export function JavaScriptCodeEditor({
+   selfComponent,
+   internalComponents = [],
+   navigation = [],
++  projectData,
+   extraAutocompleteRoots = [],
+-  autocompleteHint = "ctx · self · internal autocomplete",
++  autocompleteHint = "ctx · self · internal · tags autocomplete",
+   height = "420px",
+ }: JavaScriptCodeEditorProps) {
++  const tagRoots = useMemo(
++    () => createTagAutocompleteRoots(projectData),
++    [projectData]
++  );
++  const ctxTagRoot = useMemo(
++    () => getTagNamespaceAutocompleteRoot(projectData),
++    [projectData]
++  );
+   const autocompleteExtension = useMemo(
+     () =>
+       createCtxAutocompleteExtension(
+@@ -35,18 +53,25 @@ export function JavaScriptCodeEditor({
+         selfComponent,
+         internalComponents,
+         navigation,
+-        extraAutocompleteRoots
++        mergeAutocompleteRoots(extraAutocompleteRoots, tagRoots),
++        ctxTagRoot ? [ctxTagRoot] : []
+       ),
+-    [components, selfComponent, internalComponents, navigation, extraAutocompleteRoots]
++    [
++      components,
++      selfComponent,
++      internalComponents,
++      navigation,
++      extraAutocompleteRoots,
++      tagRoots,
++      ctxTagRoot,
++    ]
+   );
+ 
+   return (
+     <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
+       <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
+         <div className="text-xs font-medium text-zinc-300">JavaScript</div>
+-        <div className="text-[11px] text-zinc-500">
+-          {autocompleteHint}
+-        </div>
++        <div className="text-[11px] text-zinc-500">{autocompleteHint}</div>
+       </div>
+ 
+       <CodeMirror
+@@ -66,3 +91,14 @@ export function JavaScriptCodeEditor({
+     </div>
+   );
+ }
++
++function mergeAutocompleteRoots(
++  primary: AutocompleteApiNode[],
++  generated: AutocompleteApiNode[]
++) {
++  const byLabel = new Map<string, AutocompleteApiNode>();
++  for (const root of [...generated, ...primary]) {
++    byLabel.set(root.label, root);
++  }
++  return Array.from(byLabel.values());
++}
+diff --git a/src/uiframework/gui/script-editor/ScriptPage.tsx b/src/uiframework/gui/script-editor/ScriptPage.tsx
+index 9eaae01..1b4fcb8 100644
+--- a/src/uiframework/gui/script-editor/ScriptPage.tsx
++++ b/src/uiframework/gui/script-editor/ScriptPage.tsx
+@@ -29,7 +29,6 @@ import type {
+ import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
+ import { HandlerTree } from "./HandlerTree";
+ import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
+-import { createUdtTagAutocompleteRoots } from "../data/udt-autocomplete";
+ 
+ export function ScriptPage() {
+   const { scriptId, projectId } = useParams();
+@@ -378,7 +377,7 @@ function ScriptEditor({
+               selfComponent={selfComponent}
+               internalComponents={internalComponents}
+               navigation={navigationTree}
+-              extraAutocompleteRoots={createUdtTagAutocompleteRoots(document?.data)}
++              projectData={document?.data}
+             />
+ 
+             <div className="rounded-xl border border-zinc-200 bg-white p-4">
+@@ -396,6 +395,11 @@ function ScriptEditor({
+                 <code>ctx.ui.ComponentName.variant.current</code>
+                 <code>ctx.navigateTo("Page/SubPage")</code>
+                 <code>ctx.nav.Page1.go()</code>
++                <code>tags.LineSpeed</code>
++                <code>tags.LineSpeed = 1200</code>
++                <code>tags.Pump1.speed = 1450</code>
++                <code>tags.Pump1.start()</code>
++                <code>ctx.tags.Pump1.running</code>
+                 {scriptSelection?.kind === "method" ||
+                 scriptSelection?.kind === "componentMethod" ||
+                 scriptSelection?.kind === "componentHandler" ? (
+diff --git a/src/uiframework/gui/script-editor/ctx-completions.ts b/src/uiframework/gui/script-editor/ctx-completions.ts
+index aaffe88..ff2155a 100644
+--- a/src/uiframework/gui/script-editor/ctx-completions.ts
++++ b/src/uiframework/gui/script-editor/ctx-completions.ts
+@@ -20,9 +20,13 @@ export function createCtxAutocompleteExtension(
+   selfComponent?: ComponentApiDescription,
+   internalComponents: ComponentApiDescription[] = [],
+   navigation: NavigationTreeNode[] = [],
+-  extraRoots: AutocompleteApiNode[] = []
++  extraRoots: AutocompleteApiNode[] = [],
++  extraCtxChildren: AutocompleteApiNode[] = []
+ ): Extension {
+-  const roots: AutocompleteApiNode[] = [buildCtxApiTree(components, navigation), ...extraRoots];
++  const roots: AutocompleteApiNode[] = [
++    buildCtxApiTree(components, navigation, extraCtxChildren),
++    ...extraRoots,
++  ];
+ 
+   if (selfComponent) {
+     roots.push(buildComponentRoot("self", selfComponent));
+@@ -48,7 +52,8 @@ export function createCtxAutocompleteExtension(
+ 
+ function buildCtxApiTree(
+   components: ComponentApiDescription[],
+-  navigation: NavigationTreeNode[]
++  navigation: NavigationTreeNode[],
++  extraChildren: AutocompleteApiNode[] = []
+ ): AutocompleteApiNode {
+   const uiComponents: AutocompleteApiNode[] = components
+     .slice()
+@@ -130,6 +135,7 @@ function buildCtxApiTree(
+         completionType: "property",
+         detail: "string · read only",
+       },
++      ...extraChildren,
+     ],
+   };
+ }
