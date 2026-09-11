@@ -4,4 +4,5 @@ export type DataSelection =
   | { kind: "udt-method"; udtId: string; methodId: string }
   | { kind: "new-tag" }
   | { kind: "new-udt" }
+  | { kind: "driver"; driverKind: string }
   | null;

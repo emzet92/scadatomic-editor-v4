@@ -483,6 +483,7 @@ export function EditorPage() {
                 data={projectData}
                 selection={dataSelection}
                 onSelect={setDataSelection}
+                projectId={projectId}
               />
             </div>
           ) : (
