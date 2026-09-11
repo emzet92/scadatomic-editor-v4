@@ -15,8 +15,8 @@ export function hydrateRuntimeTagState(
   data: ProjectData | undefined
 ) {
   const resolvedData = data ?? EMPTY_PROJECT_DATA;
-  replaceMockTagStoreData(projectId, resolvedData);
-  for (const [path, value] of flattenTagValues(resolvedData)) {
+  const store = replaceMockTagStoreData(projectId, resolvedData);
+  for (const [path, value] of flattenTagValues(store.snapshot())) {
     runtimeSignals.set(path, value);
   }
 }

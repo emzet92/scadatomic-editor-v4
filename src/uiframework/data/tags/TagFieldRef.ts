@@ -68,3 +68,63 @@ export function resolveTagFieldRef(
 export function createTagFieldRef(tagId: string, fieldIds: string[] = []): TagFieldRef {
   return { tagId, fieldIds: [...fieldIds] };
 }
+
+/** Lists every primitive runtime leaf using stable ids plus its display path. */
+export function listPrimitiveTagFieldRefs(data: ProjectData): ResolvedTagFieldRef[] {
+  const result: ResolvedTagFieldRef[] = [];
+
+  for (const tag of Object.values(data.tags)) {
+    if (isPrimitiveTag(tag)) {
+      result.push({ ref: createTagFieldRef(tag.id), tag, path: tag.name, type: tag.type });
+      continue;
+    }
+
+    collectUdtPrimitiveRefs(data, tag, tag.type, [], [tag.name], result);
+  }
+
+  return result;
+}
+
+export function findTagFieldRefByPath(
+  data: ProjectData,
+  path: string
+): ResolvedTagFieldRef | undefined {
+  return listPrimitiveTagFieldRefs(data).find((candidate) => candidate.path === path);
+}
+
+function collectUdtPrimitiveRefs(
+  data: ProjectData,
+  tag: TagDefinition,
+  type: DataType,
+  fieldIds: string[],
+  pathSegments: string[],
+  output: ResolvedTagFieldRef[]
+) {
+  if (type.kind !== "udt") return;
+  const definition = data.udts[type.udtId];
+  if (!definition) return;
+
+  for (const field of definition.fields) {
+    const nextFieldIds = [...fieldIds, field.id];
+    const nextPathSegments = [...pathSegments, field.name];
+    if (field.type.kind === "udt") {
+      collectUdtPrimitiveRefs(
+        data,
+        tag,
+        field.type,
+        nextFieldIds,
+        nextPathSegments,
+        output
+      );
+      continue;
+    }
+
+    output.push({
+      ref: createTagFieldRef(tag.id, nextFieldIds),
+      tag,
+      path: nextPathSegments.join("."),
+      type: field.type,
+      field,
+    });
+  }
+}

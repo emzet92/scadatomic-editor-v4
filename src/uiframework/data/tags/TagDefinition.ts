@@ -1,5 +1,6 @@
 import type { PrimitiveDataType, UdtDataType } from "../types/DataType";
 import type { SimulationProjectConfig } from "../simulation/SimulationBinding";
+import type { TagSourceProjectConfig } from "../drivers/TagSourceBinding";
 
 export type PrimitiveTag = {
   id: string;
@@ -20,7 +21,9 @@ export type TagDefinition = PrimitiveTag | UdtTag;
 export type ProjectData = {
   udts: Record<string, import("../udt/UdtDefinition").UdtDefinition>;
   tags: Record<string, TagDefinition>;
-  /** Persisted source configuration. Runtime driver/session state is never stored here. */
+  /** Generic driver ownership. Driver-specific configuration stays in driver modules. */
+  sources?: TagSourceProjectConfig | undefined;
+  /** Simulation-driver configuration. Runtime driver/session state is never stored here. */
   simulation?: SimulationProjectConfig | undefined;
 };
 

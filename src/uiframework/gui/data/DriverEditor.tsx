@@ -1,10 +1,20 @@
-import { Cable, Gauge, Hand } from "lucide-react";
+import { Cable, Gauge, Hand, Link2, Unlink } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../data/simulation/default-driver-registry";
-import { listSimulationBindings } from "../../data/simulation/SimulationRegistry";
-import { simulationGeneratorRegistry } from "../../data/simulation/SimulationGeneratorRegistry";
-import { resolveTagFieldRef, type TagFieldRef } from "../../data/tags/TagFieldRef";
+import {
+  clearTagSourceDriverMapping,
+  getTagSourceMapping,
+  setTagSourceDriver,
+} from "../../data/drivers/TagSourceMapping";
+import {
+  listPrimitiveTagFieldRefs,
+  resolveTagFieldRef,
+  type ResolvedTagFieldRef,
+  type TagFieldRef,
+} from "../../data/tags/TagFieldRef";
 import type { ProjectData } from "../../data/tags/TagDefinition";
-import { PanelCard, SectionHeader } from "../ui";
+import { useEditorStore } from "../../editor-store";
+import { Button, PanelCard, SectionHeader } from "../ui";
+import { SimulationEditor } from "./simulation/SimulationEditor";
 import { SimulationStatus } from "./simulation/SimulationStatus";
 
 export function DriverEditor({
@@ -25,6 +35,10 @@ export function DriverEditor({
     );
   }
 
+  const fields = listPrimitiveTagFieldRefs(data);
+  const mappedCount = fields.filter(
+    (field) => getTagSourceMapping(data, field.ref).driver === driverKind
+  ).length;
   const isSimulation = driverKind === "simulation";
   const isManual = driverKind === "manual";
 
@@ -32,10 +46,18 @@ export function DriverEditor({
     <div className="mx-auto max-w-5xl space-y-6 p-8">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-2 text-[var(--editor-accent)]">
-          {isSimulation ? <Gauge size={18} /> : isManual ? <Hand size={18} /> : <Cable size={18} />}
+          {isSimulation ? (
+            <Gauge size={18} />
+          ) : isManual ? (
+            <Hand size={18} />
+          ) : (
+            <Cable size={18} />
+          )}
         </div>
         <div className="min-w-0">
-          <div className="text-xl font-semibold text-[var(--editor-text)]">{descriptor.displayName} driver</div>
+          <div className="text-xl font-semibold text-[var(--editor-text)]">
+            {descriptor.displayName} driver
+          </div>
           <div className="mt-1 max-w-2xl text-sm text-[var(--editor-text-muted)]">
             {descriptor.description ?? "Project tag source driver."}
           </div>
@@ -52,99 +74,148 @@ export function DriverEditor({
           <div className="mt-2 text-sm font-medium text-[var(--editor-text)]">Built in</div>
         </PanelCard>
         <PanelCard>
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-text-soft)]">Mappings</div>
-          <div className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">
-            {isSimulation ? listSimulationBindings(data).length : "Default"}
-          </div>
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-text-soft)]">Resolved fields</div>
+          <div className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">{mappedCount}</div>
         </PanelCard>
       </div>
 
-      {isSimulation ? (
-        <SimulationDriverWorkspace data={data} projectId={projectId} />
-      ) : isManual ? (
-        <ManualDriverWorkspace />
-      ) : (
-        <PanelCard>
-          <SectionHeader title="Driver configuration" description="This driver does not expose project-level configuration yet." />
+      {isSimulation ? <SimulationStatus data={data} projectId={projectId} /> : null}
+
+      <DriverMappingsWorkspace data={data} driverKind={driverKind} />
+
+      {isManual ? (
+        <PanelCard className="space-y-3">
+          <SectionHeader
+            title="Manual fallback"
+            description="Fields without any explicit source mapping also resolve to Manual. Explicit Manual mappings are useful when you want driver ownership to be intentional and swappable as a set."
+          />
+          <div className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3 font-mono text-xs text-[var(--editor-text-muted)]">
+            no mapping → Manual
+          </div>
         </PanelCard>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function ManualDriverWorkspace() {
+function DriverMappingsWorkspace({
+  data,
+  driverKind,
+}: {
+  data: ProjectData;
+  driverKind: string;
+}) {
+  const fields = listPrimitiveTagFieldRefs(data);
+  const updateProjectData = useEditorStore((state) => state.updateProjectData);
+
+  function mapHere(target: TagFieldRef) {
+    updateProjectData((current) => setTagSourceDriver(current, target, driverKind));
+  }
+
+  function unmap(target: TagFieldRef) {
+    updateProjectData((current) => clearTagSourceDriverMapping(current, target));
+  }
+
   return (
     <PanelCard className="space-y-3">
       <SectionHeader
-        title="Manual source"
-        description="Manual is the fallback source when a tag field has no explicit driver mapping."
+        title="Tag mappings"
+        description="Assign primitive tags and UDT fields to this driver. One field has at most one active source driver; mapping it here moves ownership from the previous driver."
       />
-      <div className="text-sm leading-6 text-[var(--editor-text-muted)]">
-        Values can be written from the tag value editor, scripts, UDT methods, or directly through TagStore. Manual does not own a scheduler and does not persist a binding record.
-      </div>
-      <div className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3 font-mono text-xs text-[var(--editor-text-muted)]">
-        Source → Driver → Manual
-      </div>
+
+      {fields.length === 0 ? (
+        <div className="rounded-md border border-dashed border-[var(--editor-border)] p-4 text-sm text-[var(--editor-text-soft)]">
+          Create a primitive tag or a UDT field first.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {fields.map((field) => (
+            <DriverMappingRow
+              key={`${field.ref.tagId}:${field.ref.fieldIds.join("/")}`}
+              data={data}
+              field={field}
+              driverKind={driverKind}
+              onMap={() => mapHere(field.ref)}
+              onUnmap={() => unmap(field.ref)}
+            />
+          ))}
+        </div>
+      )}
     </PanelCard>
   );
 }
 
-function SimulationDriverWorkspace({
+function DriverMappingRow({
   data,
-  projectId,
+  field,
+  driverKind,
+  onMap,
+  onUnmap,
 }: {
   data: ProjectData;
-  projectId?: string | undefined;
+  field: ResolvedTagFieldRef;
+  driverKind: string;
+  onMap(): void;
+  onUnmap(): void;
 }) {
-  const bindings = listSimulationBindings(data);
+  const mapping = getTagSourceMapping(data, field.ref);
+  const mappedHere = mapping.driver === driverKind;
+  const currentDriver = defaultTagDriverRegistry.get(mapping.driver);
+  const canUnmap = mappedHere && mapping.explicit;
 
   return (
-    <div className="space-y-4">
-      <SimulationStatus data={data} projectId={projectId} />
-      <PanelCard className="space-y-3">
-        <SectionHeader
-          title="Tag mappings"
-          description="Fields mapped to this driver. Configure the generator from the selected tag or UDT field under Source."
+    <div className="overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]">
+      <div className="flex items-center gap-3 px-3 py-2.5">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            mappedHere ? "bg-emerald-500" : "bg-[var(--editor-border-strong)]"
+          }`}
         />
-        {bindings.length === 0 ? (
-          <div className="rounded-md border border-dashed border-[var(--editor-border)] p-4 text-sm text-[var(--editor-text-soft)]">
-            No tag fields are mapped to Simulation yet.
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-mono text-xs font-medium text-[var(--editor-text)]">
+            {field.path}
           </div>
+          <div className="mt-0.5 text-[10px] text-[var(--editor-text-soft)]">
+            {mappedHere
+              ? mapping.explicit
+                ? `Explicit ${currentDriver?.displayName ?? mapping.driver} mapping`
+                : "Manual fallback"
+              : `Current source: ${currentDriver?.displayName ?? mapping.driver}`}
+          </div>
+        </div>
+
+        {mappedHere && canUnmap ? (
+          <Button size="xs" variant="secondary" onClick={onUnmap}>
+            <Unlink size={11} /> Unmap
+          </Button>
+        ) : mappedHere ? (
+          <Button size="xs" variant="secondary" onClick={onMap}>
+            <Link2 size={11} /> Map explicitly
+          </Button>
         ) : (
-          <div className="divide-y divide-[var(--editor-border)] overflow-hidden rounded-md border border-[var(--editor-border)]">
-            {bindings.map((binding) => (
-              <SimulationMappingRow key={binding.id} data={data} target={binding.target} enabled={binding.enabled} generatorKind={binding.generator.kind} />
-            ))}
-          </div>
+          <Button size="xs" variant="primary" onClick={onMap}>
+            <Link2 size={11} /> Map here
+          </Button>
         )}
-      </PanelCard>
+      </div>
+
+      {mappedHere && driverKind === "simulation" ? (
+        <div className="border-t border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 pb-3">
+          <SimulationConfigForTarget data={data} target={field.ref} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function SimulationMappingRow({
+function SimulationConfigForTarget({
   data,
   target,
-  enabled,
-  generatorKind,
 }: {
   data: ProjectData;
   target: TagFieldRef;
-  enabled: boolean;
-  generatorKind: string;
 }) {
   const resolved = resolveTagFieldRef(data, target);
-  const generator = simulationGeneratorRegistry.get(generatorKind as never);
-  return (
-    <div className="flex items-center gap-3 bg-[var(--editor-surface)] px-3 py-2.5 text-xs">
-      <span className={`h-2 w-2 shrink-0 rounded-full ${enabled ? "bg-emerald-500" : "bg-[var(--editor-border-strong)]"}`} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-mono font-medium text-[var(--editor-text)]">{resolved?.path ?? "Missing target"}</div>
-        <div className="mt-0.5 text-[10px] text-[var(--editor-text-soft)]">{enabled ? "Enabled" : "Disabled"}</div>
-      </div>
-      <div className="shrink-0 text-[10px] font-medium text-[var(--editor-accent)]">
-        {generator?.displayName ?? generatorKind}
-      </div>
-    </div>
-  );
+  if (!resolved) return null;
+  return <SimulationEditor data={data} target={target} type={resolved.type} />;
 }

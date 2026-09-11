@@ -45,7 +45,7 @@ export function BindingsEditor({
               type="text"
               list={dataListId}
               value={value}
-              placeholder="pump.speed"
+              placeholder="Pump1.speed"
               onChange={(event) => {
                 const path = event.target.value.trim();
                 setBinding(

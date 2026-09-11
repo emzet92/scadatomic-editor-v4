@@ -29,18 +29,18 @@ export function SimulationStatus({
   useEffect(() => {
     designerSimulationSession.configure(data);
     if (snapshot.running && projectId) {
-      sendWsMessage({ type: "simulation.configure", projectId, data });
+      sendWsMessage({ type: "driver.configure", driver: "simulation", projectId, data });
     }
   }, [data, projectId, snapshot.running]);
 
   function start() {
     designerSimulationSession.start(data);
-    if (projectId) sendWsMessage({ type: "simulation.start", projectId, data });
+    if (projectId) sendWsMessage({ type: "driver.start", driver: "simulation", projectId, data });
   }
 
   function stop() {
     designerSimulationSession.stop();
-    if (projectId) sendWsMessage({ type: "simulation.stop", projectId });
+    if (projectId) sendWsMessage({ type: "driver.stop", driver: "simulation", projectId });
   }
 
   const diagnosticsByBinding = new Map(
@@ -82,7 +82,7 @@ export function SimulationStatus({
           })}
         </div>
       ) : (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Enable a generator in a tag value editor to add it to this session.</div>
+        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Map a tag field to this driver and enable its generator below.</div>
       )}
     </PanelCard>
   );

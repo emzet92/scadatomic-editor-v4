@@ -3,6 +3,7 @@ import type { DataType } from "../types/DataType";
 import { TypeRegistry } from "../types/TypeRegistry";
 import { createFieldDefaultValue } from "./UdtInstanceFactory";
 import { pruneInvalidSimulationBindings } from "../simulation/SimulationRegistry";
+import { pruneInvalidTagSourceMappings } from "../drivers/TagSourceMapping";
 import type {
   UdtDefinition,
   UdtFieldDefinition,
@@ -125,7 +126,8 @@ function updateDefinitionAndInstances(
     tags[tagId] = synchronizeInstance(tag, previous, next, nextData);
   }
 
-  return pruneInvalidSimulationBindings({ ...nextData, tags });
+  const synchronized = { ...nextData, tags };
+  return pruneInvalidSimulationBindings(pruneInvalidTagSourceMappings(synchronized));
 }
 
 function synchronizeInstance(

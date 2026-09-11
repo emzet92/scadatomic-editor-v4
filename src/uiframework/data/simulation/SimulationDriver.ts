@@ -1,4 +1,5 @@
 import type { TagDriver, TagDriverContext } from "../drivers/TagDriver";
+import { getTagSourceMapping } from "../drivers/TagSourceMapping";
 import { resolveTagFieldRef } from "../tags/TagFieldRef";
 import { TypeRegistry } from "../types/TypeRegistry";
 import type { RuntimeClock } from "./RuntimeClock";
@@ -77,6 +78,7 @@ export class SimulationDriver implements TagDriver {
 
     for (const binding of listSimulationBindings(data)) {
       if (!binding.enabled) continue;
+      if (getTagSourceMapping(data, binding.target).driver !== this.kind) continue;
 
       try {
         const resolved = resolveTagFieldRef(data, binding.target);

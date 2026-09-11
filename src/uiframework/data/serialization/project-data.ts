@@ -16,7 +16,9 @@ export function isProjectData(value: unknown): value is ProjectData {
   );
   if (!tagsValid) return false;
 
-  return value.simulation === undefined || isSimulationConfig(value.simulation);
+  const sourcesValid = value.sources === undefined || isTagSourceConfig(value.sources);
+  const simulationValid = value.simulation === undefined || isSimulationConfig(value.simulation);
+  return sourcesValid && simulationValid;
 }
 
 function isUdtDefinition(value: unknown, expectedId: string): value is UdtDefinition {
@@ -75,11 +77,27 @@ function isTagDefinition(
   return TypeRegistry.validate(type, value.value);
 }
 
+
+function isTagSourceConfig(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.mappings)) return false;
+  return Object.entries(value.mappings).every(([id, mapping]) => {
+    if (!isRecord(mapping) || mapping.id !== id || typeof mapping.driver !== "string") return false;
+    return isTagFieldRef(mapping.target);
+  });
+}
+
+function isTagFieldRef(value: unknown) {
+  return isRecord(value) &&
+    typeof value.tagId === "string" &&
+    Array.isArray(value.fieldIds) &&
+    value.fieldIds.every((fieldId) => typeof fieldId === "string");
+}
+
 function isSimulationConfig(value: unknown) {
   if (!isRecord(value) || !isRecord(value.bindings)) return false;
   return Object.entries(value.bindings).every(([id, binding]) => {
     if (!isRecord(binding) || binding.id !== id || binding.driver !== "simulation" || typeof binding.enabled !== "boolean") return false;
-    if (!isRecord(binding.target) || typeof binding.target.tagId !== "string" || !Array.isArray(binding.target.fieldIds) || !binding.target.fieldIds.every((fieldId) => typeof fieldId === "string")) return false;
+    if (!isTagFieldRef(binding.target)) return false;
     return isSimulationGeneratorConfig(binding.generator);
   });
 }

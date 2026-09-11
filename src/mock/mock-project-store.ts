@@ -213,13 +213,13 @@ function seedPrototypeScripts(projectId: string) {
   ensureMockScript(
     projectId,
     "startButton.Clicked",
-    `ctx.emit("pump.start");`
+    `ctx.tags?.pump.start();`
   );
 
   ensureMockScript(
     projectId,
     "stopButton.Clicked",
-    `ctx.emit("pump.stop");`
+    `ctx.tags?.pump.stop();`
   );
 
   ensureMockScript(

@@ -314,7 +314,7 @@ export function EditorPage() {
   useEffect(() => {
     return () => {
       designerSimulationSession.stop();
-      if (projectId) sendWsMessage({ type: "simulation.stop", projectId });
+      if (projectId) sendWsMessage({ type: "driver.stop", driver: "simulation", projectId });
     };
   }, [projectId]);
 

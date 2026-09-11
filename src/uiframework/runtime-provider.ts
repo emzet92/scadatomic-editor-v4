@@ -171,10 +171,10 @@ export function RuntimeProvider({
         }
 
         if (
-          payload.type === "runtime.signal" &&
-          typeof payload.source === "string"
+          payload.type === "tag.changed" &&
+          typeof payload.path === "string"
         ) {
-          runtimeSignals.set(payload.source, payload.value);
+          runtimeSignals.set(payload.path, payload.newValue);
         }
       } catch (error) {
         console.error(

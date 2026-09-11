@@ -2,35 +2,26 @@ import { Cable } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../../data/simulation/default-driver-registry";
 import type { ProjectData } from "../../../data/tags/TagDefinition";
 import type { TagFieldRef } from "../../../data/tags/TagFieldRef";
-import type { PrimitiveDataType } from "../../../data/types/DataType";
 import {
   getTagSourceMapping,
   setTagSourceDriver,
-  type TagSourceDriverKind,
 } from "../../../data/drivers/TagSourceMapping";
 import { useEditorStore } from "../../../editor-store";
 import { FormField, Select } from "../../ui";
-import { SimulationEditor } from "./SimulationEditor";
-
-const SELECTABLE_DRIVERS = new Set<TagSourceDriverKind>(["manual", "simulation"]);
 
 export function TagSourceEditor({
   data,
   target,
-  type,
 }: {
   data: ProjectData;
   target: TagFieldRef;
-  type: PrimitiveDataType;
 }) {
   const updateProjectData = useEditorStore((state) => state.updateProjectData);
   const mapping = getTagSourceMapping(data, target);
-  const drivers = defaultTagDriverRegistry
-    .list()
-    .filter((driver) => SELECTABLE_DRIVERS.has(driver.kind as TagSourceDriverKind));
+  const drivers = defaultTagDriverRegistry.list();
   const selectedDescriptor = defaultTagDriverRegistry.get(mapping.driver);
 
-  function changeDriver(driver: TagSourceDriverKind) {
+  function changeDriver(driver: string) {
     updateProjectData((current) => setTagSourceDriver(current, target, driver));
   }
 
@@ -48,7 +39,7 @@ export function TagSourceEditor({
         <Select
           controlSize="sm"
           value={mapping.driver}
-          onChange={(event) => changeDriver(event.target.value as TagSourceDriverKind)}
+          onChange={(event) => changeDriver(event.target.value)}
         >
           {drivers.map((driver) => (
             <option key={driver.kind} value={driver.kind}>
@@ -58,14 +49,14 @@ export function TagSourceEditor({
         </Select>
       </FormField>
 
-      {mapping.driver === "simulation" ? (
-        <SimulationEditor data={data} target={target} type={type} />
-      ) : (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
-          Manual source has no driver-owned configuration. Writes from the value editor,
-          scripts and TagStore remain authoritative.
-        </div>
-      )}
+      <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
+        {mapping.explicit
+          ? `Explicitly mapped to ${selectedDescriptor?.displayName ?? mapping.driver}.`
+          : "No explicit mapping. Manual is used as the fallback source."}
+        {mapping.driver === "simulation"
+          ? " Configure the waveform under Data → Drivers → Simulation."
+          : " Driver-owned configuration is managed under Data → Drivers."}
+      </div>
     </div>
   );
 }

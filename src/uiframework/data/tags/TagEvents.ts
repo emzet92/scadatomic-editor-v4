@@ -1,5 +1,5 @@
 export type TagWriteSource = {
-  kind: "user" | "script" | "simulation" | "driver";
+  kind: "user" | "script" | "simulation" | "driver" | "session";
   id?: string | undefined;
 };
 

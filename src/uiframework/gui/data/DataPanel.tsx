@@ -6,9 +6,8 @@ import { TagsTree } from "./TagsTree";
 import { DriversTree } from "./DriversTree";
 import { UdtTree } from "./UdtTree";
 import type { DataSelection } from "./data-selection";
-import { SimulationStatus } from "./simulation/SimulationStatus";
 
-export function DataPanel({ data, selection, onSelect, projectId }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
+export function DataPanel({ data, selection, onSelect }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
   const inferredTab = selection?.kind === "driver"
     ? "drivers"
     : selection?.kind === "udt" || selection?.kind === "udt-method" || selection?.kind === "new-udt"
@@ -26,10 +25,9 @@ export function DataPanel({ data, selection, onSelect, projectId }: { data: Proj
       <SegmentedControlItem active={tab === "udts"} className="flex-1 gap-1.5" onClick={() => setManualTab("udts")}><Braces size={13} /> UDTs</SegmentedControlItem>
       <SegmentedControlItem active={tab === "drivers"} className="flex-1 gap-1.5" onClick={() => setManualTab("drivers")}><Cable size={13} /> Drivers</SegmentedControlItem>
     </SegmentedControl>
-    {tab === "tags" ? <>
-      <SimulationStatus data={data} projectId={projectId} />
+    {tab === "tags" ? (
       <TagsTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-tag" })} />
-    </> : tab === "udts" ? (
+    ) : tab === "udts" ? (
       <UdtTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-udt" })} />
     ) : (
       <DriversTree selection={selection} onSelect={onSelect} />
