@@ -1,7 +1,9 @@
-import { ImageIcon, Trash2, Upload } from "lucide-react";
+import { ImageIcon, Images, Trash2, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import type { AssetRef } from "../../assets";
 import { useAssetManager, useAssetUrl } from "../../assets";
 import { Button, PanelCard } from "../ui";
+import { ImageAssetChooserDialog } from "./ImageAssetChooserDialog";
 
 export function ImageAssetPicker({
   assetId,
@@ -16,6 +18,10 @@ export function ImageAssetPicker({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [chooserAssets, setChooserAssets] = useState<AssetRef[]>([]);
+  const [chooserLoading, setChooserLoading] = useState(false);
+  const [chooserError, setChooserError] = useState<string | null>(null);
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -43,6 +49,29 @@ export function ImageAssetPicker({
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     void upload(file);
+  }
+
+  async function loadChooserAssets() {
+    setChooserLoading(true);
+    setChooserError(null);
+
+    try {
+      const assets = (await manager.list())
+        .filter((candidate) => candidate.kind === "image")
+        .sort((left, right) => left.name.localeCompare(right.name));
+      setChooserAssets(assets);
+    } catch (loadError) {
+      setChooserError(
+        loadError instanceof Error ? loadError.message : "Failed to load assets."
+      );
+    } finally {
+      setChooserLoading(false);
+    }
+  }
+
+  function openChooser() {
+    setChooserOpen(true);
+    void loadChooserAssets();
   }
 
   const previewUrl = asset.assetId === assetId ? asset.url : null;
@@ -119,10 +148,20 @@ export function ImageAssetPicker({
           size="sm"
           className="flex-1"
           disabled={uploading}
+          onClick={openChooser}
+        >
+          <Images size={13} />
+          Choose asset
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
           <Upload size={13} />
-          {uploading ? "Uploading…" : assetId ? "Replace" : "Upload image"}
+          {uploading ? "Uploading…" : assetId ? "Replace" : "Upload"}
         </Button>
         {assetId ? (
           <Button
@@ -148,6 +187,23 @@ export function ImageAssetPicker({
       ) : null}
 
       {error ? <div className="text-[10px] leading-4 text-red-600">{error}</div> : null}
+
+      {chooserOpen ? (
+        <ImageAssetChooserDialog
+          open
+          assets={chooserAssets}
+          loading={chooserLoading}
+          error={chooserError}
+          currentAssetId={assetId}
+          onClose={() => setChooserOpen(false)}
+          onRetry={() => void loadChooserAssets()}
+          onChoose={(nextAssetId) => {
+            setError(null);
+            onChange(nextAssetId);
+          }}
+          onUploadRequest={() => fileInputRef.current?.click()}
+        />
+      ) : null}
     </div>
   );
 }
