@@ -76,15 +76,18 @@ export function Chart({
 
     showLegend = false,
     showGrid = true,
+    timeRange: _timeRange,
 
     style,
     className,
     ...domProps
 }: ChartProps) {
-    const safePoints =
-        points.length > 0
-            ? points
-            : fallbackPoints;
+    // The editor receives demo/default points through defaultChartProps. An
+    // explicit empty array from RuntimeChart means "no numeric runtime data"
+    // and must stay empty instead of resurrecting the demo series.
+    const safePoints = points;
+
+    void _timeRange;
 
     const labels =
         safePoints.map(

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { MAX_CHART_TIME_RANGE_MS } from "./chart-time-range";
 
 type Listener = () => void;
 
@@ -7,7 +8,15 @@ export type RuntimeSignalSample = {
   value: unknown;
 };
 
-const MAX_HISTORY_PER_TAG = 1000;
+/**
+ * Runtime trend history is intentionally lighter than the live signal stream.
+ * Live values are still updated for every tag.changed event, while history
+ * samples that arrive very close together are coalesced. This keeps a useful
+ * 10-minute trend window without retaining every simulation tick.
+ */
+export const RUNTIME_SIGNAL_HISTORY_COALESCE_MS = 250;
+export const RUNTIME_SIGNAL_HISTORY_RETENTION_MS = MAX_CHART_TIME_RANGE_MS;
+
 const EMPTY_HISTORY: readonly RuntimeSignalSample[] = [];
 
 class RuntimeSignalStore {
@@ -33,16 +42,26 @@ class RuntimeSignalStore {
 
     this.values.set(tag, value);
 
+    const now = Date.now();
     const currentHistory = this.histories.get(tag) ?? EMPTY_HISTORY;
-    const nextHistory = [
-      ...currentHistory,
-      {
-        timestamp: Date.now(),
-        value,
-      },
-    ].slice(-MAX_HISTORY_PER_TAG);
+    const nextSample: RuntimeSignalSample = {
+      timestamp: now,
+      value,
+    };
+    const lastSample = currentHistory[currentHistory.length - 1];
 
-    this.histories.set(tag, nextHistory);
+    const appendedHistory =
+      lastSample && now - lastSample.timestamp < RUNTIME_SIGNAL_HISTORY_COALESCE_MS
+        ? [...currentHistory.slice(0, -1), nextSample]
+        : [...currentHistory, nextSample];
+
+    this.histories.set(
+      tag,
+      pruneHistory(
+        appendedHistory,
+        now - RUNTIME_SIGNAL_HISTORY_RETENTION_MS,
+      ),
+    );
 
     for (const listener of this.listeners.get(tag) ?? []) {
       listener();
@@ -61,6 +80,27 @@ class RuntimeSignalStore {
       }
     };
   }
+}
+
+function pruneHistory(
+  history: readonly RuntimeSignalSample[],
+  cutoffTimestamp: number,
+): readonly RuntimeSignalSample[] {
+  const firstWithinRange = history.findIndex(
+    (sample) => sample.timestamp >= cutoffTimestamp,
+  );
+
+  // Keep one predecessor sample. A relative trend needs it to reconstruct the
+  // value that was active exactly at the left edge of the visible time window.
+  if (firstWithinRange > 1) {
+    return history.slice(firstWithinRange - 1);
+  }
+
+  if (firstWithinRange === -1 && history.length > 1) {
+    return history.slice(-1);
+  }
+
+  return history;
 }
 
 export const runtimeSignals = new RuntimeSignalStore();

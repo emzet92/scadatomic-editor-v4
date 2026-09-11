@@ -1,3 +1,8 @@
+import {
+  DEFAULT_CHART_TIME_RANGE,
+  type RelativeChartTimeRange,
+} from "./chart-time-range";
+
 export type CssSize = number | string;
 
 export type PageDeviceMode = "desktop" | "tablet" | "mobile";
@@ -158,6 +163,7 @@ export type ChartNodeProps = {
   color?: string;
   showLegend?: boolean;
   showGrid?: boolean;
+  timeRange?: RelativeChartTimeRange;
 };
 
 export const defaultChartProps = {
@@ -175,6 +181,7 @@ export const defaultChartProps = {
   color: "#0284c7",
   showLegend: false,
   showGrid: true,
+  timeRange: DEFAULT_CHART_TIME_RANGE,
 } satisfies ChartNodeProps;
 
 export type NavigationNodeProps = {

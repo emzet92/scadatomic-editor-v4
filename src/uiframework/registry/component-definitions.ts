@@ -26,6 +26,7 @@ export type InspectorControl =
   | { kind: "toggle" }
   | { kind: "image-asset" }
   | { kind: "tag-ref"; udtId: string }
+  | { kind: "time-range" }
   | { kind: "text-format" }
   | { kind: "text-align" }
   | { kind: "border-size"; min?: number; max?: number; step?: number }
@@ -176,6 +177,7 @@ export const componentDefinitions = {
       color: { kind: "color" },
       showLegend: { kind: "toggle" },
       showGrid: { kind: "toggle" },
+      timeRange: { kind: "time-range" },
     },
     bindings: {
       value: { label: "Runtime tag" },

@@ -2,6 +2,11 @@ import type { InspectorControl } from "../../registry/component-definitions";
 import { useEditorStore } from "../../editor-store";
 import { createTagRef, isTagRef } from "../../data/collections/TagRef";
 import { isUdtTag } from "../../data/tags/TagDefinition";
+import {
+  CHART_TIME_RANGE_PRESETS,
+  createRelativeChartTimeRange,
+  getChartTimeRangeDurationMs,
+} from "../../chart-time-range";
 import type { UpdateNode } from "./property-panel-types";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
@@ -56,6 +61,27 @@ export function PropInput({
         value={value}
         onChange={updateProp}
       />
+    );
+  }
+
+  if (control.kind === "time-range") {
+    const durationMs = getChartTimeRangeDurationMs(value);
+
+    return (
+      <FormField label="time range">
+        <Select
+          value={String(durationMs)}
+          onChange={(event) =>
+            updateProp(createRelativeChartTimeRange(Number(event.target.value)))
+          }
+        >
+          {CHART_TIME_RANGE_PRESETS.map((preset) => (
+            <option key={preset.durationMs} value={preset.durationMs}>
+              {preset.label}
+            </option>
+          ))}
+        </Select>
+      </FormField>
     );
   }
 

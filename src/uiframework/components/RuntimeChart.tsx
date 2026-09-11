@@ -1,43 +1,47 @@
+import { useEffect, useState } from "react";
 import type { Binding } from "../core/document";
-import { useRuntimeSignalHistory } from "../runtime-signals";
-import type { ChartNodeProps, ChartPoint } from "../component-props";
+import {
+  useRuntimeSignal,
+  useRuntimeSignalHistory,
+} from "../runtime-signals";
+import type { ChartNodeProps } from "../component-props";
+import {
+  DEFAULT_CHART_TIME_RANGE,
+  getChartTimeRangeDurationMs,
+} from "../chart-time-range";
+import { buildRuntimeChartPoints } from "../chart-runtime-history";
 import { Chart } from "./Chart";
 
 type RuntimeChartProps = React.ComponentProps<typeof Chart> &
   ChartNodeProps & {
     runtimeBindings?: Record<string, Binding>;
-    historyLimit?: number;
   };
+
+const WINDOW_CLOCK_INTERVAL_MS = 1_000;
 
 export function RuntimeChart({
   runtimeBindings,
   points,
-  historyLimit = 30,
+  timeRange = DEFAULT_CHART_TIME_RANGE,
   ...props
 }: RuntimeChartProps) {
   const valueBinding = runtimeBindings?.value;
   const tag = valueBinding?.kind === "tag" ? valueBinding.path : undefined;
   const history = useRuntimeSignalHistory(tag);
+  const currentValue = useRuntimeSignal(tag);
+  const now = useWindowClock(Boolean(tag));
+  const durationMs = getChartTimeRangeDurationMs(timeRange);
 
-  const runtimePoints: ChartPoint[] = history
-    .slice(-historyLimit)
-    .map((sample) => {
-      const value = toNumber(sample.value);
+  const runtimePoints = tag
+    ? buildRuntimeChartPoints({
+        history,
+        currentValue,
+        fromTimestamp: now - durationMs,
+        toTimestamp: now,
+      })
+    : [];
 
-      return value === null
-        ? null
-        : {
-            label: new Date(sample.timestamp).toLocaleTimeString(undefined, {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            }),
-            value,
-          };
-    })
-    .filter((point): point is ChartPoint => point !== null);
-
-  const resolvedPoints = runtimePoints.length > 0 ? runtimePoints : points;
+  const resolvedPoints = tag ? runtimePoints : points;
 
   return (
     <Chart
@@ -47,20 +51,18 @@ export function RuntimeChart({
   );
 }
 
-function toNumber(value: unknown): number | null {
-  if (typeof value === "number") {
-    return value;
-  }
+function useWindowClock(enabled: boolean) {
+  const [now, setNow] = useState(() => Date.now());
 
-  if (typeof value === "boolean") {
-    return value ? 1 : 0;
-  }
+  useEffect(() => {
+    if (!enabled) return undefined;
 
-  if (typeof value === "string") {
-    const normalized = value.replace(",", ".").replace(/[^\d.-]/g, "");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
+    const timer = window.setInterval(() => {
+      setNow(Date.now());
+    }, WINDOW_CLOCK_INTERVAL_MS);
 
-  return null;
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
+  return now;
 }
