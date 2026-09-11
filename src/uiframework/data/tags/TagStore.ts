@@ -2,7 +2,7 @@ import type { DataType, PrimitiveDataType } from "../types/DataType";
 import { TypeRegistry } from "../types/TypeRegistry";
 import type { UdtDefinition, UdtFieldDefinition } from "../udt/UdtDefinition";
 import { isPrimitiveTag, isUdtTag, type ProjectData, type TagDefinition, type UdtTag } from "./TagDefinition";
-import type { TagChangedEvent, TagChangedListener } from "./TagEvents";
+import type { TagChangedEvent, TagChangedListener, TagWriteOptions } from "./TagEvents";
 
 export type TagStoreSetResult =
   | { ok: true; changed: boolean; event?: TagChangedEvent | undefined }
@@ -77,7 +77,7 @@ export class TagStore {
     return { path, tag, type, value, field };
   }
 
-  set(path: string, value: unknown): TagStoreSetResult {
+  set(path: string, value: unknown, options: TagWriteOptions = {}): TagStoreSetResult {
     const resolved = this.resolve(path);
     if (!resolved) return { ok: false, error: `Unknown tag path: ${path}` };
     if (resolved.type.kind === "udt") {
@@ -124,6 +124,7 @@ export class TagStore {
       path,
       oldValue,
       newValue: value,
+      ...(options.source ? { source: options.source } : {}),
     };
     this.emit(event);
     return { ok: true, changed: true, event };

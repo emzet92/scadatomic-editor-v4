@@ -2,6 +2,7 @@ import type { PrimitiveDataType } from "../types/DataType";
 import { TypeRegistry } from "../types/TypeRegistry";
 import { createUdtTag } from "../udt/UdtInstanceFactory";
 import type { ProjectData, PrimitiveTag, TagDefinition } from "./TagDefinition";
+import { removeSimulationBindingsForTag } from "../simulation/SimulationRegistry";
 
 export const RESERVED_DATA_NAMES = new Set(["ctx", "self", "internal", "args", "tags", "$get", "$set", "$children"]);
 
@@ -78,5 +79,5 @@ export function deleteTag(data: ProjectData, tagId: string): ProjectData {
   if (!data.tags[tagId]) return data;
   const tags = { ...data.tags };
   delete tags[tagId];
-  return { ...data, tags };
+  return removeSimulationBindingsForTag({ ...data, tags }, tagId);
 }

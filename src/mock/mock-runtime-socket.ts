@@ -17,10 +17,9 @@ import {
 } from "./mock-script-runtime";
 import {
   getMockTagStore,
-  listMockTagStores,
   replaceMockTagStoreData,
 } from "./mock-tag-runtime";
-import { BasicMockTagSimulator } from "./mock-tag-simulator";
+import { MockSimulationRuntime } from "./mock-simulation-runtime";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -32,7 +31,7 @@ class MockRuntimeSocket extends EventTarget {
 
   private readonly channel = createBroadcastChannel();
   private readonly publishedDocuments = new Map<string, UiDocument>();
-  private readonly tagSimulator = new BasicMockTagSimulator();
+  private readonly simulationRuntime = new MockSimulationRuntime();
   private readonly tagEventBridges = new Map<string, () => void>();
   private signalTimer: number | null = null;
   private process = {
@@ -47,6 +46,7 @@ class MockRuntimeSocket extends EventTarget {
     if (this.channel) {
       this.channel.addEventListener("message", (event) => {
         this.capturePublishedDocument(event.data);
+        this.handleSimulationControl(event.data);
         this.dispatchPayload(event.data);
       });
     }
@@ -84,6 +84,7 @@ class MockRuntimeSocket extends EventTarget {
       const document = structuredClone(parseUiDocument(message.document));
       this.publishedDocuments.set(message.projectId, document);
       const tagStore = replaceMockTagStoreData(message.projectId, document.data);
+      this.simulationRuntime.configure(message.projectId, document.data, false);
       this.ensureTagEventBridge(message.projectId, tagStore);
     } catch (error) {
       console.warn("[mock-ws] Ignoring invalid published document", error);
@@ -99,6 +100,7 @@ class MockRuntimeSocket extends EventTarget {
   }
 
   private handleOutgoingPayload(payload: MockWsPayload) {
+    if (this.handleSimulationControl(payload)) return;
     if (payload.type !== "runtime.event") {
       return;
     }
@@ -243,22 +245,40 @@ class MockRuntimeSocket extends EventTarget {
       );
 
       this.emitProcessSignals();
-      this.simulateProjectTags();
     }, SIGNAL_INTERVAL_MS);
   }
 
-  private simulateProjectTags() {
-    const activeProjectId = getRuntimeProjectIdFromLocation();
-    if (!activeProjectId) return;
+  private handleSimulationControl(payload: unknown) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+    const message = payload as MockWsPayload;
+    if (
+      message.type !== "simulation.start" &&
+      message.type !== "simulation.stop" &&
+      message.type !== "simulation.configure"
+    ) return false;
+    if (typeof message.projectId !== "string") return true;
 
-    const activeStore = listMockTagStores().find(
-      ([projectId]) => projectId === activeProjectId
-    );
-    if (!activeStore) return;
+    if (message.type === "simulation.stop") {
+      this.simulationRuntime.stop(message.projectId);
+      return true;
+    }
 
-    const [projectId, tagStore] = activeStore;
-    this.ensureTagEventBridge(projectId, tagStore);
-    this.tagSimulator.tick(projectId, tagStore);
+    let data;
+    try {
+      data = message.data && typeof message.data === "object"
+        ? (message.data as import("../uiframework/data/tags/TagDefinition").ProjectData)
+        : this.getProjectDocument(message.projectId)?.data;
+    } catch {
+      data = undefined;
+    }
+
+    if (message.type === "simulation.start") {
+      this.simulationRuntime.start(message.projectId, data);
+    } else {
+      this.simulationRuntime.configure(message.projectId, data);
+    }
+    this.ensureTagEventBridge(message.projectId, getMockTagStore(message.projectId, data));
+    return true;
   }
 
   private ensureTagEventBridge(
@@ -421,14 +441,4 @@ function clamp(value: number, min: number, max: number) {
 function round(value: number, digits: number) {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
-}
-
-function getRuntimeProjectIdFromLocation() {
-  const match = window.location.pathname.match(/^\/render\/([^/]+)/);
-  if (!match?.[1]) return undefined;
-  try {
-    return decodeURIComponent(match[1]);
-  } catch {
-    return match[1];
-  }
 }

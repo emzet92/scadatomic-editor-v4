@@ -219,7 +219,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     let result: TagStoreSetResult = { ok: false, error: "Tag store is not ready." };
     set((state) => {
       replaceDesignerTagData(state.document.data);
-      result = designerTagStore.set(path, value);
+      result = designerTagStore.set(path, value, { source: { kind: "user" } });
       if (!result.ok || !result.changed) return state;
       return { document: { ...state.document, data: designerTagStore.snapshot() } };
     });

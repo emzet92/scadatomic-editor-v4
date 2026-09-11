@@ -9,6 +9,9 @@ import { Button, ConfirmDialog, FormField, PanelCard, TextInput } from "../ui";
 import { DataTypeSelect } from "./DataTypeSelect";
 import { DataValueInput } from "./DataValueInput";
 import type { DataSelection } from "./data-selection";
+import type { PrimitiveDataType } from "../../data/types/DataType";
+import type { TagFieldRef } from "../../data/tags/TagFieldRef";
+import { SimulationEditor } from "./simulation/SimulationEditor";
 
 export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void }) {
   const tag = data.tags[tagId];
@@ -35,14 +38,17 @@ export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId:
       <FormField label="Name" error={error}><div className="flex gap-2"><TextInput value={name} onChange={(event) => setName(event.target.value)} mono /><Button onClick={saveName}>Rename</Button></div></FormField>
       <FormField label="Type"><DataTypeSelect data={data} value={stableTag.type} onChange={() => undefined} disabled /></FormField>
     </PanelCard>
-    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit goes through TagStore.set() and emits tag.changed when the value actually changes.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue path={stableTag.name} label="Value" type={stableTag.type} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
+    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit goes through TagStore.set() and emits tag.changed when the value actually changes.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} data={data} target={{ tagId: stableTag.id, fieldIds: [field.id] }} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue data={data} target={{ tagId: stableTag.id, fieldIds: [] }} path={stableTag.name} label="Value" type={stableTag.type} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
     <ConfirmDialog open={deleteOpen} title={`Delete ${stableTag.name}?`} description="The tag and its persisted runtime value will be removed from this project." confirmLabel="Delete tag" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { updateProjectData((current) => deleteTag(current, stableTag.id)); setDeleteOpen(false); onSelect(null); }} />
   </div>;
 }
 
-function TagFieldValue({ path, label, type, onChange }: { path: string; label: string; type: { kind: "string" } | { kind: "int" } | { kind: "bool" }; onChange(value: string | number | boolean): void }) {
+function TagFieldValue({ data, target, path, label, type, onChange }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void }) {
   const value = useDesignerTagValue(path);
-  return <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>;
+  return <div className="space-y-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3">
+    <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>
+    <SimulationEditor data={data} target={target} type={type} />
+  </div>;
 }
 
 function Missing() { return <div className="p-8 text-sm text-[var(--editor-text-muted)]">Tag no longer exists.</div>; }

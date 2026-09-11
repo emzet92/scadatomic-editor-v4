@@ -11,9 +11,12 @@ export function isProjectData(value: unknown): value is ProjectData {
     return false;
   }
 
-  return Object.entries(value.tags).every(([id, tag]) =>
+  const tagsValid = Object.entries(value.tags).every(([id, tag]) =>
     isTagDefinition(tag, id, udts as Record<string, UdtDefinition>)
   );
+  if (!tagsValid) return false;
+
+  return value.simulation === undefined || isSimulationConfig(value.simulation);
 }
 
 function isUdtDefinition(value: unknown, expectedId: string): value is UdtDefinition {
@@ -70,6 +73,39 @@ function isTagDefinition(
   }
 
   return TypeRegistry.validate(type, value.value);
+}
+
+function isSimulationConfig(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.bindings)) return false;
+  return Object.entries(value.bindings).every(([id, binding]) => {
+    if (!isRecord(binding) || binding.id !== id || binding.driver !== "simulation" || typeof binding.enabled !== "boolean") return false;
+    if (!isRecord(binding.target) || typeof binding.target.tagId !== "string" || !Array.isArray(binding.target.fieldIds) || !binding.target.fieldIds.every((fieldId) => typeof fieldId === "string")) return false;
+    return isSimulationGeneratorConfig(binding.generator);
+  });
+}
+
+function isSimulationGeneratorConfig(value: unknown) {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  switch (value.kind) {
+    case "constant":
+      return typeof value.value === "string" || typeof value.value === "number" || typeof value.value === "boolean";
+    case "sine":
+      return numbers(value, ["min", "max", "periodMs", "phase"]);
+    case "ramp":
+      return numbers(value, ["min", "max", "durationMs"]) && (value.mode === "loop" || value.mode === "pingPong");
+    case "square":
+      return numbers(value, ["low", "high", "periodMs", "dutyCycle"]);
+    case "random":
+      return numbers(value, ["min", "max", "intervalMs"]) && (value.seed === undefined || typeof value.seed === "number");
+    case "toggle":
+      return typeof value.intervalMs === "number" && typeof value.initialValue === "boolean";
+    default:
+      return false;
+  }
+}
+
+function numbers(value: Record<string, unknown>, keys: string[]) {
+  return keys.every((key) => typeof value[key] === "number" && Number.isFinite(value[key]));
 }
 
 function isDataType(value: unknown): value is DataType {

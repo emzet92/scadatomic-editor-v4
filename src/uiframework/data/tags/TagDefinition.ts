@@ -1,4 +1,5 @@
 import type { PrimitiveDataType, UdtDataType } from "../types/DataType";
+import type { SimulationProjectConfig } from "../simulation/SimulationBinding";
 
 export type PrimitiveTag = {
   id: string;
@@ -19,6 +20,8 @@ export type TagDefinition = PrimitiveTag | UdtTag;
 export type ProjectData = {
   udts: Record<string, import("../udt/UdtDefinition").UdtDefinition>;
   tags: Record<string, TagDefinition>;
+  /** Persisted source configuration. Runtime driver/session state is never stored here. */
+  simulation?: SimulationProjectConfig | undefined;
 };
 
 export function createEmptyProjectData(): ProjectData {

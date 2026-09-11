@@ -5,8 +5,9 @@ import { SegmentedControl, SegmentedControlItem } from "../ui";
 import { TagsTree } from "./TagsTree";
 import { UdtTree } from "./UdtTree";
 import type { DataSelection } from "./data-selection";
+import { SimulationStatus } from "./simulation/SimulationStatus";
 
-export function DataPanel({ data, selection, onSelect }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void }) {
+export function DataPanel({ data, selection, onSelect, projectId }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
   const inferredTab = selection?.kind === "udt" || selection?.kind === "udt-method" || selection?.kind === "new-udt" ? "udts" : "tags";
   const [manualTab, setManualTab] = useState<"tags" | "udts" | null>(null);
   const tab = manualTab ?? inferredTab;
@@ -19,6 +20,9 @@ export function DataPanel({ data, selection, onSelect }: { data: ProjectData; se
       <SegmentedControlItem active={tab === "tags"} className="flex-1 gap-1.5" onClick={() => setManualTab("tags")}><Tags size={13} /> Tags</SegmentedControlItem>
       <SegmentedControlItem active={tab === "udts"} className="flex-1 gap-1.5" onClick={() => setManualTab("udts")}><Braces size={13} /> UDTs</SegmentedControlItem>
     </SegmentedControl>
-    {tab === "tags" ? <TagsTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-tag" })} /> : <UdtTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-udt" })} />}
+    {tab === "tags" ? <>
+      <SimulationStatus data={data} projectId={projectId} />
+      <TagsTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-tag" })} />
+    </> : <UdtTree data={data} selection={selection} onSelect={onSelect} onCreate={() => onSelect({ kind: "new-udt" })} />}
   </div>;
 }

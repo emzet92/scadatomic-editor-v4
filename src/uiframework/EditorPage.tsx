@@ -44,6 +44,8 @@ import { DataPanel } from "./gui/data/DataPanel";
 import { DataWorkspace } from "./gui/data/DataWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+import { sendWsMessage } from "./websocket";
 
 export function RendererRoot({
   document,
@@ -305,6 +307,17 @@ export function EditorPage() {
     };
   }, [projectId, projectName, document, loading, flushPendingSave]);
 
+  useEffect(() => {
+    designerSimulationSession.configure(document.data ?? { udts: {}, tags: {} });
+  }, [document.data]);
+
+  useEffect(() => {
+    return () => {
+      designerSimulationSession.stop();
+      if (projectId) sendWsMessage({ type: "simulation.stop", projectId });
+    };
+  }, [projectId]);
+
   function setComponentMode(mode: ComponentEditorMode | null) {
     setScopedComponentMode(mode ? scopeMode(activePageId, mode) : null);
   }
@@ -432,6 +445,7 @@ export function EditorPage() {
               data={projectData}
               selection={dataSelection}
               onSelect={setDataSelection}
+              projectId={projectId}
             />
           ) : componentDefinitionMode && focusedDefinition ? (
             <>

@@ -1,10 +1,12 @@
 import type { TagStore } from "../tags/TagStore";
+import type { TagWriteSource } from "../tags/TagEvents";
 import { isPrimitiveTag, isUdtTag } from "../tags/TagDefinition";
 import type { UdtDefinition, UdtMethodDefinition } from "../udt/UdtDefinition";
 
 export type TagRuntimeContext = {
   log?: (...args: unknown[]) => void;
   emit?: (eventName: string, payload?: Record<string, unknown>) => void;
+  writeSource?: TagWriteSource | undefined;
 };
 
 export type TagRuntimeApi = Record<string, unknown> & {
@@ -88,7 +90,7 @@ export function createTagRuntimeProxy(
             `Cannot assign an entire UDT value: ${path}.${property}`
           );
         }
-        setOrThrow(tagStore, `${path}.${property}`, value);
+        setOrThrow(tagStore, `${path}.${property}`, value, context.writeSource);
         return true;
       },
       ownKeys() {
@@ -123,7 +125,7 @@ export function createTagRuntimeProxy(
         return (path: string) => tagStore.get(path);
       }
       if (property === "$set") {
-        return (path: string, value: unknown) => setOrThrow(tagStore, path, value);
+        return (path: string, value: unknown) => setOrThrow(tagStore, path, value, context.writeSource);
       }
       if (property === "$children") {
         return (path: string) => tagStore.children(path);
@@ -145,7 +147,7 @@ export function createTagRuntimeProxy(
       if (!isPrimitiveTag(tag)) {
         throw new TypeError(`Cannot assign an entire UDT value: ${tag.name}`);
       }
-      setOrThrow(tagStore, tag.name, value);
+      setOrThrow(tagStore, tag.name, value, context.writeSource);
       return true;
     },
     ownKeys() {
@@ -232,8 +234,13 @@ function executeUdtMethod(
   return execute(self, ctx, args);
 }
 
-function setOrThrow(tagStore: TagStore, path: string, value: unknown) {
-  const result = tagStore.set(path, value);
+function setOrThrow(
+  tagStore: TagStore,
+  path: string,
+  value: unknown,
+  source: TagWriteSource | undefined
+) {
+  const result = tagStore.set(path, value, { source: source ?? { kind: "script" } });
   if (!result.ok) throw new TypeError(result.error);
 }
 

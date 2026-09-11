@@ -2,6 +2,7 @@ import { isUdtTag, type ProjectData, type UdtTag } from "../tags/TagDefinition";
 import type { DataType } from "../types/DataType";
 import { TypeRegistry } from "../types/TypeRegistry";
 import { createFieldDefaultValue } from "./UdtInstanceFactory";
+import { pruneInvalidSimulationBindings } from "../simulation/SimulationRegistry";
 import type {
   UdtDefinition,
   UdtFieldDefinition,
@@ -124,7 +125,7 @@ function updateDefinitionAndInstances(
     tags[tagId] = synchronizeInstance(tag, previous, next, nextData);
   }
 
-  return { ...nextData, tags };
+  return pruneInvalidSimulationBindings({ ...nextData, tags });
 }
 
 function synchronizeInstance(
