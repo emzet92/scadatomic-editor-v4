@@ -75,7 +75,7 @@ export function SimulationStatus({
               <SimulationBindingStatusRow
                 key={binding.id}
                 path={resolved.path}
-                generatorName={simulationGeneratorRegistry.get(binding.generator.kind)?.displayName ?? binding.generator.kind}
+                generatorName={`${simulationGeneratorRegistry.get(binding.generator.kind)?.displayName ?? binding.generator.kind}${binding.activation ? " · conditional" : ""}`}
                 error={diagnosticsByBinding.get(binding.id)?.message}
               />
             );

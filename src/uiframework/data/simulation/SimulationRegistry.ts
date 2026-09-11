@@ -8,6 +8,7 @@ import type {
 } from "./SimulationBinding";
 import { createEmptySimulationConfig } from "./SimulationBinding";
 import { simulationGeneratorRegistry } from "./SimulationGeneratorRegistry";
+import type { SimulationActivation } from "./SimulationActivation";
 
 export function getSimulationConfig(data: ProjectData): SimulationProjectConfig {
   return data.simulation ?? createEmptySimulationConfig();
@@ -130,6 +131,19 @@ export function updateSimulationGenerator(
     ...binding,
     generator,
   }));
+}
+
+export function updateSimulationActivation(
+  data: ProjectData,
+  bindingId: string,
+  activation: SimulationActivation | undefined
+) {
+  return updateSimulationBinding(data, bindingId, (binding) => {
+    if (activation) return { ...binding, activation };
+    const withoutActivation = { ...binding };
+    delete withoutActivation.activation;
+    return withoutActivation;
+  });
 }
 
 function filterSimulationBindings(

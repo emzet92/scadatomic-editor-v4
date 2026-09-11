@@ -98,8 +98,25 @@ function isSimulationConfig(value: unknown) {
   return Object.entries(value.bindings).every(([id, binding]) => {
     if (!isRecord(binding) || binding.id !== id || binding.driver !== "simulation" || typeof binding.enabled !== "boolean") return false;
     if (!isTagFieldRef(binding.target)) return false;
-    return isSimulationGeneratorConfig(binding.generator);
+    if (!isSimulationGeneratorConfig(binding.generator)) return false;
+    return binding.activation === undefined || isSimulationActivation(binding.activation);
   });
+}
+
+function isSimulationActivation(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.condition) || !isRecord(value.inactiveBehavior)) return false;
+  const condition = value.condition;
+  if (!isTagFieldRef(condition.source)) return false;
+  if (condition.operator !== "eq" && condition.operator !== "neq") return false;
+  if (!isPrimitiveValue(condition.value)) return false;
+
+  const inactive = value.inactiveBehavior;
+  if (inactive.kind === "hold") return true;
+  return inactive.kind === "set" && isPrimitiveValue(inactive.value);
+}
+
+function isPrimitiveValue(value: unknown) {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
 }
 
 function isSimulationGeneratorConfig(value: unknown) {

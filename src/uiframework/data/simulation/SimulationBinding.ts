@@ -1,4 +1,5 @@
 import type { TagFieldRef } from "../tags/TagFieldRef";
+import type { SimulationActivation } from "./SimulationActivation";
 
 export type ConstantGeneratorConfig = {
   kind: "constant";
@@ -59,6 +60,8 @@ export type SimulationBinding = {
   target: TagFieldRef;
   enabled: boolean;
   generator: SimulationGeneratorConfig;
+  /** Optional Simulation-only gate. The generator runs only while the condition is true. */
+  activation?: SimulationActivation | undefined;
 };
 
 export type SimulationProjectConfig = {
