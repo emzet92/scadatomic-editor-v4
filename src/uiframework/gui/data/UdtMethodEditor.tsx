@@ -1,7 +1,7 @@
 import { Play, Save } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createUdtInstanceApi } from "../../data/runtime/UdtRuntime";
-import { getDesignerTagStore } from "../../data/tags/designer-tag-store";
+import { getDesignerTagRuntime } from "../../data/tags/designer-tag-store";
 import { isUdtTag, type ProjectData } from "../../data/tags/TagDefinition";
 import { updateUdtMethod } from "../../data/udt/UdtRegistry";
 import { useEditorStore } from "../../editor-store";
@@ -44,7 +44,9 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; 
   function run() {
     if (!selectedInstance) { setRunMessage("Create a UDT tag instance first."); return; }
     try {
-      const api = createUdtInstanceApi(selectedInstance.name, getDesignerTagStore(), {
+      const runtime = getDesignerTagRuntime();
+      if (!runtime) throw new Error("Designer runtime session is not connected yet.");
+      const api = createUdtInstanceApi(selectedInstance.name, runtime, {
         log: (...args) => console.log(`[udt:${udt.name}.${selectedMethod.name}]`, ...args),
       });
       const callable = api[selectedMethod.name];
@@ -57,7 +59,7 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; 
   }
 
   return <div className="mx-auto max-w-6xl space-y-5 p-8">
-    <div><div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">UDT method</div><h1 className="mt-1 text-xl font-semibold text-[var(--editor-text)]">{udt.name}.{selectedMethod.name}()</h1><p className="mt-1 text-sm text-[var(--editor-text-muted)]">self is bound to the concrete UDT instance; assignments are proxied through TagStore.set().</p></div>
+    <div><div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">UDT method</div><h1 className="mt-1 text-xl font-semibold text-[var(--editor-text)]">{udt.name}.{selectedMethod.name}()</h1><p className="mt-1 text-sm text-[var(--editor-text-muted)]">self is bound to the concrete UDT instance; assignments are routed through the mapped tag driver.</p></div>
     <PanelCard className="grid gap-3 md:grid-cols-[1fr_auto]">
       <FormField label="Method name"><TextInput mono value={name} onChange={(event) => setName(event.target.value)} /></FormField>
       <div className="flex items-end"><Button onClick={renameMethod}><Save size={13} /> Rename</Button></div>

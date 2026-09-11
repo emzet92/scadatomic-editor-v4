@@ -1,4 +1,4 @@
-import type { TagStore } from "../tags/TagStore";
+import type { TagRuntime } from "./TagRuntime";
 import type { TagWriteSource } from "../tags/TagEvents";
 import { isPrimitiveTag, isUdtTag } from "../tags/TagDefinition";
 import type { UdtDefinition, UdtMethodDefinition } from "../udt/UdtDefinition";
@@ -29,11 +29,11 @@ const TAG_RUNTIME_HELPERS = new Set(["$get", "$set", "$children"]);
  *   tags.Pump1.speed = 1450
  *   tags.Pump1.start()
  *
- * Every write is routed through TagStore.set(), so validation, tag.changed and
- * subscriptions remain the single mutation pipeline.
+ * Every application write is routed through TagRuntime to the owning driver.
+ * Drivers publish readback into TagStore, which remains the single event source.
  */
 export function createTagRuntimeProxy(
-  tagStore: TagStore,
+  tagRuntime: TagRuntime,
   context: TagRuntimeContext = {}
 ): TagRuntimeApi {
   const udtProxyCache = new Map<string, UdtInstanceApi>();
@@ -50,7 +50,7 @@ export function createTagRuntimeProxy(
     const proxy = new Proxy({} as UdtInstanceApi, {
       get(_target, property) {
         if (typeof property !== "string") return undefined;
-        const definition = getDefinition(tagStore, definitionId);
+        const definition = getDefinition(tagRuntime, definitionId);
         if (!definition) return undefined;
 
         const field = definition.fields.find(
@@ -60,7 +60,7 @@ export function createTagRuntimeProxy(
           const fieldPath = `${path}.${field.name}`;
           return field.type.kind === "udt"
             ? createScopedUdtProxy(fieldPath, field.type.udtId)
-            : tagStore.get(fieldPath);
+            : tagRuntime.get(fieldPath);
         }
 
         const method = definition.methods.find(
@@ -78,7 +78,7 @@ export function createTagRuntimeProxy(
       },
       set(_target, property, value) {
         if (typeof property !== "string") return false;
-        const definition = getDefinition(tagStore, definitionId);
+        const definition = getDefinition(tagRuntime, definitionId);
         const field = definition?.fields.find(
           (candidate) => candidate.name === property
         );
@@ -90,11 +90,11 @@ export function createTagRuntimeProxy(
             `Cannot assign an entire UDT value: ${path}.${property}`
           );
         }
-        setOrThrow(tagStore, `${path}.${property}`, value, context.writeSource);
+        setOrThrow(tagRuntime, `${path}.${property}`, value, context.writeSource);
         return true;
       },
       ownKeys() {
-        const definition = getDefinition(tagStore, definitionId);
+        const definition = getDefinition(tagRuntime, definitionId);
         return definition
           ? [
               ...definition.fields.map((field) => field.name),
@@ -104,7 +104,7 @@ export function createTagRuntimeProxy(
       },
       has(_target, property) {
         if (typeof property !== "string") return false;
-        const definition = getDefinition(tagStore, definitionId);
+        const definition = getDefinition(tagRuntime, definitionId);
         return !!definition?.fields.some((field) => field.name === property) ||
           !!definition?.methods.some((method) => method.name === property);
       },
@@ -122,44 +122,44 @@ export function createTagRuntimeProxy(
       if (typeof property !== "string") return undefined;
 
       if (property === "$get") {
-        return (path: string) => tagStore.get(path);
+        return (path: string) => tagRuntime.get(path);
       }
       if (property === "$set") {
-        return (path: string, value: unknown) => setOrThrow(tagStore, path, value, context.writeSource);
+        return (path: string, value: unknown) => setOrThrow(tagRuntime, path, value, context.writeSource);
       }
       if (property === "$children") {
-        return (path: string) => tagStore.children(path);
+        return (path: string) => tagRuntime.children(path);
       }
 
-      const tag = tagStore.getTagByName(property);
+      const tag = tagRuntime.getTagByName(property);
       if (!tag) return undefined;
       return isUdtTag(tag)
         ? createScopedUdtProxy(tag.name, tag.type.udtId)
-        : tagStore.get(tag.name);
+        : tagRuntime.get(tag.name);
     },
     set(_target, property, value) {
       if (typeof property !== "string") return false;
       if (TAG_RUNTIME_HELPERS.has(property)) {
         throw new TypeError(`${property} is a read-only tag runtime helper.`);
       }
-      const tag = tagStore.getTagByName(property);
+      const tag = tagRuntime.getTagByName(property);
       if (!tag) throw new TypeError(`Unknown tag: ${property}`);
       if (!isPrimitiveTag(tag)) {
         throw new TypeError(`Cannot assign an entire UDT value: ${tag.name}`);
       }
-      setOrThrow(tagStore, tag.name, value, context.writeSource);
+      setOrThrow(tagRuntime, tag.name, value, context.writeSource);
       return true;
     },
     ownKeys() {
       return [
         ...TAG_RUNTIME_HELPERS,
-        ...tagStore.listTags().map((tag) => tag.name),
+        ...tagRuntime.listTags().map((tag) => tag.name),
       ];
     },
     has(_target, property) {
       return (
         typeof property === "string" &&
-        (TAG_RUNTIME_HELPERS.has(property) || !!tagStore.getTagByName(property))
+        (TAG_RUNTIME_HELPERS.has(property) || !!tagRuntime.getTagByName(property))
       );
     },
     getOwnPropertyDescriptor() {
@@ -176,13 +176,13 @@ export function createTagRuntimeProxy(
  * JavaScript function parameter cannot be intercepted by a Proxy.
  */
 export function createTagRuntimeGlobals(
-  tagStore: TagStore,
+  tagRuntime: TagRuntime,
   context: TagRuntimeContext = {}
 ): Record<string, unknown> {
-  const tags = createTagRuntimeProxy(tagStore, context);
+  const tags = createTagRuntimeProxy(tagRuntime, context);
   const globals: Record<string, unknown> = { tags };
 
-  for (const tag of tagStore.listTags()) {
+  for (const tag of tagRuntime.listTags()) {
     if (isUdtTag(tag)) {
       globals[tag.name] = tags[tag.name];
     }
@@ -193,14 +193,14 @@ export function createTagRuntimeGlobals(
 
 export function createUdtInstanceApi(
   tagName: string,
-  tagStore: TagStore,
+  tagRuntime: TagRuntime,
   context: TagRuntimeContext = {}
 ): UdtInstanceApi {
-  const tag = tagStore.getTagByName(tagName);
+  const tag = tagRuntime.getTagByName(tagName);
   if (!tag || !isUdtTag(tag)) {
     throw new Error(`Unknown UDT tag: ${tagName}`);
   }
-  const tags = createTagRuntimeProxy(tagStore, context);
+  const tags = createTagRuntimeProxy(tagRuntime, context);
   const api = tags[tagName];
   if (!api || typeof api !== "object") {
     throw new Error(`Cannot create UDT runtime proxy for: ${tagName}`);
@@ -235,18 +235,18 @@ function executeUdtMethod(
 }
 
 function setOrThrow(
-  tagStore: TagStore,
+  tagRuntime: TagRuntime,
   path: string,
   value: unknown,
   source: TagWriteSource | undefined
 ) {
-  const result = tagStore.set(path, value, { source: source ?? { kind: "script" } });
+  const result = tagRuntime.write(path, value, source ?? { kind: "script" });
   if (!result.ok) throw new TypeError(result.error);
 }
 
 function getDefinition(
-  tagStore: TagStore,
+  tagRuntime: TagRuntime,
   definitionId: string
 ): UdtDefinition | undefined {
-  return tagStore.getUdtDefinitionById(definitionId);
+  return tagRuntime.getUdtDefinitionById(definitionId);
 }

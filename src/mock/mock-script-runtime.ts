@@ -1,4 +1,4 @@
-import type { TagStore } from "../uiframework/data/tags/TagStore";
+import type { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
 import {
   createTagRuntimeGlobals,
   createTagRuntimeProxy,
@@ -56,7 +56,7 @@ export type MockScriptHost = {
   resolveComponentScopeForRuntimeNode(
     runtimeNodeId: string
   ): MockRuntimeComponentScope | undefined;
-  getTagStore(): TagStore | undefined;
+  getTagRuntime(): TagRuntime | undefined;
   getNavigationTree(): NavigationTreeNode[];
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
@@ -115,7 +115,7 @@ export type MockScriptContext = {
   /** Public API of components on the current runtime page. */
   ui: MockScriptUiApi;
   nav: MockScriptNavigationApi;
-  /** Dynamic typed tag namespace. All writes are routed through TagStore. */
+  /** Dynamic typed tag namespace. Writes are routed through the owning tag driver. */
   tags?: TagRuntimeApi | undefined;
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
@@ -198,10 +198,10 @@ function createContext(
 ): MockScriptContext {
   const ui = createUiApi(host, event.projectId, () => ctx);
   const nav = createNavigationApi(host);
-  const tagStore = host.getTagStore();
+  const tagRuntime = host.getTagRuntime();
   const contextRef: { current?: MockScriptContext } = {};
-  const tags = tagStore
-    ? createTagRuntimeProxy(tagStore, {
+  const tags = tagRuntime
+    ? createTagRuntimeProxy(tagRuntime, {
         log: (...values) => contextRef.current?.log(...values),
         emit: (eventName, payload) => contextRef.current?.emit(eventName, payload),
       })
@@ -672,9 +672,9 @@ function executeSource({
 }
 
 function createTagGlobals(host: MockScriptHost, ctx: MockScriptContext) {
-  const tagStore = host.getTagStore();
-  return tagStore
-    ? createTagRuntimeGlobals(tagStore, {
+  const tagRuntime = host.getTagRuntime();
+  return tagRuntime
+    ? createTagRuntimeGlobals(tagRuntime, {
         log: (...values) => ctx.log(...values),
         emit: (eventName, payload) => ctx.emit(eventName, payload),
       })

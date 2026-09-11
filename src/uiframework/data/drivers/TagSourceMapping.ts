@@ -5,10 +5,8 @@ import {
   type TagFieldRef,
 } from "../tags/TagFieldRef";
 import {
-  createSimulationBinding,
   findSimulationBinding,
   removeSimulationBindingForTarget,
-  upsertSimulationBinding,
 } from "../simulation/SimulationRegistry";
 import {
   createEmptyTagSourceConfig,
@@ -98,12 +96,7 @@ export function setTagSourceDriver(
 
   let next = removeExplicitTagSourceMappingForTarget(data, target);
 
-  if (driver === "simulation") {
-    const existing = findSimulationBinding(next, target);
-    next = existing
-      ? next
-      : upsertSimulationBinding(next, createSimulationBinding(next, target));
-  } else {
+  if (driver !== "simulation") {
     next = removeSimulationBindingForTarget(next, target);
   }
 

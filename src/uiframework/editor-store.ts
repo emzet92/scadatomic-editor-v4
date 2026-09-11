@@ -34,8 +34,8 @@ import {
 } from "./core/node-name";
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
 import type { ProjectData } from "./data/tags/TagDefinition";
-import type { TagStoreSetResult } from "./data/tags/TagStore";
-import { getDesignerTagStore, replaceDesignerTagData } from "./data/tags/designer-tag-store";
+import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
 
 export type DragPreview = {
   type: string;
@@ -67,7 +67,7 @@ type EditorState = {
   document: UiDocument;
 
   updateProjectData: (updater: (data: ProjectData) => ProjectData) => void;
-  setTagValue: (path: string, value: unknown) => TagStoreSetResult;
+  setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
   dragX: number;
@@ -216,7 +216,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   setTagValue: (path, value) => {
-    return getDesignerTagStore().set(path, value, { source: { kind: "user" } });
+    return writeDesignerTagValue(path, value);
   },
 
   dragPreview: null,

@@ -82,7 +82,7 @@ export function SimulationStatus({
           })}
         </div>
       ) : (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Map a tag field to this driver and enable its generator below.</div>
+        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Map fields to Simulation, then add generators only to signals that should be driven automatically.</div>
       )}
     </PanelCard>
   );

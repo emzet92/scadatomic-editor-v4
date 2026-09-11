@@ -16,6 +16,7 @@ import {
   type MockRuntimeComponentScope,
 } from "./mock-script-runtime";
 import {
+  getMockRuntimeSession,
   getMockTagStore,
   replaceMockTagStoreData,
 } from "./mock-tag-runtime";
@@ -170,7 +171,7 @@ class MockRuntimeSocket extends EventTarget {
             ? resolveComponentScopeForRuntimeNode(document, runtimeNodeId)
             : undefined;
         },
-        getTagStore: () => tagStore,
+        getTagRuntime: () => getMockRuntimeSession(projectId, projectDocument?.data).tags,
         getNavigationTree: () => {
           const document = this.getProjectDocument(projectId);
           return document ? buildNavigationTree(document) : [];

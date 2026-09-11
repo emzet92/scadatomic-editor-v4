@@ -1,23 +1,31 @@
 import { useSyncExternalStore } from "react";
+import type { TagRuntime } from "../runtime/TagRuntime";
 import { createEmptyProjectData, type ProjectData } from "./TagDefinition";
 import { TagStore } from "./TagStore";
 
 let activeStore = new TagStore(createEmptyProjectData());
+let activeRuntime: TagRuntime | undefined;
 const activeStoreListeners = new Set<() => void>();
 
 export function getDesignerTagStore() {
   return activeStore;
 }
 
-/** Attach Designer controls directly to the canonical runtime TagStore. */
-export function attachDesignerTagStore(store: TagStore) {
-  if (activeStore === store) return;
-  activeStore = store;
+export function getDesignerTagRuntime() {
+  return activeRuntime;
+}
+
+/** Attach Designer controls directly to the canonical project runtime. */
+export function attachDesignerTagRuntime(runtime: TagRuntime) {
+  if (activeRuntime === runtime && activeStore === runtime.store) return;
+  activeRuntime = runtime;
+  activeStore = runtime.store;
   notifyActiveStoreChanged();
 }
 
-export function detachDesignerTagStore(store: TagStore, data?: ProjectData) {
-  if (activeStore !== store) return;
+export function detachDesignerTagRuntime(runtime: TagRuntime, data?: ProjectData) {
+  if (activeRuntime !== runtime) return;
+  activeRuntime = undefined;
   activeStore = new TagStore(data ?? createEmptyProjectData());
   notifyActiveStoreChanged();
 }
@@ -28,6 +36,15 @@ export function detachDesignerTagStore(store: TagStore, data?: ProjectData) {
  */
 export function replaceDesignerTagData(data: ProjectData | undefined) {
   activeStore.reconfigure(data ?? createEmptyProjectData());
+}
+
+export function writeDesignerTagValue(path: string, value: unknown) {
+  if (activeRuntime) {
+    return activeRuntime.write(path, value, { kind: "user" });
+  }
+  // Pre-session fallback used only while the designer is bootstrapping.
+  const result = activeStore.set(path, value, { source: { kind: "user" } });
+  return result.ok ? { ok: true as const } : { ok: false as const, error: result.error };
 }
 
 export function useDesignerTagValue(path: string | undefined) {

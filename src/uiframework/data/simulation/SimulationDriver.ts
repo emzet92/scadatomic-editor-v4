@@ -1,6 +1,11 @@
-import type { TagDriver, TagDriverContext } from "../drivers/TagDriver";
+import type {
+  TagDriver,
+  TagDriverContext,
+  TagDriverWriteRequest,
+  TagDriverWriteResult,
+} from "../drivers/TagDriver";
 import { getTagSourceMapping } from "../drivers/TagSourceMapping";
-import { resolveTagFieldRef } from "../tags/TagFieldRef";
+import { listPrimitiveTagFieldRefs, resolveTagFieldRef, tagFieldRefKey } from "../tags/TagFieldRef";
 import { TypeRegistry } from "../types/TypeRegistry";
 import type { RuntimeClock } from "./RuntimeClock";
 import { PerformanceRuntimeClock } from "./RuntimeClock";
@@ -27,9 +32,10 @@ export type SimulationDriverOptions = {
 /**
  * Local simulation source driver.
  *
- * The driver never owns tag values. It writes generated values through the
- * shared TagStore and reacts to condition inputs by subscribing to the same
- * store. Conditions are event-driven; waveforms are time-driven.
+ * The driver owns simulated device registers for fields mapped to it. External
+ * writes update that device state and publish a readback into TagStore. Optional
+ * generators drive selected registers. Conditions are event-driven; waveforms
+ * are time-driven.
  */
 export class SimulationDriver implements TagDriver {
   readonly kind = "simulation";
@@ -48,6 +54,8 @@ export class SimulationDriver implements TagDriver {
   private readonly dependencySubscriptions = new Map<string, () => void>();
   private readonly queuedReactiveBindings = new Set<string>();
   private reactiveFlushQueued = false;
+  /** Simulated device/process image keyed by stable field reference. */
+  private readonly deviceValues = new Map<string, unknown>();
 
   constructor(context: TagDriverContext, options: SimulationDriverOptions = {}) {
     this.context = context;
@@ -57,6 +65,7 @@ export class SimulationDriver implements TagDriver {
   }
 
   configure() {
+    this.syncDeviceState(this.context.getProjectData());
     this.syncActivationDependencies(this.context.getProjectData());
     if (this.isRunning()) this.queueAllConditionalBindings();
   }
@@ -67,6 +76,7 @@ export class SimulationDriver implements TagDriver {
     const now = this.clock.now();
     this.startedAt = now;
     this.lastTickAt = now;
+    this.syncDeviceState(this.context.getProjectData());
     this.syncActivationDependencies(this.context.getProjectData());
     this.tick(now);
     this.timer = setInterval(() => this.tick(), this.tickMs);
@@ -97,6 +107,23 @@ export class SimulationDriver implements TagDriver {
 
   getDiagnostics() {
     return [...this.diagnostics];
+  }
+
+  /**
+   * Application write to a simulated device register. The write changes the
+   * simulated device state and publishes one readback event to TagStore.
+   */
+  write(request: TagDriverWriteRequest): TagDriverWriteResult {
+    const data = this.context.getProjectData();
+    if (getTagSourceMapping(data, request.target).driver !== this.kind) {
+      return { ok: false, error: `${request.path} is not mapped to Simulation.` };
+    }
+
+    this.deviceValues.set(tagFieldRefKey(request.target), request.value);
+    const result = this.context.publish(request.path, request.value, {
+      source: { kind: "driver", id: this.kind },
+    });
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
   }
 
   /** Deterministic entry point used by tests and manual simulation clocks. */
@@ -181,7 +208,11 @@ export class SimulationDriver implements TagDriver {
         if (!activation.active) {
           this.activationStartedAt.delete(binding.id);
           if (binding.activation.inactiveBehavior.kind === "set") {
-            const inactiveResult = this.context.tagStore.set(
+            this.deviceValues.set(
+              tagFieldRefKey(binding.target),
+              binding.activation.inactiveBehavior.value
+            );
+            const inactiveResult = this.context.publish(
               resolved.path,
               binding.activation.inactiveBehavior.value,
               { source: { kind: "simulation", id: binding.id } }
@@ -228,7 +259,8 @@ export class SimulationDriver implements TagDriver {
         };
       }
 
-      const result = this.context.tagStore.set(resolved.path, nextValue, {
+      this.deviceValues.set(tagFieldRefKey(binding.target), nextValue);
+      const result = this.context.publish(resolved.path, nextValue, {
         source: { kind: "simulation", id: binding.id },
       });
       if (!result.ok) {
@@ -242,6 +274,22 @@ export class SimulationDriver implements TagDriver {
     }
 
     return undefined;
+  }
+
+  private syncDeviceState(data: ReturnType<TagDriverContext["getProjectData"]>) {
+    const mappedKeys = new Set<string>();
+    for (const field of listPrimitiveTagFieldRefs(data)) {
+      if (getTagSourceMapping(data, field.ref).driver !== this.kind) continue;
+      const key = tagFieldRefKey(field.ref);
+      mappedKeys.add(key);
+      if (!this.deviceValues.has(key)) {
+        this.deviceValues.set(key, this.context.tagStore.get(field.path));
+      }
+    }
+
+    for (const key of [...this.deviceValues.keys()]) {
+      if (!mappedKeys.has(key)) this.deviceValues.delete(key);
+    }
   }
 
   private syncActivationDependencies(data: ReturnType<TagDriverContext["getProjectData"]>) {

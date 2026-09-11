@@ -13,6 +13,13 @@ import {
 } from "../../data/tags/TagFieldRef";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import { useEditorStore } from "../../editor-store";
+import { useDesignerTagValue } from "../../data/tags/designer-tag-store";
+import {
+  createSimulationBinding,
+  findSimulationBinding,
+  removeSimulationBindingForTarget,
+  upsertSimulationBinding,
+} from "../../data/simulation/SimulationRegistry";
 import { Button, PanelCard, SectionHeader } from "../ui";
 import { SimulationEditor } from "./simulation/SimulationEditor";
 import { SimulationStatus } from "./simulation/SimulationStatus";
@@ -162,6 +169,7 @@ function DriverMappingRow({
   const mappedHere = mapping.driver === driverKind;
   const currentDriver = defaultTagDriverRegistry.get(mapping.driver);
   const canUnmap = mappedHere && mapping.explicit;
+  const liveValue = useDesignerTagValue(field.path);
 
   return (
     <div className="overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]">
@@ -175,12 +183,17 @@ function DriverMappingRow({
           <div className="truncate font-mono text-xs font-medium text-[var(--editor-text)]">
             {field.path}
           </div>
-          <div className="mt-0.5 text-[10px] text-[var(--editor-text-soft)]">
-            {mappedHere
-              ? mapping.explicit
-                ? `Explicit ${currentDriver?.displayName ?? mapping.driver} mapping`
-                : "Manual fallback"
-              : `Current source: ${currentDriver?.displayName ?? mapping.driver}`}
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-[var(--editor-text-soft)]">
+            <span>
+              {mappedHere
+                ? mapping.explicit
+                  ? `Explicit ${currentDriver?.displayName ?? mapping.driver} mapping`
+                  : "Manual fallback"
+                : `Current source: ${currentDriver?.displayName ?? mapping.driver}`}
+            </span>
+            {mappedHere ? (
+              <span className="font-mono text-[var(--editor-text-muted)]">live={formatDriverValue(liveValue)}</span>
+            ) : null}
           </div>
         </div>
 
@@ -216,6 +229,51 @@ function SimulationConfigForTarget({
   target: TagFieldRef;
 }) {
   const resolved = resolveTagFieldRef(data, target);
+  const binding = findSimulationBinding(data, target);
+  const updateProjectData = useEditorStore((state) => state.updateProjectData);
   if (!resolved) return null;
-  return <SimulationEditor data={data} target={target} type={resolved.type} />;
+
+  function addGenerator() {
+    updateProjectData((current) => {
+      if (findSimulationBinding(current, target)) return current;
+      return upsertSimulationBinding(current, createSimulationBinding(current, target));
+    });
+  }
+
+  function removeGenerator() {
+    updateProjectData((current) => removeSimulationBindingForTarget(current, target));
+  }
+
+  if (!binding) {
+    return (
+      <div className="flex items-center justify-between gap-3 pt-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold text-[var(--editor-text)]">Writable simulated register</div>
+          <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+            Application writes are routed to SimulationDriver and read back through TagStore. Add a generator only for signals that should be driven by simulated process behavior.
+          </div>
+        </div>
+        <Button size="xs" variant="secondary" onClick={addGenerator}>Add generator</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[11px] font-semibold text-[var(--editor-text)]">Generated signal</div>
+          <div className="text-[10px] text-[var(--editor-text-soft)]">The driver owns this register and also updates it from the configured generator.</div>
+        </div>
+        <Button size="xs" variant="secondary" onClick={removeGenerator}>Remove generator</Button>
+      </div>
+      <SimulationEditor data={data} target={target} type={resolved.type} />
+    </div>
+  );
+}
+
+function formatDriverValue(value: unknown) {
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "—";
 }

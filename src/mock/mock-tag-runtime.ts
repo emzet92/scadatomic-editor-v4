@@ -3,6 +3,7 @@ import {
   type ProjectData,
 } from "../uiframework/data/tags/TagDefinition";
 import { ProjectRuntimeSession } from "../uiframework/data/runtime/ProjectRuntimeSession";
+import { createDefaultTagDriverRegistry } from "../uiframework/data/simulation/default-driver-registry";
 import { hydrateProjectDataFromTagSession } from "./mock-tag-session-state";
 
 const sessions = new Map<string, ProjectRuntimeSession>();
@@ -13,7 +14,8 @@ export function getMockRuntimeSession(projectId: string, data?: ProjectData) {
     const base = data ?? createEmptyProjectData();
     session = new ProjectRuntimeSession(
       projectId,
-      hydrateProjectDataFromTagSession(projectId, base)
+      hydrateProjectDataFromTagSession(projectId, base),
+      createDefaultTagDriverRegistry()
     );
     sessions.set(projectId, session);
   }

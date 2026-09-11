@@ -8,12 +8,12 @@ export function createDefaultTagDriverRegistry() {
       kind: "manual",
       displayName: "Manual",
       description: "Value is controlled by the designer, scripts, or TagStore writes.",
-      create: () => new ManualTagDriver(),
+      create: (context) => new ManualTagDriver(context),
     })
     .register({
       kind: "simulation",
       displayName: "Simulation",
-      description: "Value is generated locally by a configured simulation generator.",
+      description: "Owns simulated device registers; optional generators can drive selected fields.",
       create: (context) => new SimulationDriver(context),
     });
 }

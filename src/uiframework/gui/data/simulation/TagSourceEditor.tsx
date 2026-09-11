@@ -54,7 +54,7 @@ export function TagSourceEditor({
           ? `Explicitly mapped to ${selectedDescriptor?.displayName ?? mapping.driver}.`
           : "No explicit mapping. Manual is used as the fallback source."}
         {mapping.driver === "simulation"
-          ? " Configure the waveform under Data → Drivers → Simulation."
+          ? " Configure optional generators under Data → Drivers → Simulation."
           : " Driver-owned configuration is managed under Data → Drivers."}
       </div>
     </div>

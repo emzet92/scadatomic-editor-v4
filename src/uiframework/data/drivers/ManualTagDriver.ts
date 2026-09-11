@@ -1,18 +1,34 @@
-import type { TagDriver } from "./TagDriver";
+import type {
+  TagDriver,
+  TagDriverContext,
+  TagDriverWriteRequest,
+  TagDriverWriteResult,
+} from "./TagDriver";
 
 /**
- * Explicit no-op source used by the designer when a tag is controlled manually.
- * Keeping it as a real driver descriptor means the Source picker can be driven by
- * the same registry as future Modbus / OPC UA / MQTT drivers.
+ * Immediate local source. Manual behaves like a trivial device: an application
+ * write is accepted and the same value is synchronously published as readback.
  */
 export class ManualTagDriver implements TagDriver {
   readonly kind = "manual";
+  private readonly context: TagDriverContext;
+
+  constructor(context: TagDriverContext) {
+    this.context = context;
+  }
 
   start() {}
   stop() {}
   dispose() {}
 
   isRunning() {
-    return false;
+    return true;
+  }
+
+  write(request: TagDriverWriteRequest): TagDriverWriteResult {
+    const result = this.context.publish(request.path, request.value, {
+      source: request.requestedBy,
+    });
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
   }
 }
