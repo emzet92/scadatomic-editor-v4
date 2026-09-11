@@ -1,4 +1,4 @@
-import type { PageId, UiDocument, UiPage } from "../core/document";
+import { getPageKind, type PageId, type UiDocument, type UiPage } from "../core/document";
 
 export type NavigationTreeNode = {
   pageId: PageId;
@@ -11,6 +11,7 @@ export function buildNavigationTree(document: UiDocument): NavigationTreeNode[] 
   const childrenByParent = new Map<string | null, UiPage[]>();
 
   for (const page of Object.values(document.pages)) {
+    if (getPageKind(page) !== "page") continue;
     const parentKey = page.parentPageId ?? null;
     const children = childrenByParent.get(parentKey) ?? [];
     children.push(page);

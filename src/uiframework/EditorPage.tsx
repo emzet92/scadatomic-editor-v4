@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
 import { getPage, type UiDocument } from "./core/document";
+import { createPageRenderDocument } from "./core/page-layouts";
 import { createComponentDefinitionDocument } from "./reusable-components";
 import { PageDesignerSurface } from "./designer/PageDesignerSurface";
 import {
@@ -62,7 +63,7 @@ export function RendererRoot({
       registry={registry}
       decorateProps={(node) => ({
         ...getDefaultComponentVariantProps(node),
-        ...(node.type === "Page"
+        ...(node.type === "Page" && !node.props?.embeddedInLayout
           ? {
               style: {
                 boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
@@ -407,6 +408,7 @@ export function EditorPage() {
     scopedComponentDefinitionMode
   );
   const activeDocument: UiDocument = { ...document, rootId: activePage.rootId };
+  const activeRenderDocument = createPageRenderDocument(document, activePage.id);
   const focusedNode = componentMode
     ? document.nodes[componentMode.nodeId]
     : undefined;
@@ -414,7 +416,7 @@ export function EditorPage() {
     ? document.components?.[componentDefinitionMode.componentId]
     : undefined;
   const inComponentMode = !!componentMode || !!componentDefinitionMode;
-  const rootPage = document.nodes[activePage.rootId];
+  const rootPage = activeRenderDocument.nodes[activeRenderDocument.rootId];
   const navigationTree = buildNavigationTree(document);
   const pageWidth = Math.max(1, Number(rootPage?.props?.width ?? 1440) || 1440);
   const pageHeight = Math.max(1, Number(rootPage?.props?.height ?? 900) || 900);
@@ -615,7 +617,7 @@ export function EditorPage() {
                       height={pageHeight}
                       deviceMode={pageDeviceMode}
                     >
-                      <RendererRoot document={activeDocument} registry={editorRegistry} />
+                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} />
                     </PageViewportFrame>
                     <PageDesignerSurface registry={editorRegistry} />
                   </>

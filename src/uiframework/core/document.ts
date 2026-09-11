@@ -4,6 +4,7 @@ import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
 import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
 export type NodeId = string;
 export type PageId = string;
+export type PageKind = "page" | "layout";
 export type ComponentDefinitionId = string;
 
 export type TagBinding = {
@@ -94,7 +95,11 @@ export type UiPage = {
   id: PageId;
   name: string;
   rootId: NodeId;
+  /** Missing in legacy v4 documents means a regular runtime page. */
+  kind?: PageKind | undefined;
   parentPageId?: PageId | undefined;
+  /** Regular pages may render inside a PageLayout. */
+  layoutId?: PageId | undefined;
 };
 
 export type UiDocument = {
@@ -126,6 +131,7 @@ export function createUiDocument(
         id: pageId,
         name: rootNode?.name ?? "Page1",
         rootId,
+        kind: "page",
       },
     },
     nodes,
@@ -150,8 +156,14 @@ export function createEmptyUiDocument(): UiDocument {
   });
 }
 
+export function getPageKind(page: UiPage): PageKind {
+  return page.kind === "layout" ? "layout" : "page";
+}
+
 export function getStartPage(document: UiDocument): UiPage {
-  return document.pages[document.startPageId] ?? Object.values(document.pages)[0]!;
+  const configured = document.pages[document.startPageId];
+  if (configured && getPageKind(configured) === "page") return configured;
+  return Object.values(document.pages).find((page) => getPageKind(page) === "page")!;
 }
 
 export function getPage(document: UiDocument, pageId: PageId | undefined): UiPage {
@@ -184,6 +196,20 @@ export function createPageRootNode(name: string): UiNode {
       display: "grid",
     },
     children: [],
+  };
+}
+
+export function createPageLayoutNodes(name: string): { root: UiNode; slot: UiNode } {
+  const slot: UiNode = {
+    id: crypto.randomUUID(),
+    name: "ContentSlot",
+    type: "PageSlot",
+    props: { slotName: "content" },
+  };
+  const root = createPageRootNode(name);
+  return {
+    root: { ...root, children: [slot.id] },
+    slot,
   };
 }
 
@@ -223,7 +249,7 @@ export function isUiDocument(value: unknown): value is UiDocument {
   }
 
   const startPage = pages[candidate.startPageId] as UiPage;
-  if (candidate.rootId !== startPage.rootId) {
+  if (getPageKind(startPage) !== "page" || candidate.rootId !== startPage.rootId) {
     return false;
   }
 
@@ -260,12 +286,24 @@ function isPageGraphValid(pages: Record<PageId, UiPage>) {
     if (rootIds.has(page.rootId)) return false;
     rootIds.add(page.rootId);
 
-    if (page.parentPageId && !pages[page.parentPageId]) {
-      return false;
+    const kind = getPageKind(page);
+    if (kind === "layout") {
+      if (page.parentPageId || page.layoutId) return false;
+      continue;
+    }
+
+    if (page.parentPageId) {
+      const parent = pages[page.parentPageId];
+      if (!parent || getPageKind(parent) !== "page") return false;
+    }
+    if (page.layoutId) {
+      const layout = pages[page.layoutId];
+      if (!layout || getPageKind(layout) !== "layout") return false;
     }
   }
 
   for (const page of Object.values(pages)) {
+    if (getPageKind(page) !== "page") continue;
     const visited = new Set<PageId>();
     let current: UiPage | undefined = page;
 
@@ -291,7 +329,9 @@ function isUiPage(
     typeof value.name !== "string" ||
     !isJsIdentifier(value.name) ||
     typeof value.rootId !== "string" ||
-    (value.parentPageId !== undefined && typeof value.parentPageId !== "string")
+    (value.kind !== undefined && value.kind !== "page" && value.kind !== "layout") ||
+    (value.parentPageId !== undefined && typeof value.parentPageId !== "string") ||
+    (value.layoutId !== undefined && typeof value.layoutId !== "string")
   ) {
     return false;
   }

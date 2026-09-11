@@ -55,6 +55,7 @@ export function PropertyPanel({
   const setBinding = useEditorStore((state) => state.setBinding);
   const setEvent = useEditorStore((state) => state.setEvent);
   const setStartPage = useEditorStore((state) => state.setStartPage);
+  const setPageLayout = useEditorStore((state) => state.setPageLayout);
   const createReusableComponent = useEditorStore(
     (state) => state.createReusableComponent
   );
@@ -200,12 +201,15 @@ export function PropertyPanel({
       />
 
       <div className="flex-1 overflow-auto p-4 space-y-6">
-        {node.type === "Page" ? (
+        {node.type === "Page" && page ? (
           <PageSettingsEditor
+            document={document}
+            page={page}
             node={node}
             updateNode={updateNode}
-            isStartPage={page?.id === document.startPageId}
-            onSetStartPage={page ? () => setStartPage(page.id) : undefined}
+            isStartPage={page.id === document.startPageId}
+            onSetStartPage={() => setStartPage(page.id)}
+            onSetLayout={(layoutId) => setPageLayout(page.id, layoutId)}
           />
         ) : null}
 

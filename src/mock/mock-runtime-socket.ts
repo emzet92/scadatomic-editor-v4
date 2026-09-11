@@ -5,6 +5,7 @@ import {
   type UiNode,
 } from "../uiframework/core/document";
 import { buildNavigationTree } from "../uiframework/navigation/navigation";
+import { getPageLayout } from "../uiframework/core/page-layouts";
 import { getMockProjectSnapshot } from "./mock-project-store";
 import {
   applyMockRuntimeUiState,
@@ -239,7 +240,13 @@ class MockRuntimeSocket extends EventTarget {
             return Object.values(document.nodes).find((node) => node.name === name);
           }
 
-          return findNodeByNameInSubtree(document, page.rootId, name);
+          const pageNode = findNodeByNameInSubtree(document, page.rootId, name);
+          if (pageNode) return pageNode;
+
+          const layout = getPageLayout(document, page);
+          return layout
+            ? findNodeByNameInSubtree(document, layout.rootId, name)
+            : undefined;
         },
         resolveComponentDefinition: (componentDefinitionId) => {
           const document = this.getProjectDocument(projectId);

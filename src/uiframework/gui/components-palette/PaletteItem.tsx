@@ -4,6 +4,7 @@ import {
   Boxes,
   ChartLine,
   LayoutTemplate,
+  PanelTop,
   Image as ImageIcon,
   GripVertical,
   Menu,
@@ -12,6 +13,7 @@ import {
   Type,
 } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
+import { getPageKind } from "../../core/document";
 import {
   createProjectComponentRepository,
   wouldCreateComponentCycle,
@@ -23,6 +25,7 @@ import {
 
 const icons = {
   Page: LayoutTemplate,
+  PageSlot: PanelTop,
   Container: Box,
   Text: Type,
   Button: RectangleHorizontal,
@@ -41,6 +44,9 @@ export function ComponentPalette({
   const [search, setSearch] = useState("");
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
   const document = useEditorStore((s) => s.document);
+  const activePageId = useEditorStore((s) => s.activePageId);
+  const activePage = document.pages[activePageId];
+  const editingLayout = !!activePage && getPageKind(activePage) === "layout";
   const reusableComponents = useMemo(
     () => createProjectComponentRepository(document).list(),
     [document]
@@ -50,6 +56,7 @@ export function ComponentPalette({
   const items = Object.values(componentDefinitions).filter(
     (item) =>
       item.type !== "Page" &&
+      (item.type !== "PageSlot" || (editingLayout && !ownerComponentId)) &&
       item.label.toLowerCase().includes(normalizedSearch)
   );
   const reusableItems = reusableComponents.filter((item) =>

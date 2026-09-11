@@ -5,8 +5,10 @@ import {
 } from "./core/commands";
 import {
   createEmptyUiDocument,
+  createPageLayoutNodes,
   createPageRootNode,
   getPage,
+  getPageKind,
   type Binding,
   type HandlerRef,
   type MethodRef,
@@ -16,6 +18,7 @@ import {
   type NodeId,
   type UiDocument,
   type UiNode,
+  type PageKind,
 } from "./core/document";
 import { getComponentDefinition } from "./registry/component-definitions";
 import { setOptionalRecordEntry } from "./core/optional-record";
@@ -77,7 +80,9 @@ type EditorState = {
 
   setActivePageId: (pageId: PageId) => void;
   setStartPage: (pageId: PageId) => void;
+  setPageLayout: (pageId: PageId, layoutId: PageId | null) => void;
   addPage: (parentPageId?: PageId | undefined) => PageId | null;
+  addPageLayout: () => PageId | null;
   deletePage: (pageId: PageId) => boolean;
   setSelectedNodeId: (id: NodeId | null) => void;
   selectNode: (
@@ -186,14 +191,22 @@ function applyActiveCommand(state: EditorState, command: DocumentCommand) {
   return applyDocumentCommand(state.document, command, getActiveRootId(state));
 }
 
-function createUniquePageName(document: UiDocument, parentPageId?: PageId) {
+function createUniquePageName(
+  document: UiDocument,
+  parentPageId?: PageId,
+  kind: PageKind = "page"
+) {
   const siblingNames = new Set(
     Object.values(document.pages)
-      .filter((page) => page.parentPageId === parentPageId)
+      .filter(
+        (page) =>
+          getPageKind(page) === kind &&
+          page.parentPageId === parentPageId
+      )
       .map((page) => page.name)
   );
 
-  const base = parentPageId ? "SubPage" : "Page";
+  const base = kind === "layout" ? "Layout" : parentPageId ? "SubPage" : "Page";
   let index = 1;
   while (siblingNames.has(`${base}${index}`)) index += 1;
   return `${base}${index}`;
@@ -242,8 +255,31 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setStartPage: (pageId) => {
     set((state) => {
-      if (!state.document.pages[pageId]) return state;
+      const page = state.document.pages[pageId];
+      if (!page || getPageKind(page) !== "page") return state;
       return { document: withStartPage(state.document, pageId) };
+    });
+  },
+
+  setPageLayout: (pageId, layoutId) => {
+    set((state) => {
+      const page = state.document.pages[pageId];
+      if (!page || getPageKind(page) !== "page") return state;
+      if (layoutId) {
+        const layout = state.document.pages[layoutId];
+        if (!layout || getPageKind(layout) !== "layout") return state;
+      }
+
+      const nextPage = { ...page };
+      if (layoutId) nextPage.layoutId = layoutId;
+      else delete nextPage.layoutId;
+
+      return {
+        document: {
+          ...state.document,
+          pages: { ...state.document.pages, [pageId]: nextPage },
+        },
+      };
     });
   },
 
@@ -251,9 +287,12 @@ export const useEditorStore = create<EditorState>((set) => ({
     let createdPageId: PageId | null = null;
 
     set((state) => {
-      if (parentPageId && !state.document.pages[parentPageId]) return state;
+      if (parentPageId) {
+        const parent = state.document.pages[parentPageId];
+        if (!parent || getPageKind(parent) !== "page") return state;
+      }
 
-      const name = createUniquePageName(state.document, parentPageId);
+      const name = createUniquePageName(state.document, parentPageId, "page");
       const root = createPageRootNode(name);
       const pageId = crypto.randomUUID();
       createdPageId = pageId;
@@ -267,12 +306,49 @@ export const useEditorStore = create<EditorState>((set) => ({
               id: pageId,
               name,
               rootId: root.id,
+              kind: "page",
               ...(parentPageId ? { parentPageId } : {}),
             },
           },
           nodes: {
             ...state.document.nodes,
             [root.id]: root,
+          },
+        },
+        activePageId: pageId,
+        selectedNodeId: root.id,
+        selectedNodeIds: [root.id],
+      };
+    });
+
+    return createdPageId;
+  },
+
+  addPageLayout: () => {
+    let createdPageId: PageId | null = null;
+
+    set((state) => {
+      const name = createUniquePageName(state.document, undefined, "layout");
+      const { root, slot } = createPageLayoutNodes(name);
+      const pageId = crypto.randomUUID();
+      createdPageId = pageId;
+
+      return {
+        document: {
+          ...state.document,
+          pages: {
+            ...state.document.pages,
+            [pageId]: {
+              id: pageId,
+              name,
+              rootId: root.id,
+              kind: "layout",
+            },
+          },
+          nodes: {
+            ...state.document.nodes,
+            [root.id]: root,
+            [slot.id]: slot,
           },
         },
         activePageId: pageId,
@@ -298,6 +374,14 @@ export const useEditorStore = create<EditorState>((set) => ({
 
       for (const deletedPageId of plan.pageIds) delete pages[deletedPageId];
       for (const deletedNodeId of plan.nodeIds) delete nodes[deletedNodeId];
+
+      for (const [remainingPageId, remainingPage] of Object.entries(pages)) {
+        if (remainingPage.layoutId && deletedPageIds.has(remainingPage.layoutId)) {
+          const detached = { ...remainingPage };
+          delete detached.layoutId;
+          pages[remainingPageId] = detached;
+        }
+      }
 
       const startPageId = deletedPageIds.has(state.document.startPageId)
         ? plan.fallbackPageId
@@ -438,6 +522,7 @@ export const useEditorStore = create<EditorState>((set) => ({
         Object.values(state.document.pages).some(
           (page) =>
             page.id !== pageEntry.id &&
+            getPageKind(page) === getPageKind(pageEntry) &&
             page.parentPageId === pageEntry.parentPageId &&
             page.name === validation.name
         )

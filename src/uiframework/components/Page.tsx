@@ -14,6 +14,7 @@ export function Page({
   gap = 12,
   columns = 1,
   display = "grid",
+  embeddedInLayout = false,
   children,
   style,
   className,
@@ -22,9 +23,9 @@ export function Page({
   const safeColumns = Math.max(1, Math.floor(columns));
 
   const pageStyle: CSSProperties = {
-    width: toCssSize(width),
-    height: toCssSize(height),
-    minHeight: toCssSize(height),
+    width: embeddedInLayout ? "100%" : toCssSize(width),
+    height: embeddedInLayout ? "auto" : toCssSize(height),
+    minHeight: embeddedInLayout ? 0 : toCssSize(height),
     backgroundColor,
     padding,
     display,
@@ -45,6 +46,7 @@ export function Page({
     <div
       {...domProps}
       data-page-mode={deviceMode}
+      data-page-embedded={embeddedInLayout || undefined}
       className={className}
       style={pageStyle}
     >

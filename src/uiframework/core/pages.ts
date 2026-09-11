@@ -1,4 +1,4 @@
-import type { NodeId, PageId, UiDocument } from "./document";
+import { getPageKind, type NodeId, type PageId, type UiDocument } from "./document";
 
 export type PageDeletionPlan = {
   pageIds: PageId[];
@@ -13,11 +13,13 @@ export function collectPageSubtreeIds(
   document: UiDocument,
   pageId: PageId
 ): PageId[] {
-  if (!document.pages[pageId]) return [];
+  const root = document.pages[pageId];
+  if (!root) return [];
+  if (getPageKind(root) === "layout") return [root.id];
 
   const childrenByParent = new Map<PageId, PageId[]>();
   for (const page of Object.values(document.pages)) {
-    if (!page.parentPageId) continue;
+    if (getPageKind(page) !== "page" || !page.parentPageId) continue;
     const children = childrenByParent.get(page.parentPageId) ?? [];
     children.push(page.id);
     childrenByParent.set(page.parentPageId, children);
@@ -94,8 +96,17 @@ export function createPageDeletionPlan(
 
   const deletedIds = new Set(pageIds);
   const remainingPages = Object.values(document.pages).filter(
-    (candidate) => !deletedIds.has(candidate.id)
+    (candidate) =>
+      getPageKind(candidate) === "page" && !deletedIds.has(candidate.id)
   );
+
+  if (getPageKind(page) === "layout") {
+    return {
+      pageIds,
+      nodeIds: collectPageNodeIds(document, pageIds),
+      fallbackPageId: document.startPageId,
+    };
+  }
 
   // A project must always have at least one renderable page.
   if (remainingPages.length === 0) return null;
@@ -120,7 +131,7 @@ export function withStartPage(
   pageId: PageId
 ): UiDocument {
   const page = document.pages[pageId];
-  if (!page) return document;
+  if (!page || getPageKind(page) !== "page") return document;
 
   return {
     ...document,

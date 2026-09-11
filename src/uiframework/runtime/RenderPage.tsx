@@ -11,6 +11,7 @@ import {
   type UiDocument,
 } from "../core/document";
 import { RenderNode } from "../Renderer";
+import { createPageRenderDocument } from "../core/page-layouts";
 import {
   buildNavigationTree,
   resolveNavigationPath,
@@ -118,7 +119,8 @@ export function RenderPage() {
     document,
     routeTarget?.pageId ?? document.startPageId
   );
-  if (!document.nodes[currentPage.rootId]) {
+  const renderDocument = createPageRenderDocument(document, currentPage.id);
+  if (!renderDocument.nodes[renderDocument.rootId]) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
         Empty page
@@ -145,8 +147,8 @@ export function RenderPage() {
       >
         <div className="mx-auto w-fit">
           <RenderNode
-            id={currentPage.rootId}
-            document={document}
+            id={renderDocument.rootId}
+            document={renderDocument}
             registry={runtimeRegistry}
             decorateComponentInternals
             resolveNode={(node, context) => {

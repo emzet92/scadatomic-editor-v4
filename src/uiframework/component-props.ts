@@ -16,6 +16,8 @@ export type PageNodeProps = {
   gap?: number;
   columns?: number;
   display?: "grid" | "flex";
+  /** Ephemeral render-only flag used when a Page is projected into a layout slot. */
+  embeddedInLayout?: boolean;
 };
 
 export const defaultPageProps = {

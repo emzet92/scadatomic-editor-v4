@@ -1,6 +1,13 @@
-import { ChevronRight, FileText, Home, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  Home,
+  LayoutTemplate,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
-import type { UiDocument } from "../../core/document";
+import { getPageKind, type UiDocument } from "../../core/document";
 import { collectPageSubtreeIds } from "../../core/pages";
 import { useEditorStore } from "../../editor-store";
 import {
@@ -15,64 +22,114 @@ export function PageTree() {
   const setActivePageId = useEditorStore((state) => state.setActivePageId);
   const setStartPage = useEditorStore((state) => state.setStartPage);
   const addPage = useEditorStore((state) => state.addPage);
+  const addPageLayout = useEditorStore((state) => state.addPageLayout);
   const deletePage = useEditorStore((state) => state.deletePage);
   const [pendingDeletePageId, setPendingDeletePageId] = useState<string | null>(null);
 
   const tree = useMemo(() => buildNavigationTree(document), [document]);
-  const pageCount = Object.keys(document.pages).length;
+  const layouts = useMemo(
+    () =>
+      Object.values(document.pages).filter(
+        (page) => getPageKind(page) === "layout"
+      ),
+    [document]
+  );
+  const runtimePageCount = Object.values(document.pages).filter(
+    (page) => getPageKind(page) === "page"
+  ).length;
   const pendingDeletePage = pendingDeletePageId
     ? document.pages[pendingDeletePageId]
     : undefined;
+  const pendingKind = pendingDeletePage ? getPageKind(pendingDeletePage) : "page";
   const pendingDeletePageIds = pendingDeletePage
     ? collectPageSubtreeIds(document, pendingDeletePage.id)
     : [];
   const pendingDescendantCount = Math.max(0, pendingDeletePageIds.length - 1);
   const canConfirmDelete =
-    !!pendingDeletePage && pendingDeletePageIds.length < pageCount;
+    !!pendingDeletePage &&
+    (pendingKind === "layout" || pendingDeletePageIds.length < runtimePageCount);
 
   return (
-    <div data-editor-ignore className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          Pages
+    <div data-editor-ignore className="space-y-4">
+      <section className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+            Pages
+          </div>
+          <IconButton
+            aria-label="Add top-level page"
+            title="Add top-level page"
+            variant="secondary"
+            onClick={() => addPage()}
+          >
+            <Plus size={14} />
+          </IconButton>
         </div>
-        <IconButton
-          aria-label="Add top-level page"
-          title="Add top-level page"
-          variant="secondary"
-          onClick={() => addPage()}
-        >
-          <Plus size={14} />
-        </IconButton>
-      </div>
 
-      <div className="space-y-0.5">
-        {tree.map((node) => (
-          <PageTreeRow
-            key={node.pageId}
-            node={node}
-            depth={0}
-            activePageId={activePageId}
-            startPageId={document.startPageId}
-            pageCount={pageCount}
-            onOpen={setActivePageId}
-            onSetStartPage={setStartPage}
-            onAddChild={(pageId) => addPage(pageId)}
-            onDelete={setPendingDeletePageId}
-            document={document}
-          />
-        ))}
-      </div>
+        <div className="space-y-0.5">
+          {tree.map((node) => (
+            <PageTreeRow
+              key={node.pageId}
+              node={node}
+              depth={0}
+              activePageId={activePageId}
+              startPageId={document.startPageId}
+              runtimePageCount={runtimePageCount}
+              onOpen={setActivePageId}
+              onSetStartPage={setStartPage}
+              onAddChild={(pageId) => addPage(pageId)}
+              onDelete={setPendingDeletePageId}
+              document={document}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-2 border-t border-[var(--editor-border)] pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+            Layouts
+          </div>
+          <IconButton
+            aria-label="Add page layout"
+            title="Add page layout"
+            variant="secondary"
+            onClick={() => addPageLayout()}
+          >
+            <Plus size={14} />
+          </IconButton>
+        </div>
+
+        <div className="space-y-0.5">
+          {layouts.length > 0 ? (
+            layouts.map((layout) => (
+              <LayoutRow
+                key={layout.id}
+                name={layout.name}
+                active={layout.id === activePageId}
+                onOpen={() => setActivePageId(layout.id)}
+                onDelete={() => setPendingDeletePageId(layout.id)}
+              />
+            ))
+          ) : (
+            <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+              Add a layout to share navigation, headers, sidebars and other chrome between pages.
+            </div>
+          )}
+        </div>
+      </section>
 
       <ConfirmDialog
         open={!!pendingDeletePage}
-        title={`Delete ${pendingDeletePage?.name ?? "page"}?`}
+        title={`Delete ${pendingDeletePage?.name ?? (pendingKind === "layout" ? "layout" : "page")}?`}
         description={
-          pendingDescendantCount > 0
-            ? `This will permanently remove this page, ${pendingDescendantCount} nested subpage${pendingDescendantCount === 1 ? "" : "s"}, and all of their UI nodes.`
-            : "This will permanently remove this page and all of its UI nodes."
+          pendingKind === "layout"
+            ? "This will remove the layout and its UI nodes. Pages using it will return to no layout."
+            : pendingDescendantCount > 0
+              ? `This will permanently remove this page, ${pendingDescendantCount} nested subpage${pendingDescendantCount === 1 ? "" : "s"}, and all of their UI nodes.`
+              : "This will permanently remove this page and all of its UI nodes."
         }
-        confirmLabel="Delete page"
+        confirmLabel={pendingKind === "layout" ? "Delete layout" : "Delete page"}
         destructive
         onCancel={() => setPendingDeletePageId(null)}
         onConfirm={() => {
@@ -86,12 +143,54 @@ export function PageTree() {
   );
 }
 
+function LayoutRow({
+  name,
+  active,
+  onOpen,
+  onDelete,
+}: {
+  name: string;
+  active: boolean;
+  onOpen(): void;
+  onDelete(): void;
+}) {
+  return (
+    <div
+      className={`group flex h-8 items-center rounded-md px-1 text-xs transition ${
+        active
+          ? "bg-violet-50 text-violet-700"
+          : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
+      >
+        <LayoutTemplate size={12} className="shrink-0 opacity-70" />
+        <span className="truncate font-medium">{name}</span>
+      </button>
+      <div className="hidden shrink-0 group-hover:block">
+        <IconButton
+          aria-label={`Delete ${name}`}
+          title={`Delete ${name}`}
+          variant="danger"
+          size="icon-xs"
+          onClick={onDelete}
+        >
+          <Trash2 size={12} />
+        </IconButton>
+      </div>
+    </div>
+  );
+}
+
 function PageTreeRow({
   node,
   depth,
   activePageId,
   startPageId,
-  pageCount,
+  runtimePageCount,
   onOpen,
   onSetStartPage,
   onAddChild,
@@ -102,7 +201,7 @@ function PageTreeRow({
   depth: number;
   activePageId: string;
   startPageId: string;
-  pageCount: number;
+  runtimePageCount: number;
   onOpen(pageId: string): void;
   onSetStartPage(pageId: string): void;
   onAddChild(pageId: string): void;
@@ -114,7 +213,7 @@ function PageTreeRow({
   const isStartPage = node.pageId === startPageId;
   const hasChildren = node.children.length > 0;
   const deleteCount = collectPageSubtreeIds(document, node.pageId).length;
-  const canDelete = deleteCount > 0 && deleteCount < pageCount;
+  const canDelete = deleteCount > 0 && deleteCount < runtimePageCount;
 
   return (
     <div>
@@ -203,7 +302,7 @@ function PageTreeRow({
               depth={depth + 1}
               activePageId={activePageId}
               startPageId={startPageId}
-              pageCount={pageCount}
+              runtimePageCount={runtimePageCount}
               onOpen={onOpen}
               onSetStartPage={onSetStartPage}
               onAddChild={onAddChild}

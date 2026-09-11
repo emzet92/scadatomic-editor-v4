@@ -3,6 +3,7 @@ import { Button } from "../components/Button";
 import { Chart } from "../components/Chart";
 import { Container } from "../components/Container";
 import { Page } from "../components/Page";
+import { EditorPageSlot, RuntimePageSlot } from "../components/PageSlot";
 import { Navigation } from "../components/Navigation";
 import { Image } from "../components/Image";
 import { RuntimeButton } from "../components/RuntimeButton";
@@ -60,6 +61,17 @@ export const componentDefinitions = {
       gap: { kind: "number", min: 0 },
       columns: { kind: "number", min: 1, max: 24 },
       display: { kind: "select", options: ["grid", "flex"] },
+    },
+  },
+  PageSlot: {
+    type: "PageSlot",
+    label: "Page Slot",
+    description: "Content outlet for a Page Layout",
+    editor: EditorPageSlot,
+    runtime: RuntimePageSlot,
+    defaults: { slotName: "content" },
+    inspector: {
+      slotName: { kind: "select", options: ["content"] },
     },
   },
   Navigation: {
