@@ -24,7 +24,7 @@ export function createCtxAutocompleteExtension(
   extraCtxChildren: AutocompleteApiNode[] = []
 ): Extension {
   const roots: AutocompleteApiNode[] = [
-    buildCtxApiTree(components, navigation, extraCtxChildren),
+    buildCtxApiTree(components, navigation, selfComponent, extraCtxChildren),
     ...extraRoots,
   ];
 
@@ -53,6 +53,7 @@ export function createCtxAutocompleteExtension(
 function buildCtxApiTree(
   components: ComponentApiDescription[],
   navigation: NavigationTreeNode[],
+  selfComponent: ComponentApiDescription | undefined,
   extraChildren: AutocompleteApiNode[] = []
 ): AutocompleteApiNode {
   const uiComponents: AutocompleteApiNode[] = components
@@ -70,6 +71,14 @@ function buildCtxApiTree(
         detail: "UI component API",
         children: uiComponents,
       },
+      ...(selfComponent
+        ? [{
+            label: "inputs",
+            completionType: "namespace",
+            detail: "current reusable-component inputs",
+            children: selfComponent.properties.map(componentPropertyToAutocomplete),
+          }]
+        : []),
       {
         label: "nav",
         completionType: "namespace",
@@ -181,11 +190,7 @@ function buildComponentRoot(
             },
           ]
         : []),
-      ...component.properties.map((property) => ({
-        label: property.name,
-        completionType: "property",
-        detail: `${property.valueType} · read/write`,
-      })),
+      ...component.properties.map(componentPropertyToAutocomplete),
       ...component.methods.map((method) => ({
         label: method.name,
         completionType: "method",
@@ -233,6 +238,29 @@ function buildComponentRoot(
           ]
         : []),
     ],
+  };
+}
+
+function componentPropertyToAutocomplete(
+  property: ComponentApiDescription["properties"][number]
+): AutocompleteApiNode {
+  const children = [
+    ...(property.members ?? []).map((member) => ({
+      label: member.name,
+      completionType: "property",
+      detail: `${member.valueType} · read/write`,
+    })),
+    ...(property.methods ?? []).map((method) => ({
+      label: method.name,
+      completionType: "method",
+      detail: "UDT method",
+    })),
+  ];
+  return {
+    label: property.name,
+    completionType: children.length > 0 ? "class" : "property",
+    detail: `${property.valueType} · read/write`,
+    ...(children.length > 0 ? { children } : {}),
   };
 }
 

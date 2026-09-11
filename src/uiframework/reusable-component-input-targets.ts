@@ -25,7 +25,15 @@ export function listComponentInputTargets(
     const node = definition.nodes[nodeId];
     if (!node) return;
 
-    const properties = getComponentApiPropertyNames(node, projectDocument);
+    const nestedDefinition = node.componentDefinitionId
+      ? projectDocument.components?.[node.componentDefinitionId]
+      : undefined;
+    const properties = nestedDefinition
+      ? Object.entries(nestedDefinition.inputs ?? {})
+          .filter(([, input]) => input.type !== "tagRef")
+          .map(([name]) => name)
+          .sort((left, right) => left.localeCompare(right))
+      : getComponentApiPropertyNames(node, projectDocument);
     if (properties.length > 0) result.push({ node, properties });
 
     for (const childId of node.children ?? []) appendNode(childId);

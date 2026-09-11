@@ -14,6 +14,7 @@ import {
 } from "../../reusable-component-input-targets";
 import {
   createComponentInput,
+  createTagRefComponentInput,
   getComponentInputTargetType,
   inferInputType,
 } from "../../reusable-components";
@@ -45,6 +46,8 @@ export function PublicInputsEditor({
   const [targetNodeId, setTargetNodeId] = useState("");
   const [property, setProperty] = useState("");
   const [type, setType] = useState<ComponentInputType>("string");
+  const [udtId, setUdtId] = useState("");
+  const [inputMode, setInputMode] = useState<"mapped" | "tagRef">("mapped");
   const [error, setError] = useState<string | null>(null);
 
   const targetNodes = useMemo(
@@ -78,6 +81,7 @@ export function PublicInputsEditor({
   }
 
   function beginAdd() {
+    setInputMode("mapped");
     const first =
       targetNodes.find((entry) => entry.node.id === selectedNode?.id) ??
       targetNodes[0];
@@ -94,18 +98,31 @@ export function PublicInputsEditor({
     setError(null);
   }
 
-  function addInput() {
-    if (!targetNodeEntry) return;
+  function beginAddTagRef() {
+    const firstUdt = Object.values(projectDocument.data?.udts ?? {})[0];
+    setInputMode("tagRef");
+    setAdding(true);
+    setName("item");
+    setType("tagRef");
+    setUdtId(firstUdt?.id ?? "");
+    setError(null);
+  }
 
+  function addInput() {
     try {
-      const input = createComponentInput(
-        definition,
-        targetNodeEntry.node,
-        property,
-        name,
-        type,
-        projectDocument
-      );
+      const input = inputMode === "tagRef"
+        ? createTagRefComponentInput(definition, name, udtId)
+        : targetNodeEntry
+          ? createComponentInput(
+              definition,
+              targetNodeEntry.node,
+              property,
+              name,
+              type,
+              projectDocument
+            )
+          : null;
+      if (!input) return;
       const inputName = name.trim();
 
       updateDefinition((current) => ({
@@ -143,9 +160,17 @@ export function PublicInputsEditor({
         description="Only these properties are visible on component instances."
         action={
           !adding ? (
-            <Button disabled={targetNodes.length === 0} onClick={beginAdd}>
-              <Plus size={12} /> Expose
-            </Button>
+            <div className="flex gap-1.5">
+              <Button disabled={targetNodes.length === 0} onClick={beginAdd}>
+                <Plus size={12} /> Expose
+              </Button>
+              <Button
+                disabled={Object.keys(projectDocument.data?.udts ?? {}).length === 0}
+                onClick={beginAddTagRef}
+              >
+                <Plus size={12} /> Tag ref
+              </Button>
+            </div>
           ) : null
         }
       />
@@ -159,8 +184,9 @@ export function PublicInputsEditor({
             <div className="min-w-0 flex-1">
               <div className="font-mono text-xs font-medium">{inputName}</div>
               <div className="mt-0.5 truncate text-[9px] text-[var(--editor-text-muted)]">
-                {input.type} → {definition.nodes[input.target.nodeId]?.name ?? "?"}.
-                {input.target.property}
+                {input.type === "tagRef"
+                  ? `TagRef<${projectDocument.data?.udts[input.udtId]?.name ?? "UDT"}>`
+                  : `${input.type} → ${definition.nodes[input.target.nodeId]?.name ?? "?"}.${input.target.property}`}
               </div>
             </div>
             <IconButton
@@ -192,57 +218,67 @@ export function PublicInputsEditor({
                 }}
               />
             </FormField>
-            <FormField label="Type" compact>
-              <Select
-                controlSize="sm"
-                value={type}
-                onChange={(event) =>
-                  setType(event.target.value as ComponentInputType)
-                }
-              >
-                <option value="string">String</option>
-                <option value="number">Number</option>
-                <option value="boolean">Boolean</option>
-                <option value="color">Color</option>
-                <option value="tag">Tag</option>
-              </Select>
-            </FormField>
+            {inputMode === "tagRef" ? (
+              <FormField label="UDT" compact>
+                <Select controlSize="sm" value={udtId} onChange={(event) => setUdtId(event.target.value)}>
+                  {Object.values(projectDocument.data?.udts ?? {}).map((udt) => (
+                    <option key={udt.id} value={udt.id}>{udt.name}</option>
+                  ))}
+                </Select>
+              </FormField>
+            ) : (
+              <FormField label="Type" compact>
+                <Select
+                  controlSize="sm"
+                  value={type}
+                  onChange={(event) => setType(event.target.value as ComponentInputType)}
+                >
+                  <option value="string">String</option>
+                  <option value="number">Number</option>
+                  <option value="boolean">Boolean</option>
+                  <option value="color">Color</option>
+                  <option value="tag">Tag</option>
+                </Select>
+              </FormField>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <FormField label="Maps to component" compact>
-              <Select
-                controlSize="sm"
-                mono
-                value={targetNodeId}
-                onChange={(event) => selectTarget(event.target.value)}
-              >
-                {targetNodes.map(({ node }) => (
-                  <option key={node.id} value={node.id}>
-                    {node.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+          {inputMode === "mapped" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <FormField label="Maps to component" compact>
+                <Select
+                  controlSize="sm"
+                  mono
+                  value={targetNodeId}
+                  onChange={(event) => selectTarget(event.target.value)}
+                >
+                  {targetNodes.map(({ node }) => (
+                    <option key={node.id} value={node.id}>{node.name}</option>
+                  ))}
+                </Select>
+              </FormField>
 
-            <FormField label="Property" compact>
-              <Select
-                controlSize="sm"
-                mono
-                value={property}
-                onChange={(event) => {
-                  if (!targetNodeEntry) return;
-                  selectTarget(targetNodeEntry.node.id, event.target.value);
-                }}
-              >
-                {(targetNodeEntry?.properties ?? []).map((prop) => (
-                  <option key={prop} value={prop}>
-                    {prop}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-          </div>
+              <FormField label="Property" compact>
+                <Select
+                  controlSize="sm"
+                  mono
+                  value={property}
+                  onChange={(event) => {
+                    if (!targetNodeEntry) return;
+                    selectTarget(targetNodeEntry.node.id, event.target.value);
+                  }}
+                >
+                  {(targetNodeEntry?.properties ?? []).map((prop) => (
+                    <option key={prop} value={prop}>{prop}</option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+          ) : (
+            <div className="rounded-md bg-[var(--editor-surface-muted)] px-2.5 py-2 text-[10px] text-[var(--editor-text-muted)]">
+              Live UDT reference. Use it in bindings as <code>{name || "item"}.field</code> and in component scripts through <code>self.{name || "item"}</code>.
+            </div>
+          )}
 
           {error ? <div className="text-[10px] text-red-600">{error}</div> : null}
 

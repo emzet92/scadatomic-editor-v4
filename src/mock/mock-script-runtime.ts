@@ -2,8 +2,10 @@ import type { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
 import {
   createTagRuntimeGlobals,
   createTagRuntimeProxy,
+  createUdtInstanceApi,
   type TagRuntimeApi,
 } from "../uiframework/data/runtime/TagRuntimeProxy";
+import { isTagRef } from "../uiframework/data/collections/TagRef";
 import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
 import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
 import {
@@ -100,6 +102,8 @@ export type MockScriptNavigationApi = {
   [key: string]: MockScriptNavigationNodeApi | unknown;
 };
 
+export type MockScriptInputsApi = Record<string, unknown>;
+
 export type MockScriptContext = {
   projectId: string;
   handlerId: string;
@@ -115,6 +119,8 @@ export type MockScriptContext = {
   /** Public API of components on the current runtime page. */
   ui: MockScriptUiApi;
   nav: MockScriptNavigationApi;
+  /** Current reusable-component public inputs. TagRef inputs are live tag proxies. */
+  inputs?: MockScriptInputsApi | undefined;
   /** Dynamic typed tag namespace. Writes are routed through the owning tag driver. */
   tags?: TagRuntimeApi | undefined;
   navigateTo(path: string): void;
@@ -144,8 +150,13 @@ export function executeMockScript(
   host: MockScriptHost
 ): void {
   const script = getMockScript(event.projectId, event.handlerId);
-  const ctx = createContext(event, host);
   const ownerScope = host.resolveComponentScopeForRuntimeNode(event.sourceNodeId);
+  const selfRef: { current: UiComponentScriptApi | undefined } = { current: undefined };
+  const ctx = createContext(event, host, () =>
+    ownerScope && selfRef.current
+      ? createInputsApi(ownerScope.definition, selfRef.current)
+      : undefined
+  );
   const self = ownerScope
     ? createComponentApi(
         ownerScope.instance,
@@ -158,6 +169,7 @@ export function executeMockScript(
         }
       )
     : undefined;
+  selfRef.current = self;
   const internal = ownerScope
     ? createInternalUiApi(
         ownerScope.definition,
@@ -194,7 +206,8 @@ export function executeMockScript(
 
 function createContext(
   event: MockScriptEvent,
-  host: MockScriptHost
+  host: MockScriptHost,
+  getInputs?: () => MockScriptInputsApi | undefined
 ): MockScriptContext {
   const ui = createUiApi(host, event.projectId, () => ctx);
   const nav = createNavigationApi(host);
@@ -213,6 +226,9 @@ function createContext(
     sourceNodeId: event.sourceNodeId,
     eventName: event.eventName,
     payload: Object.freeze({ ...(event.payload ?? {}) }),
+    get inputs() {
+      return getInputs?.();
+    },
     state: Object.freeze({
       get<T>(key: string, fallback?: T) {
         return getMockSessionValue(event.projectId, key, fallback);
@@ -251,6 +267,31 @@ function createContext(
   contextRef.current = ctx;
 
   return ctx;
+}
+
+function createInputsApi(
+  definition: UiComponentDefinition,
+  self: UiComponentScriptApi
+): MockScriptInputsApi {
+  const inputNames = new Set(Object.keys(definition.inputs ?? {}));
+  return new Proxy({} as MockScriptInputsApi, {
+    get(_target, property) {
+      return typeof property === "string" && inputNames.has(property)
+        ? self[property]
+        : undefined;
+    },
+    set(_target, property, value) {
+      if (typeof property !== "string" || !inputNames.has(property)) return false;
+      self[property] = value;
+      return true;
+    },
+    ownKeys() {
+      return [...inputNames];
+    },
+    getOwnPropertyDescriptor() {
+      return { enumerable: true, configurable: true };
+    },
+  });
 }
 
 function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
@@ -499,13 +540,20 @@ function createComponentApi(
 
     const callable = (...args: unknown[]) => {
       const script = getMockScript(projectId, methodRef.scriptId);
+      const baseContext = getContext();
+      const executionContext = reusableDefinition
+        ? Object.freeze({
+            ...baseContext,
+            inputs: createInputsApi(reusableDefinition, componentSelfProxy),
+          })
+        : baseContext;
       return executeSource({
         code: script.code,
-        ctx: getContext(),
+        ctx: executionContext,
         self: reusableDefinition ? componentSelfProxy : publicProxy,
         internal: getInternalApi(),
         args,
-        globals: createTagGlobals(host, getContext()),
+        globals: createTagGlobals(host, executionContext),
         sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
       });
     };
@@ -569,7 +617,23 @@ function createComponentApi(
         if (typeof property !== "string" || hasOwn(apiTarget, property)) {
           return Reflect.get(apiTarget, property, receiver);
         }
-        if (allowedProps.has(property)) return localProps[property];
+        if (allowedProps.has(property)) {
+          const input = reusableDefinition?.inputs?.[property];
+          const value = localProps[property];
+          if (input?.type === "tagRef" && isTagRef(value)) {
+            const tagRuntime = host.getTagRuntime();
+            const tag = tagRuntime?.listTags().find((candidate) => candidate.id === value.tagId);
+            if (!tagRuntime || !tag || tag.type.kind !== "udt" || tag.type.udtId !== input.udtId) {
+              return undefined;
+            }
+            return createUdtInstanceApi(tag.name, tagRuntime, {
+              writeSource: { kind: "script" },
+              log: (...values) => getContext().log(...values),
+              emit: (eventName, payload) => getContext().emit(eventName, payload),
+            });
+          }
+          return value;
+        }
         return getMethod(property, includePrivateMethods);
       },
       set(_apiTarget, property, value) {

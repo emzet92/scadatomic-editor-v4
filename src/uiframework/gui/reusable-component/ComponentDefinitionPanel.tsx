@@ -139,6 +139,7 @@ export function ComponentDefinitionPanel({
                     ? {
                         bindingDefinitions: primitiveDefinition.bindings,
                         setBinding: setInternalBinding,
+                        componentInputs: definition.inputs,
                       }
                     : {})}
                   {...(primitiveDefinition?.events

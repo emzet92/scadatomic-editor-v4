@@ -23,6 +23,7 @@ import { PageSettingsEditor } from "./PageSettingsEditor";
 import { ComponentProperties } from "./ComponentProperties";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
+import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
 
 type Props = {
   document: UiDocument;
@@ -224,6 +225,10 @@ export function PropertyPanel({
             No component definition for {node.type}.
           </div>
         )}
+
+        {node.type === "Container" ? (
+          <RepeatBehaviorEditor document={document} node={node} updateNode={updateNode} />
+        ) : null}
 
         {node.type !== "Page" ? (
           <VariantsEditor

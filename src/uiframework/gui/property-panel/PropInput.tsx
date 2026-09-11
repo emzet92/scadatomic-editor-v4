@@ -1,4 +1,7 @@
 import type { InspectorControl } from "../../registry/component-definitions";
+import { useEditorStore } from "../../editor-store";
+import { createTagRef, isTagRef } from "../../data/collections/TagRef";
+import { isUdtTag } from "../../data/tags/TagDefinition";
 import type { UpdateNode } from "./property-panel-types";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
@@ -44,6 +47,16 @@ export function PropInput({
         [propName]: nextValue,
       },
     }));
+  }
+
+  if (control.kind === "tag-ref") {
+    return (
+      <TagRefInput
+        udtId={control.udtId}
+        value={value}
+        onChange={updateProp}
+      />
+    );
   }
 
   if (control.kind === "image-asset") {
@@ -338,4 +351,39 @@ function normalizeColorForInput(value: string) {
   }
 
   return "#18181b";
+}
+
+function TagRefInput({
+  udtId,
+  value,
+  onChange,
+}: {
+  udtId: string;
+  value: unknown;
+  onChange: (value: unknown) => void;
+}) {
+  const projectData = useEditorStore((state) => state.document.data);
+  const tags = Object.values(projectData?.tags ?? {}).filter(
+    (tag) => isUdtTag(tag) && tag.type.udtId === udtId
+  );
+  const selectedId = isTagRef(value) ? value.tagId : "";
+
+  return (
+    <FormField label="tag">
+      <Select
+        value={selectedId}
+        onChange={(event) => {
+          const tag = tags.find((candidate) => candidate.id === event.target.value);
+          onChange(tag ? createTagRef(tag) : undefined);
+        }}
+      >
+        <option value="">Unassigned</option>
+        {tags.map((tag) => (
+          <option key={tag.id} value={tag.id}>
+            {tag.name}
+          </option>
+        ))}
+      </Select>
+    </FormField>
+  );
 }

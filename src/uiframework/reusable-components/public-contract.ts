@@ -50,6 +50,12 @@ export function createComponentInput(
       );
     }
 
+    if (nestedInput.type === "tagRef") {
+      throw new Error(
+        `Tag reference input “${internalNode.name}.${property}” must be passed as a component input, not exposed through a primitive mapping.`
+      );
+    }
+
     if (requestedType && requestedType !== nestedInput.type) {
       throw new Error(
         `“${internalNode.name}.${property}” is ${nestedInput.type}; the mapped public input must use the same type.`
@@ -91,7 +97,9 @@ export function createComponentInput(
     ...(internalNode.props ?? {}),
   };
   const inferredType =
-    requestedType ?? inferInputType(property, resolvedProps[property]);
+    requestedType === "tagRef"
+      ? inferInputType(property, resolvedProps[property])
+      : requestedType ?? inferInputType(property, resolvedProps[property]);
   const defaultValue =
     inferredType === "tag"
       ? internalNode.bindings?.[property]?.path ?? ""
@@ -106,6 +114,26 @@ export function createComponentInput(
       kind: inferredType === "tag" ? "binding" : "prop",
     },
   };
+}
+
+
+export function createTagRefComponentInput(
+  definition: UiComponentDefinition,
+  requestedName: string,
+  udtId: string
+): ComponentInputDefinition {
+  const name = requestedName.trim();
+  if (!isJsIdentifier(name)) {
+    throw new Error("Use a JS identifier, e.g. pump or motor.");
+  }
+  if (!udtId) throw new Error("Select a UDT for the tag reference.");
+  if (definition.inputs?.[name]) {
+    throw new Error(`Input “${name}” already exists.`);
+  }
+  if (definition.methods?.[name] || isReservedComponentApiName(name)) {
+    throw new Error(`“${name}” conflicts with the component API.`);
+  }
+  return { type: "tagRef", udtId };
 }
 
 export function getComponentInputTargetType(
@@ -135,7 +163,7 @@ export function getComponentInputTargetType(
 export function inferInputType(
   property: string,
   value: unknown
-): ComponentInputType {
+): Exclude<ComponentInputType, "tagRef"> {
   if (/color/i.test(property)) return "color";
   if (/tag/i.test(property)) return "tag";
   if (typeof value === "boolean") return "boolean";

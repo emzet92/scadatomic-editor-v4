@@ -27,6 +27,8 @@ import { findTagFieldRefByPath } from "../uiframework/data/tags/TagFieldRef";
 import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
 import type { TagWriteSource } from "../uiframework/data/tags/TagEvents";
 import { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
+import { parseRepeatInstanceId } from "../uiframework/repeat/RepeatRuntime";
+import { createTagRef } from "../uiframework/data/collections/TagRef";
 import { persistTagValueToSession } from "./mock-tag-session-state";
 import {
   isMockRuntimeAuthority,
@@ -552,7 +554,31 @@ function resolveComponentScopeForRuntimeNode(
   const parts = runtimeNodeId.split("::").filter(Boolean);
   if (parts.length < 2) return undefined;
 
-  let instance = document.nodes[parts[0]!];
+  const rootRuntimeId = parts[0]!;
+  let instance = document.nodes[rootRuntimeId];
+  if (!instance) {
+    const repeat = parseRepeatInstanceId(rootRuntimeId);
+    if (repeat) {
+      const container = document.nodes[repeat.containerId];
+      const behavior = container?.contentBehavior;
+      const tag = document.data?.tags[repeat.tagId];
+      const tagRef = tag ? createTagRef(tag) : undefined;
+      if (
+        behavior?.kind === "repeat" &&
+        behavior.template.componentDefinitionId === repeat.componentDefinitionId &&
+        tag &&
+        tagRef
+      ) {
+        instance = {
+          id: rootRuntimeId,
+          name: `repeat_${tag.name}`,
+          type: "ComponentInstance",
+          componentDefinitionId: repeat.componentDefinitionId,
+          props: { [behavior.template.inputName]: tagRef },
+        };
+      }
+    }
+  }
   if (instance?.type !== "ComponentInstance" || !instance.componentDefinitionId) {
     return undefined;
   }

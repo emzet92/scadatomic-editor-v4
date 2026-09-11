@@ -82,7 +82,7 @@ function ScriptEditor({
     scriptSelection?.kind === "method"
       ? scriptSelection.component
       : componentScriptDefinition
-        ? describeComponentScriptSelfApi(componentScriptDefinition)
+        ? describeComponentScriptSelfApi(componentScriptDefinition, document ?? undefined)
         : undefined;
   const internalComponents =
     document && componentScriptDefinition

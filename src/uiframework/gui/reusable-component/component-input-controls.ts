@@ -7,7 +7,9 @@ export function createInputControls(
   return Object.fromEntries(
     Object.entries(definition.inputs ?? {}).map(([name, input]) => [
       name,
-      inputTypeToControl(input.type),
+      input.type === "tagRef"
+        ? ({ kind: "tag-ref", udtId: input.udtId } as const)
+        : inputTypeToControl(input.type),
     ])
   );
 }
@@ -20,6 +22,8 @@ function inputTypeToControl(type: ComponentInputType): InspectorControl {
       return { kind: "toggle" };
     case "color":
       return { kind: "color" };
+    case "tagRef":
+      return { kind: "text" };
     case "tag":
     case "string":
     default:

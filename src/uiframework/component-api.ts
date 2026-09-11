@@ -15,6 +15,8 @@ import {
 export type ComponentApiProperty = {
   name: string;
   valueType: string;
+  members?: ComponentApiProperty[] | undefined;
+  methods?: { name: string }[] | undefined;
 };
 
 export type ComponentApiMethod = {

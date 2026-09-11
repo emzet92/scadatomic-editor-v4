@@ -25,6 +25,7 @@ export type InspectorControl =
   | { kind: "color" }
   | { kind: "toggle" }
   | { kind: "image-asset" }
+  | { kind: "tag-ref"; udtId: string }
   | { kind: "text-format" }
   | { kind: "text-align" }
   | { kind: "border-size"; min?: number; max?: number; step?: number }

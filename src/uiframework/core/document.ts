@@ -1,5 +1,7 @@
 import { createEmptyProjectData, type ProjectData } from "../data/tags/TagDefinition";
 import { isProjectData } from "../data/serialization/project-data";
+import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
+import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
 export type NodeId = string;
 export type PageId = string;
 export type ComponentDefinitionId = string;
@@ -9,7 +11,13 @@ export type TagBinding = {
   path: string;
 };
 
-export type Binding = TagBinding;
+export type TagRefBinding = {
+  kind: "tagRef";
+  input: string;
+  path: string;
+};
+
+export type Binding = TagBinding | TagRefBinding;
 
 export type HandlerRef = {
   handlerId: string;
@@ -32,17 +40,26 @@ export type ComponentInputType =
   | "number"
   | "boolean"
   | "color"
-  | "tag";
+  | "tag"
+  | "tagRef";
 
-export type ComponentInputDefinition = {
-  type: ComponentInputType;
-  defaultValue?: unknown;
-  target: {
-    nodeId: NodeId;
-    property: string;
-    kind: "prop" | "binding";
-  };
+export type ComponentInputTarget = {
+  nodeId: NodeId;
+  property: string;
+  kind: "prop" | "binding";
 };
+
+export type ComponentInputDefinition =
+  | {
+      type: Exclude<ComponentInputType, "tagRef">;
+      defaultValue?: unknown;
+      target: ComponentInputTarget;
+    }
+  | {
+      type: "tagRef";
+      udtId: string;
+      defaultValue?: unknown;
+    };
 
 export type UiComponentDefinition = {
   id: ComponentDefinitionId;
@@ -64,6 +81,8 @@ export type UiNode = {
   methods?: Record<string, MethodRef> | undefined;
   variants?: Record<string, UiVariant> | undefined;
   defaultVariant?: string | undefined;
+  /** Optional data-driven content behavior. Currently supported on Container nodes. */
+  contentBehavior?: ContainerContentBehavior | undefined;
   children?: NodeId[] | undefined;
 };
 
@@ -314,6 +333,13 @@ function isUiNode(value: unknown, expectedId: string): value is UiNode {
   }
 
   if (
+    node.contentBehavior !== undefined &&
+    !isContainerContentBehavior(node.contentBehavior)
+  ) {
+    return false;
+  }
+
+  if (
     node.children !== undefined &&
     (!Array.isArray(node.children) ||
       !node.children.every((childId) => typeof childId === "string"))
@@ -420,14 +446,13 @@ function isComponentDefinition(
 }
 
 function isComponentInput(value: unknown): value is ComponentInputDefinition {
-  if (!isRecord(value) || !isRecord(value.target)) {
-    return false;
+  if (!isRecord(value)) return false;
+  if (value.type === "tagRef") {
+    return typeof value.udtId === "string";
   }
-
+  if (!isRecord(value.target)) return false;
   return (
-    ["string", "number", "boolean", "color", "tag"].includes(
-      String(value.type)
-    ) &&
+    ["string", "number", "boolean", "color", "tag"].includes(String(value.type)) &&
     typeof value.target.nodeId === "string" &&
     typeof value.target.property === "string" &&
     (value.target.kind === "prop" || value.target.kind === "binding")
@@ -435,11 +460,13 @@ function isComponentInput(value: unknown): value is ComponentInputDefinition {
 }
 
 function isBinding(value: unknown): value is Binding {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  return value.kind === "tag" && typeof value.path === "string";
+  if (!isRecord(value)) return false;
+  if (value.kind === "tag") return typeof value.path === "string";
+  return (
+    value.kind === "tagRef" &&
+    typeof value.input === "string" &&
+    typeof value.path === "string"
+  );
 }
 
 function isHandlerRef(value: unknown): value is HandlerRef {

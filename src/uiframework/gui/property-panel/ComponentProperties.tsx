@@ -31,6 +31,7 @@ export function ComponentProperties({
   setEvent,
   handlerIdPrefix,
   emptyMessage = "This component exposes no editable properties.",
+  componentInputs,
 }: {
   node: UiNode;
   values: Record<string, unknown>;
@@ -51,6 +52,7 @@ export function ComponentProperties({
   /** Optional scope for generated handler ids used by private definition nodes. */
   handlerIdPrefix?: string;
   emptyMessage?: string;
+  componentInputs?: import("../../core/document").UiComponentDefinition["inputs"];
 }) {
   const hasControls = Object.keys(controls).length > 0;
 
@@ -75,6 +77,7 @@ export function ComponentProperties({
           definitions={bindingDefinitions}
           bindings={node.bindings}
           setBinding={setBinding}
+          componentInputs={componentInputs}
         />
       ) : null}
 

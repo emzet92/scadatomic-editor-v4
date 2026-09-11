@@ -15,7 +15,8 @@ import type {
  * ctx.ui   -> intentionally NOT built here; it stays the scene-public facade
  */
 export function describeComponentScriptSelfApi(
-  definition: UiComponentDefinition
+  definition: UiComponentDefinition,
+  document?: UiDocument
 ): ComponentApiDescription {
   const root = definition.nodes[definition.rootId];
   const variantNames = Object.keys(root?.variants ?? {}).sort((left, right) =>
@@ -28,10 +29,25 @@ export function describeComponentScriptSelfApi(
     type: definition.name,
     apiSurface: "reusable",
     definitionName: definition.name,
-    properties: Object.entries(definition.inputs ?? {}).map(([name, input]) => ({
-      name,
-      valueType: input.type,
-    })),
+    properties: Object.entries(definition.inputs ?? {}).map(([name, input]) => {
+      if (input.type !== "tagRef") return { name, valueType: input.type };
+      const udt = document?.data?.udts[input.udtId];
+      return {
+        name,
+        valueType: `TagRef<${udt?.name ?? "UDT"}>`,
+        ...(udt
+          ? {
+              members: udt.fields.map((field) => ({
+                name: field.name,
+                valueType: field.type.kind === "udt"
+                  ? document?.data?.udts[field.type.udtId]?.name ?? "UDT"
+                  : field.type.kind,
+              })),
+              methods: udt.methods.map((method) => ({ name: method.name })),
+            }
+          : {}),
+      };
+    }),
     // Component-owned scripts can call both public and private methods through
     // self. Visibility only controls the facade exposed outside the definition.
     methods: Object.entries(definition.methods ?? {})
