@@ -35,7 +35,7 @@ import {
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
 import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagStoreSetResult } from "./data/tags/TagStore";
-import { designerTagStore, replaceDesignerTagData } from "./data/tags/designer-tag-store";
+import { getDesignerTagStore, replaceDesignerTagData } from "./data/tags/designer-tag-store";
 
 export type DragPreview = {
   type: string;
@@ -216,14 +216,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   setTagValue: (path, value) => {
-    let result: TagStoreSetResult = { ok: false, error: "Tag store is not ready." };
-    set((state) => {
-      replaceDesignerTagData(state.document.data);
-      result = designerTagStore.set(path, value, { source: { kind: "user" } });
-      if (!result.ok || !result.changed) return state;
-      return { document: { ...state.document, data: designerTagStore.snapshot() } };
-    });
-    return result;
+    return getDesignerTagStore().set(path, value, { source: { kind: "user" } });
   },
 
   dragPreview: null,
@@ -388,7 +381,6 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setDocument: (document) => {
     const startPage = getPage(document, document.startPageId);
-    replaceDesignerTagData(document.data);
     set({
       document,
       activePageId: startPage.id,

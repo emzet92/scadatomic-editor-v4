@@ -46,7 +46,7 @@ import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
 import { sendWsMessage } from "./websocket";
-import { connectMockDesignerTagBridge } from "../mock/mock-designer-tag-bridge";
+import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
 
 export function RendererRoot({
   document,
@@ -309,9 +309,12 @@ export function EditorPage() {
   }, [projectId, projectName, document, loading, flushPendingSave]);
 
   useEffect(() => {
-    if (!projectId) return;
-    return connectMockDesignerTagBridge(projectId);
-  }, [projectId]);
+    if (!projectId || loading) return;
+    connectMockDesignerRuntimeSession(
+      projectId,
+      document.data ?? { udts: {}, tags: {} }
+    );
+  }, [document.data, loading, projectId]);
 
   useEffect(() => {
     designerSimulationSession.configure(document.data ?? { udts: {}, tags: {} });

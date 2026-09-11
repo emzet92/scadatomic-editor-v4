@@ -1,30 +1,51 @@
-import { TagStore } from "../uiframework/data/tags/TagStore";
 import {
   createEmptyProjectData,
   type ProjectData,
 } from "../uiframework/data/tags/TagDefinition";
+import { ProjectRuntimeSession } from "../uiframework/data/runtime/ProjectRuntimeSession";
 import { hydrateProjectDataFromTagSession } from "./mock-tag-session-state";
 
-const stores = new Map<string, TagStore>();
+const sessions = new Map<string, ProjectRuntimeSession>();
 
-export function getMockTagStore(projectId: string, data?: ProjectData) {
-  let store = stores.get(projectId);
-  if (!store) {
+export function getMockRuntimeSession(projectId: string, data?: ProjectData) {
+  let session = sessions.get(projectId);
+  if (!session) {
     const base = data ?? createEmptyProjectData();
-    store = new TagStore(hydrateProjectDataFromTagSession(projectId, base));
-    stores.set(projectId, store);
+    session = new ProjectRuntimeSession(
+      projectId,
+      hydrateProjectDataFromTagSession(projectId, base)
+    );
+    sessions.set(projectId, session);
   }
-  return store;
+  return session;
 }
 
+export function getMockTagStore(projectId: string, data?: ProjectData) {
+  return getMockRuntimeSession(projectId, data).tagStore;
+}
+
+/** Live configuration update: preserves current runtime values. */
+export function configureMockRuntimeProjectData(
+  projectId: string,
+  data?: ProjectData
+) {
+  const resolved = data ?? createEmptyProjectData();
+  const session = getMockRuntimeSession(projectId, resolved);
+  session.configure(resolved);
+  return session;
+}
+
+/** Explicit runtime boundary: rehydrate initial/session values. */
 export function replaceMockTagStoreData(projectId: string, data?: ProjectData) {
   const base = data ?? createEmptyProjectData();
   const hydrated = hydrateProjectDataFromTagSession(projectId, base);
-  const store = getMockTagStore(projectId, hydrated);
-  store.replaceData(hydrated);
-  return store;
+  const session = getMockRuntimeSession(projectId, hydrated);
+  session.reset(hydrated);
+  return session.tagStore;
 }
 
-export function listMockTagStores(): Array<[string, TagStore]> {
-  return Array.from(stores.entries());
+export function listMockTagStores() {
+  return Array.from(sessions.entries()).map(
+    ([projectId, session]) => [projectId, session.tagStore] as const
+  );
 }

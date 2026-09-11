@@ -8,6 +8,7 @@ export type TagDriverContext = {
 
 export interface TagDriver {
   readonly kind: string;
+  configure?(): void | Promise<void>;
   start(): void | Promise<void>;
   stop(): void | Promise<void>;
   dispose(): void | Promise<void>;

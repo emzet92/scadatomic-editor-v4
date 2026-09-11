@@ -231,7 +231,7 @@ class MockRuntimeSocket extends EventTarget {
     return true;
   }
 
-  private ensureTagEventBridge(
+  ensureTagEventBridge(
     projectId: string,
     tagStore: ReturnType<typeof getMockTagStore>
   ) {
@@ -246,7 +246,7 @@ class MockRuntimeSocket extends EventTarget {
 
       // Tag changes are the canonical runtime event now. The pre-tag
       // The legacy signal transport and prototype process events are removed.
-      this.dispatchPayload({
+      this.emitMockResponse({
         ...tagEvent,
         projectId,
         timestamp: Date.now(),
@@ -349,6 +349,16 @@ let socket: MockRuntimeSocket | null = null;
 export function getMockRuntimeSocket() {
   socket ??= new MockRuntimeSocket();
   return socket;
+}
+
+export function ensureMockTagRuntimeBridge(
+  projectId: string,
+  data?: import("../uiframework/data/tags/TagDefinition").ProjectData
+) {
+  const runtimeSocket = getMockRuntimeSocket();
+  const tagStore = getMockTagStore(projectId, data);
+  runtimeSocket.ensureTagEventBridge(projectId, tagStore);
+  return tagStore;
 }
 
 export function sendMockWsMessage(payload: unknown) {

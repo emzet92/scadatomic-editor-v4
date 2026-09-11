@@ -2,10 +2,12 @@ import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
 import { createEmptyProjectData } from "../uiframework/data/tags/TagDefinition";
 import type { TagDriver } from "../uiframework/data/drivers/TagDriver";
 import { createDefaultTagDriverRegistry } from "../uiframework/data/simulation/default-driver-registry";
-import { getMockTagStore, replaceMockTagStoreData } from "./mock-tag-runtime";
+import {
+  configureMockRuntimeProjectData,
+  getMockRuntimeSession,
+} from "./mock-tag-runtime";
 
 type DriverEntry = {
-  data: ProjectData;
   driver: TagDriver;
 };
 
@@ -16,43 +18,37 @@ export class MockDriverRuntime {
   configure(
     projectId: string,
     driverKind: string,
-    data: ProjectData | undefined,
-    replaceStore = true
+    data: ProjectData | undefined
   ) {
     const resolvedData = data ?? createEmptyProjectData();
-    const store = replaceStore
-      ? replaceMockTagStoreData(projectId, resolvedData)
-      : getMockTagStore(projectId, resolvedData);
+    const session = configureMockRuntimeProjectData(projectId, resolvedData);
     const projectEntries = this.entries.get(projectId) ?? new Map<string, DriverEntry>();
     this.entries.set(projectId, projectEntries);
 
     const current = projectEntries.get(driverKind);
     if (current) {
-      current.data = resolvedData;
+      current.driver.configure?.();
       return current;
     }
 
     const driver = this.drivers.create(driverKind, {
-      tagStore: store,
-      getProjectData: () => projectEntries.get(driverKind)?.data ?? resolvedData,
+      tagStore: session.tagStore,
+      getProjectData: () => getMockRuntimeSession(projectId).getProjectData(),
     });
-    const entry: DriverEntry = { data: resolvedData, driver };
+    const entry: DriverEntry = { driver };
     projectEntries.set(driverKind, entry);
     return entry;
   }
 
   configureExisting(projectId: string, data: ProjectData | undefined) {
-    const projectEntries = this.entries.get(projectId);
-    if (!projectEntries) return;
-    const resolvedData = data ?? createEmptyProjectData();
-    for (const entry of projectEntries.values()) entry.data = resolvedData;
+    configureMockRuntimeProjectData(projectId, data ?? createEmptyProjectData());
+    for (const entry of this.entries.get(projectId)?.values() ?? []) {
+      entry.driver.configure?.();
+    }
   }
 
   start(projectId: string, driverKind: string, data?: ProjectData) {
-    // The project-scoped TagStore may already contain handler/session writes.
-    // Starting a driver must never replace that live runtime state with the
-    // persisted ProjectData snapshot.
-    const entry = this.configure(projectId, driverKind, data, false);
+    const entry = this.configure(projectId, driverKind, data);
     entry.driver.start();
     return entry.driver;
   }
@@ -63,6 +59,13 @@ export class MockDriverRuntime {
 
   isRunning(projectId: string, driverKind: string) {
     return this.entries.get(projectId)?.get(driverKind)?.driver.isRunning() ?? false;
+  }
+
+  disposeProject(projectId: string) {
+    const entries = this.entries.get(projectId);
+    if (!entries) return;
+    for (const entry of entries.values()) entry.driver.dispose();
+    this.entries.delete(projectId);
   }
 
   dispose() {

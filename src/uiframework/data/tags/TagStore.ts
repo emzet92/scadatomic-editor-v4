@@ -33,6 +33,18 @@ export class TagStore {
     this.data = structuredClone(data);
   }
 
+  /**
+   * Updates project/tag definitions while preserving the current runtime values
+   * by stable tag/field ids. This is used for live designer configuration
+   * changes and must not behave like a runtime restart.
+   */
+  reconfigure(data: ProjectData) {
+    const runtimeValues = capturePrimitiveRuntimeValues(this.data);
+    const next = structuredClone(data);
+    applyPrimitiveRuntimeValues(next, runtimeValues);
+    this.data = next;
+  }
+
   snapshot(): ProjectData {
     return structuredClone(this.data);
   }
@@ -220,4 +232,90 @@ function collectPrimitivePaths(
   for (const childPath of store.children(path)) {
     collectPrimitivePaths(store, childPath, output);
   }
+}
+
+
+type PrimitiveRuntimeValue = {
+  tagId: string;
+  fieldIds: string[];
+  value: unknown;
+};
+
+function capturePrimitiveRuntimeValues(data: ProjectData): PrimitiveRuntimeValue[] {
+  const values: PrimitiveRuntimeValue[] = [];
+  for (const [tagId, tag] of Object.entries(data.tags)) {
+    if (isPrimitiveTag(tag)) {
+      values.push({ tagId, fieldIds: [], value: tag.value });
+      continue;
+    }
+    collectUdtRuntimeValues(data, tagId, tag.type.udtId, tag.values, [], values);
+  }
+  return values;
+}
+
+function collectUdtRuntimeValues(
+  data: ProjectData,
+  tagId: string,
+  udtId: string,
+  record: Record<string, unknown>,
+  fieldIds: string[],
+  output: PrimitiveRuntimeValue[]
+) {
+  const definition = data.udts[udtId];
+  if (!definition) return;
+  for (const field of definition.fields) {
+    const nextIds = [...fieldIds, field.id];
+    const value = record[field.name];
+    if (field.type.kind === "udt") {
+      if (isRecord(value)) {
+        collectUdtRuntimeValues(data, tagId, field.type.udtId, value, nextIds, output);
+      }
+      continue;
+    }
+    output.push({ tagId, fieldIds: nextIds, value });
+  }
+}
+
+function applyPrimitiveRuntimeValues(
+  data: ProjectData,
+  values: PrimitiveRuntimeValue[]
+) {
+  for (const runtimeValue of values) {
+    const tag = data.tags[runtimeValue.tagId];
+    if (!tag) continue;
+    if (runtimeValue.fieldIds.length === 0) {
+      if (isPrimitiveTag(tag) && TypeRegistry.validate(tag.type, runtimeValue.value)) {
+        data.tags[runtimeValue.tagId] = { ...tag, value: runtimeValue.value };
+      }
+      continue;
+    }
+    if (!isUdtTag(tag)) continue;
+    const resolved = resolveFieldPathByIds(data, tag.type.udtId, runtimeValue.fieldIds);
+    if (!resolved || resolved.type.kind === "udt" || !TypeRegistry.validate(resolved.type, runtimeValue.value)) {
+      continue;
+    }
+    data.tags[runtimeValue.tagId] = {
+      ...tag,
+      values: setNestedValue(tag.values, resolved.names, runtimeValue.value),
+    };
+  }
+}
+
+function resolveFieldPathByIds(
+  data: ProjectData,
+  rootUdtId: string,
+  fieldIds: string[]
+): { names: string[]; type: DataType } | undefined {
+  let udtId = rootUdtId;
+  const names: string[] = [];
+  let type: DataType | undefined;
+  for (const fieldId of fieldIds) {
+    const definition = data.udts[udtId];
+    const field = definition?.fields.find((candidate) => candidate.id === fieldId);
+    if (!field) return undefined;
+    names.push(field.name);
+    type = field.type;
+    if (field.type.kind === "udt") udtId = field.type.udtId;
+  }
+  return type ? { names, type } : undefined;
 }

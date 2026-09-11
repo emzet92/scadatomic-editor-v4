@@ -4,8 +4,12 @@ import { resolveTagFieldRef } from "../tags/TagFieldRef";
 import { TypeRegistry } from "../types/TypeRegistry";
 import type { RuntimeClock } from "./RuntimeClock";
 import { PerformanceRuntimeClock } from "./RuntimeClock";
+import type { SimulationBinding } from "./SimulationBinding";
 import { simulationGeneratorRegistry } from "./SimulationGeneratorRegistry";
-import { evaluateSimulationActivation, validateSimulationActivation } from "./SimulationActivation";
+import {
+  evaluateSimulationActivation,
+  validateSimulationActivation,
+} from "./SimulationActivation";
 import { listSimulationBindings } from "./SimulationRegistry";
 
 export type SimulationDriverDiagnostic = {
@@ -20,6 +24,13 @@ export type SimulationDriverOptions = {
   onDiagnosticsChanged?: ((diagnostics: SimulationDriverDiagnostic[]) => void) | undefined;
 };
 
+/**
+ * Local simulation source driver.
+ *
+ * The driver never owns tag values. It writes generated values through the
+ * shared TagStore and reacts to condition inputs by subscribing to the same
+ * store. Conditions are event-driven; waveforms are time-driven.
+ */
 export class SimulationDriver implements TagDriver {
   readonly kind = "simulation";
 
@@ -28,13 +39,15 @@ export class SimulationDriver implements TagDriver {
   private readonly tickMs: number;
   private readonly onDiagnosticsChanged: ((diagnostics: SimulationDriverDiagnostic[]) => void) | undefined;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private running = false;
   private startedAt = 0;
   private lastTickAt = 0;
   private diagnostics: SimulationDriverDiagnostic[] = [];
   private readonly activationStartedAt = new Map<string, number>();
-  private activationDependencyPaths = new Set<string>();
-  private unsubscribeTagChanges: (() => void) | undefined;
-  private reactiveTickQueued = false;
+  private dependencyIndex = new Map<string, Set<string>>();
+  private readonly dependencySubscriptions = new Map<string, () => void>();
+  private readonly queuedReactiveBindings = new Set<string>();
+  private reactiveFlushQueued = false;
 
   constructor(context: TagDriverContext, options: SimulationDriverOptions = {}) {
     this.context = context;
@@ -43,39 +56,43 @@ export class SimulationDriver implements TagDriver {
     this.onDiagnosticsChanged = options.onDiagnosticsChanged;
   }
 
+  configure() {
+    this.syncActivationDependencies(this.context.getProjectData());
+    if (this.isRunning()) this.queueAllConditionalBindings();
+  }
+
   start() {
-    if (this.timer !== undefined) return;
+    if (this.running) return;
+    this.running = true;
     const now = this.clock.now();
     this.startedAt = now;
     this.lastTickAt = now;
     this.syncActivationDependencies(this.context.getProjectData());
-    this.unsubscribeTagChanges = this.context.tagStore.subscribe("*", (event) => {
-      this.handleTagChanged(event.path);
-    });
     this.tick(now);
     this.timer = setInterval(() => this.tick(), this.tickMs);
   }
 
   stop() {
+    if (!this.running && this.timer === undefined) return;
+    this.running = false;
     if (this.timer !== undefined) {
       clearInterval(this.timer);
       this.timer = undefined;
     }
-    this.unsubscribeTagChanges?.();
-    this.unsubscribeTagChanges = undefined;
-    this.reactiveTickQueued = false;
-    this.activationDependencyPaths.clear();
+    this.clearDependencySubscriptions();
+    this.dependencyIndex.clear();
+    this.queuedReactiveBindings.clear();
+    this.reactiveFlushQueued = false;
     this.activationStartedAt.clear();
   }
 
   dispose() {
     this.stop();
-    this.activationStartedAt.clear();
     this.updateDiagnostics([]);
   }
 
   isRunning() {
-    return this.timer !== undefined;
+    return this.running;
   }
 
   getDiagnostics() {
@@ -90,145 +107,229 @@ export class SimulationDriver implements TagDriver {
     this.lastTickAt = now;
 
     const data = this.context.getProjectData();
-    const diagnostics: SimulationDriverDiagnostic[] = [];
     this.syncActivationDependencies(data);
-
     const bindings = listSimulationBindings(data);
-    const knownBindingIds = new Set(bindings.map((binding) => binding.id));
-    for (const bindingId of this.activationStartedAt.keys()) {
-      if (!knownBindingIds.has(bindingId)) this.activationStartedAt.delete(bindingId);
-    }
+    this.pruneBindingState(bindings);
 
+    const diagnostics: SimulationDriverDiagnostic[] = [];
     for (const binding of bindings) {
-      if (!binding.enabled) {
-        this.activationStartedAt.delete(binding.id);
-        continue;
-      }
-      if (getTagSourceMapping(data, binding.target).driver !== this.kind) {
-        this.activationStartedAt.delete(binding.id);
-        continue;
-      }
-
-      try {
-        const resolved = resolveTagFieldRef(data, binding.target);
-        if (!resolved) {
-          diagnostics.push({ bindingId: binding.id, message: "Simulation target no longer exists." });
-          continue;
-        }
-
-        const descriptor = simulationGeneratorRegistry.get(binding.generator.kind);
-        if (!descriptor || !descriptor.supportedTypes.includes(resolved.type.kind)) {
-          diagnostics.push({ bindingId: binding.id, path: resolved.path, message: `${binding.generator.kind} does not support ${resolved.type.kind}.` });
-          continue;
-        }
-
-        const configError = simulationGeneratorRegistry.validate(binding.generator);
-        if (configError) {
-          diagnostics.push({ bindingId: binding.id, path: resolved.path, message: configError });
-          continue;
-        }
-
-        let generatorElapsed = elapsed;
-        if (binding.activation) {
-          const activationError = validateSimulationActivation(data, resolved.type, binding.activation);
-          if (activationError) {
-            this.activationStartedAt.delete(binding.id);
-            diagnostics.push({ bindingId: binding.id, path: resolved.path, message: activationError });
-            continue;
-          }
-
-          const activation = evaluateSimulationActivation(data, this.context.tagStore, binding.activation);
-          if (!activation.ok) {
-            this.activationStartedAt.delete(binding.id);
-            diagnostics.push({ bindingId: binding.id, path: resolved.path, message: activation.message });
-            continue;
-          }
-
-          if (!activation.active) {
-            this.activationStartedAt.delete(binding.id);
-            if (binding.activation.inactiveBehavior.kind === "set") {
-              const inactiveResult = this.context.tagStore.set(
-                resolved.path,
-                binding.activation.inactiveBehavior.value,
-                { source: { kind: "simulation", id: binding.id } }
-              );
-              if (!inactiveResult.ok) {
-                diagnostics.push({ bindingId: binding.id, path: resolved.path, message: inactiveResult.error });
-              }
-            }
-            continue;
-          }
-
-          let activeSince = this.activationStartedAt.get(binding.id);
-          if (activeSince === undefined) {
-            activeSince = now;
-            this.activationStartedAt.set(binding.id, activeSince);
-          }
-          generatorElapsed = Math.max(0, now - activeSince);
-        } else {
-          this.activationStartedAt.delete(binding.id);
-        }
-
-        const currentValue = this.context.tagStore.get(resolved.path);
-        const nextValue = simulationGeneratorRegistry.evaluate(
-          {
-            now,
-            elapsed: generatorElapsed,
-            delta,
-            currentValue,
-            bindingId: binding.id,
-            path: resolved.path,
-          },
-          binding.generator
-        );
-
-        if (!TypeRegistry.validate(resolved.type, nextValue)) {
-          diagnostics.push({ bindingId: binding.id, path: resolved.path, message: "Generator produced a value incompatible with the tag type." });
-          continue;
-        }
-
-        const result = this.context.tagStore.set(resolved.path, nextValue, {
-          source: { kind: "simulation", id: binding.id },
-        });
-        if (!result.ok) {
-          diagnostics.push({ bindingId: binding.id, path: resolved.path, message: result.error });
-        }
-      } catch (error) {
-        diagnostics.push({
-          bindingId: binding.id,
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
+      const diagnostic = this.evaluateBinding(binding, now, elapsed, delta);
+      if (diagnostic) diagnostics.push(diagnostic);
     }
-
     this.updateDiagnostics(diagnostics);
   }
 
+  private evaluateBinding(
+    binding: SimulationBinding,
+    now: number,
+    elapsed: number,
+    delta: number
+  ): SimulationDriverDiagnostic | undefined {
+    if (!binding.enabled) {
+      this.activationStartedAt.delete(binding.id);
+      return undefined;
+    }
+
+    const data = this.context.getProjectData();
+    if (getTagSourceMapping(data, binding.target).driver !== this.kind) {
+      this.activationStartedAt.delete(binding.id);
+      return undefined;
+    }
+
+    try {
+      const resolved = resolveTagFieldRef(data, binding.target);
+      if (!resolved) {
+        return { bindingId: binding.id, message: "Simulation target no longer exists." };
+      }
+
+      const descriptor = simulationGeneratorRegistry.get(binding.generator.kind);
+      if (!descriptor || !descriptor.supportedTypes.includes(resolved.type.kind)) {
+        return {
+          bindingId: binding.id,
+          path: resolved.path,
+          message: `${binding.generator.kind} does not support ${resolved.type.kind}.`,
+        };
+      }
+
+      const configError = simulationGeneratorRegistry.validate(binding.generator);
+      if (configError) {
+        return { bindingId: binding.id, path: resolved.path, message: configError };
+      }
+
+      let generatorElapsed = elapsed;
+      if (binding.activation) {
+        const activationError = validateSimulationActivation(
+          data,
+          resolved.type,
+          binding.activation
+        );
+        if (activationError) {
+          this.activationStartedAt.delete(binding.id);
+          return { bindingId: binding.id, path: resolved.path, message: activationError };
+        }
+
+        const activation = evaluateSimulationActivation(
+          data,
+          this.context.tagStore,
+          binding.activation
+        );
+        if (!activation.ok) {
+          this.activationStartedAt.delete(binding.id);
+          return { bindingId: binding.id, path: resolved.path, message: activation.message };
+        }
+
+        if (!activation.active) {
+          this.activationStartedAt.delete(binding.id);
+          if (binding.activation.inactiveBehavior.kind === "set") {
+            const inactiveResult = this.context.tagStore.set(
+              resolved.path,
+              binding.activation.inactiveBehavior.value,
+              { source: { kind: "simulation", id: binding.id } }
+            );
+            if (!inactiveResult.ok) {
+              return {
+                bindingId: binding.id,
+                path: resolved.path,
+                message: inactiveResult.error,
+              };
+            }
+          }
+          return undefined;
+        }
+
+        let activeSince = this.activationStartedAt.get(binding.id);
+        if (activeSince === undefined) {
+          activeSince = now;
+          this.activationStartedAt.set(binding.id, activeSince);
+        }
+        generatorElapsed = Math.max(0, now - activeSince);
+      } else {
+        this.activationStartedAt.delete(binding.id);
+      }
+
+      const currentValue = this.context.tagStore.get(resolved.path);
+      const nextValue = simulationGeneratorRegistry.evaluate(
+        {
+          now,
+          elapsed: generatorElapsed,
+          delta,
+          currentValue,
+          bindingId: binding.id,
+          path: resolved.path,
+        },
+        binding.generator
+      );
+
+      if (!TypeRegistry.validate(resolved.type, nextValue)) {
+        return {
+          bindingId: binding.id,
+          path: resolved.path,
+          message: "Generator produced a value incompatible with the tag type.",
+        };
+      }
+
+      const result = this.context.tagStore.set(resolved.path, nextValue, {
+        source: { kind: "simulation", id: binding.id },
+      });
+      if (!result.ok) {
+        return { bindingId: binding.id, path: resolved.path, message: result.error };
+      }
+    } catch (error) {
+      return {
+        bindingId: binding.id,
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    return undefined;
+  }
 
   private syncActivationDependencies(data: ReturnType<TagDriverContext["getProjectData"]>) {
-    const paths = new Set<string>();
+    const nextIndex = new Map<string, Set<string>>();
+
     for (const binding of listSimulationBindings(data)) {
       if (!binding.enabled || !binding.activation) continue;
       if (getTagSourceMapping(data, binding.target).driver !== this.kind) continue;
       const source = resolveTagFieldRef(data, binding.activation.condition.source);
-      if (source) paths.add(source.path);
+      if (!source) continue;
+      const ids = nextIndex.get(source.path) ?? new Set<string>();
+      ids.add(binding.id);
+      nextIndex.set(source.path, ids);
     }
-    this.activationDependencyPaths = paths;
+
+    for (const [path, unsubscribe] of this.dependencySubscriptions) {
+      if (nextIndex.has(path)) continue;
+      unsubscribe();
+      this.dependencySubscriptions.delete(path);
+    }
+
+    if (this.isRunning()) {
+      for (const path of nextIndex.keys()) {
+        if (this.dependencySubscriptions.has(path)) continue;
+        this.dependencySubscriptions.set(
+          path,
+          this.context.tagStore.subscribe(path, () => this.handleDependencyChanged(path))
+        );
+      }
+    }
+
+    this.dependencyIndex = nextIndex;
   }
 
-  private handleTagChanged(path: string) {
+  private handleDependencyChanged(path: string) {
     if (!this.isRunning()) return;
-    this.syncActivationDependencies(this.context.getProjectData());
-    if (!this.activationDependencyPaths.has(path) || this.reactiveTickQueued) return;
+    const bindingIds = this.dependencyIndex.get(path);
+    if (!bindingIds) return;
+    for (const bindingId of bindingIds) this.queuedReactiveBindings.add(bindingId);
+    this.queueReactiveFlush();
+  }
 
-    // Tag writes from handlers/UDT methods must wake conditional simulation
-    // immediately. Queueing avoids recursive ticks when a generated tag is
-    // itself used as another simulation condition.
-    this.reactiveTickQueued = true;
+  private queueAllConditionalBindings() {
+    for (const bindingIds of this.dependencyIndex.values()) {
+      for (const bindingId of bindingIds) this.queuedReactiveBindings.add(bindingId);
+    }
+    this.queueReactiveFlush();
+  }
+
+  private queueReactiveFlush() {
+    if (this.reactiveFlushQueued || this.queuedReactiveBindings.size === 0) return;
+    this.reactiveFlushQueued = true;
     queueMicrotask(() => {
-      this.reactiveTickQueued = false;
-      if (this.isRunning()) this.tick();
+      this.reactiveFlushQueued = false;
+      if (!this.isRunning()) {
+        this.queuedReactiveBindings.clear();
+        return;
+      }
+
+      const bindingIds = new Set(this.queuedReactiveBindings);
+      this.queuedReactiveBindings.clear();
+      const bindings = listSimulationBindings(this.context.getProjectData()).filter(
+        (binding) => bindingIds.has(binding.id)
+      );
+      const now = this.clock.now();
+      const elapsed = Math.max(0, now - this.startedAt);
+      const nextDiagnostics = this.diagnostics.filter(
+        (diagnostic) => !bindingIds.has(diagnostic.bindingId)
+      );
+
+      for (const binding of bindings) {
+        const diagnostic = this.evaluateBinding(binding, now, elapsed, 0);
+        if (diagnostic) nextDiagnostics.push(diagnostic);
+      }
+      this.updateDiagnostics(nextDiagnostics);
     });
+  }
+
+  private pruneBindingState(bindings: SimulationBinding[]) {
+    const knownBindingIds = new Set(bindings.map((binding) => binding.id));
+    for (const bindingId of this.activationStartedAt.keys()) {
+      if (!knownBindingIds.has(bindingId)) this.activationStartedAt.delete(bindingId);
+    }
+  }
+
+  private clearDependencySubscriptions() {
+    for (const unsubscribe of this.dependencySubscriptions.values()) unsubscribe();
+    this.dependencySubscriptions.clear();
   }
 
   private updateDiagnostics(next: SimulationDriverDiagnostic[]) {
