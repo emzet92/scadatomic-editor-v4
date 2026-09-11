@@ -14,16 +14,14 @@ export class MockDriverRuntime {
   ) {
     const resolvedData = data ?? createEmptyProjectData();
     const session = configureMockRuntimeProjectData(projectId, resolvedData);
-    session.drivers.configure();
     return session.drivers.get(driverKind);
   }
 
   configureExisting(projectId: string, data: ProjectData | undefined) {
-    const session = configureMockRuntimeProjectData(
+    configureMockRuntimeProjectData(
       projectId,
       data ?? createEmptyProjectData()
     );
-    session.drivers.configure();
   }
 
   start(projectId: string, driverKind: string, data?: ProjectData) {

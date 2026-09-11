@@ -3,29 +3,37 @@ type AuthorityLease = {
   expiresAt: number;
 };
 
-const STORAGE_PREFIX = "scadatomic.mock.runtime-authority.v1.";
-const LEASE_MS = 4_000;
-const HEARTBEAT_MS = 1_000;
+type AuthorityListener = (isAuthority: boolean) => void;
+
+const STORAGE_PREFIX = "scadatomic.mock.runtime-authority.v2.";
+const LEASE_MS = 6_000;
+const HEARTBEAT_MS = 1_500;
 const ownerId = createOwnerId();
 const heartbeatTimers = new Map<string, number>();
+const listeners = new Map<string, Set<AuthorityListener>>();
+const lastKnownAuthority = new Map<string, boolean>();
 
 /**
  * Cross-tab ownership for the local mock I/O host.
  *
- * Only the authority for a project may run source drivers and publish canonical
- * tag readback. Runtime-preview tabs remain clients and send write requests to
- * that authority, just like an HMI writing to a real PLC/edge runtime.
+ * Only the Designer host should claim authority. Runtime-preview clients never
+ * self-promote on a tag write; they behave like HMIs talking to an external
+ * PLC/edge runtime. Authority loss is observable so stale drivers can be
+ * disposed immediately instead of leaving orphaned simulation timers behind.
  */
 export function claimMockRuntimeAuthority(projectId: string) {
   const current = readLease(projectId);
   const now = Date.now();
   if (current && current.ownerId !== ownerId && current.expiresAt > now) {
+    updateAuthorityState(projectId, false);
     return false;
   }
 
   writeLease(projectId, { ownerId, expiresAt: now + LEASE_MS });
   const verified = readLease(projectId);
-  if (!verified || verified.ownerId !== ownerId) return false;
+  const claimed = !!verified && verified.ownerId === ownerId;
+  updateAuthorityState(projectId, claimed);
+  if (!claimed) return false;
 
   ensureHeartbeat(projectId);
   return true;
@@ -40,11 +48,21 @@ export function ensureMockRuntimeAuthority(projectId: string) {
 
 export function isMockRuntimeAuthority(projectId: string) {
   const lease = readLease(projectId);
-  if (!lease || lease.ownerId !== ownerId || lease.expiresAt <= Date.now()) {
-    if (heartbeatTimers.has(projectId)) stopHeartbeat(projectId);
-    return false;
+  // Browser background-tab throttling may delay the heartbeat beyond LEASE_MS.
+  // If localStorage still names this tab as owner, an incoming message is proof
+  // that the tab is alive: renew synchronously instead of spuriously dropping
+  // authority and spawning a second simulator elsewhere.
+  const owns = !!lease && lease.ownerId === ownerId;
+  if (owns) {
+    if (lease.expiresAt <= Date.now()) {
+      writeLease(projectId, { ownerId, expiresAt: Date.now() + LEASE_MS });
+    }
+    ensureHeartbeat(projectId);
+  } else if (heartbeatTimers.has(projectId)) {
+    stopHeartbeat(projectId);
   }
-  return true;
+  updateAuthorityState(projectId, owns);
+  return owns;
 }
 
 export function hasLiveMockRuntimeAuthority(projectId: string) {
@@ -53,7 +71,8 @@ export function hasLiveMockRuntimeAuthority(projectId: string) {
 }
 
 export function releaseMockRuntimeAuthority(projectId: string) {
-  if (isMockRuntimeAuthority(projectId)) {
+  const lease = readLease(projectId);
+  if (lease?.ownerId === ownerId) {
     try {
       localStorage.removeItem(storageKey(projectId));
     } catch {
@@ -61,6 +80,21 @@ export function releaseMockRuntimeAuthority(projectId: string) {
     }
   }
   stopHeartbeat(projectId);
+  updateAuthorityState(projectId, false);
+}
+
+export function subscribeMockRuntimeAuthority(
+  projectId: string,
+  listener: AuthorityListener
+) {
+  const current = listeners.get(projectId) ?? new Set<AuthorityListener>();
+  current.add(listener);
+  listeners.set(projectId, current);
+  listener(isMockRuntimeAuthority(projectId));
+  return () => {
+    current.delete(listener);
+    if (current.size === 0) listeners.delete(projectId);
+  };
 }
 
 export function getMockRuntimeAuthorityOwnerId() {
@@ -73,12 +107,14 @@ function ensureHeartbeat(projectId: string) {
     const lease = readLease(projectId);
     if (!lease || lease.ownerId !== ownerId) {
       stopHeartbeat(projectId);
+      updateAuthorityState(projectId, false);
       return;
     }
     writeLease(projectId, {
       ownerId,
       expiresAt: Date.now() + LEASE_MS,
     });
+    updateAuthorityState(projectId, true);
   }, HEARTBEAT_MS);
   heartbeatTimers.set(projectId, timer);
 }
@@ -89,6 +125,12 @@ function stopHeartbeat(projectId: string) {
     window.clearInterval(timer);
   }
   heartbeatTimers.delete(projectId);
+}
+
+function updateAuthorityState(projectId: string, next: boolean) {
+  if (lastKnownAuthority.get(projectId) === next) return;
+  lastKnownAuthority.set(projectId, next);
+  for (const listener of listeners.get(projectId) ?? []) listener(next);
 }
 
 function readLease(projectId: string): AuthorityLease | undefined {
@@ -116,6 +158,10 @@ function storageKey(projectId: string) {
   return `${STORAGE_PREFIX}${projectId}`;
 }
 
+function projectIdFromStorageKey(key: string | null) {
+  return key?.startsWith(STORAGE_PREFIX) ? key.slice(STORAGE_PREFIX.length) : undefined;
+}
+
 function createOwnerId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -124,6 +170,16 @@ function createOwnerId() {
 }
 
 if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    const projectId = projectIdFromStorageKey(event.key);
+    if (!projectId || !heartbeatTimers.has(projectId)) return;
+    const lease = readLease(projectId);
+    if (!lease || lease.ownerId !== ownerId) {
+      stopHeartbeat(projectId);
+      updateAuthorityState(projectId, false);
+    }
+  });
+
   window.addEventListener("pagehide", () => {
     for (const projectId of [...heartbeatTimers.keys()]) {
       releaseMockRuntimeAuthority(projectId);

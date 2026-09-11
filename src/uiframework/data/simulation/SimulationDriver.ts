@@ -56,6 +56,13 @@ export class SimulationDriver implements TagDriver {
   private reactiveFlushQueued = false;
   /** Simulated device/process image keyed by stable field reference. */
   private readonly deviceValues = new Map<string, unknown>();
+  /**
+   * Runtime force/override for generated registers written by the application.
+   * A PLC-like write must win over the local waveform instead of being silently
+   * overwritten on the next 50 ms tick. Overrides are cleared only by an
+   * explicit driver reconfigure/restart.
+   */
+  private readonly manualOverrides = new Set<string>();
 
   constructor(context: TagDriverContext, options: SimulationDriverOptions = {}) {
     this.context = context;
@@ -65,6 +72,7 @@ export class SimulationDriver implements TagDriver {
   }
 
   configure() {
+    this.manualOverrides.clear();
     this.syncDeviceState(this.context.getProjectData());
     this.syncActivationDependencies(this.context.getProjectData());
     if (this.isRunning()) this.queueAllConditionalBindings();
@@ -72,6 +80,7 @@ export class SimulationDriver implements TagDriver {
 
   start() {
     if (this.running) return;
+    this.manualOverrides.clear();
     this.running = true;
     const now = this.clock.now();
     this.startedAt = now;
@@ -94,6 +103,7 @@ export class SimulationDriver implements TagDriver {
     this.queuedReactiveBindings.clear();
     this.reactiveFlushQueued = false;
     this.activationStartedAt.clear();
+    this.manualOverrides.clear();
   }
 
   dispose() {
@@ -119,7 +129,14 @@ export class SimulationDriver implements TagDriver {
       return { ok: false, error: `${request.path} is not mapped to Simulation.` };
     }
 
-    this.deviceValues.set(tagFieldRefKey(request.target), request.value);
+    const targetKey = tagFieldRefKey(request.target);
+    this.deviceValues.set(targetKey, request.value);
+
+    const generated = listSimulationBindings(data).some(
+      (binding) => binding.enabled && tagFieldRefKey(binding.target) === targetKey
+    );
+    if (generated) this.manualOverrides.add(targetKey);
+
     const result = this.context.publish(request.path, request.value, {
       source: { kind: "driver", id: this.kind },
     });
@@ -167,6 +184,10 @@ export class SimulationDriver implements TagDriver {
       const resolved = resolveTagFieldRef(data, binding.target);
       if (!resolved) {
         return { bindingId: binding.id, message: "Simulation target no longer exists." };
+      }
+
+      if (this.manualOverrides.has(tagFieldRefKey(binding.target))) {
+        return undefined;
       }
 
       const descriptor = simulationGeneratorRegistry.get(binding.generator.kind);

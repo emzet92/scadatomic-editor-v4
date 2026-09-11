@@ -22,6 +22,11 @@ export function getMockRuntimeSession(projectId: string, data?: ProjectData) {
   return session;
 }
 
+
+export function hasMockRuntimeSession(projectId: string) {
+  return sessions.has(projectId);
+}
+
 export function getMockTagStore(projectId: string, data?: ProjectData) {
   return getMockRuntimeSession(projectId, data).tagStore;
 }

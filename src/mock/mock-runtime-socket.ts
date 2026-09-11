@@ -16,8 +16,10 @@ import {
   type MockRuntimeComponentScope,
 } from "./mock-script-runtime";
 import {
+  configureMockRuntimeProjectData,
   getMockRuntimeSession,
   getMockTagStore,
+  hasMockRuntimeSession,
   replaceMockTagStoreData,
 } from "./mock-tag-runtime";
 import { MockDriverRuntime } from "./mock-driver-runtime";
@@ -27,13 +29,14 @@ import type { TagWriteSource } from "../uiframework/data/tags/TagEvents";
 import { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
 import { persistTagValueToSession } from "./mock-tag-session-state";
 import {
-  ensureMockRuntimeAuthority,
   isMockRuntimeAuthority,
+  subscribeMockRuntimeAuthority,
 } from "./mock-runtime-authority";
 
 type MockWsPayload = Record<string, unknown>;
 
-const CHANNEL_NAME = "scadatomic.mock.runtime.v3";
+const CHANNEL_NAME = "scadatomic.mock.runtime.v4";
+const MAX_SEEN_MESSAGES = 2_048;
 
 /**
  * Browser-side transport for the local mock runtime.
@@ -50,7 +53,12 @@ class MockRuntimeSocket extends EventTarget {
   private readonly publishedDocuments = new Map<string, UiDocument>();
   private readonly driverRuntime = new MockDriverRuntime();
   private readonly tagEventBridges = new Map<string, () => void>();
+  private readonly authoritySubscriptions = new Map<string, () => void>();
   private readonly clientTagRuntimes = new Map<string, TagRuntime>();
+  private readonly seenWriteRequests = new Set<string>();
+  private readonly seenWriteRequestOrder: string[] = [];
+  private readonly seenReadbacks = new Set<string>();
+  private readonly seenReadbackOrder: string[] = [];
 
   constructor() {
     super();
@@ -59,8 +67,9 @@ class MockRuntimeSocket extends EventTarget {
       this.channel.addEventListener("message", (event) => {
         this.capturePublishedDocument(event.data, true);
         this.handleIncomingAuthorityRequest(event.data);
-        this.applyRemoteTagReadback(event.data);
-        this.dispatchPayload(event.data);
+        if (this.applyRemoteTagReadback(event.data)) {
+          this.dispatchPayload(event.data);
+        }
       });
     }
   }
@@ -137,7 +146,9 @@ class MockRuntimeSocket extends EventTarget {
       // Every tab gets a readback cache initialized from the same project
       // snapshot. Only the authority may start/configure source drivers or
       // bridge TagStore events back onto the transport.
-      const tagStore = replaceMockTagStoreData(message.projectId, document.data);
+      const tagStore = hasMockRuntimeSession(message.projectId)
+        ? configureMockRuntimeProjectData(message.projectId, document.data).tagStore
+        : replaceMockTagStoreData(message.projectId, document.data);
       if (isMockRuntimeAuthority(message.projectId)) {
         this.driverRuntime.configureExisting(message.projectId, document.data);
         this.ensureTagEventBridge(message.projectId, tagStore);
@@ -163,7 +174,7 @@ class MockRuntimeSocket extends EventTarget {
   }
 
   private handleOutgoingPayload(payload: MockWsPayload) {
-    if (this.handleDriverControl(payload, true)) return;
+    if (this.handleDriverControl(payload)) return;
     if (payload.type !== "runtime.event") {
       return;
     }
@@ -272,7 +283,7 @@ class MockRuntimeSocket extends EventTarget {
     const message = payload as MockWsPayload;
 
     if (message.type === "tag.write.request") {
-      this.handleTagWriteRequest(message, false);
+      this.handleTagWriteRequest(message);
       return;
     }
 
@@ -281,21 +292,26 @@ class MockRuntimeSocket extends EventTarget {
       return;
     }
 
-    this.handleDriverControl(message, false);
+    this.handleDriverControl(message);
   }
 
   private handleOutgoingTagWriteRequest(payload: MockWsPayload) {
-    this.handleTagWriteRequest(payload, true);
+    // Runtime clients never self-promote to I/O authority on a write. The
+    // Designer-owned host behaves like the PLC/edge runtime and remains the
+    // single owner of source drivers.
+    this.handleTagWriteRequest(payload);
   }
 
-  private handleTagWriteRequest(payload: MockWsPayload, allowAuthorityClaim: boolean) {
+  private handleTagWriteRequest(payload: MockWsPayload) {
     const projectId = payload.projectId;
     const path = payload.path;
     if (typeof projectId !== "string" || typeof path !== "string") return;
+    if (!isMockRuntimeAuthority(projectId)) return;
 
-    const ownsRuntime = isMockRuntimeAuthority(projectId) ||
-      (allowAuthorityClaim && ensureMockRuntimeAuthority(projectId));
-    if (!ownsRuntime) return;
+    const requestId = typeof payload.requestId === "string" ? payload.requestId : undefined;
+    if (requestId && !this.rememberMessage(requestId, this.seenWriteRequests, this.seenWriteRequestOrder)) {
+      return;
+    }
 
     const document = this.getProjectDocument(projectId);
     const session = getMockRuntimeSession(projectId, document?.data);
@@ -335,7 +351,7 @@ class MockRuntimeSocket extends EventTarget {
     });
   }
 
-  private handleDriverControl(payload: unknown, allowAuthorityClaim = false) {
+  private handleDriverControl(payload: unknown) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
     const message = payload as MockWsPayload;
     if (
@@ -347,9 +363,7 @@ class MockRuntimeSocket extends EventTarget {
       return true;
     }
 
-    const ownsRuntime = isMockRuntimeAuthority(message.projectId) ||
-      (allowAuthorityClaim && ensureMockRuntimeAuthority(message.projectId));
-    if (!ownsRuntime) return true;
+    if (!isMockRuntimeAuthority(message.projectId)) return true;
 
     if (message.type === "driver.stop") {
       this.driverRuntime.stop(message.projectId, message.driver);
@@ -372,10 +386,14 @@ class MockRuntimeSocket extends EventTarget {
   }
 
   private applyRemoteTagReadback(payload: unknown) {
-    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return true;
     const message = payload as MockWsPayload;
     if (typeof message.projectId !== "string" || isMockRuntimeAuthority(message.projectId)) {
-      return;
+      return true;
+    }
+
+    if (message.type === "tag.changed" && typeof message.eventId === "string") {
+      if (!this.rememberMessage(message.eventId, this.seenReadbacks, this.seenReadbackOrder)) return false;
     }
 
     const data = this.getProjectDocument(message.projectId)?.data;
@@ -393,16 +411,17 @@ class MockRuntimeSocket extends EventTarget {
           console.warn("[mock-ws] Ignoring invalid tag snapshot entry", entry, result.error);
         }
       }
-      return;
+      return true;
     }
 
-    if (message.type !== "tag.changed" || typeof message.path !== "string") return;
+    if (message.type !== "tag.changed" || typeof message.path !== "string") return true;
 
     const source = parseTagWriteSource(message.source);
     const result = tagStore.set(message.path, message.newValue, { source });
     if (!result.ok) {
       console.warn("[mock-ws] Ignoring invalid remote tag readback", message, result.error);
     }
+    return true;
   }
 
   ensureTagEventBridge(
@@ -411,6 +430,7 @@ class MockRuntimeSocket extends EventTarget {
   ) {
     if (!isMockRuntimeAuthority(projectId) || this.tagEventBridges.has(projectId)) return;
 
+    this.ensureAuthorityLifecycle(projectId);
     const unsubscribe = tagStore.subscribe("*", (tagEvent) => {
       // A stale/lost authority must never continue publishing process values.
       if (!isMockRuntimeAuthority(projectId)) return;
@@ -423,11 +443,38 @@ class MockRuntimeSocket extends EventTarget {
 
       this.emitMockResponse({
         ...tagEvent,
+        eventId: createMessageId(),
         projectId,
         timestamp: Date.now(),
       });
     });
     this.tagEventBridges.set(projectId, unsubscribe);
+  }
+
+  private ensureAuthorityLifecycle(projectId: string) {
+    if (this.authoritySubscriptions.has(projectId)) return;
+    const unsubscribe = subscribeMockRuntimeAuthority(projectId, (isAuthority) => {
+      if (isAuthority) return;
+
+      // Losing the lease is a hard runtime boundary. Stale drivers must stop
+      // immediately; otherwise every authority handoff leaves another timer
+      // running in the background and eventually starves the browser thread.
+      this.driverRuntime.disposeProject(projectId);
+      this.tagEventBridges.get(projectId)?.();
+      this.tagEventBridges.delete(projectId);
+    });
+    this.authoritySubscriptions.set(projectId, unsubscribe);
+  }
+
+  private rememberMessage(id: string, set: Set<string>, order: string[]) {
+    if (set.has(id)) return false;
+    set.add(id);
+    order.push(id);
+    while (order.length > MAX_SEEN_MESSAGES) {
+      const oldest = order.shift();
+      if (oldest) set.delete(oldest);
+    }
+    return true;
   }
 
   private emitMockResponse(payload: MockWsPayload) {

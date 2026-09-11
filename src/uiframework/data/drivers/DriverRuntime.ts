@@ -71,7 +71,6 @@ export class DriverRuntime {
   start(kind: string) {
     const driver = this.getOrCreate(kind);
     if (!driver) throw new Error(`Unknown tag driver: ${kind}`);
-    driver.configure?.();
     driver.start();
     return driver;
   }
