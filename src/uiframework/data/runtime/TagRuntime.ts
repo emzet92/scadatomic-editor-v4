@@ -1,4 +1,3 @@
-import type { DriverRuntime } from "../drivers/DriverRuntime";
 import type { TagWriteSource } from "../tags/TagEvents";
 import type { TagStore } from "../tags/TagStore";
 
@@ -7,16 +6,31 @@ export type TagRuntimeWriteResult =
   | { ok: false; error: string };
 
 /**
- * Application-facing tag API. Reads come from the live process image; writes
- * are routed to the source driver that owns the mapped tag field.
+ * Write boundary used by TagRuntime. The production/local host implementation
+ * is DriverRuntime. Browser runtime clients can supply a remote write router
+ * that forwards the request to the authoritative driver host.
+ */
+export interface TagWriteRouter {
+  writePath(
+    path: string,
+    value: unknown,
+    requestedBy: TagWriteSource
+  ): TagRuntimeWriteResult;
+}
+
+/**
+ * Application-facing tag API. Reads always come from a local process-image
+ * cache. Writes never mutate that cache directly: they are routed to the
+ * current source owner (local DriverRuntime or a remote authoritative host),
+ * and only driver readback updates TagStore.
  */
 export class TagRuntime {
   readonly store: TagStore;
-  private readonly drivers: DriverRuntime;
+  private readonly writer: TagWriteRouter;
 
-  constructor(store: TagStore, drivers: DriverRuntime) {
+  constructor(store: TagStore, writer: TagWriteRouter) {
     this.store = store;
-    this.drivers = drivers;
+    this.writer = writer;
   }
 
   get(path: string) {
@@ -28,7 +42,7 @@ export class TagRuntime {
     value: unknown,
     source: TagWriteSource = { kind: "script" }
   ): TagRuntimeWriteResult {
-    return this.drivers.writePath(path, value, source);
+    return this.writer.writePath(path, value, source);
   }
 
   children(path: string) {

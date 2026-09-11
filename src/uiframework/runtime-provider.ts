@@ -170,6 +170,17 @@ export function RuntimeProvider({
           return;
         }
 
+        if (payload.type === "tag.snapshot" && Array.isArray(payload.values)) {
+          for (const item of payload.values) {
+            if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+            const entry = item as Record<string, unknown>;
+            if (typeof entry.path === "string") {
+              runtimeSignals.set(entry.path, entry.value);
+            }
+          }
+          return;
+        }
+
         if (
           payload.type === "tag.changed" &&
           typeof payload.path === "string"

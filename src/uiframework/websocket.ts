@@ -6,10 +6,10 @@ import {
 /**
  * Development runtime transport.
  *
- * This intentionally looks like the old websocket module to its callers, but
- * it never opens a real network connection. Random process values are emitted
- * locally and publish/runtime events are mirrored between browser tabs via
- * BroadcastChannel when available.
+ * The API intentionally matches the old websocket module. Browser tabs mirror
+ * messages through BroadcastChannel, while one project authority owns drivers
+ * and canonical tag readback. Runtime-preview handlers remain local clients and
+ * send PLC-like tag write requests through this transport.
  */
 export function getWs() {
   return getMockRuntimeSocket();
