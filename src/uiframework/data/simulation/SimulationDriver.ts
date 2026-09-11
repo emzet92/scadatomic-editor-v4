@@ -32,6 +32,9 @@ export class SimulationDriver implements TagDriver {
   private lastTickAt = 0;
   private diagnostics: SimulationDriverDiagnostic[] = [];
   private readonly activationStartedAt = new Map<string, number>();
+  private activationDependencyPaths = new Set<string>();
+  private unsubscribeTagChanges: (() => void) | undefined;
+  private reactiveTickQueued = false;
 
   constructor(context: TagDriverContext, options: SimulationDriverOptions = {}) {
     this.context = context;
@@ -45,6 +48,10 @@ export class SimulationDriver implements TagDriver {
     const now = this.clock.now();
     this.startedAt = now;
     this.lastTickAt = now;
+    this.syncActivationDependencies(this.context.getProjectData());
+    this.unsubscribeTagChanges = this.context.tagStore.subscribe("*", (event) => {
+      this.handleTagChanged(event.path);
+    });
     this.tick(now);
     this.timer = setInterval(() => this.tick(), this.tickMs);
   }
@@ -54,6 +61,10 @@ export class SimulationDriver implements TagDriver {
       clearInterval(this.timer);
       this.timer = undefined;
     }
+    this.unsubscribeTagChanges?.();
+    this.unsubscribeTagChanges = undefined;
+    this.reactiveTickQueued = false;
+    this.activationDependencyPaths.clear();
     this.activationStartedAt.clear();
   }
 
@@ -80,6 +91,7 @@ export class SimulationDriver implements TagDriver {
 
     const data = this.context.getProjectData();
     const diagnostics: SimulationDriverDiagnostic[] = [];
+    this.syncActivationDependencies(data);
 
     const bindings = listSimulationBindings(data);
     const knownBindingIds = new Set(bindings.map((binding) => binding.id));
@@ -190,6 +202,33 @@ export class SimulationDriver implements TagDriver {
     }
 
     this.updateDiagnostics(diagnostics);
+  }
+
+
+  private syncActivationDependencies(data: ReturnType<TagDriverContext["getProjectData"]>) {
+    const paths = new Set<string>();
+    for (const binding of listSimulationBindings(data)) {
+      if (!binding.enabled || !binding.activation) continue;
+      if (getTagSourceMapping(data, binding.target).driver !== this.kind) continue;
+      const source = resolveTagFieldRef(data, binding.activation.condition.source);
+      if (source) paths.add(source.path);
+    }
+    this.activationDependencyPaths = paths;
+  }
+
+  private handleTagChanged(path: string) {
+    if (!this.isRunning()) return;
+    this.syncActivationDependencies(this.context.getProjectData());
+    if (!this.activationDependencyPaths.has(path) || this.reactiveTickQueued) return;
+
+    // Tag writes from handlers/UDT methods must wake conditional simulation
+    // immediately. Queueing avoids recursive ticks when a generated tag is
+    // itself used as another simulation condition.
+    this.reactiveTickQueued = true;
+    queueMicrotask(() => {
+      this.reactiveTickQueued = false;
+      if (this.isRunning()) this.tick();
+    });
   }
 
   private updateDiagnostics(next: SimulationDriverDiagnostic[]) {

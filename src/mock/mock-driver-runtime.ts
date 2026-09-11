@@ -49,7 +49,10 @@ export class MockDriverRuntime {
   }
 
   start(projectId: string, driverKind: string, data?: ProjectData) {
-    const entry = this.configure(projectId, driverKind, data, data !== undefined);
+    // The project-scoped TagStore may already contain handler/session writes.
+    // Starting a driver must never replace that live runtime state with the
+    // persisted ProjectData snapshot.
+    const entry = this.configure(projectId, driverKind, data, false);
     entry.driver.start();
     return entry.driver;
   }

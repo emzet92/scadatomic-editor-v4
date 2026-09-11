@@ -1,51 +1,35 @@
+import type { SimulationDriverDiagnostic } from "./SimulationDriver";
 import type { ProjectData } from "../tags/TagDefinition";
-import { designerTagStore } from "../tags/designer-tag-store";
-import {
-  SimulationDriver,
-  type SimulationDriverDiagnostic,
-} from "./SimulationDriver";
 
 export type DesignerSimulationSnapshot = {
   running: boolean;
   diagnostics: SimulationDriverDiagnostic[];
 };
 
+/**
+ * UI-side lifecycle state only. The actual SimulationDriver runs in the same
+ * project-scoped mock runtime as script handlers, so there is a single
+ * canonical TagStore for script writes and generated values.
+ */
 class DesignerSimulationSession {
-  private data: ProjectData = { udts: {}, tags: {} };
   private readonly listeners = new Set<() => void>();
   private snapshot: DesignerSimulationSnapshot = { running: false, diagnostics: [] };
-  private readonly driver = new SimulationDriver(
-    {
-      tagStore: designerTagStore,
-      getProjectData: () => this.data,
-    },
-    {
-      onDiagnosticsChanged: (diagnostics) => {
-        this.snapshot = { ...this.snapshot, diagnostics };
-        this.emit();
-      },
-    }
-  );
 
   configure(data: ProjectData) {
-    this.data = data;
+    void data;
   }
 
   start(data: ProjectData) {
-    this.configure(data);
-    this.driver.start();
-    if (!this.snapshot.running) {
-      this.snapshot = { ...this.snapshot, running: true };
-      this.emit();
-    }
+    void data;
+    if (this.snapshot.running) return;
+    this.snapshot = { running: true, diagnostics: [] };
+    this.emit();
   }
 
   stop() {
-    this.driver.stop();
-    if (this.snapshot.running || this.snapshot.diagnostics.length > 0) {
-      this.snapshot = { running: false, diagnostics: [] };
-      this.emit();
-    }
+    if (!this.snapshot.running) return;
+    this.snapshot = { running: false, diagnostics: [] };
+    this.emit();
   }
 
   subscribe(listener: () => void) {
