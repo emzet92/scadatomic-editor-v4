@@ -11,7 +11,7 @@ import { DataValueInput } from "./DataValueInput";
 import type { DataSelection } from "./data-selection";
 import type { PrimitiveDataType } from "../../data/types/DataType";
 import type { TagFieldRef } from "../../data/tags/TagFieldRef";
-import { SimulationEditor } from "./simulation/SimulationEditor";
+import { TagSourceEditor } from "./simulation/TagSourceEditor";
 
 export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void }) {
   const tag = data.tags[tagId];
@@ -47,7 +47,7 @@ function TagFieldValue({ data, target, path, label, type, onChange }: { data: Pr
   const value = useDesignerTagValue(path);
   return <div className="space-y-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3">
     <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>
-    <SimulationEditor data={data} target={target} type={type} />
+    <TagSourceEditor data={data} target={target} type={type} />
   </div>;
 }
 

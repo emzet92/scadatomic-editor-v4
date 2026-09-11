@@ -16,5 +16,7 @@ export interface TagDriver {
 
 export type TagDriverFactory = {
   kind: string;
+  displayName: string;
+  description?: string | undefined;
   create(context: TagDriverContext): TagDriver;
 };

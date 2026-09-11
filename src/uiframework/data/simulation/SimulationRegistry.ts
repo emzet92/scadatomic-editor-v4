@@ -82,6 +82,16 @@ export function removeSimulationBinding(data: ProjectData, bindingId: string): P
   return { ...data, simulation: { ...current, bindings } };
 }
 
+export function removeSimulationBindingForTarget(
+  data: ProjectData,
+  target: TagFieldRef
+): ProjectData {
+  return filterSimulationBindings(
+    data,
+    (binding) => !tagFieldRefsEqual(binding.target, target)
+  );
+}
+
 export function removeSimulationBindingsForTag(data: ProjectData, tagId: string): ProjectData {
   return filterSimulationBindings(data, (binding) => binding.target.tagId !== tagId);
 }

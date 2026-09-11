@@ -19,6 +19,7 @@ import { NavigationRuntimeProvider } from "../navigation/NavigationRuntimeProvid
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
 import { getComponentVariantProps } from "../component-variants";
+import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
 
 export function RenderPage() {
   const { projectId, "*": routePath = "" } = useParams();
@@ -51,6 +52,7 @@ export function RenderPage() {
 
         const project = await getProjectById(projectId);
         if (!cancelled) {
+          hydrateRuntimeTagState(projectId, project.tree.data);
           setDocument(project.tree);
         }
       } catch (error) {

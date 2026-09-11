@@ -3,15 +3,16 @@ import type { ProjectData } from "../../../data/tags/TagDefinition";
 import type { TagFieldRef } from "../../../data/tags/TagFieldRef";
 import type { PrimitiveDataType } from "../../../data/types/DataType";
 import {
-  createSimulationBinding,
   findSimulationBinding,
   replaceSimulationGenerator,
   updateSimulationBinding,
   updateSimulationGenerator,
-  upsertSimulationBinding,
 } from "../../../data/simulation/SimulationRegistry";
 import { simulationGeneratorRegistry } from "../../../data/simulation/SimulationGeneratorRegistry";
-import type { SimulationGeneratorConfig, SimulationGeneratorKind } from "../../../data/simulation/SimulationBinding";
+import type {
+  SimulationGeneratorConfig,
+  SimulationGeneratorKind,
+} from "../../../data/simulation/SimulationBinding";
 import { useEditorStore } from "../../../editor-store";
 import { Checkbox, FormField, Select } from "../../ui";
 import {
@@ -39,65 +40,75 @@ export function SimulationEditor({
     ? simulationGeneratorRegistry.validate(binding.generator)
     : null;
 
+  // The Source editor owns creation/removal of the mapping. If this is missing,
+  // the project changed between renders; render nothing rather than creating
+  // configuration as a render side effect.
+  if (!binding) return null;
+  const stableBinding = binding;
+
   function setEnabled(enabled: boolean) {
-    updateProjectData((current) => {
-      const existing = findSimulationBinding(current, target);
-      if (existing) {
-        return updateSimulationBinding(current, existing.id, (candidate) => ({
-          ...candidate,
-          enabled,
-        }));
-      }
-      if (!enabled) return current;
-      return upsertSimulationBinding(current, createSimulationBinding(current, target));
-    });
+    updateProjectData((current) =>
+      updateSimulationBinding(current, stableBinding.id, (candidate) => ({
+        ...candidate,
+        enabled,
+      }))
+    );
   }
 
   function setGeneratorKind(kind: SimulationGeneratorKind) {
-    if (!binding) return;
-    updateProjectData((current) => replaceSimulationGenerator(current, binding.id, kind));
+    updateProjectData((current) =>
+      replaceSimulationGenerator(current, stableBinding.id, kind)
+    );
   }
 
   function setGenerator(generator: SimulationGeneratorConfig) {
-    if (!binding) return;
-    updateProjectData((current) => updateSimulationGenerator(current, binding.id, generator));
+    updateProjectData((current) =>
+      updateSimulationGenerator(current, stableBinding.id, generator)
+    );
   }
 
   return (
-    <div className="space-y-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3">
+    <div className="space-y-3 border-t border-[var(--editor-border)] pt-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
-          <Activity size={13} className="text-[var(--editor-accent)]" /> Simulation
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
+          <Activity size={12} className="text-[var(--editor-accent)]" /> Simulation configuration
         </div>
         <label className="flex items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
-          <Checkbox checked={binding?.enabled ?? false} onChange={(event) => setEnabled(event.target.checked)} />
+          <Checkbox
+            checked={stableBinding.enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+          />
           Enabled
         </label>
       </div>
 
-      {binding ? (
-        <>
-          <FormField label="Generator" compact error={validationError}>
-            <Select
-              controlSize="sm"
-              value={binding.generator.kind}
-              onChange={(event) => setGeneratorKind(event.target.value as SimulationGeneratorKind)}
-            >
-              {descriptors.map((descriptor) => (
-                <option key={descriptor.kind} value={descriptor.kind}>{descriptor.displayName}</option>
-              ))}
-            </Select>
-          </FormField>
-          <GeneratorConfigEditor type={type} config={binding.generator} onChange={setGenerator} />
-          {!binding.enabled ? (
-            <div className="text-[10px] text-[var(--editor-text-soft)]">Configuration is saved, but this binding is disabled.</div>
-          ) : null}
-        </>
-      ) : (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
-          Enable simulation to attach a local driver generator to this tag path.
+      <FormField label="Generator" compact error={validationError}>
+        <Select
+          controlSize="sm"
+          value={stableBinding.generator.kind}
+          onChange={(event) =>
+            setGeneratorKind(event.target.value as SimulationGeneratorKind)
+          }
+        >
+          {descriptors.map((descriptor) => (
+            <option key={descriptor.kind} value={descriptor.kind}>
+              {descriptor.displayName}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+
+      <GeneratorConfigEditor
+        type={type}
+        config={stableBinding.generator}
+        onChange={setGenerator}
+      />
+
+      {!stableBinding.enabled ? (
+        <div className="text-[10px] text-[var(--editor-text-soft)]">
+          The Simulation driver is mapped, but this binding is disabled.
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

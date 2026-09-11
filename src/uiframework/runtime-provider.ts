@@ -10,8 +10,7 @@ import {
   setMockRuntimeNodeVariant,
 } from "../mock/mock-runtime-ui-state";
 import { getComponentVariantProps } from "./component-variants";
-import { flattenTagValues } from "./data/runtime/UdtRuntime";
-import { replaceMockTagStoreData } from "../mock/mock-tag-runtime";
+import { hydrateRuntimeTagState } from "./runtime-tag-bridge";
 
 type RuntimeProviderProps = {
   projectId?: string | undefined;
@@ -38,18 +37,12 @@ export function RuntimeProvider({
     onNavigateRef.current = onNavigate;
   }, [onNavigate, onNodeUpdated, onScreenUpdated]);
 
-  // Rehydrate session-scoped runtime UI state only when the runtime/project
-  // boundary changes. Do not couple this to render callbacks: they can change
-  // identity whenever the active document changes.
+  // Rehydrate only session-scoped UI overrides here. Tag signal hydration is
+  // performed at explicit project-load / publish boundaries, outside React
+  // state updaters, because runtimeSignals synchronously notifies subscribers.
   useEffect(() => {
     if (!projectId) return;
-    setDocument((current) => {
-      replaceMockTagStoreData(projectId, current.data);
-      for (const [path, value] of flattenTagValues(current.data ?? { udts: {}, tags: {} })) {
-        runtimeSignals.set(path, value);
-      }
-      return applyMockRuntimeUiState(projectId, current);
-    });
+    setDocument((current) => applyMockRuntimeUiState(projectId, current));
   }, [projectId, setDocument]);
 
   // Keep one websocket subscription per project. The latest callbacks are read
@@ -75,12 +68,7 @@ export function RuntimeProvider({
         if (payload.type === "screen.publish") {
           const publishedDocument = parseUiDocument(payload.document);
           if (projectId) {
-            replaceMockTagStoreData(projectId, publishedDocument.data);
-            for (const [path, value] of flattenTagValues(
-              publishedDocument.data ?? { udts: {}, tags: {} }
-            )) {
-              runtimeSignals.set(path, value);
-            }
+            hydrateRuntimeTagState(projectId, publishedDocument.data);
           }
           setDocument(
             projectId
