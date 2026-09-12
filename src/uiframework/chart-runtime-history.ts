@@ -20,13 +20,14 @@ export function buildRuntimeChartPoints({
   });
 
   return samples
-    .map((sample) => {
+    .map((sample): ChartPoint | null => {
       const value = toNumber(sample.value);
       return value === null
         ? null
         : {
             label: formatTimestamp(sample.timestamp),
             value,
+            timestamp: sample.timestamp,
           };
     })
     .filter((point): point is ChartPoint => point !== null);

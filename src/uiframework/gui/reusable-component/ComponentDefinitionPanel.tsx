@@ -135,11 +135,11 @@ export function ComponentDefinitionPanel({
                   values={internalValues}
                   controls={internalControls}
                   updateNode={updateInternalNode}
+                  componentInputs={definition.inputs}
                   {...(primitiveDefinition?.bindings
                     ? {
                         bindingDefinitions: primitiveDefinition.bindings,
                         setBinding: setInternalBinding,
-                        componentInputs: definition.inputs,
                       }
                     : {})}
                   {...(primitiveDefinition?.events

@@ -2,6 +2,7 @@ import {
   DEFAULT_CHART_TIME_RANGE,
   type RelativeChartTimeRange,
 } from "./chart-time-range";
+import type { ChartSeriesDefinition } from "./chart-series";
 
 export type CssSize = number | string;
 
@@ -153,6 +154,8 @@ export type ChartKind = "line" | "bar";
 export type ChartPoint = {
   label: string;
   value: number;
+  /** Runtime points carry their original timestamp so multiple series can share one X axis. */
+  timestamp?: number;
 };
 
 export type ChartNodeProps = {
@@ -162,6 +165,8 @@ export type ChartNodeProps = {
   height?: CssSize;
   minHeight?: CssSize;
   points?: ChartPoint[];
+  /** Multi-series chart definition. Series bindings live in UiNode.bindings under series:<id>. */
+  series?: ChartSeriesDefinition[];
   color?: string;
   showLegend?: boolean;
   showGrid?: boolean;

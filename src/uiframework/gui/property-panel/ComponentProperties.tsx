@@ -62,6 +62,8 @@ export function ComponentProperties({
         <PropsEditor
           nodeId={node.id}
           values={values}
+          bindings={node.bindings}
+          componentInputs={componentInputs}
           controls={controls}
           updateNode={updateNode}
         />

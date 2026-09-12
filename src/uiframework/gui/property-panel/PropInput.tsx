@@ -1,3 +1,4 @@
+import type { Binding, ComponentInputDefinition } from "../../core/document";
 import type { InspectorControl } from "../../registry/component-definitions";
 import { useEditorStore } from "../../editor-store";
 import { createTagRef, isTagRef } from "../../data/collections/TagRef";
@@ -8,10 +9,12 @@ import {
   getChartTimeRangeDurationMs,
 } from "../../chart-time-range";
 import type { UpdateNode } from "./property-panel-types";
+import { ChartSeriesInput } from "./ChartSeriesInput";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
   FormField,
+  SectionHeader,
   SegmentedControl,
   SegmentedControlItem,
   Select,
@@ -34,6 +37,8 @@ export function PropInput({
   propName,
   value,
   values,
+  bindings,
+  componentInputs,
   control,
   updateNode,
 }: {
@@ -41,6 +46,8 @@ export function PropInput({
   propName: string;
   value: unknown;
   values: Record<string, unknown>;
+  bindings?: Record<string, Binding> | undefined;
+  componentInputs?: Record<string, ComponentInputDefinition> | undefined;
   control: InspectorControl;
   updateNode: UpdateNode;
 }) {
@@ -61,6 +68,25 @@ export function PropInput({
         value={value}
         onChange={updateProp}
       />
+    );
+  }
+
+  if (control.kind === "chart-series") {
+    return (
+      <div className="space-y-2">
+        <SectionHeader
+          title="Data points"
+          description="Add multiple live tag series to the same chart."
+        />
+        <ChartSeriesInput
+          nodeId={nodeId}
+          value={value}
+          values={values}
+          bindings={bindings}
+          componentInputs={componentInputs}
+          updateNode={updateNode}
+        />
+      </div>
     );
   }
 

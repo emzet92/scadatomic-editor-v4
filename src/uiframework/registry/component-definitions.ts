@@ -28,6 +28,7 @@ export type InspectorControl =
   | { kind: "image-asset" }
   | { kind: "tag-ref"; udtId: string }
   | { kind: "time-range" }
+  | { kind: "chart-series" }
   | { kind: "text-format" }
   | { kind: "text-align" }
   | { kind: "border-size"; min?: number; max?: number; step?: number }
@@ -186,13 +187,10 @@ export const componentDefinitions = {
       width: { kind: "text" },
       height: { kind: "text" },
       minHeight: { kind: "text" },
-      color: { kind: "color" },
+      series: { kind: "chart-series" },
       showLegend: { kind: "toggle" },
       showGrid: { kind: "toggle" },
       timeRange: { kind: "time-range" },
-    },
-    bindings: {
-      value: { label: "Runtime tag" },
     },
   },
 } satisfies Record<string, ComponentDefinition>;
