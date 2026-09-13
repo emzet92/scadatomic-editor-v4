@@ -15,7 +15,11 @@ import {
   NodeBoundsOverlay,
 } from "../editor/overlay/DropOverlay";
 import { SelectionOverlay } from "../editor/overlay/SelectionOverlay";
-import { getComponentDefinition } from "../registry/component-definitions";
+import { ContainerGridOverlay } from "../editor/overlay/ContainerGridOverlay";
+import {
+  getComponentDefinition,
+  getDefaultPropsForType,
+} from "../registry/component-definitions";
 import type { ComponentRegistry } from "../registry/editor-registry";
 import type { DesignerAdapter } from "./designer-adapter";
 
@@ -281,6 +285,39 @@ export function DesignerSurface({
     ? snapshot.document.nodes[snapshot.selectedNodeId]
     : undefined;
 
+  const selectedContainerChildRects = useMemo(() => {
+    if (!selectedNode || selectedNode.type !== "Container") return [];
+    const childIds = new Set(selectedNode.children ?? []);
+    return rects
+      .filter((rect) => childIds.has(rect.id))
+      .sort((left, right) => (left.childIndex ?? 0) - (right.childIndex ?? 0));
+  }, [rects, selectedNode]);
+
+  const renderedGridColumns = useMemo(() => {
+    if (!selectedNode || selectedNode.type !== "Container" || !selectedRect) {
+      return 1;
+    }
+    const props = selectedNode.props ?? {};
+    const configured =
+      typeof props.columns === "number"
+        ? Math.max(1, Math.floor(props.columns))
+        : 1;
+    if (props.gridMode !== "adaptive") return configured;
+
+    const gap =
+      typeof props.gap === "number" ? Math.max(0, props.gap) : 12;
+    const padding =
+      typeof props.padding === "number" ? Math.max(0, props.padding) : 12;
+    const minColumnWidth =
+      typeof props.minColumnWidth === "number"
+        ? Math.max(96, props.minColumnWidth)
+        : 220;
+    const innerWidth = Math.max(1, selectedRect.width - padding * 2);
+    const possible = Math.max(1, Math.floor((innerWidth + gap) / (minColumnWidth + gap)));
+    const itemCount = Math.max(1, selectedNode.children?.length ?? 0);
+    return Math.min(possible, itemCount);
+  }, [selectedNode, selectedRect]);
+
   return (
     <>
       {dragPreview ? (
@@ -314,6 +351,31 @@ export function DesignerSurface({
           }}
         />
       ))}
+
+      {selectedRect && selectedNode?.type === "Container" && selectedNode.props?.display !== "flex" ? (
+        <ContainerGridOverlay
+          rect={selectedRect}
+          node={selectedNode}
+          childRects={selectedContainerChildRects}
+          renderedColumns={renderedGridColumns}
+          onSetColumns={(columns) => {
+            adapterRef.current.updateNodeProps(selectedNode.id, {
+              display: "grid",
+              gridMode: "fixed",
+              columns,
+            });
+          }}
+          onQuickAdd={(type, insertIndex) => {
+            adapterRef.current.insertNode(selectedNode.id, insertIndex, {
+              type,
+              props: {
+                ...getDefaultPropsForType(type),
+                ...(type === "Image" ? { width: "100%" } : {}),
+              },
+            });
+          }}
+        />
+      ) : null}
 
       <SelectionOverlay
         rect={selectedRect}

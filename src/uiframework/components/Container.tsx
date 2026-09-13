@@ -1,5 +1,9 @@
 import type { CSSProperties, HTMLAttributes } from "react";
-import type { ContainerNodeProps, CssSize } from "../component-props";
+import {
+  defaultContainerProps,
+  type ContainerNodeProps,
+  type CssSize,
+} from "../component-props";
 
 export type ContainerProps =
   Omit<HTMLAttributes<HTMLDivElement>, "color"> &
@@ -9,20 +13,26 @@ export function Container({
   width = "100%",
   height,
   minWidth,
-  minHeight = 80,
+  minHeight = defaultContainerProps.minHeight,
   maxWidth,
   maxHeight,
-  borderSize = 1,
-  padding = 8,
-  gap = 8,
-  columns = 1,
-  display = "grid",
+  borderSize = defaultContainerProps.borderSize,
+  padding = defaultContainerProps.padding,
+  gap = defaultContainerProps.gap,
+  columns = defaultContainerProps.columns,
+  gridMode = defaultContainerProps.gridMode,
+  minColumnWidth = defaultContainerProps.minColumnWidth,
+  minRowHeight = defaultContainerProps.minRowHeight,
+  display = defaultContainerProps.display,
   children,
   style,
   className,
   ...domProps
 }: ContainerProps) {
   const safeColumns = Math.max(1, Math.floor(columns));
+  const safeMinColumnWidth = Math.max(96, Math.floor(minColumnWidth));
+  const safeMinRowHeight = Math.max(24, Math.floor(minRowHeight));
+  const isGrid = display === "grid";
 
   const layoutStyle: CSSProperties = {
     width: toCssSize(width),
@@ -32,24 +42,37 @@ export function Container({
     maxWidth: toCssSize(maxWidth),
     maxHeight: toCssSize(maxHeight),
     border: borderSize > 0 ? `${borderSize}px solid #d4d4d8` : undefined,
-    borderRadius: 5,
+    borderRadius: 8,
     padding,
     display,
     gap,
-    gridTemplateColumns:
-      display === "grid"
-        ? `repeat(${safeColumns}, minmax(0, 1fr))`
-        : undefined,
-    alignItems: display === "flex" ? "center" : undefined,
+    gridTemplateColumns: isGrid
+      ? gridMode === "adaptive"
+        ? `repeat(auto-fit, minmax(min(100%, ${safeMinColumnWidth}px), 1fr))`
+        : `repeat(${safeColumns}, minmax(0, 1fr))`
+      : undefined,
+    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, auto)` : undefined,
+    gridAutoFlow: isGrid ? "row" : undefined,
+    alignContent: isGrid ? "start" : undefined,
+    alignItems: display === "flex" ? "center" : isGrid ? "stretch" : undefined,
     flexWrap: display === "flex" ? "wrap" : undefined,
     boxSizing: "border-box",
     ...style,
   };
 
+  const layoutClassName = [
+    className,
+    isGrid ? "scadatomic-grid-layout" : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div
       {...domProps}
-      className={className}
+      data-layout-kind={isGrid ? "grid" : "flex"}
+      data-grid-mode={isGrid ? gridMode : undefined}
+      className={layoutClassName || undefined}
       style={layoutStyle}
     >
       {children}

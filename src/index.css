@@ -26,3 +26,16 @@
   --editor-canvas-bg: #f3f4f8;
   --editor-grid-dot: #d8dbea;
 }
+/* Stable grid sizing for the visual designer and runtime. A child may keep its
+   preferred width, but it is never allowed to widen the CSS grid track. */
+.scadatomic-grid-layout > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.scadatomic-grid-layout > img,
+.scadatomic-grid-layout > svg,
+.scadatomic-grid-layout > canvas {
+  max-width: 100%;
+}

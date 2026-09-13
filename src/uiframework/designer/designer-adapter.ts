@@ -42,6 +42,7 @@ export type DesignerAdapter = {
   ) => void;
   deleteNode: (nodeId: NodeId) => void;
   duplicateNode: (nodeId: NodeId) => NodeId | null;
+  updateNodeProps: (nodeId: NodeId, patch: Record<string, unknown>) => void;
   canMoveNode: (nodeId: NodeId) => boolean;
   canDeleteNode: (nodeId: NodeId) => boolean;
   canDuplicateNode: (nodeId: NodeId) => boolean;

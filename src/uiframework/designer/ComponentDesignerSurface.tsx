@@ -105,6 +105,16 @@ export function ComponentDesignerSurface({
         if (duplicatedNodeId) onSelectNode(duplicatedNodeId);
         return duplicatedNodeId;
       },
+      updateNodeProps: (nodeId, patch) => {
+        useEditorStore.getState().updateComponentDefinitionNode(
+          componentId,
+          nodeId,
+          (current) => ({
+            ...current,
+            props: { ...(current.props ?? {}), ...patch },
+          })
+        );
+      },
       canMoveNode: (nodeId) => nodeId !== rootId,
       canDeleteNode: (nodeId) => nodeId !== rootId,
       canDuplicateNode: (nodeId) => nodeId !== rootId,

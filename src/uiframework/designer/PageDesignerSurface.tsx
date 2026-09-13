@@ -73,6 +73,13 @@ export function PageDesignerSurface({
         if (!ownedNodeIds.has(nodeId) || nodeId === activePage.rootId) return null;
         return useEditorStore.getState().duplicateNode(nodeId);
       },
+      updateNodeProps: (nodeId, patch) => {
+        if (!ownedNodeIds.has(nodeId)) return;
+        useEditorStore.getState().updateNode(nodeId, (current) => ({
+          ...current,
+          props: { ...(current.props ?? {}), ...patch },
+        }));
+      },
       canMoveNode: (nodeId) =>
         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
       canDeleteNode: (nodeId) =>
