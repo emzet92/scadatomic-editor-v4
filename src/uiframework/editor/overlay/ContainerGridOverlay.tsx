@@ -51,6 +51,7 @@ export function ContainerGridOverlay({
     24,
     480
   );
+  const rowMode = rawProps.gridRowMode === "minimum" ? "minimum" : "content";
   const isAdaptive = rawProps.gridMode === "adaptive";
   const columns = Math.max(1, Math.min(12, Math.floor(renderedColumns || configuredColumns)));
   const children = node.children ?? [];
@@ -67,8 +68,9 @@ export function ContainerGridOverlay({
         padding,
         gap,
         minRowHeight,
+        rowMode,
       }),
-    [rect, childRects, children.length, columns, padding, gap, minRowHeight]
+    [rect, childRects, children.length, columns, padding, gap, minRowHeight, rowMode]
   );
 
   return (
@@ -410,6 +412,7 @@ function calculateGridGeometry({
   padding,
   gap,
   minRowHeight,
+  rowMode,
 }: {
   rect: RectInfo;
   childRects: readonly RectInfo[];
@@ -418,21 +421,28 @@ function calculateGridGeometry({
   padding: number;
   gap: number;
   minRowHeight: number;
+  rowMode: "content" | "minimum";
 }) {
   const innerWidth = Math.max(24, rect.width - padding * 2);
-  const innerHeight = Math.max(24, rect.height - padding * 2);
   const cellWidth = Math.max(
     24,
     (innerWidth - gap * Math.max(0, columns - 1)) / columns
   );
   const rows = Math.max(1, Math.ceil((childCount + 1) / columns));
-  const naturalRowHeight = Math.max(
-    28,
-    (innerHeight - gap * Math.max(0, rows - 1)) / rows
-  );
-  const rowHeight = Math.max(
-    28,
-    Math.min(minRowHeight, Math.max(naturalRowHeight, 40))
+  const rowHeights = Array.from({ length: rows }, (_, row) => {
+    const rowRects = childRects.filter((child) => {
+      const childIndex = child.childIndex ?? -1;
+      return Math.floor(childIndex / columns) === row;
+    });
+    const contentHeight = rowRects.length
+      ? Math.max(...rowRects.map((child) => child.height))
+      : 40;
+    return rowMode === "minimum"
+      ? Math.max(minRowHeight, contentHeight)
+      : Math.max(32, contentHeight);
+  });
+  const rowTops = rowHeights.map((_, row) =>
+    rowHeights.slice(0, row).reduce((sum, height) => sum + height, 0) + row * gap
   );
 
   const cells = Array.from({ length: rows * columns }).map((_, index) => {
@@ -442,9 +452,9 @@ function calculateGridGeometry({
       row,
       column,
       left: column * (cellWidth + gap),
-      top: row * (rowHeight + gap),
+      top: rowTops[row] ?? 0,
       width: cellWidth,
-      height: rowHeight,
+      height: rowHeights[row] ?? 40,
     };
   });
 
@@ -452,7 +462,7 @@ function calculateGridGeometry({
     (_, index) => (index + 1) * cellWidth + index * gap + gap / 2
   );
   const horizontalGuides = Array.from({ length: Math.max(0, rows - 1) }).map(
-    (_, index) => (index + 1) * rowHeight + index * gap + gap / 2
+    (_, index) => (rowTops[index + 1] ?? 0) - gap / 2
   );
 
   const nextIndex = childCount;
@@ -471,11 +481,11 @@ function calculateGridGeometry({
     ? Math.min(...nextRowRects.map((child) => child.top))
     : previousRowRects.length
       ? Math.max(...previousRowRects.map((child) => child.bottom)) + gap
-      : rect.top + padding + nextRow * (rowHeight + gap);
+      : rect.top + padding + (rowTops[nextRow] ?? 0);
 
   const unclampedLeft =
     rect.left + padding + nextColumn * (cellWidth + gap) + cellWidth / 2;
-  const unclampedTop = computedRowTop + rowHeight / 2;
+  const unclampedTop = computedRowTop + (rowHeights[nextRow] ?? 40) / 2;
 
   return {
     cells,

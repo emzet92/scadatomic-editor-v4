@@ -36,7 +36,7 @@ export function TextInput({
       data-editor-ignore
       aria-invalid={invalid || undefined}
       className={cx(
-        "w-full rounded-md border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition placeholder:text-[var(--editor-text-soft)] focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
+        "w-full rounded-[12px] border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition placeholder:text-[var(--editor-text-soft)] focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
         invalid
           ? "border-red-400 focus:border-red-500"
           : "border-[var(--editor-border)] focus:border-[var(--editor-accent)]",
@@ -64,7 +64,7 @@ export function Select({
       data-editor-ignore
       aria-invalid={invalid || undefined}
       className={cx(
-        "w-full rounded-md border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
+        "w-full rounded-[12px] border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
         invalid
           ? "border-red-400 focus:border-red-500"
           : "border-[var(--editor-border)] focus:border-[var(--editor-accent)]",

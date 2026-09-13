@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { RenameNodeResult } from "../../editor-store";
 import type { UiNode } from "./property-panel-types";
+import { TextInput } from "../ui";
 
 export function PropertyPanelHeader({
   node,
@@ -59,10 +60,11 @@ export function PropertyPanelHeader({
 
       <label className="mt-2 block">
         <span className="sr-only">Component name</span>
-        <input
+        <TextInput
           value={name}
           spellCheck={false}
           autoComplete="off"
+          invalid={Boolean(error)}
           onChange={(event) => {
             setName(event.target.value);
             setError(null);
@@ -80,26 +82,7 @@ export function PropertyPanelHeader({
               event.currentTarget.blur();
             }
           }}
-          className={`
-            w-full
-            rounded-md
-            border
-            bg-[var(--editor-surface)]
-            px-2
-            py-1.5
-            text-sm
-            font-semibold
-            text-[var(--editor-text)]
-            outline-none
-            transition
-            focus:ring-2
-            focus:ring-blue-500/20
-            ${
-              error
-                ? "border-red-500 focus:border-red-500"
-                : "border-[var(--editor-border)] focus:border-blue-500"
-            }
-          `}
+          className="font-semibold"
         />
       </label>
 

@@ -112,6 +112,8 @@ export const componentDefinitions = {
       gridMode: { kind: "select", options: ["fixed", "adaptive"] },
       minColumnWidth: { kind: "number", min: 96, max: 640 },
       minRowHeight: { kind: "number", min: 24, max: 480 },
+      gridRowMode: { kind: "select", options: ["content", "minimum"] },
+      gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
       borderSize: { kind: "border-size", min: 0 },
       display: { kind: "select", options: ["grid", "flex"] },
     },

@@ -1,0 +1,479 @@
+diff --git a/src/uiframework/component-props.ts b/src/uiframework/component-props.ts
+index 16188a6..4605111 100644
+--- a/src/uiframework/component-props.ts
++++ b/src/uiframework/component-props.ts
+@@ -33,6 +33,8 @@ export const defaultPageProps = {
+ } satisfies PageNodeProps;
+ 
+ export type ContainerGridMode = "fixed" | "adaptive";
++export type ContainerGridRowMode = "content" | "minimum";
++export type ContainerGridItemAlignment = "start" | "center" | "end" | "stretch";
+ 
+ export type ContainerNodeProps = {
+   width?: CssSize;
+@@ -47,6 +49,8 @@ export type ContainerNodeProps = {
+   gridMode?: ContainerGridMode;
+   minColumnWidth?: number;
+   minRowHeight?: number;
++  gridRowMode?: ContainerGridRowMode;
++  gridItemAlignment?: ContainerGridItemAlignment;
+   borderSize?: number;
+   display?: "grid" | "flex";
+ };
+@@ -60,6 +64,8 @@ export const defaultContainerProps = {
+   gridMode: "fixed",
+   minColumnWidth: 220,
+   minRowHeight: 64,
++  gridRowMode: "content",
++  gridItemAlignment: "start",
+   borderSize: 1,
+   display: "grid",
+ } satisfies ContainerNodeProps;
+diff --git a/src/uiframework/components/Container.tsx b/src/uiframework/components/Container.tsx
+index 296c57a..0428340 100644
+--- a/src/uiframework/components/Container.tsx
++++ b/src/uiframework/components/Container.tsx
+@@ -23,6 +23,8 @@ export function Container({
+   gridMode = defaultContainerProps.gridMode,
+   minColumnWidth = defaultContainerProps.minColumnWidth,
+   minRowHeight = defaultContainerProps.minRowHeight,
++  gridRowMode = defaultContainerProps.gridRowMode,
++  gridItemAlignment = defaultContainerProps.gridItemAlignment,
+   display = defaultContainerProps.display,
+   children,
+   style,
+@@ -51,10 +53,14 @@ export function Container({
+         ? `repeat(auto-fit, minmax(min(100%, ${safeMinColumnWidth}px), 1fr))`
+         : `repeat(${safeColumns}, minmax(0, 1fr))`
+       : undefined,
+-    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, max-content)` : undefined,
++    gridAutoRows: isGrid
++      ? gridRowMode === "minimum"
++        ? `minmax(${safeMinRowHeight}px, max-content)`
++        : "max-content"
++      : undefined,
+     gridAutoFlow: isGrid ? "row" : undefined,
+     alignContent: isGrid ? "start" : undefined,
+-    alignItems: display === "flex" ? "center" : isGrid ? "stretch" : undefined,
++    alignItems: display === "flex" ? "center" : isGrid ? gridItemAlignment : undefined,
+     justifyItems: isGrid ? "stretch" : undefined,
+     flexWrap: display === "flex" ? "wrap" : undefined,
+     boxSizing: "border-box",
+diff --git a/src/uiframework/editor/overlay/ContainerGridOverlay.tsx b/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
+index a58f06e..a60f59e 100644
+--- a/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
++++ b/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
+@@ -51,6 +51,7 @@ export function ContainerGridOverlay({
+     24,
+     480
+   );
++  const rowMode = rawProps.gridRowMode === "minimum" ? "minimum" : "content";
+   const isAdaptive = rawProps.gridMode === "adaptive";
+   const columns = Math.max(1, Math.min(12, Math.floor(renderedColumns || configuredColumns)));
+   const children = node.children ?? [];
+@@ -67,8 +68,9 @@ export function ContainerGridOverlay({
+         padding,
+         gap,
+         minRowHeight,
++        rowMode,
+       }),
+-    [rect, childRects, children.length, columns, padding, gap, minRowHeight]
++    [rect, childRects, children.length, columns, padding, gap, minRowHeight, rowMode]
+   );
+ 
+   return (
+@@ -410,6 +412,7 @@ function calculateGridGeometry({
+   padding,
+   gap,
+   minRowHeight,
++  rowMode,
+ }: {
+   rect: RectInfo;
+   childRects: readonly RectInfo[];
+@@ -418,21 +421,28 @@ function calculateGridGeometry({
+   padding: number;
+   gap: number;
+   minRowHeight: number;
++  rowMode: "content" | "minimum";
+ }) {
+   const innerWidth = Math.max(24, rect.width - padding * 2);
+-  const innerHeight = Math.max(24, rect.height - padding * 2);
+   const cellWidth = Math.max(
+     24,
+     (innerWidth - gap * Math.max(0, columns - 1)) / columns
+   );
+   const rows = Math.max(1, Math.ceil((childCount + 1) / columns));
+-  const naturalRowHeight = Math.max(
+-    28,
+-    (innerHeight - gap * Math.max(0, rows - 1)) / rows
+-  );
+-  const rowHeight = Math.max(
+-    28,
+-    Math.min(minRowHeight, Math.max(naturalRowHeight, 40))
++  const rowHeights = Array.from({ length: rows }, (_, row) => {
++    const rowRects = childRects.filter((child) => {
++      const childIndex = child.childIndex ?? -1;
++      return Math.floor(childIndex / columns) === row;
++    });
++    const contentHeight = rowRects.length
++      ? Math.max(...rowRects.map((child) => child.height))
++      : 40;
++    return rowMode === "minimum"
++      ? Math.max(minRowHeight, contentHeight)
++      : Math.max(32, contentHeight);
++  });
++  const rowTops = rowHeights.map((_, row) =>
++    rowHeights.slice(0, row).reduce((sum, height) => sum + height, 0) + row * gap
+   );
+ 
+   const cells = Array.from({ length: rows * columns }).map((_, index) => {
+@@ -442,9 +452,9 @@ function calculateGridGeometry({
+       row,
+       column,
+       left: column * (cellWidth + gap),
+-      top: row * (rowHeight + gap),
++      top: rowTops[row] ?? 0,
+       width: cellWidth,
+-      height: rowHeight,
++      height: rowHeights[row] ?? 40,
+     };
+   });
+ 
+@@ -452,7 +462,7 @@ function calculateGridGeometry({
+     (_, index) => (index + 1) * cellWidth + index * gap + gap / 2
+   );
+   const horizontalGuides = Array.from({ length: Math.max(0, rows - 1) }).map(
+-    (_, index) => (index + 1) * rowHeight + index * gap + gap / 2
++    (_, index) => (rowTops[index + 1] ?? 0) - gap / 2
+   );
+ 
+   const nextIndex = childCount;
+@@ -471,11 +481,11 @@ function calculateGridGeometry({
+     ? Math.min(...nextRowRects.map((child) => child.top))
+     : previousRowRects.length
+       ? Math.max(...previousRowRects.map((child) => child.bottom)) + gap
+-      : rect.top + padding + nextRow * (rowHeight + gap);
++      : rect.top + padding + (rowTops[nextRow] ?? 0);
+ 
+   const unclampedLeft =
+     rect.left + padding + nextColumn * (cellWidth + gap) + cellWidth / 2;
+-  const unclampedTop = computedRowTop + rowHeight / 2;
++  const unclampedTop = computedRowTop + (rowHeights[nextRow] ?? 40) / 2;
+ 
+   return {
+     cells,
+diff --git a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+index 8a90c8f..5282e75 100644
+--- a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
+ import { defaultButtonProps } from "../../component-props";
+ import type { UiNode } from "../../core/document";
+ import type { UpdateNode } from "./property-panel-types";
++import { TextInput } from "../ui";
+ 
+ export function ButtonLayoutEditor({
+   node,
+@@ -120,7 +121,8 @@ function CompactNumber({
+         {label}
+       </span>
+       <div className="mt-1.5 flex items-center gap-1.5">
+-        <input
++        <TextInput
++          controlSize="sm"
+           type="number"
+           min={min}
+           max={max}
+@@ -128,7 +130,7 @@ function CompactNumber({
+           onChange={(event) =>
+             onChange(clamp(Number(event.target.value), min, max))
+           }
+-          className="h-7 min-w-0 flex-1 rounded-[9px] border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2 text-xs text-[var(--editor-text)] outline-none focus:border-[var(--editor-accent-border)]"
++          className="h-7 min-w-0 flex-1 px-2 text-xs"
+         />
+         <span className="text-[9px] text-[var(--editor-text-soft)]">px</span>
+       </div>
+diff --git a/src/uiframework/gui/property-panel/ChartSeriesInput.tsx b/src/uiframework/gui/property-panel/ChartSeriesInput.tsx
+index 40e5a24..66c8210 100644
+--- a/src/uiframework/gui/property-panel/ChartSeriesInput.tsx
++++ b/src/uiframework/gui/property-panel/ChartSeriesInput.tsx
+@@ -149,7 +149,7 @@ export function ChartSeriesInput({
+                   data-editor-ignore
+                   type="color"
+                   aria-label={`${series.label} color`}
+-                  className="h-8 w-full cursor-pointer rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1"
++                  className="h-8 w-full cursor-pointer rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1"
+                   value={normalizeColor(series.color, index)}
+                   onChange={(event) => updateSeries(series.id, { color: event.target.value })}
+                 />
+diff --git a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+index 441f0b1..b6e15ec 100644
+--- a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+@@ -1,10 +1,13 @@
+ import { LayoutGrid, Minus, Plus, Rows3 } from "lucide-react";
+ import {
+   defaultContainerProps,
++  type ContainerGridItemAlignment,
+   type ContainerGridMode,
++  type ContainerGridRowMode,
+ } from "../../component-props";
+ import type { UiNode } from "../../core/document";
+ import type { UpdateNode } from "./property-panel-types";
++import { TextInput } from "../ui";
+ 
+ type GridPreset = {
+   id: string;
+@@ -98,6 +101,14 @@ export function ContainerLayoutEditor({
+     480,
+     defaultContainerProps.minRowHeight
+   );
++  const gridRowMode: ContainerGridRowMode =
++    rawProps.gridRowMode === "minimum" ? "minimum" : "content";
++  const gridItemAlignment: ContainerGridItemAlignment =
++    rawProps.gridItemAlignment === "center" ||
++    rawProps.gridItemAlignment === "end" ||
++    rawProps.gridItemAlignment === "stretch"
++      ? rawProps.gridItemAlignment
++      : "start";
+ 
+   function patch(nextProps: Record<string, unknown>) {
+     updateNode(node.id, (current) => ({
+@@ -230,21 +241,71 @@ export function ContainerLayoutEditor({
+             </ControlRow>
+ 
+             <div className="mt-4">
+-              <ControlRow
+-                label="Minimum row"
+-                description="Keeps empty and short cells easy to target."
+-              >
+-                <NumberPill
+-                  value={minRowHeight}
+-                  suffix="px"
+-                  onDecrease={() =>
+-                    patch({ minRowHeight: Math.max(24, minRowHeight - 8) })
+-                  }
+-                  onIncrease={() =>
+-                    patch({ minRowHeight: Math.min(480, minRowHeight + 8) })
+-                  }
+-                />
+-              </ControlRow>
++              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
++                Vertical sizing
++              </div>
++              <div className="mt-2 grid grid-cols-2 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
++                <SegmentButton
++                  active={gridRowMode === "content"}
++                  onClick={() => patch({ gridRowMode: "content" })}
++                >
++                  Hug content
++                </SegmentButton>
++                <SegmentButton
++                  active={gridRowMode === "minimum"}
++                  onClick={() => patch({ gridRowMode: "minimum" })}
++                >
++                  Minimum row
++                </SegmentButton>
++              </div>
++              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
++                Hug keeps rows as short as their content. Minimum reserves a predictable target height.
++              </div>
++            </div>
++
++            {gridRowMode === "minimum" ? (
++              <div className="mt-4">
++                <ControlRow
++                  label="Minimum row"
++                  description="Only used while Minimum row sizing is enabled."
++                >
++                  <NumberPill
++                    value={minRowHeight}
++                    suffix="px"
++                    onDecrease={() =>
++                      patch({ minRowHeight: Math.max(24, minRowHeight - 8) })
++                    }
++                    onIncrease={() =>
++                      patch({ minRowHeight: Math.min(480, minRowHeight + 8) })
++                    }
++                  />
++                </ControlRow>
++              </div>
++            ) : null}
++
++            <div className="mt-4">
++              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
++                Items in row
++              </div>
++              <div className="mt-2 grid grid-cols-4 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
++                {([
++                  ["start", "Top"],
++                  ["center", "Center"],
++                  ["end", "Bottom"],
++                  ["stretch", "Fill"],
++                ] as const).map(([value, label]) => (
++                  <SegmentButton
++                    key={value}
++                    active={gridItemAlignment === value}
++                    onClick={() => patch({ gridItemAlignment: value })}
++                  >
++                    {label}
++                  </SegmentButton>
++                ))}
++              </div>
++              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
++                Top is the default: components keep their own height instead of filling downward.
++              </div>
+             </div>
+           </div>
+         </>
+@@ -436,7 +497,8 @@ function CompactValue({
+         {label}
+       </span>
+       <div className="mt-1 flex items-center gap-1">
+-        <input
++        <TextInput
++          controlSize="sm"
+           type="number"
+           min={0}
+           max={64}
+@@ -444,7 +506,7 @@ function CompactValue({
+           onChange={(event) =>
+             onChange(Math.max(0, Math.min(64, Number(event.target.value) || 0)))
+           }
+-          className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-[var(--editor-text)] outline-none"
++          className="h-7 min-w-0 flex-1 px-2 text-xs font-semibold"
+         />
+         <span className="text-[10px] text-[var(--editor-text-soft)]">px</span>
+       </div>
+diff --git a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+index f979fa2..03856e9 100644
+--- a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
++++ b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+@@ -29,6 +29,8 @@ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
+   "gridMode",
+   "minColumnWidth",
+   "minRowHeight",
++  "gridRowMode",
++  "gridItemAlignment",
+ ]);
+ 
+ /**
+diff --git a/src/uiframework/gui/property-panel/PropInput.tsx b/src/uiframework/gui/property-panel/PropInput.tsx
+index b3b0368..b6c2386 100644
+--- a/src/uiframework/gui/property-panel/PropInput.tsx
++++ b/src/uiframework/gui/property-panel/PropInput.tsx
+@@ -213,7 +213,7 @@ export function PropInput({
+       <FormField label="border">
+         <div
+           data-editor-ignore
+-          className="flex h-9 w-full items-center overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
++          className="flex h-9 w-full items-center overflow-hidden rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
+         >
+           <span
+             title="Border size · all sides"
+@@ -249,7 +249,7 @@ export function PropInput({
+             type="color"
+             value={normalizeColorForInput(textColorValue)}
+             onChange={(event) => updateProp(event.target.value)}
+-            className="h-9 w-12 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
++            className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
+           />
+           <TextInput
+             value={textColorValue}
+@@ -282,7 +282,7 @@ export function PropInput({
+ 
+     return (
+       <FormField label={propName}>
+-        <label className="flex items-center gap-3 h-9 px-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
++        <label className="flex items-center gap-3 h-9 px-3 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
+           <Checkbox
+             checked={checked}
+             onChange={(event) => updateProp(event.target.checked)}
+diff --git a/src/uiframework/gui/property-panel/PropertyPanelHeader.tsx b/src/uiframework/gui/property-panel/PropertyPanelHeader.tsx
+index 09de7e7..65641c7 100644
+--- a/src/uiframework/gui/property-panel/PropertyPanelHeader.tsx
++++ b/src/uiframework/gui/property-panel/PropertyPanelHeader.tsx
+@@ -1,6 +1,7 @@
+ import { useRef, useState } from "react";
+ import type { RenameNodeResult } from "../../editor-store";
+ import type { UiNode } from "./property-panel-types";
++import { TextInput } from "../ui";
+ 
+ export function PropertyPanelHeader({
+   node,
+@@ -59,10 +60,11 @@ export function PropertyPanelHeader({
+ 
+       <label className="mt-2 block">
+         <span className="sr-only">Component name</span>
+-        <input
++        <TextInput
+           value={name}
+           spellCheck={false}
+           autoComplete="off"
++          invalid={Boolean(error)}
+           onChange={(event) => {
+             setName(event.target.value);
+             setError(null);
+@@ -80,26 +82,7 @@ export function PropertyPanelHeader({
+               event.currentTarget.blur();
+             }
+           }}
+-          className={`
+-            w-full
+-            rounded-md
+-            border
+-            bg-[var(--editor-surface)]
+-            px-2
+-            py-1.5
+-            text-sm
+-            font-semibold
+-            text-[var(--editor-text)]
+-            outline-none
+-            transition
+-            focus:ring-2
+-            focus:ring-blue-500/20
+-            ${
+-              error
+-                ? "border-red-500 focus:border-red-500"
+-                : "border-[var(--editor-border)] focus:border-blue-500"
+-            }
+-          `}
++          className="font-semibold"
+         />
+       </label>
+ 
+diff --git a/src/uiframework/gui/ui/FormControls.tsx b/src/uiframework/gui/ui/FormControls.tsx
+index e32b1e7..d900ab3 100644
+--- a/src/uiframework/gui/ui/FormControls.tsx
++++ b/src/uiframework/gui/ui/FormControls.tsx
+@@ -36,7 +36,7 @@ export function TextInput({
+       data-editor-ignore
+       aria-invalid={invalid || undefined}
+       className={cx(
+-        "w-full rounded-md border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition placeholder:text-[var(--editor-text-soft)] focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
++        "w-full rounded-[12px] border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition placeholder:text-[var(--editor-text-soft)] focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
+         invalid
+           ? "border-red-400 focus:border-red-500"
+           : "border-[var(--editor-border)] focus:border-[var(--editor-accent)]",
+@@ -64,7 +64,7 @@ export function Select({
+       data-editor-ignore
+       aria-invalid={invalid || undefined}
+       className={cx(
+-        "w-full rounded-md border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
++        "w-full rounded-[12px] border bg-[var(--editor-surface)] text-[var(--editor-text)] outline-none transition focus:ring-2 focus:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-50",
+         invalid
+           ? "border-red-400 focus:border-red-500"
+           : "border-[var(--editor-border)] focus:border-[var(--editor-accent)]",
+diff --git a/src/uiframework/registry/component-definitions.ts b/src/uiframework/registry/component-definitions.ts
+index a372f67..423bf91 100644
+--- a/src/uiframework/registry/component-definitions.ts
++++ b/src/uiframework/registry/component-definitions.ts
+@@ -112,6 +112,8 @@ export const componentDefinitions = {
+       gridMode: { kind: "select", options: ["fixed", "adaptive"] },
+       minColumnWidth: { kind: "number", min: 96, max: 640 },
+       minRowHeight: { kind: "number", min: 24, max: 480 },
++      gridRowMode: { kind: "select", options: ["content", "minimum"] },
++      gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
+       borderSize: { kind: "border-size", min: 0 },
+       display: { kind: "select", options: ["grid", "flex"] },
+     },

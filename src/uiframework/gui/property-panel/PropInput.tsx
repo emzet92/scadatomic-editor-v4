@@ -213,7 +213,7 @@ export function PropInput({
       <FormField label="border">
         <div
           data-editor-ignore
-          className="flex h-9 w-full items-center overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
+          className="flex h-9 w-full items-center overflow-hidden rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
         >
           <span
             title="Border size · all sides"
@@ -249,7 +249,7 @@ export function PropInput({
             type="color"
             value={normalizeColorForInput(textColorValue)}
             onChange={(event) => updateProp(event.target.value)}
-            className="h-9 w-12 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
+            className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
           />
           <TextInput
             value={textColorValue}
@@ -282,7 +282,7 @@ export function PropInput({
 
     return (
       <FormField label={propName}>
-        <label className="flex items-center gap-3 h-9 px-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
+        <label className="flex items-center gap-3 h-9 px-3 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
           <Checkbox
             checked={checked}
             onChange={(event) => updateProp(event.target.checked)}

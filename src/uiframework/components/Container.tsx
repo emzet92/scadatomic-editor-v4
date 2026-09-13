@@ -23,6 +23,8 @@ export function Container({
   gridMode = defaultContainerProps.gridMode,
   minColumnWidth = defaultContainerProps.minColumnWidth,
   minRowHeight = defaultContainerProps.minRowHeight,
+  gridRowMode = defaultContainerProps.gridRowMode,
+  gridItemAlignment = defaultContainerProps.gridItemAlignment,
   display = defaultContainerProps.display,
   children,
   style,
@@ -51,10 +53,14 @@ export function Container({
         ? `repeat(auto-fit, minmax(min(100%, ${safeMinColumnWidth}px), 1fr))`
         : `repeat(${safeColumns}, minmax(0, 1fr))`
       : undefined,
-    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, max-content)` : undefined,
+    gridAutoRows: isGrid
+      ? gridRowMode === "minimum"
+        ? `minmax(${safeMinRowHeight}px, max-content)`
+        : "max-content"
+      : undefined,
     gridAutoFlow: isGrid ? "row" : undefined,
     alignContent: isGrid ? "start" : undefined,
-    alignItems: display === "flex" ? "center" : isGrid ? "stretch" : undefined,
+    alignItems: display === "flex" ? "center" : isGrid ? gridItemAlignment : undefined,
     justifyItems: isGrid ? "stretch" : undefined,
     flexWrap: display === "flex" ? "wrap" : undefined,
     boxSizing: "border-box",

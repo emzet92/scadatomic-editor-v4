@@ -33,6 +33,8 @@ export const defaultPageProps = {
 } satisfies PageNodeProps;
 
 export type ContainerGridMode = "fixed" | "adaptive";
+export type ContainerGridRowMode = "content" | "minimum";
+export type ContainerGridItemAlignment = "start" | "center" | "end" | "stretch";
 
 export type ContainerNodeProps = {
   width?: CssSize;
@@ -47,6 +49,8 @@ export type ContainerNodeProps = {
   gridMode?: ContainerGridMode;
   minColumnWidth?: number;
   minRowHeight?: number;
+  gridRowMode?: ContainerGridRowMode;
+  gridItemAlignment?: ContainerGridItemAlignment;
   borderSize?: number;
   display?: "grid" | "flex";
 };
@@ -60,6 +64,8 @@ export const defaultContainerProps = {
   gridMode: "fixed",
   minColumnWidth: 220,
   minRowHeight: 64,
+  gridRowMode: "content",
+  gridItemAlignment: "start",
   borderSize: 1,
   display: "grid",
 } satisfies ContainerNodeProps;

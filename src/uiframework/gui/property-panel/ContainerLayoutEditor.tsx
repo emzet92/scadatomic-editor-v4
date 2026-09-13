@@ -1,10 +1,13 @@
 import { LayoutGrid, Minus, Plus, Rows3 } from "lucide-react";
 import {
   defaultContainerProps,
+  type ContainerGridItemAlignment,
   type ContainerGridMode,
+  type ContainerGridRowMode,
 } from "../../component-props";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
+import { TextInput } from "../ui";
 
 type GridPreset = {
   id: string;
@@ -98,6 +101,14 @@ export function ContainerLayoutEditor({
     480,
     defaultContainerProps.minRowHeight
   );
+  const gridRowMode: ContainerGridRowMode =
+    rawProps.gridRowMode === "minimum" ? "minimum" : "content";
+  const gridItemAlignment: ContainerGridItemAlignment =
+    rawProps.gridItemAlignment === "center" ||
+    rawProps.gridItemAlignment === "end" ||
+    rawProps.gridItemAlignment === "stretch"
+      ? rawProps.gridItemAlignment
+      : "start";
 
   function patch(nextProps: Record<string, unknown>) {
     updateNode(node.id, (current) => ({
@@ -230,21 +241,71 @@ export function ContainerLayoutEditor({
             </ControlRow>
 
             <div className="mt-4">
-              <ControlRow
-                label="Minimum row"
-                description="Keeps empty and short cells easy to target."
-              >
-                <NumberPill
-                  value={minRowHeight}
-                  suffix="px"
-                  onDecrease={() =>
-                    patch({ minRowHeight: Math.max(24, minRowHeight - 8) })
-                  }
-                  onIncrease={() =>
-                    patch({ minRowHeight: Math.min(480, minRowHeight + 8) })
-                  }
-                />
-              </ControlRow>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+                Vertical sizing
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
+                <SegmentButton
+                  active={gridRowMode === "content"}
+                  onClick={() => patch({ gridRowMode: "content" })}
+                >
+                  Hug content
+                </SegmentButton>
+                <SegmentButton
+                  active={gridRowMode === "minimum"}
+                  onClick={() => patch({ gridRowMode: "minimum" })}
+                >
+                  Minimum row
+                </SegmentButton>
+              </div>
+              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+                Hug keeps rows as short as their content. Minimum reserves a predictable target height.
+              </div>
+            </div>
+
+            {gridRowMode === "minimum" ? (
+              <div className="mt-4">
+                <ControlRow
+                  label="Minimum row"
+                  description="Only used while Minimum row sizing is enabled."
+                >
+                  <NumberPill
+                    value={minRowHeight}
+                    suffix="px"
+                    onDecrease={() =>
+                      patch({ minRowHeight: Math.max(24, minRowHeight - 8) })
+                    }
+                    onIncrease={() =>
+                      patch({ minRowHeight: Math.min(480, minRowHeight + 8) })
+                    }
+                  />
+                </ControlRow>
+              </div>
+            ) : null}
+
+            <div className="mt-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+                Items in row
+              </div>
+              <div className="mt-2 grid grid-cols-4 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
+                {([
+                  ["start", "Top"],
+                  ["center", "Center"],
+                  ["end", "Bottom"],
+                  ["stretch", "Fill"],
+                ] as const).map(([value, label]) => (
+                  <SegmentButton
+                    key={value}
+                    active={gridItemAlignment === value}
+                    onClick={() => patch({ gridItemAlignment: value })}
+                  >
+                    {label}
+                  </SegmentButton>
+                ))}
+              </div>
+              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+                Top is the default: components keep their own height instead of filling downward.
+              </div>
             </div>
           </div>
         </>
@@ -436,7 +497,8 @@ function CompactValue({
         {label}
       </span>
       <div className="mt-1 flex items-center gap-1">
-        <input
+        <TextInput
+          controlSize="sm"
           type="number"
           min={0}
           max={64}
@@ -444,7 +506,7 @@ function CompactValue({
           onChange={(event) =>
             onChange(Math.max(0, Math.min(64, Number(event.target.value) || 0)))
           }
-          className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-[var(--editor-text)] outline-none"
+          className="h-7 min-w-0 flex-1 px-2 text-xs font-semibold"
         />
         <span className="text-[10px] text-[var(--editor-text-soft)]">px</span>
       </div>

@@ -149,7 +149,7 @@ export function ChartSeriesInput({
                   data-editor-ignore
                   type="color"
                   aria-label={`${series.label} color`}
-                  className="h-8 w-full cursor-pointer rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1"
+                  className="h-8 w-full cursor-pointer rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1"
                   value={normalizeColor(series.color, index)}
                   onChange={(event) => updateSeries(series.id, { color: event.target.value })}
                 />

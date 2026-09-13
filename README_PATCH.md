@@ -1,15 +1,37 @@
-# SCADAtomic patch — component editor grid + button spacing
+# Grid hug sizing + rounded property inputs
 
-Base: `scadatomic-editor-grid-hardened-source.zip`
+Incremental patch on top of `scadatomic-editor-component-grid-button-spacing-source.zip`.
 
-Changes:
-- shared `NodePropertiesEditor` for Page + reusable component definition inspectors
-- the same `ContainerLayoutEditor` (Grid/Flow, presets, adaptive/fixed) now appears inside reusable component editing
-- one shared `ComponentPreviewFrame` replaces duplicated component canvas wrappers and gives grids a stable responsive width
-- compact Button defaults
-- Button Padding X/Y, Margin X/Y and Corner radius editor in both inspector contexts
-- grid children use `width:auto + stretch` so margins do not create `100% + margin` overflow
+## Grid vertical behavior
 
-Validation:
-- TypeScript `tsc -b`: passed
-- ESLint on all changed TS/TSX files: passed
+Grid containers now default to:
+
+- `gridRowMode: "content"` — rows hug their content instead of reserving/filling vertical space.
+- `gridItemAlignment: "start"` — children keep their natural height at the top of the row instead of stretching downward.
+
+The Layout property editor exposes:
+
+- Row sizing: `Hug content` / `Minimum row`
+- Item alignment: `Top` / `Center` / `Bottom` / `Fill`
+- `Minimum row` height only when that row mode is enabled
+
+The designer grid overlay uses the same row mode and derives row heights from the actual rendered child heights, so the overlay no longer paints fake full-height rows down the container.
+
+## Property panel inputs
+
+The existing generic `TextInput` from `src/uiframework/gui/ui/FormControls.tsx` remains the single text/number input primitive and now uses the same 12px rounding language as the grid settings.
+
+Reused by:
+
+- ordinary string/number props
+- component name
+- button spacing values
+- grid gap/padding compact values
+- chart series text inputs
+
+Selects and compound property controls were visually aligned to the same radius.
+
+## Validation
+
+- TypeScript `tsc -b`: pass
+- ESLint on all touched TS/TSX files: pass

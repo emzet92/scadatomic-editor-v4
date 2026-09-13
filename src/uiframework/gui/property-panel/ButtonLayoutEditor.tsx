@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { defaultButtonProps } from "../../component-props";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
+import { TextInput } from "../ui";
 
 export function ButtonLayoutEditor({
   node,
@@ -120,7 +121,8 @@ function CompactNumber({
         {label}
       </span>
       <div className="mt-1.5 flex items-center gap-1.5">
-        <input
+        <TextInput
+          controlSize="sm"
           type="number"
           min={min}
           max={max}
@@ -128,7 +130,7 @@ function CompactNumber({
           onChange={(event) =>
             onChange(clamp(Number(event.target.value), min, max))
           }
-          className="h-7 min-w-0 flex-1 rounded-[9px] border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2 text-xs text-[var(--editor-text)] outline-none focus:border-[var(--editor-accent-border)]"
+          className="h-7 min-w-0 flex-1 px-2 text-xs"
         />
         <span className="text-[9px] text-[var(--editor-text-soft)]">px</span>
       </div>
