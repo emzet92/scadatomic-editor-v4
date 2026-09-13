@@ -154,6 +154,11 @@ export const componentDefinitions = {
       label: { kind: "text" },
       disabled: { kind: "toggle" },
       backgroundColor: { kind: "color" },
+      paddingX: { kind: "number", min: 0, max: 64 },
+      paddingY: { kind: "number", min: 0, max: 48 },
+      marginX: { kind: "number", min: 0, max: 64 },
+      marginY: { kind: "number", min: 0, max: 64 },
+      borderRadius: { kind: "number", min: 0, max: 64 },
     },
     events: {
       click: { label: "Click", defaultSuffix: "Clicked" },

@@ -31,7 +31,9 @@
    wider than the layout. Height remains component-owned so content can grow the
    row naturally without being cropped. */
 .scadatomic-grid-layout > * {
-  width: 100% !important;
+  /* Let CSS Grid own the available inline size. `auto` + stretch respects
+     component margins without creating width:100% + margin overflow. */
+  width: auto !important;
   min-width: 0 !important;
   max-width: 100% !important;
   justify-self: stretch;
@@ -44,7 +46,7 @@
 }
 
 .scadatomic-grid-layout > [data-scadatomic-type="Button"] {
-  min-height: 40px;
+  min-height: 32px;
 }
 
 .scadatomic-grid-layout > [data-scadatomic-type="Image"],

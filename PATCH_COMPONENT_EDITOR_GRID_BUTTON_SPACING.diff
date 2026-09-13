@@ -1,0 +1,602 @@
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/GRID_COMPONENT_EDITOR_BUTTON_SPACING.md gridfix2_work/scadatomic-editor-grid-hardened-source/GRID_COMPONENT_EDITOR_BUTTON_SPACING.md
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/GRID_COMPONENT_EDITOR_BUTTON_SPACING.md	1970-01-01 00:00:00.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/GRID_COMPONENT_EDITOR_BUTTON_SPACING.md	2026-09-13 17:53:28.776748644 +0000
+@@ -0,0 +1,45 @@
++# Grid template + Button spacing follow-up
++
++## What changed
++
++### One shared property path
++
++`NodePropertiesEditor` is now the shared primitive-node property surface used by both:
++
++- normal Page designer (`PropertyPanel`)
++- reusable component definition designer (`ComponentDefinitionPanel`)
++
++Container-specific layout controls are no longer wired only in `PropertyPanel`. A Container selected inside a reusable component now gets the exact same `ContainerLayoutEditor` with Grid/Flow, presets, fixed/adaptive mode, columns, min column width, min row height, gap and padding.
++
++### Stable component preview frame
++
++Both component preview modes now use one `ComponentPreviewFrame`. The frame owns a stable responsive width (`w-full`, `max-w-[960px]`, `min-w-0`) so percentage-based Container roots and adaptive grid templates have a real inline size to resolve against. The old duplicated wrappers were removed.
++
++### Compact Button spacing
++
++Button defaults are now compact:
++
++- horizontal padding: 10px
++- vertical padding: 5px
++- horizontal margin: 0px
++- vertical margin: 0px
++- radius: 6px
++- minimum visual height: 32px
++
++A shared `ButtonLayoutEditor` exposes Padding X/Y, Margin X/Y and Corner radius in both Page and reusable-component property editors.
++
++### Grid + margin behavior
++
++Grid children now use `width:auto !important` with `justify-self: stretch` instead of `width:100% !important`. This lets CSS Grid subtract margins from the available track size instead of creating `100% + margin` overflow.
++
++## Main files
++
++- `src/uiframework/gui/property-panel/NodePropertiesEditor.tsx`
++- `src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx`
++- `src/uiframework/gui/property-panel/PropertyPanel.tsx`
++- `src/uiframework/gui/reusable-component/ComponentDefinitionPanel.tsx`
++- `src/uiframework/EditorPage.tsx`
++- `src/uiframework/components/Button.tsx`
++- `src/uiframework/component-props.ts`
++- `src/uiframework/registry/component-definitions.ts`
++- `src/index.css`
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/index.css gridfix2_work/scadatomic-editor-grid-hardened-source/src/index.css
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/index.css	2026-09-13 17:28:25.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/index.css	2026-09-13 17:51:17.244270565 +0000
+@@ -31,7 +31,9 @@
+    wider than the layout. Height remains component-owned so content can grow the
+    row naturally without being cropped. */
+ .scadatomic-grid-layout > * {
+-  width: 100% !important;
++  /* Let CSS Grid own the available inline size. `auto` + stretch respects
++     component margins without creating width:100% + margin overflow. */
++  width: auto !important;
+   min-width: 0 !important;
+   max-width: 100% !important;
+   justify-self: stretch;
+@@ -44,7 +46,7 @@
+ }
+ 
+ .scadatomic-grid-layout > [data-scadatomic-type="Button"] {
+-  min-height: 40px;
++  min-height: 32px;
+ }
+ 
+ .scadatomic-grid-layout > [data-scadatomic-type="Image"],
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/EditorPage.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/EditorPage.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/EditorPage.tsx	2026-09-13 17:23:36.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/EditorPage.tsx	2026-09-13 17:52:18.680692157 +0000
+@@ -1,5 +1,5 @@
+ import { Boxes, Database, LayoutTemplate, Palette } from "lucide-react";
+-import { useCallback, useEffect, useRef, useState } from "react";
++import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+ import { useParams } from "react-router-dom";
+ import { getProjectById, updateProject } from "../http/projects-api";
+ import { getPage, type UiDocument } from "./core/document";
+@@ -126,6 +126,25 @@
+   );
+ }
+ 
++function ComponentPreviewFrame({
++  interactive = false,
++  children,
++}: {
++  interactive?: boolean;
++  children: ReactNode;
++}) {
++  return (
++    <div
++      {...(interactive ? { "data-editor-component-canvas": true } : {})}
++      className={`w-full min-w-0 max-w-[960px] rounded-xl border border-dashed border-violet-300 bg-white/90 p-6 shadow-sm ${
++        interactive ? "" : "pointer-events-none"
++      }`}
++    >
++      {children}
++    </div>
++  );
++}
++
+ export function EditorPage() {
+   const { projectId } = useParams();
+   const document = useEditorStore((state) => state.document);
+@@ -602,15 +621,12 @@
+                 >
+                 {componentDefinitionMode && focusedDefinition ? (
+                   <>
+-                    <div
+-                      data-editor-component-canvas
+-                      className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm"
+-                    >
++                    <ComponentPreviewFrame interactive>
+                       <ComponentDefinitionRenderer
+                         document={document}
+                         mode={componentDefinitionMode}
+                       />
+-                    </div>
++                    </ComponentPreviewFrame>
+                     <ComponentDesignerSurface
+                       componentId={focusedDefinition.id}
+                       registry={editorRegistry}
+@@ -624,12 +640,12 @@
+                     />
+                   </>
+                 ) : componentMode ? (
+-                  <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
++                  <ComponentPreviewFrame>
+                     <ComponentModeRenderer
+                       document={document}
+                       mode={componentMode}
+                     />
+-                  </div>
++                  </ComponentPreviewFrame>
+                 ) : (
+                   <>
+                     <PageViewportFrame
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/component-props.ts gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/component-props.ts
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/component-props.ts	2026-09-13 16:59:54.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/component-props.ts	2026-09-13 17:51:16.027063994 +0000
+@@ -128,12 +128,22 @@
+   label?: string;
+   disabled?: boolean;
+   backgroundColor?: string;
++  paddingX?: number;
++  paddingY?: number;
++  marginX?: number;
++  marginY?: number;
++  borderRadius?: number;
+ };
+ 
+ export const defaultButtonProps = {
+   label: "Button",
+   disabled: false,
+   backgroundColor: "#0284c7",
++  paddingX: 10,
++  paddingY: 5,
++  marginX: 0,
++  marginY: 0,
++  borderRadius: 6,
+ } satisfies ButtonNodeProps;
+ 
+ export type ImageFit = "contain" | "cover" | "fill" | "none" | "scale-down";
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/components/Button.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/components/Button.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/components/Button.tsx	2026-09-08 12:48:51.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/components/Button.tsx	2026-09-13 17:51:16.167600616 +0000
+@@ -1,5 +1,8 @@
+ import type { ButtonHTMLAttributes } from "react";
+-import type { ButtonNodeProps } from "../component-props";
++import {
++  defaultButtonProps,
++  type ButtonNodeProps,
++} from "../component-props";
+ 
+ export type ButtonProps =
+   ButtonHTMLAttributes<HTMLButtonElement> &
+@@ -8,30 +11,46 @@
+ export function Button({
+   label,
+   backgroundColor,
++  paddingX = defaultButtonProps.paddingX,
++  paddingY = defaultButtonProps.paddingY,
++  marginX = defaultButtonProps.marginX,
++  marginY = defaultButtonProps.marginY,
++  borderRadius = defaultButtonProps.borderRadius,
+   className,
+   style,
+   ...props
+ }: ButtonProps) {
++  const safePaddingX = clampSpacing(paddingX, 0, 64);
++  const safePaddingY = clampSpacing(paddingY, 0, 48);
++  const safeMarginX = clampSpacing(marginX, 0, 64);
++  const safeMarginY = clampSpacing(marginY, 0, 64);
++  const safeRadius = clampSpacing(borderRadius, 0, 64);
++
+   return (
+     <button
+       {...props}
+       style={{
+         ...style,
+-        backgroundColor: backgroundColor ?? "#0284c7",
++        backgroundColor: backgroundColor ?? defaultButtonProps.backgroundColor,
++        paddingInline: safePaddingX,
++        paddingBlock: safePaddingY,
++        marginInline: safeMarginX,
++        marginBlock: safeMarginY,
++        borderRadius: safeRadius,
++        boxSizing: "border-box",
+       }}
+       className={
+         className ??
+         `
+           inline-flex
++          min-h-8
+           items-center
+           justify-center
+-          gap-2
+-          h-9
+-          px-4
+-          rounded-md
++          gap-1.5
+           text-white
+           text-sm
+           font-medium
++          leading-5
+           transition-colors
+           disabled:opacity-50
+           disabled:pointer-events-none
+@@ -42,3 +61,8 @@
+     </button>
+   );
+ }
++
++function clampSpacing(value: number | undefined, min: number, max: number) {
++  const resolved = typeof value === "number" && Number.isFinite(value) ? value : min;
++  return Math.max(min, Math.min(max, resolved));
++}
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx	1970-01-01 00:00:00.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx	2026-09-13 17:52:25.518810553 +0000
+@@ -0,0 +1,146 @@
++import { Maximize2, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
++import type { ReactNode } from "react";
++import { defaultButtonProps } from "../../component-props";
++import type { UiNode } from "../../core/document";
++import type { UpdateNode } from "./property-panel-types";
++
++export function ButtonLayoutEditor({
++  node,
++  updateNode,
++}: {
++  node: UiNode;
++  updateNode: UpdateNode;
++}) {
++  const props = node.props ?? {};
++  const paddingX = readNumber(props.paddingX, defaultButtonProps.paddingX);
++  const paddingY = readNumber(props.paddingY, defaultButtonProps.paddingY);
++  const marginX = readNumber(props.marginX, defaultButtonProps.marginX);
++  const marginY = readNumber(props.marginY, defaultButtonProps.marginY);
++  const borderRadius = readNumber(
++    props.borderRadius,
++    defaultButtonProps.borderRadius
++  );
++
++  function patch(next: Record<string, unknown>) {
++    updateNode(node.id, (current) => ({
++      ...current,
++      props: {
++        ...(current.props ?? {}),
++        ...next,
++      },
++    }));
++  }
++
++  return (
++    <section className="overflow-hidden rounded-[18px] border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
++      <div className="flex items-start gap-2.5 px-3.5 pb-2.5 pt-3.5">
++        <div className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++          <Maximize2 size={15} />
++        </div>
++        <div className="min-w-0 flex-1">
++          <div className="text-xs font-semibold text-[var(--editor-text)]">
++            Button spacing
++          </div>
++          <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
++            Compact by default. Grid keeps margins inside the assigned cell.
++          </div>
++        </div>
++      </div>
++
++      <div className="border-t border-[var(--editor-border)] p-3">
++        <div className="grid grid-cols-2 gap-2">
++          <CompactNumber
++            icon={<MoveHorizontal size={12} />}
++            label="Padding X"
++            value={paddingX}
++            min={0}
++            max={64}
++            onChange={(value) => patch({ paddingX: value })}
++          />
++          <CompactNumber
++            icon={<MoveVertical size={12} />}
++            label="Padding Y"
++            value={paddingY}
++            min={0}
++            max={48}
++            onChange={(value) => patch({ paddingY: value })}
++          />
++          <CompactNumber
++            icon={<MoveHorizontal size={12} />}
++            label="Margin X"
++            value={marginX}
++            min={0}
++            max={64}
++            onChange={(value) => patch({ marginX: value })}
++          />
++          <CompactNumber
++            icon={<MoveVertical size={12} />}
++            label="Margin Y"
++            value={marginY}
++            min={0}
++            max={64}
++            onChange={(value) => patch({ marginY: value })}
++          />
++        </div>
++
++        <div className="mt-2">
++          <CompactNumber
++            icon={<Radius size={12} />}
++            label="Corner radius"
++            value={borderRadius}
++            min={0}
++            max={64}
++            onChange={(value) => patch({ borderRadius: value })}
++          />
++        </div>
++      </div>
++    </section>
++  );
++}
++
++function CompactNumber({
++  icon,
++  label,
++  value,
++  min,
++  max,
++  onChange,
++}: {
++  icon: ReactNode;
++  label: string;
++  value: number;
++  min: number;
++  max: number;
++  onChange: (value: number) => void;
++}) {
++  return (
++    <label className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
++      <span className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
++        {icon}
++        {label}
++      </span>
++      <div className="mt-1.5 flex items-center gap-1.5">
++        <input
++          type="number"
++          min={min}
++          max={max}
++          value={value}
++          onChange={(event) =>
++            onChange(clamp(Number(event.target.value), min, max))
++          }
++          className="h-7 min-w-0 flex-1 rounded-[9px] border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2 text-xs text-[var(--editor-text)] outline-none focus:border-[var(--editor-accent-border)]"
++        />
++        <span className="text-[9px] text-[var(--editor-text-soft)]">px</span>
++      </div>
++    </label>
++  );
++}
++
++function readNumber(value: unknown, fallback: number) {
++  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
++}
++
++function clamp(value: number, min: number, max: number) {
++  if (!Number.isFinite(value)) return min;
++  return Math.max(min, Math.min(max, value));
++}
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx	1970-01-01 00:00:00.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx	2026-09-13 17:51:49.356300556 +0000
+@@ -0,0 +1,113 @@
++import type {
++  Binding,
++  HandlerRef,
++  UiComponentDefinition,
++  UiNode,
++} from "../../core/document";
++import type {
++  ComponentDefinition,
++  InspectorControl,
++} from "../../registry/component-definitions";
++import { ButtonLayoutEditor } from "./ButtonLayoutEditor";
++import { ComponentProperties } from "./ComponentProperties";
++import { ContainerLayoutEditor } from "./ContainerLayoutEditor";
++import type { UpdateNode } from "./property-panel-types";
++
++const BUTTON_LAYOUT_CONTROL_KEYS = new Set([
++  "paddingX",
++  "paddingY",
++  "marginX",
++  "marginY",
++  "borderRadius",
++]);
++
++const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
++  "padding",
++  "gap",
++  "columns",
++  "display",
++  "gridMode",
++  "minColumnWidth",
++  "minRowHeight",
++]);
++
++/**
++ * One property surface for primitive nodes in both the Page designer and the
++ * reusable-component designer. Container layout is intentionally handled here
++ * so there is no second/raw inspector path that can drift from the main grid UX.
++ */
++export function NodePropertiesEditor({
++  node,
++  values,
++  controls,
++  updateNode,
++  bindingDefinitions,
++  setBinding,
++  eventDefinitions,
++  setEvent,
++  handlerIdPrefix,
++  emptyMessage,
++  componentInputs,
++}: {
++  node: UiNode;
++  values: Record<string, unknown>;
++  controls: Record<string, InspectorControl>;
++  updateNode: UpdateNode;
++  bindingDefinitions?: ComponentDefinition["bindings"];
++  setBinding?: (
++    nodeId: string,
++    property: string,
++    binding: Binding | null
++  ) => void;
++  eventDefinitions?: ComponentDefinition["events"];
++  setEvent?: (
++    nodeId: string,
++    event: string,
++    handler: HandlerRef | null
++  ) => void;
++  handlerIdPrefix?: string;
++  emptyMessage?: string;
++  componentInputs?: UiComponentDefinition["inputs"];
++}) {
++  const resolvedControls =
++    node.type === "Container"
++      ? omitControls(controls, CONTAINER_LAYOUT_CONTROL_KEYS)
++      : node.type === "Button"
++        ? omitControls(controls, BUTTON_LAYOUT_CONTROL_KEYS)
++        : controls;
++
++  return (
++    <div className="space-y-5">
++      {node.type === "Container" ? (
++        <ContainerLayoutEditor node={node} updateNode={updateNode} />
++      ) : null}
++
++      {node.type === "Button" ? (
++        <ButtonLayoutEditor node={node} updateNode={updateNode} />
++      ) : null}
++
++      <ComponentProperties
++        node={node}
++        values={values}
++        controls={resolvedControls}
++        updateNode={updateNode}
++        {...(bindingDefinitions ? { bindingDefinitions } : {})}
++        {...(setBinding ? { setBinding } : {})}
++        {...(eventDefinitions ? { eventDefinitions } : {})}
++        {...(setEvent ? { setEvent } : {})}
++        {...(handlerIdPrefix ? { handlerIdPrefix } : {})}
++        {...(emptyMessage ? { emptyMessage } : {})}
++        {...(componentInputs ? { componentInputs } : {})}
++      />
++    </div>
++  );
++}
++
++function omitControls<T extends Record<string, unknown>>(
++  controls: T,
++  omittedKeys: ReadonlySet<string>
++) {
++  return Object.fromEntries(
++    Object.entries(controls).filter(([key]) => !omittedKeys.has(key))
++  ) as T;
++}
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/PropertyPanel.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/PropertyPanel.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/PropertyPanel.tsx	2026-09-13 17:00:48.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/property-panel/PropertyPanel.tsx	2026-09-13 17:50:59.545056696 +0000
+@@ -20,11 +20,10 @@
+ import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
+ import { MultiSelectionPanel } from "./MultiSelectionPanel";
+ import { PageSettingsEditor } from "./PageSettingsEditor";
+-import { ComponentProperties } from "./ComponentProperties";
++import { NodePropertiesEditor } from "./NodePropertiesEditor";
+ import { VariantsEditor } from "./VariantsEditor";
+ import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
+ import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
+-import { ContainerLayoutEditor } from "./ContainerLayoutEditor";
+ 
+ type Props = {
+   document: UiDocument;
+@@ -214,19 +213,11 @@
+           />
+         ) : null}
+ 
+-        {node.type === "Container" ? (
+-          <ContainerLayoutEditor node={node} updateNode={updateNode} />
+-        ) : null}
+-
+         {definition ? (
+-          <ComponentProperties
++          <NodePropertiesEditor
+             node={node}
+             values={resolvedProps}
+-            controls={
+-              node.type === "Container"
+-                ? omitContainerLayoutControls(definition.inspector)
+-                : definition.inspector
+-            }
++            controls={definition.inspector}
+             updateNode={updateNode}
+             bindingDefinitions={definition.bindings}
+             setBinding={setBinding}
+@@ -280,19 +271,3 @@
+     </div>
+   );
+ }
+-
+-const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
+-  "padding",
+-  "gap",
+-  "columns",
+-  "display",
+-  "gridMode",
+-  "minColumnWidth",
+-  "minRowHeight",
+-]);
+-
+-function omitContainerLayoutControls<T extends Record<string, unknown>>(controls: T) {
+-  return Object.fromEntries(
+-    Object.entries(controls).filter(([key]) => !CONTAINER_LAYOUT_CONTROL_KEYS.has(key))
+-  ) as T;
+-}
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/reusable-component/ComponentDefinitionPanel.tsx gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/reusable-component/ComponentDefinitionPanel.tsx
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/gui/reusable-component/ComponentDefinitionPanel.tsx	2026-09-12 00:19:31.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/gui/reusable-component/ComponentDefinitionPanel.tsx	2026-09-13 17:51:00.119688621 +0000
+@@ -12,7 +12,7 @@
+   getResolvedComponentInstanceProps,
+ } from "../../reusable-components";
+ import { getComponentDefinition } from "../../registry/component-definitions";
+-import { ComponentProperties } from "../property-panel/ComponentProperties";
++import { NodePropertiesEditor } from "../property-panel/NodePropertiesEditor";
+ import type { UpdateNode } from "../property-panel/property-panel-types";
+ import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
+ import { VariantsEditor } from "../property-panel/VariantsEditor";
+@@ -130,7 +130,7 @@
+               />
+             ) : (
+               <>
+-                <ComponentProperties
++                <NodePropertiesEditor
+                   node={internalNode}
+                   values={internalValues}
+                   controls={internalControls}
+diff -ruN '--exclude=*.tsbuildinfo' '--exclude=dist' gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/registry/component-definitions.ts gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/registry/component-definitions.ts
+--- gridfix2_base_clean/scadatomic-editor-grid-hardened-source/src/uiframework/registry/component-definitions.ts	2026-09-13 17:00:02.000000000 +0000
++++ gridfix2_work/scadatomic-editor-grid-hardened-source/src/uiframework/registry/component-definitions.ts	2026-09-13 17:51:16.645977580 +0000
+@@ -154,6 +154,11 @@
+       label: { kind: "text" },
+       disabled: { kind: "toggle" },
+       backgroundColor: { kind: "color" },
++      paddingX: { kind: "number", min: 0, max: 64 },
++      paddingY: { kind: "number", min: 0, max: 48 },
++      marginX: { kind: "number", min: 0, max: 64 },
++      marginY: { kind: "number", min: 0, max: 64 },
++      borderRadius: { kind: "number", min: 0, max: 64 },
+     },
+     events: {
+       click: { label: "Click", defaultSuffix: "Clicked" },

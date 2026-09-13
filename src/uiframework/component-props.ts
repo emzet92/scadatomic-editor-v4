@@ -128,12 +128,22 @@ export type ButtonNodeProps = {
   label?: string;
   disabled?: boolean;
   backgroundColor?: string;
+  paddingX?: number;
+  paddingY?: number;
+  marginX?: number;
+  marginY?: number;
+  borderRadius?: number;
 };
 
 export const defaultButtonProps = {
   label: "Button",
   disabled: false,
   backgroundColor: "#0284c7",
+  paddingX: 10,
+  paddingY: 5,
+  marginX: 0,
+  marginY: 0,
+  borderRadius: 6,
 } satisfies ButtonNodeProps;
 
 export type ImageFit = "contain" | "cover" | "fill" | "none" | "scale-down";

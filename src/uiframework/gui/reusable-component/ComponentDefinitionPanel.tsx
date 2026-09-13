@@ -12,7 +12,7 @@ import {
   getResolvedComponentInstanceProps,
 } from "../../reusable-components";
 import { getComponentDefinition } from "../../registry/component-definitions";
-import { ComponentProperties } from "../property-panel/ComponentProperties";
+import { NodePropertiesEditor } from "../property-panel/NodePropertiesEditor";
 import type { UpdateNode } from "../property-panel/property-panel-types";
 import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
 import { VariantsEditor } from "../property-panel/VariantsEditor";
@@ -130,7 +130,7 @@ export function ComponentDefinitionPanel({
               />
             ) : (
               <>
-                <ComponentProperties
+                <NodePropertiesEditor
                   node={internalNode}
                   values={internalValues}
                   controls={internalControls}

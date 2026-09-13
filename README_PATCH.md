@@ -1,26 +1,15 @@
-# SCADAtomic – grid children / tree delete / repeat guards
+# SCADAtomic patch — component editor grid + button spacing
 
-Incremental patch on top of `scadatomic-editor-grid-layout-ux-source.zip`.
+Base: `scadatomic-editor-grid-hardened-source.zip`
 
-## What changed
+Changes:
+- shared `NodePropertiesEditor` for Page + reusable component definition inspectors
+- the same `ContainerLayoutEditor` (Grid/Flow, presets, adaptive/fixed) now appears inside reusable component editing
+- one shared `ComponentPreviewFrame` replaces duplicated component canvas wrappers and gives grids a stable responsive width
+- compact Button defaults
+- Button Padding X/Y, Margin X/Y and Corner radius editor in both inspector contexts
+- grid children use `width:auto + stretch` so margins do not create `100% + margin` overflow
 
-- Grid children now use the grid cell width consistently across Text, Button, Image, Chart, Container, Navigation, PageSlot and reusable ComponentInstance roots.
-- Grid drag/drop placement is calculated from the real rendered DOM rows/columns, so Adaptive mode and mixed-height items no longer use stale configured-column math.
-- Drop indicators follow actual multi-column geometry.
-- Added Delete action to the left Component tree.
-- Added Delete action to reusable Component structure tree.
-- Selection falls back to the parent after delete.
-- Repeat-managed containers reject manual child insertion and moves at both UI and core command/store levels.
-- Duplicate into a repeat-managed container is blocked because it also creates a new child.
-- Quick-add is disabled for repeat containers and the overlay shows `Loop-managed · add disabled`.
-- Repeat properties explain that manual add/move/duplicate is disabled until switched back to Static.
-
-## Validation
-
-- `tsc -b` passes.
-- ESLint passes for all modified TS/TSX files.
-- `git diff --check` passes.
-
-## Patch
-
-Apply `PATCH_GRID_CHILDREN_TREE_LOOP_GUARDS.diff` against the previous grid-layout source snapshot.
+Validation:
+- TypeScript `tsc -b`: passed
+- ESLint on all changed TS/TSX files: passed

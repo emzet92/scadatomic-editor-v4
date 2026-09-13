@@ -1,5 +1,5 @@
 import { Boxes, Database, LayoutTemplate, Palette } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../http/projects-api";
 import { getPage, type UiDocument } from "./core/document";
@@ -123,6 +123,25 @@ function ComponentDefinitionRenderer({
         "data-scadatomic-type": node.type,
       })}
     />
+  );
+}
+
+function ComponentPreviewFrame({
+  interactive = false,
+  children,
+}: {
+  interactive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      {...(interactive ? { "data-editor-component-canvas": true } : {})}
+      className={`w-full min-w-0 max-w-[960px] rounded-xl border border-dashed border-violet-300 bg-white/90 p-6 shadow-sm ${
+        interactive ? "" : "pointer-events-none"
+      }`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -602,15 +621,12 @@ export function EditorPage() {
                 >
                 {componentDefinitionMode && focusedDefinition ? (
                   <>
-                    <div
-                      data-editor-component-canvas
-                      className="max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm"
-                    >
+                    <ComponentPreviewFrame interactive>
                       <ComponentDefinitionRenderer
                         document={document}
                         mode={componentDefinitionMode}
                       />
-                    </div>
+                    </ComponentPreviewFrame>
                     <ComponentDesignerSurface
                       componentId={focusedDefinition.id}
                       registry={editorRegistry}
@@ -624,12 +640,12 @@ export function EditorPage() {
                     />
                   </>
                 ) : componentMode ? (
-                  <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-10 shadow-sm">
+                  <ComponentPreviewFrame>
                     <ComponentModeRenderer
                       document={document}
                       mode={componentMode}
                     />
-                  </div>
+                  </ComponentPreviewFrame>
                 ) : (
                   <>
                     <PageViewportFrame

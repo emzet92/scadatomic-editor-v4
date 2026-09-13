@@ -20,11 +20,10 @@ import { PropertyPanelHeader } from "./PropertyPanelHeader";
 import { PropertyPanelNodeNotFound } from "./PropertyPanelNodeNotFound";
 import { MultiSelectionPanel } from "./MultiSelectionPanel";
 import { PageSettingsEditor } from "./PageSettingsEditor";
-import { ComponentProperties } from "./ComponentProperties";
+import { NodePropertiesEditor } from "./NodePropertiesEditor";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
 import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
-import { ContainerLayoutEditor } from "./ContainerLayoutEditor";
 
 type Props = {
   document: UiDocument;
@@ -214,19 +213,11 @@ export function PropertyPanel({
           />
         ) : null}
 
-        {node.type === "Container" ? (
-          <ContainerLayoutEditor node={node} updateNode={updateNode} />
-        ) : null}
-
         {definition ? (
-          <ComponentProperties
+          <NodePropertiesEditor
             node={node}
             values={resolvedProps}
-            controls={
-              node.type === "Container"
-                ? omitContainerLayoutControls(definition.inspector)
-                : definition.inspector
-            }
+            controls={definition.inspector}
             updateNode={updateNode}
             bindingDefinitions={definition.bindings}
             setBinding={setBinding}
@@ -279,20 +270,4 @@ export function PropertyPanel({
       </div>
     </div>
   );
-}
-
-const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
-  "padding",
-  "gap",
-  "columns",
-  "display",
-  "gridMode",
-  "minColumnWidth",
-  "minRowHeight",
-]);
-
-function omitContainerLayoutControls<T extends Record<string, unknown>>(controls: T) {
-  return Object.fromEntries(
-    Object.entries(controls).filter(([key]) => !CONTAINER_LAYOUT_CONTROL_KEYS.has(key))
-  ) as T;
 }
