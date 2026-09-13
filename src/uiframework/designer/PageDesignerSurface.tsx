@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { getPage } from "../core/document";
 import { createPageRenderDocument } from "../core/page-layouts";
 import { collectPageNodeIds } from "../core/pages";
+import { buildDocumentIndex } from "../core/document-index";
+import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
 import { useEditorStore } from "../editor-store";
 import type { ComponentRegistry } from "../registry/editor-registry";
 import { DesignerSurface } from "./DesignerSurface";
@@ -25,6 +27,10 @@ export function PageDesignerSurface({
   const ownedNodeIds = useMemo(
     () => new Set(collectPageNodeIds(document, [activePage.id])),
     [document, activePage.id]
+  );
+  const renderIndex = useMemo(
+    () => buildDocumentIndex(renderDocument, renderDocument.rootId),
+    [renderDocument]
   );
 
   const adapter = useMemo<DesignerAdapter>(
@@ -84,8 +90,14 @@ export function PageDesignerSurface({
         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
       canDeleteNode: (nodeId) =>
         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
-      canDuplicateNode: (nodeId) =>
-        ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+      canDuplicateNode: (nodeId) => {
+        if (!ownedNodeIds.has(nodeId) || nodeId === activePage.rootId) {
+          return false;
+        }
+        const parentId = renderIndex.parentById.get(nodeId);
+        const parent = parentId ? renderDocument.nodes[parentId] : undefined;
+        return !!parent && canAcceptManualChildren(parent);
+      },
     }),
     [
       activePage.id,
@@ -93,6 +105,7 @@ export function PageDesignerSurface({
       activePage.rootId,
       ownedNodeIds,
       renderDocument,
+      renderIndex,
       selectedNodeId,
       selectedNodeIds,
     ]

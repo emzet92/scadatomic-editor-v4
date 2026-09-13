@@ -38,3 +38,22 @@ export function isContainerContentBehavior(
     typeof (template as Record<string, unknown>).inputName === "string"
   );
 }
+
+
+export type ContainerChildHost = {
+  type: string;
+  contentBehavior?: ContainerContentBehavior | undefined;
+};
+
+/**
+ * Repeat containers own their rendered children at runtime. Static designer
+ * children would never be rendered, so all manual insert/move/duplicate paths
+ * must treat the container as read-only while repeat mode is active.
+ */
+export function canAcceptManualChildren(node: ContainerChildHost): boolean {
+  return !(node.type === "Container" && node.contentBehavior?.kind === "repeat");
+}
+
+export function isRepeatContainer(node: ContainerChildHost): boolean {
+  return node.type === "Container" && node.contentBehavior?.kind === "repeat";
+}

@@ -190,6 +190,7 @@ export function RenderPage() {
                 : node.id;
               const baseProps = {
                 "data-node-id": runtimeNodeId,
+                "data-scadatomic-type": node.type,
               };
 
               if (node.type === "Text" || node.type === "Chart") {

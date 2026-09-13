@@ -26,11 +26,40 @@
   --editor-canvas-bg: #f3f4f8;
   --editor-grid-dot: #d8dbea;
 }
-/* Stable grid sizing for the visual designer and runtime. A child may keep its
-   preferred width, but it is never allowed to widen the CSS grid track. */
+/* Grid owns the horizontal size of its cells. Component-local width defaults
+   (Image=320px, charts, reusable component roots, etc.) must never push a track
+   wider than the layout. Height remains component-owned so content can grow the
+   row naturally without being cropped. */
 .scadatomic-grid-layout > * {
-  min-width: 0;
-  max-width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  justify-self: stretch;
+  box-sizing: border-box;
+}
+
+.scadatomic-grid-layout > [data-scadatomic-type="Text"] {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.scadatomic-grid-layout > [data-scadatomic-type="Button"] {
+  min-height: 40px;
+}
+
+.scadatomic-grid-layout > [data-scadatomic-type="Image"],
+.scadatomic-grid-layout > [data-scadatomic-type="Chart"],
+.scadatomic-grid-layout > [data-scadatomic-type="Container"],
+.scadatomic-grid-layout > [data-scadatomic-type="ComponentInstance"],
+.scadatomic-grid-layout > [data-scadatomic-type="PageSlot"] {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.scadatomic-grid-layout > [data-scadatomic-type="ComponentInstance"] > * {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   box-sizing: border-box;
 }
 

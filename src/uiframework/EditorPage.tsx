@@ -71,6 +71,7 @@ export function RendererRoot({
             }
           : {}),
         "data-node-id": node.id,
+        "data-scadatomic-type": node.type,
       })}
     />
   );
@@ -92,6 +93,7 @@ function ComponentModeRenderer({
         ...(node.id === mode.nodeId
           ? getComponentVariantProps(node, mode.variantName)
           : getDefaultComponentVariantProps(node)),
+        "data-scadatomic-type": node.type,
       })}
     />
   );
@@ -118,6 +120,7 @@ function ComponentDefinitionRenderer({
           ? getComponentVariantProps(node, mode.variantName)
           : getDefaultComponentVariantProps(node)),
         "data-component-node-id": node.id,
+        "data-scadatomic-type": node.type,
       })}
     />
   );
@@ -469,6 +472,23 @@ export function EditorPage() {
                     selectedInternalNodeId: nodeId,
                   })
                 }
+                onDelete={(nodeId) => {
+                  if (nodeId === focusedDefinition.rootId) return;
+                  const parentId =
+                    Object.values(focusedDefinition.nodes).find((candidate) =>
+                      candidate.children?.includes(nodeId)
+                    )?.id ?? focusedDefinition.rootId;
+                  useEditorStore
+                    .getState()
+                    .deleteComponentDefinitionNode(
+                      componentDefinitionMode.componentId,
+                      nodeId
+                    );
+                  setComponentDefinitionMode({
+                    componentId: componentDefinitionMode.componentId,
+                    selectedInternalNodeId: parentId,
+                  });
+                }}
               />
               <div className="border-t border-zinc-200" />
               <ComponentPalette

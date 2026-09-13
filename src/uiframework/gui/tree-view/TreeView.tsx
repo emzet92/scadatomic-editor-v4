@@ -1,4 +1,6 @@
 import { getPage } from "../../core/document";
+import { buildDocumentIndex } from "../../core/document-index";
+import { canAcceptManualChildren } from "../../repeat/RepeatBehavior";
 import { useEditorStore } from "../../editor-store";
 import { TreeNode } from "./TreeNode";
 
@@ -11,7 +13,9 @@ export function TreeView() {
   const moveNodeUp = useEditorStore((state) => state.moveNodeUp);
   const moveNodeDown = useEditorStore((state) => state.moveNodeDown);
   const duplicateNode = useEditorStore((state) => state.duplicateNode);
+  const deleteNode = useEditorStore((state) => state.deleteNode);
   const page = getPage(document, activePageId);
+  const index = buildDocumentIndex(document, page.rootId);
 
   if (!document.nodes[page.rootId]) return null;
 
@@ -37,7 +41,14 @@ export function TreeView() {
         moveNodeUp={moveNodeUp}
         moveNodeDown={moveNodeDown}
         duplicateNode={duplicateNode}
-        canDuplicateNode={(nodeId) => nodeId !== page.rootId}
+        canDuplicateNode={(nodeId) => {
+          if (nodeId === page.rootId) return false;
+          const parentId = index.parentById.get(nodeId);
+          const parent = parentId ? document.nodes[parentId] : undefined;
+          return !!parent && canAcceptManualChildren(parent);
+        }}
+        deleteNode={deleteNode}
+        canDeleteNode={(nodeId) => nodeId !== page.rootId}
       />
     </div>
   );

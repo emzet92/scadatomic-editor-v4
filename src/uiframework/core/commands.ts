@@ -1,5 +1,6 @@
 import { buildDocumentIndex } from "./document-index";
 import { setOptionalRecordEntry } from "./optional-record";
+import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
 import type {
   Binding,
   HandlerRef,
@@ -115,7 +116,11 @@ function insertNode(
 ): UiDocument {
   const parent = document.nodes[command.parentId];
 
-  if (!parent || document.nodes[command.node.id]) {
+  if (
+    !parent ||
+    document.nodes[command.node.id] ||
+    !canAcceptManualChildren(parent)
+  ) {
     return document;
   }
 
@@ -242,7 +247,7 @@ function moveNode(
   const node = document.nodes[command.nodeId];
   const targetParent = document.nodes[command.targetParentId];
 
-  if (!node || !targetParent) {
+  if (!node || !targetParent || !canAcceptManualChildren(targetParent)) {
     return document;
   }
 

@@ -2,6 +2,7 @@ import {
   ChevronUp,
   ChevronDown,
   Copy,
+  Trash2,
 } from "lucide-react";
 
 export function TreeNodeMoveActions({
@@ -10,12 +11,16 @@ export function TreeNodeMoveActions({
   moveNodeDown,
   duplicateNode,
   canDuplicate,
+  deleteNode,
+  canDelete,
 }: {
   nodeId: string;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => string | null;
   canDuplicate: boolean;
+  deleteNode: (nodeId: string) => void;
+  canDelete: boolean;
 }) {
   if (nodeId === "root" && !canDuplicate) {
     return null;
@@ -53,8 +58,34 @@ export function TreeNodeMoveActions({
         </button>
       ) : null}
 
+      {canDelete ? (
+        <button
+          data-editor-ignore
+          type="button"
+          aria-label="Delete node"
+          title="Delete"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteNode(nodeId);
+          }}
+          className="
+            p-1
+            rounded-md
+            text-[var(--editor-text-soft)]
+            hover:bg-red-50
+            hover:text-[var(--editor-danger)]
+            transition
+          "
+        >
+          <Trash2 size={14} />
+        </button>
+      ) : null}
+
       <button
         data-editor-ignore
+        type="button"
+        aria-label="Move node up"
+        title="Move up"
         onClick={(e) => {
           e.stopPropagation();
           moveNodeUp(nodeId);
@@ -73,6 +104,9 @@ export function TreeNodeMoveActions({
 
       <button
         data-editor-ignore
+        type="button"
+        aria-label="Move node down"
+        title="Move down"
         onClick={(e) => {
           e.stopPropagation();
           moveNodeDown(nodeId);

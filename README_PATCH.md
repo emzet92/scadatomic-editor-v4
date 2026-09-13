@@ -1,56 +1,26 @@
-# Grid Layout UX refactor
+# SCADAtomic – grid children / tree delete / repeat guards
+
+Incremental patch on top of `scadatomic-editor-grid-layout-ux-source.zip`.
 
 ## What changed
 
-The Container layout editor now exposes a dedicated Material-3-inspired layout surface instead of relying only on raw property inputs.
-
-### Designer overlay
-
-When a Grid Container is selected, the designer shows:
-
-- the resolved grid tracks and cell guides,
-- a compact layout badge,
-- `- / +` column controls for fixed grids,
-- a contextual `+` in the next safe slot,
-- a quick-add menu for Text, Button, Container, Chart and Image.
-
-The quick-add action uses the existing DesignerAdapter/insertNode path, so IDs, selection and tree ordering keep using the normal editor store logic.
-
-### Property panel
-
-`ContainerLayoutEditor` adds:
-
-- Grid / Flow segmented mode,
-- Stack, Split, Cards, Dense and Adaptive presets,
-- fixed column count controls,
-- adaptive minimum column width controls,
-- minimum row height,
-- spacing presets plus explicit gap/padding values.
-
-### Layout stability
-
-Container Grid now supports:
-
-- `gridMode: "fixed" | "adaptive"`,
-- `minColumnWidth`,
-- `minRowHeight`,
-- fixed tracks using `minmax(0, 1fr)`,
-- adaptive tracks using `auto-fit`,
-- direct-child `min-width: 0; max-width: 100%` clamping.
-
-This prevents a child with its own preferred width from expanding a grid track and breaking the surrounding layout.
-
-## Main files
-
-- `src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx`
-- `src/uiframework/editor/overlay/ContainerGridOverlay.tsx`
-- `src/uiframework/components/Container.tsx`
-- `src/uiframework/designer/DesignerSurface.tsx`
-- `src/uiframework/designer/designer-adapter.ts`
-- `src/uiframework/component-props.ts`
-- `src/index.css`
+- Grid children now use the grid cell width consistently across Text, Button, Image, Chart, Container, Navigation, PageSlot and reusable ComponentInstance roots.
+- Grid drag/drop placement is calculated from the real rendered DOM rows/columns, so Adaptive mode and mixed-height items no longer use stale configured-column math.
+- Drop indicators follow actual multi-column geometry.
+- Added Delete action to the left Component tree.
+- Added Delete action to reusable Component structure tree.
+- Selection falls back to the parent after delete.
+- Repeat-managed containers reject manual child insertion and moves at both UI and core command/store levels.
+- Duplicate into a repeat-managed container is blocked because it also creates a new child.
+- Quick-add is disabled for repeat containers and the overlay shows `Loop-managed · add disabled`.
+- Repeat properties explain that manual add/move/duplicate is disabled until switched back to Static.
 
 ## Validation
 
-- TypeScript: passed (`tsc -b`)
-- ESLint on all touched TypeScript/TSX files: passed
+- `tsc -b` passes.
+- ESLint passes for all modified TS/TSX files.
+- `git diff --check` passes.
+
+## Patch
+
+Apply `PATCH_GRID_CHILDREN_TREE_LOOP_GUARDS.diff` against the previous grid-layout source snapshot.

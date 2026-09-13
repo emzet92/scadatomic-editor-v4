@@ -23,4 +23,6 @@ export type TreeNodeProps = {
   moveNodeDown: (nodeId: string) => void;
   duplicateNode: (nodeId: string) => string | null;
   canDuplicateNode: (nodeId: string) => boolean;
+  deleteNode: (nodeId: string) => void;
+  canDeleteNode: (nodeId: string) => boolean;
 };

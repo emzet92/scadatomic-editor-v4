@@ -22,6 +22,7 @@ import {
 } from "../registry/component-definitions";
 import type { ComponentRegistry } from "../registry/editor-registry";
 import type { DesignerAdapter } from "./designer-adapter";
+import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
 
 export function DesignerSurface({
   adapter,
@@ -177,7 +178,11 @@ export function DesignerSurface({
         ? getComponentDefinition(hoveredNode.type)
         : undefined;
 
-      if (hoveredNode && hoveredDefinition?.acceptsChildren) {
+      if (
+        hoveredNode &&
+        hoveredDefinition?.acceptsChildren &&
+        canAcceptManualChildren(hoveredNode)
+      ) {
         setHoverDropTarget({
           parentId: hoveredNode.id,
           insertIndex: findContainerInsertIndex(
@@ -191,13 +196,20 @@ export function DesignerSurface({
         return;
       }
 
+      const siblingTarget = findSiblingDropTarget(
+        snapshot.document,
+        rectsRef.current,
+        hoveredRect,
+        event.clientX,
+        event.clientY
+      );
+      const siblingParent = siblingTarget
+        ? snapshot.document.nodes[siblingTarget.parentId]
+        : undefined;
       setHoverDropTarget(
-        findSiblingDropTarget(
-          snapshot.document,
-          hoveredRect,
-          event.clientX,
-          event.clientY
-        )
+        siblingTarget && siblingParent && canAcceptManualChildren(siblingParent)
+          ? siblingTarget
+          : null
       );
     }
 

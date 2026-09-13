@@ -51,10 +51,11 @@ export function Container({
         ? `repeat(auto-fit, minmax(min(100%, ${safeMinColumnWidth}px), 1fr))`
         : `repeat(${safeColumns}, minmax(0, 1fr))`
       : undefined,
-    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, auto)` : undefined,
+    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, max-content)` : undefined,
     gridAutoFlow: isGrid ? "row" : undefined,
     alignContent: isGrid ? "start" : undefined,
     alignItems: display === "flex" ? "center" : isGrid ? "stretch" : undefined,
+    justifyItems: isGrid ? "stretch" : undefined,
     flexWrap: display === "flex" ? "wrap" : undefined,
     boxSizing: "border-box",
     ...style,

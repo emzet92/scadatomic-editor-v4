@@ -103,6 +103,9 @@ export function RepeatBehaviorEditor({
                 ))}
               </Select>
             </FormField>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800">
+              Repeat mode owns this container&apos;s children. Manual add, move and duplicate into this container are disabled until Content mode is switched back to Static.
+            </div>
             {templates.length === 0 ? (
               <div className="text-[10px] text-amber-700">
                 Create a user component with a public TagRef input for this UDT first.

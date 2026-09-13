@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import type { NodeId } from "../core/document";
+import { buildDocumentIndex } from "../core/document-index";
+import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
 import { useEditorStore } from "../editor-store";
 import type { ComponentRegistry } from "../registry/editor-registry";
 import { createComponentDefinitionDocument } from "../reusable-components";
@@ -32,6 +34,7 @@ export function ComponentDesignerSurface({
     if (!definition || !componentDocument) return null;
 
     const rootId = definition.rootId;
+    const componentIndex = buildDocumentIndex(componentDocument, rootId);
     return {
       key: `component:${componentId}`,
       canvasSelector: "[data-editor-component-canvas]",
@@ -117,7 +120,12 @@ export function ComponentDesignerSurface({
       },
       canMoveNode: (nodeId) => nodeId !== rootId,
       canDeleteNode: (nodeId) => nodeId !== rootId,
-      canDuplicateNode: (nodeId) => nodeId !== rootId,
+      canDuplicateNode: (nodeId) => {
+        if (nodeId === rootId) return false;
+        const parentId = componentIndex.parentById.get(nodeId);
+        const parent = parentId ? componentDocument.nodes[parentId] : undefined;
+        return !!parent && canAcceptManualChildren(parent);
+      },
     };
   }, [
     componentDocument,

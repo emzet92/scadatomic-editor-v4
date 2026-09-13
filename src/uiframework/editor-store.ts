@@ -37,6 +37,8 @@ import {
 } from "./core/node-name";
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
 import { duplicateNodeSubtree } from "./core/duplicate-node";
+import { buildDocumentIndex } from "./core/document-index";
+import { canAcceptManualChildren } from "./repeat/RepeatBehavior";
 import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
@@ -735,7 +737,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (!definition || !parent) return state;
 
       const parentDefinition = getComponentDefinition(parent.type);
-      if (!parentDefinition?.acceptsChildren) return state;
+      if (!parentDefinition?.acceptsChildren || !canAcceptManualChildren(parent)) {
+        return state;
+      }
 
       if (
         node.componentDefinitionId &&
@@ -840,6 +844,9 @@ export const useEditorStore = create<EditorState>((set) => ({
         state.document,
         definition
       );
+      if (!canDuplicateIntoCurrentParent(syntheticDocument, definition.rootId, nodeId)) {
+        return state;
+      }
       const result = duplicateNodeSubtree(
         syntheticDocument,
         nodeId,
@@ -873,7 +880,13 @@ export const useEditorStore = create<EditorState>((set) => ({
       const targetDefinition = targetParent
         ? getComponentDefinition(targetParent.type)
         : undefined;
-      if (!targetParent || !targetDefinition?.acceptsChildren) return state;
+      if (
+        !targetParent ||
+        !targetDefinition?.acceptsChildren ||
+        !canAcceptManualChildren(targetParent)
+      ) {
+        return state;
+      }
 
       const syntheticDocument = createComponentDefinitionDocument(
         state.document,
@@ -904,7 +917,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   insertNode: (parentId, insertIndex, node) => {
     set((state) => {
       const parent = state.document.nodes[parentId];
-      if (!parent) {
+      if (!parent || !canAcceptManualChildren(parent)) {
         return state;
       }
 
@@ -947,18 +960,26 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   deleteNode: (id) => {
     set((state) => {
+      const rootId = getActiveRootId(state);
+      const parentId = buildDocumentIndex(state.document, rootId).parentById.get(id);
       const document = applyActiveCommand(state, {
         type: "node.delete",
         nodeId: id,
       });
+      const selectedNodeIds = state.selectedNodeIds.filter(
+        (nodeId) => !!document.nodes[nodeId]
+      );
+      const fallbackSelection =
+        selectedNodeIds[0] ??
+        (parentId && document.nodes[parentId] ? parentId : null);
 
       return {
         document,
-        selectedNodeIds: state.selectedNodeIds.filter((nodeId) => !!document.nodes[nodeId]),
+        selectedNodeIds: fallbackSelection ? [fallbackSelection] : [],
         selectedNodeId:
           state.selectedNodeId && document.nodes[state.selectedNodeId]
             ? state.selectedNodeId
-            : state.selectedNodeIds.find((nodeId) => !!document.nodes[nodeId]) ?? null,
+            : fallbackSelection,
       };
     });
   },
@@ -967,10 +988,14 @@ export const useEditorStore = create<EditorState>((set) => ({
     let duplicatedNodeId: NodeId | null = null;
 
     set((state) => {
+      const rootId = getActiveRootId(state);
+      if (!canDuplicateIntoCurrentParent(state.document, rootId, id)) {
+        return state;
+      }
       const result = duplicateNodeSubtree(
         state.document,
         id,
-        getActiveRootId(state)
+        rootId
       );
       if (!result.duplicatedNodeId) return state;
 
@@ -1060,18 +1085,41 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   moveNode: (nodeId, targetParentId, targetIndex) => {
-    set((state) => ({
-      document: applyActiveCommand(state, {
-        type: "node.move",
-        nodeId,
-        targetParentId,
-        targetIndex,
-      }),
-      draggedNodeId: null,
-      nodeDragCandidate: null,
-      selectedNodeId: nodeId,
-      selectedNodeIds: [nodeId],
-    }));
+    set((state) => {
+      const targetParent = state.document.nodes[targetParentId];
+      if (!targetParent || !canAcceptManualChildren(targetParent)) {
+        return {
+          ...state,
+          draggedNodeId: null,
+          nodeDragCandidate: null,
+        };
+      }
+
+      return {
+        document: applyActiveCommand(state, {
+          type: "node.move",
+          nodeId,
+          targetParentId,
+          targetIndex,
+        }),
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+        selectedNodeId: nodeId,
+        selectedNodeIds: [nodeId],
+      };
+    });
   },
 }));
+
+function canDuplicateIntoCurrentParent(
+  document: UiDocument,
+  rootId: NodeId,
+  nodeId: NodeId
+): boolean {
+  const index = buildDocumentIndex(document, rootId);
+  const parentId = index.parentById.get(nodeId);
+  if (!parentId) return false;
+  const parent = document.nodes[parentId];
+  return !!parent && canAcceptManualChildren(parent);
+}
 

@@ -1,0 +1,1042 @@
+diff --git a/src/index.css b/src/index.css
+index 94efa1b..1ed557f 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -26,11 +26,40 @@
+   --editor-canvas-bg: #f3f4f8;
+   --editor-grid-dot: #d8dbea;
+ }
+-/* Stable grid sizing for the visual designer and runtime. A child may keep its
+-   preferred width, but it is never allowed to widen the CSS grid track. */
++/* Grid owns the horizontal size of its cells. Component-local width defaults
++   (Image=320px, charts, reusable component roots, etc.) must never push a track
++   wider than the layout. Height remains component-owned so content can grow the
++   row naturally without being cropped. */
+ .scadatomic-grid-layout > * {
+-  min-width: 0;
+-  max-width: 100%;
++  width: 100% !important;
++  min-width: 0 !important;
++  max-width: 100% !important;
++  justify-self: stretch;
++  box-sizing: border-box;
++}
++
++.scadatomic-grid-layout > [data-scadatomic-type="Text"] {
++  overflow-wrap: anywhere;
++  word-break: break-word;
++}
++
++.scadatomic-grid-layout > [data-scadatomic-type="Button"] {
++  min-height: 40px;
++}
++
++.scadatomic-grid-layout > [data-scadatomic-type="Image"],
++.scadatomic-grid-layout > [data-scadatomic-type="Chart"],
++.scadatomic-grid-layout > [data-scadatomic-type="Container"],
++.scadatomic-grid-layout > [data-scadatomic-type="ComponentInstance"],
++.scadatomic-grid-layout > [data-scadatomic-type="PageSlot"] {
++  min-width: 0 !important;
++  max-width: 100% !important;
++}
++
++.scadatomic-grid-layout > [data-scadatomic-type="ComponentInstance"] > * {
++  width: 100% !important;
++  min-width: 0 !important;
++  max-width: 100% !important;
+   box-sizing: border-box;
+ }
+ 
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index e7bcfbc..fc666b7 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -71,6 +71,7 @@ export function RendererRoot({
+             }
+           : {}),
+         "data-node-id": node.id,
++        "data-scadatomic-type": node.type,
+       })}
+     />
+   );
+@@ -92,6 +93,7 @@ function ComponentModeRenderer({
+         ...(node.id === mode.nodeId
+           ? getComponentVariantProps(node, mode.variantName)
+           : getDefaultComponentVariantProps(node)),
++        "data-scadatomic-type": node.type,
+       })}
+     />
+   );
+@@ -118,6 +120,7 @@ function ComponentDefinitionRenderer({
+           ? getComponentVariantProps(node, mode.variantName)
+           : getDefaultComponentVariantProps(node)),
+         "data-component-node-id": node.id,
++        "data-scadatomic-type": node.type,
+       })}
+     />
+   );
+@@ -469,6 +472,23 @@ export function EditorPage() {
+                     selectedInternalNodeId: nodeId,
+                   })
+                 }
++                onDelete={(nodeId) => {
++                  if (nodeId === focusedDefinition.rootId) return;
++                  const parentId =
++                    Object.values(focusedDefinition.nodes).find((candidate) =>
++                      candidate.children?.includes(nodeId)
++                    )?.id ?? focusedDefinition.rootId;
++                  useEditorStore
++                    .getState()
++                    .deleteComponentDefinitionNode(
++                      componentDefinitionMode.componentId,
++                      nodeId
++                    );
++                  setComponentDefinitionMode({
++                    componentId: componentDefinitionMode.componentId,
++                    selectedInternalNodeId: parentId,
++                  });
++                }}
+               />
+               <div className="border-t border-zinc-200" />
+               <ComponentPalette
+diff --git a/src/uiframework/components/Container.tsx b/src/uiframework/components/Container.tsx
+index aa12c3a..296c57a 100644
+--- a/src/uiframework/components/Container.tsx
++++ b/src/uiframework/components/Container.tsx
+@@ -51,10 +51,11 @@ export function Container({
+         ? `repeat(auto-fit, minmax(min(100%, ${safeMinColumnWidth}px), 1fr))`
+         : `repeat(${safeColumns}, minmax(0, 1fr))`
+       : undefined,
+-    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, auto)` : undefined,
++    gridAutoRows: isGrid ? `minmax(${safeMinRowHeight}px, max-content)` : undefined,
+     gridAutoFlow: isGrid ? "row" : undefined,
+     alignContent: isGrid ? "start" : undefined,
+     alignItems: display === "flex" ? "center" : isGrid ? "stretch" : undefined,
++    justifyItems: isGrid ? "stretch" : undefined,
+     flexWrap: display === "flex" ? "wrap" : undefined,
+     boxSizing: "border-box",
+     ...style,
+diff --git a/src/uiframework/core/commands.ts b/src/uiframework/core/commands.ts
+index 7b8924b..1ac4e48 100644
+--- a/src/uiframework/core/commands.ts
++++ b/src/uiframework/core/commands.ts
+@@ -1,5 +1,6 @@
+ import { buildDocumentIndex } from "./document-index";
+ import { setOptionalRecordEntry } from "./optional-record";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
+ import type {
+   Binding,
+   HandlerRef,
+@@ -115,7 +116,11 @@ function insertNode(
+ ): UiDocument {
+   const parent = document.nodes[command.parentId];
+ 
+-  if (!parent || document.nodes[command.node.id]) {
++  if (
++    !parent ||
++    document.nodes[command.node.id] ||
++    !canAcceptManualChildren(parent)
++  ) {
+     return document;
+   }
+ 
+@@ -242,7 +247,7 @@ function moveNode(
+   const node = document.nodes[command.nodeId];
+   const targetParent = document.nodes[command.targetParentId];
+ 
+-  if (!node || !targetParent) {
++  if (!node || !targetParent || !canAcceptManualChildren(targetParent)) {
+     return document;
+   }
+ 
+diff --git a/src/uiframework/designer/ComponentDesignerSurface.tsx b/src/uiframework/designer/ComponentDesignerSurface.tsx
+index d6accdd..52e880a 100644
+--- a/src/uiframework/designer/ComponentDesignerSurface.tsx
++++ b/src/uiframework/designer/ComponentDesignerSurface.tsx
+@@ -1,5 +1,7 @@
+ import { useMemo } from "react";
+ import type { NodeId } from "../core/document";
++import { buildDocumentIndex } from "../core/document-index";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
+ import { useEditorStore } from "../editor-store";
+ import type { ComponentRegistry } from "../registry/editor-registry";
+ import { createComponentDefinitionDocument } from "../reusable-components";
+@@ -32,6 +34,7 @@ export function ComponentDesignerSurface({
+     if (!definition || !componentDocument) return null;
+ 
+     const rootId = definition.rootId;
++    const componentIndex = buildDocumentIndex(componentDocument, rootId);
+     return {
+       key: `component:${componentId}`,
+       canvasSelector: "[data-editor-component-canvas]",
+@@ -117,7 +120,12 @@ export function ComponentDesignerSurface({
+       },
+       canMoveNode: (nodeId) => nodeId !== rootId,
+       canDeleteNode: (nodeId) => nodeId !== rootId,
+-      canDuplicateNode: (nodeId) => nodeId !== rootId,
++      canDuplicateNode: (nodeId) => {
++        if (nodeId === rootId) return false;
++        const parentId = componentIndex.parentById.get(nodeId);
++        const parent = parentId ? componentDocument.nodes[parentId] : undefined;
++        return !!parent && canAcceptManualChildren(parent);
++      },
+     };
+   }, [
+     componentDocument,
+diff --git a/src/uiframework/designer/DesignerSurface.tsx b/src/uiframework/designer/DesignerSurface.tsx
+index 795a66c..baf2e1e 100644
+--- a/src/uiframework/designer/DesignerSurface.tsx
++++ b/src/uiframework/designer/DesignerSurface.tsx
+@@ -22,6 +22,7 @@ import {
+ } from "../registry/component-definitions";
+ import type { ComponentRegistry } from "../registry/editor-registry";
+ import type { DesignerAdapter } from "./designer-adapter";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
+ 
+ export function DesignerSurface({
+   adapter,
+@@ -177,7 +178,11 @@ export function DesignerSurface({
+         ? getComponentDefinition(hoveredNode.type)
+         : undefined;
+ 
+-      if (hoveredNode && hoveredDefinition?.acceptsChildren) {
++      if (
++        hoveredNode &&
++        hoveredDefinition?.acceptsChildren &&
++        canAcceptManualChildren(hoveredNode)
++      ) {
+         setHoverDropTarget({
+           parentId: hoveredNode.id,
+           insertIndex: findContainerInsertIndex(
+@@ -191,13 +196,20 @@ export function DesignerSurface({
+         return;
+       }
+ 
++      const siblingTarget = findSiblingDropTarget(
++        snapshot.document,
++        rectsRef.current,
++        hoveredRect,
++        event.clientX,
++        event.clientY
++      );
++      const siblingParent = siblingTarget
++        ? snapshot.document.nodes[siblingTarget.parentId]
++        : undefined;
+       setHoverDropTarget(
+-        findSiblingDropTarget(
+-          snapshot.document,
+-          hoveredRect,
+-          event.clientX,
+-          event.clientY
+-        )
++        siblingTarget && siblingParent && canAcceptManualChildren(siblingParent)
++          ? siblingTarget
++          : null
+       );
+     }
+ 
+diff --git a/src/uiframework/designer/PageDesignerSurface.tsx b/src/uiframework/designer/PageDesignerSurface.tsx
+index 2ec038a..6bbd385 100644
+--- a/src/uiframework/designer/PageDesignerSurface.tsx
++++ b/src/uiframework/designer/PageDesignerSurface.tsx
+@@ -2,6 +2,8 @@ import { useMemo } from "react";
+ import { getPage } from "../core/document";
+ import { createPageRenderDocument } from "../core/page-layouts";
+ import { collectPageNodeIds } from "../core/pages";
++import { buildDocumentIndex } from "../core/document-index";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
+ import { useEditorStore } from "../editor-store";
+ import type { ComponentRegistry } from "../registry/editor-registry";
+ import { DesignerSurface } from "./DesignerSurface";
+@@ -26,6 +28,10 @@ export function PageDesignerSurface({
+     () => new Set(collectPageNodeIds(document, [activePage.id])),
+     [document, activePage.id]
+   );
++  const renderIndex = useMemo(
++    () => buildDocumentIndex(renderDocument, renderDocument.rootId),
++    [renderDocument]
++  );
+ 
+   const adapter = useMemo<DesignerAdapter>(
+     () => ({
+@@ -84,8 +90,14 @@ export function PageDesignerSurface({
+         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+       canDeleteNode: (nodeId) =>
+         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+-      canDuplicateNode: (nodeId) =>
+-        ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
++      canDuplicateNode: (nodeId) => {
++        if (!ownedNodeIds.has(nodeId) || nodeId === activePage.rootId) {
++          return false;
++        }
++        const parentId = renderIndex.parentById.get(nodeId);
++        const parent = parentId ? renderDocument.nodes[parentId] : undefined;
++        return !!parent && canAcceptManualChildren(parent);
++      },
+     }),
+     [
+       activePage.id,
+@@ -93,6 +105,7 @@ export function PageDesignerSurface({
+       activePage.rootId,
+       ownedNodeIds,
+       renderDocument,
++      renderIndex,
+       selectedNodeId,
+       selectedNodeIds,
+     ]
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index c062f63..703db22 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -37,6 +37,8 @@ import {
+ } from "./core/node-name";
+ import { createPageDeletionPlan, withStartPage } from "./core/pages";
+ import { duplicateNodeSubtree } from "./core/duplicate-node";
++import { buildDocumentIndex } from "./core/document-index";
++import { canAcceptManualChildren } from "./repeat/RepeatBehavior";
+ import type { ProjectData } from "./data/tags/TagDefinition";
+ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+ import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
+@@ -735,7 +737,9 @@ export const useEditorStore = create<EditorState>((set) => ({
+       if (!definition || !parent) return state;
+ 
+       const parentDefinition = getComponentDefinition(parent.type);
+-      if (!parentDefinition?.acceptsChildren) return state;
++      if (!parentDefinition?.acceptsChildren || !canAcceptManualChildren(parent)) {
++        return state;
++      }
+ 
+       if (
+         node.componentDefinitionId &&
+@@ -840,6 +844,9 @@ export const useEditorStore = create<EditorState>((set) => ({
+         state.document,
+         definition
+       );
++      if (!canDuplicateIntoCurrentParent(syntheticDocument, definition.rootId, nodeId)) {
++        return state;
++      }
+       const result = duplicateNodeSubtree(
+         syntheticDocument,
+         nodeId,
+@@ -873,7 +880,13 @@ export const useEditorStore = create<EditorState>((set) => ({
+       const targetDefinition = targetParent
+         ? getComponentDefinition(targetParent.type)
+         : undefined;
+-      if (!targetParent || !targetDefinition?.acceptsChildren) return state;
++      if (
++        !targetParent ||
++        !targetDefinition?.acceptsChildren ||
++        !canAcceptManualChildren(targetParent)
++      ) {
++        return state;
++      }
+ 
+       const syntheticDocument = createComponentDefinitionDocument(
+         state.document,
+@@ -904,7 +917,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+   insertNode: (parentId, insertIndex, node) => {
+     set((state) => {
+       const parent = state.document.nodes[parentId];
+-      if (!parent) {
++      if (!parent || !canAcceptManualChildren(parent)) {
+         return state;
+       }
+ 
+@@ -947,18 +960,26 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   deleteNode: (id) => {
+     set((state) => {
++      const rootId = getActiveRootId(state);
++      const parentId = buildDocumentIndex(state.document, rootId).parentById.get(id);
+       const document = applyActiveCommand(state, {
+         type: "node.delete",
+         nodeId: id,
+       });
++      const selectedNodeIds = state.selectedNodeIds.filter(
++        (nodeId) => !!document.nodes[nodeId]
++      );
++      const fallbackSelection =
++        selectedNodeIds[0] ??
++        (parentId && document.nodes[parentId] ? parentId : null);
+ 
+       return {
+         document,
+-        selectedNodeIds: state.selectedNodeIds.filter((nodeId) => !!document.nodes[nodeId]),
++        selectedNodeIds: fallbackSelection ? [fallbackSelection] : [],
+         selectedNodeId:
+           state.selectedNodeId && document.nodes[state.selectedNodeId]
+             ? state.selectedNodeId
+-            : state.selectedNodeIds.find((nodeId) => !!document.nodes[nodeId]) ?? null,
++            : fallbackSelection,
+       };
+     });
+   },
+@@ -967,10 +988,14 @@ export const useEditorStore = create<EditorState>((set) => ({
+     let duplicatedNodeId: NodeId | null = null;
+ 
+     set((state) => {
++      const rootId = getActiveRootId(state);
++      if (!canDuplicateIntoCurrentParent(state.document, rootId, id)) {
++        return state;
++      }
+       const result = duplicateNodeSubtree(
+         state.document,
+         id,
+-        getActiveRootId(state)
++        rootId
+       );
+       if (!result.duplicatedNodeId) return state;
+ 
+@@ -1060,18 +1085,41 @@ export const useEditorStore = create<EditorState>((set) => ({
+   },
+ 
+   moveNode: (nodeId, targetParentId, targetIndex) => {
+-    set((state) => ({
+-      document: applyActiveCommand(state, {
+-        type: "node.move",
+-        nodeId,
+-        targetParentId,
+-        targetIndex,
+-      }),
+-      draggedNodeId: null,
+-      nodeDragCandidate: null,
+-      selectedNodeId: nodeId,
+-      selectedNodeIds: [nodeId],
+-    }));
++    set((state) => {
++      const targetParent = state.document.nodes[targetParentId];
++      if (!targetParent || !canAcceptManualChildren(targetParent)) {
++        return {
++          ...state,
++          draggedNodeId: null,
++          nodeDragCandidate: null,
++        };
++      }
++
++      return {
++        document: applyActiveCommand(state, {
++          type: "node.move",
++          nodeId,
++          targetParentId,
++          targetIndex,
++        }),
++        draggedNodeId: null,
++        nodeDragCandidate: null,
++        selectedNodeId: nodeId,
++        selectedNodeIds: [nodeId],
++      };
++    });
+   },
+ }));
+ 
++function canDuplicateIntoCurrentParent(
++  document: UiDocument,
++  rootId: NodeId,
++  nodeId: NodeId
++): boolean {
++  const index = buildDocumentIndex(document, rootId);
++  const parentId = index.parentById.get(nodeId);
++  if (!parentId) return false;
++  const parent = document.nodes[parentId];
++  return !!parent && canAcceptManualChildren(parent);
++}
++
+diff --git a/src/uiframework/editor/interaction/geometry.ts b/src/uiframework/editor/interaction/geometry.ts
+index b7090c5..3ce4c61 100644
+--- a/src/uiframework/editor/interaction/geometry.ts
++++ b/src/uiframework/editor/interaction/geometry.ts
+@@ -94,39 +94,40 @@ export function findContainerInsertIndex(
+   const container = document.nodes[containerId];
+   const children = container?.children ?? [];
+   const display = container?.props?.display === "flex" ? "flex" : "grid";
+-  const columns =
+-    typeof container?.props?.columns === "number"
+-      ? Math.max(1, Math.floor(container.props.columns))
+-      : 1;
+-
+-  for (let index = 0; index < children.length; index += 1) {
+-    const rect = rects.find((candidate) => candidate.id === children[index]);
+-    if (!rect) {
+-      continue;
+-    }
++  const positioned = children.flatMap((childId, index) => {
++    const rect = rects.find((candidate) => candidate.id === childId);
++    return rect ? [{ index, rect }] : [];
++  });
++
++  if (positioned.length === 0) return 0;
+ 
+-    if (display === "flex") {
+-      if (pointerX < rect.left + rect.width / 2) {
+-        return index;
++  if (display === "flex") {
++    for (const item of positioned) {
++      if (pointerX < item.rect.left + item.rect.width / 2) {
++        return item.index;
+       }
+-      continue;
+     }
++    return children.length;
++  }
+ 
+-    if (columns > 1) {
+-      const isAbove = pointerY < rect.top;
+-      const isSameRow = pointerY >= rect.top && pointerY <= rect.bottom;
++  const rows = groupGridRows(positioned);
++  for (const row of rows) {
++    const rowTop = Math.min(...row.map((item) => item.rect.top));
++    const rowBottom = Math.max(...row.map((item) => item.rect.bottom));
++    const rowMiddle = rowTop + (rowBottom - rowTop) / 2;
+ 
+-      if (
+-        isAbove ||
+-        (isSameRow && pointerX < rect.left + rect.width / 2)
+-      ) {
+-        return index;
+-      }
+-      continue;
++    if (pointerY < rowTop) {
++      return row[0]?.index ?? 0;
+     }
+ 
+-    if (pointerY < rect.top + rect.height / 2) {
+-      return index;
++    if (pointerY <= rowBottom || pointerY < rowMiddle) {
++      for (const item of row) {
++        if (pointerX < item.rect.left + item.rect.width / 2) {
++          return item.index;
++        }
++      }
++      const last = row[row.length - 1];
++      return last ? last.index + 1 : children.length;
+     }
+   }
+ 
+@@ -135,6 +136,7 @@ export function findContainerInsertIndex(
+ 
+ export function findSiblingDropTarget(
+   document: UiDocument,
++  rects: readonly RectInfo[],
+   hoveredRect: RectInfo,
+   pointerX: number,
+   pointerY: number
+@@ -148,8 +150,15 @@ export function findSiblingDropTarget(
+ 
+   const parent = document.nodes[hoveredRect.parentId];
+   const display = parent?.props?.display === "flex" ? "flex" : "grid";
++  const siblingRects = (parent?.children ?? [])
++    .map((childId) => rects.find((candidate) => candidate.id === childId))
++    .filter((rect): rect is RectInfo => Boolean(rect));
++  const sameVisualRow = siblingRects.filter(
++    (rect) => Math.abs(rect.top - hoveredRect.top) <= gridRowTolerance(hoveredRect, rect)
++  );
++  const gridIsMultiColumn = display === "grid" && sameVisualRow.length > 1;
+   const insertAfter =
+-    display === "flex"
++    display === "flex" || gridIsMultiColumn
+       ? pointerX > hoveredRect.left + hoveredRect.width / 2
+       : pointerY > hoveredRect.top + hoveredRect.height / 2;
+ 
+@@ -173,9 +182,11 @@ export function getDropIndicatorRect(
+   const isHorizontal = parent?.props?.display === "flex";
+   const beforeRect = findRect(rects, children[target.insertIndex]);
+   const previousRect = findRect(rects, children[target.insertIndex - 1]);
++  const gridHasMultipleColumns =
++    !isHorizontal && hasMultipleGridColumns(children, rects);
+ 
+   if (beforeRect) {
+-    return isHorizontal
++    return isHorizontal || gridHasMultipleColumns
+       ? {
+           left: beforeRect.left - 2,
+           top: beforeRect.top,
+@@ -191,7 +202,7 @@ export function getDropIndicatorRect(
+   }
+ 
+   if (previousRect) {
+-    return isHorizontal
++    return isHorizontal || gridHasMultipleColumns
+       ? {
+           left: previousRect.right - 2,
+           top: previousRect.top,
+@@ -226,6 +237,55 @@ export function getDropIndicatorRect(
+       };
+ }
+ 
++function groupGridRows(
++  positioned: ReadonlyArray<{ index: number; rect: RectInfo }>
++): Array<Array<{ index: number; rect: RectInfo }>> {
++  const rows: Array<Array<{ index: number; rect: RectInfo }>> = [];
++
++  for (const item of positioned) {
++    const row = rows.find((candidate) => {
++      const anchor = candidate[0]?.rect;
++      return anchor
++        ? Math.abs(anchor.top - item.rect.top) <= gridRowTolerance(anchor, item.rect)
++        : false;
++    });
++
++    if (row) {
++      row.push(item);
++    } else {
++      rows.push([item]);
++    }
++  }
++
++  rows.sort((left, right) => (left[0]?.rect.top ?? 0) - (right[0]?.rect.top ?? 0));
++  for (const row of rows) {
++    row.sort((left, right) => left.rect.left - right.rect.left);
++  }
++  return rows;
++}
++
++function gridRowTolerance(left: RectInfo, right: RectInfo) {
++  return Math.max(6, Math.min(left.height, right.height) * 0.2);
++}
++
++function hasMultipleGridColumns(
++  children: readonly NodeId[],
++  rects: readonly RectInfo[]
++): boolean {
++  const childRects = children
++    .map((childId) => findRect(rects, childId))
++    .filter((rect): rect is RectInfo => Boolean(rect));
++
++  return childRects.some((rect, index) =>
++    childRects.some(
++      (other, otherIndex) =>
++        index !== otherIndex &&
++        Math.abs(rect.top - other.top) <= gridRowTolerance(rect, other) &&
++        Math.abs(rect.left - other.left) > 4
++    )
++  );
++}
++
+ function findRect(
+   rects: readonly RectInfo[],
+   id: NodeId | undefined
+diff --git a/src/uiframework/editor/overlay/ContainerGridOverlay.tsx b/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
+index 45e81e7..a58f06e 100644
+--- a/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
++++ b/src/uiframework/editor/overlay/ContainerGridOverlay.tsx
+@@ -54,7 +54,8 @@ export function ContainerGridOverlay({
+   const isAdaptive = rawProps.gridMode === "adaptive";
+   const columns = Math.max(1, Math.min(12, Math.floor(renderedColumns || configuredColumns)));
+   const children = node.children ?? [];
+-  const canQuickAdd = node.contentBehavior?.kind !== "repeat";
++  const repeatManaged = node.contentBehavior?.kind === "repeat";
++  const canQuickAdd = !repeatManaged;
+ 
+   const geometry = useMemo(
+     () =>
+@@ -216,6 +217,28 @@ export function ContainerGridOverlay({
+               </GridAdjustButton>
+             </div>
+           ) : null}
++
++          {repeatManaged ? (
++            <div
++              title="Children are generated by the repeat source. Switch Content mode to Static to add components manually."
++              style={{
++                display: "flex",
++                alignItems: "center",
++                height: 30,
++                padding: "0 10px",
++                borderRadius: 15,
++                border: "1px solid rgba(245,158,11,.28)",
++                background: "rgba(255,251,235,.96)",
++                color: "#92400e",
++                boxShadow: "0 5px 18px rgba(15,23,42,.06)",
++                pointerEvents: "auto",
++                fontSize: 10,
++                fontWeight: 650,
++              }}
++            >
++              Loop-managed · add disabled
++            </div>
++          ) : null}
+         </div>
+ 
+         {canQuickAdd ? (
+diff --git a/src/uiframework/gui/repeat/RepeatBehaviorEditor.tsx b/src/uiframework/gui/repeat/RepeatBehaviorEditor.tsx
+index 3806b31..b510a8d 100644
+--- a/src/uiframework/gui/repeat/RepeatBehaviorEditor.tsx
++++ b/src/uiframework/gui/repeat/RepeatBehaviorEditor.tsx
+@@ -103,6 +103,9 @@ export function RepeatBehaviorEditor({
+                 ))}
+               </Select>
+             </FormField>
++            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800">
++              Repeat mode owns this container&apos;s children. Manual add, move and duplicate into this container are disabled until Content mode is switched back to Static.
++            </div>
+             {templates.length === 0 ? (
+               <div className="text-[10px] text-amber-700">
+                 Create a user component with a public TagRef input for this UDT first.
+diff --git a/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx b/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
+index 1c51049..626a92b 100644
+--- a/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
++++ b/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
+@@ -1,14 +1,16 @@
+-import { ChevronRight, Layers3 } from "lucide-react";
++import { ChevronRight, Layers3, Trash2 } from "lucide-react";
+ import type { UiComponentDefinition } from "../../core/document";
+ 
+ export function ComponentStructureTree({
+   definition,
+   selectedNodeId,
+   onSelect,
++  onDelete,
+ }: {
+   definition: UiComponentDefinition;
+   selectedNodeId: string;
+   onSelect: (nodeId: string) => void;
++  onDelete: (nodeId: string) => void;
+ }) {
+   return (
+     <div data-editor-ignore className="max-h-[42vh] overflow-auto bg-[var(--editor-surface)]">
+@@ -29,6 +31,7 @@ export function ComponentStructureTree({
+           nodeId={definition.rootId}
+           selectedNodeId={selectedNodeId}
+           onSelect={onSelect}
++          onDelete={onDelete}
+           depth={0}
+         />
+       </div>
+@@ -41,39 +44,62 @@ function TreeNode({
+   nodeId,
+   selectedNodeId,
+   onSelect,
++  onDelete,
+   depth,
+ }: {
+   definition: UiComponentDefinition;
+   nodeId: string;
+   selectedNodeId: string;
+   onSelect: (nodeId: string) => void;
++  onDelete: (nodeId: string) => void;
+   depth: number;
+ }) {
+   const node = definition.nodes[nodeId];
+   if (!node) return null;
+   const children = node.children ?? [];
++  const canDelete = node.id !== definition.rootId;
+ 
+   return (
+     <div>
+-      <button
+-        type="button"
+-        onClick={() => onSelect(node.id)}
+-        className={`flex w-full items-center gap-1.5 rounded-md py-1.5 pr-2 text-left text-xs transition ${
++      <div
++        className={`group flex w-full items-center gap-1 rounded-md pr-1 transition ${
+           selectedNodeId === node.id
+             ? "bg-violet-50 text-violet-700"
+             : "text-[var(--editor-text)] hover:bg-[var(--editor-surface-muted)]"
+         }`}
+         style={{ paddingLeft: 8 + depth * 12 }}
+       >
+-        <ChevronRight
+-          size={11}
+-          className={children.length ? "text-zinc-400" : "opacity-0"}
+-        />
+-        <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
+-        <span className="text-[9px] uppercase tracking-wide text-[var(--editor-text-muted)]">
+-          {node.type}
+-        </span>
+-      </button>
++        <button
++          type="button"
++          onClick={() => onSelect(node.id)}
++          className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left text-xs"
++        >
++          <ChevronRight
++            size={11}
++            className={children.length ? "text-zinc-400" : "opacity-0"}
++          />
++          <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
++          <span className="text-[9px] uppercase tracking-wide text-[var(--editor-text-muted)]">
++            {node.type}
++          </span>
++        </button>
++
++        {canDelete ? (
++          <button
++            type="button"
++            aria-label={`Delete ${node.name}`}
++            title="Delete"
++            onClick={(event) => {
++              event.stopPropagation();
++              onDelete(node.id);
++            }}
++            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--editor-text-soft)] opacity-0 transition hover:bg-red-50 hover:text-[var(--editor-danger)] group-hover:opacity-100 focus:opacity-100"
++          >
++            <Trash2 size={13} />
++          </button>
++        ) : null}
++      </div>
++
+       {children.map((childId) => (
+         <TreeNode
+           key={childId}
+@@ -81,6 +107,7 @@ function TreeNode({
+           nodeId={childId}
+           selectedNodeId={selectedNodeId}
+           onSelect={onSelect}
++          onDelete={onDelete}
+           depth={depth + 1}
+         />
+       ))}
+diff --git a/src/uiframework/gui/tree-view/TreeNode.tsx b/src/uiframework/gui/tree-view/TreeNode.tsx
+index 7b18c3b..071e383 100644
+--- a/src/uiframework/gui/tree-view/TreeNode.tsx
++++ b/src/uiframework/gui/tree-view/TreeNode.tsx
+@@ -14,6 +14,8 @@ export function TreeNode({
+   moveNodeDown,
+   duplicateNode,
+   canDuplicateNode,
++  deleteNode,
++  canDeleteNode,
+ }: TreeNodeProps) {
+   const node = nodes[nodeId];
+   const [collapsed, setCollapsed] = useState(level > 0);
+@@ -39,6 +41,8 @@ export function TreeNode({
+         moveNodeDown={moveNodeDown}
+         duplicateNode={duplicateNode}
+         canDuplicate={canDuplicateNode(nodeId)}
++        deleteNode={deleteNode}
++        canDelete={canDeleteNode(nodeId)}
+       />
+ 
+       {!collapsed && (
+@@ -53,6 +57,8 @@ export function TreeNode({
+           moveNodeDown={moveNodeDown}
+           duplicateNode={duplicateNode}
+           canDuplicateNode={canDuplicateNode}
++          deleteNode={deleteNode}
++          canDeleteNode={canDeleteNode}
+         />
+       )}
+     </>
+diff --git a/src/uiframework/gui/tree-view/TreeNodeChildren.tsx b/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
+index 838419a..71f7143 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
+@@ -12,6 +12,8 @@ export function TreeNodeChildren({
+   moveNodeDown,
+   duplicateNode,
+   canDuplicateNode,
++  deleteNode,
++  canDeleteNode,
+ }: {
+   node: TreeNodeData;
+   level: number;
+@@ -23,6 +25,8 @@ export function TreeNodeChildren({
+   moveNodeDown: (nodeId: string) => void;
+   duplicateNode: (nodeId: string) => string | null;
+   canDuplicateNode: (nodeId: string) => boolean;
++  deleteNode: (nodeId: string) => void;
++  canDeleteNode: (nodeId: string) => boolean;
+ }) {
+   return (
+     <>
+@@ -39,6 +43,8 @@ export function TreeNodeChildren({
+           moveNodeDown={moveNodeDown}
+           duplicateNode={duplicateNode}
+           canDuplicateNode={canDuplicateNode}
++          deleteNode={deleteNode}
++          canDeleteNode={canDeleteNode}
+         />
+       ))}
+     </>
+diff --git a/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx b/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
+index c9a7102..be3d031 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
+@@ -2,6 +2,7 @@ import {
+   ChevronUp,
+   ChevronDown,
+   Copy,
++  Trash2,
+ } from "lucide-react";
+ 
+ export function TreeNodeMoveActions({
+@@ -10,12 +11,16 @@ export function TreeNodeMoveActions({
+   moveNodeDown,
+   duplicateNode,
+   canDuplicate,
++  deleteNode,
++  canDelete,
+ }: {
+   nodeId: string;
+   moveNodeUp: (nodeId: string) => void;
+   moveNodeDown: (nodeId: string) => void;
+   duplicateNode: (nodeId: string) => string | null;
+   canDuplicate: boolean;
++  deleteNode: (nodeId: string) => void;
++  canDelete: boolean;
+ }) {
+   if (nodeId === "root" && !canDuplicate) {
+     return null;
+@@ -53,8 +58,34 @@ export function TreeNodeMoveActions({
+         </button>
+       ) : null}
+ 
++      {canDelete ? (
++        <button
++          data-editor-ignore
++          type="button"
++          aria-label="Delete node"
++          title="Delete"
++          onClick={(e) => {
++            e.stopPropagation();
++            deleteNode(nodeId);
++          }}
++          className="
++            p-1
++            rounded-md
++            text-[var(--editor-text-soft)]
++            hover:bg-red-50
++            hover:text-[var(--editor-danger)]
++            transition
++          "
++        >
++          <Trash2 size={14} />
++        </button>
++      ) : null}
++
+       <button
+         data-editor-ignore
++        type="button"
++        aria-label="Move node up"
++        title="Move up"
+         onClick={(e) => {
+           e.stopPropagation();
+           moveNodeUp(nodeId);
+@@ -73,6 +104,9 @@ export function TreeNodeMoveActions({
+ 
+       <button
+         data-editor-ignore
++        type="button"
++        aria-label="Move node down"
++        title="Move down"
+         onClick={(e) => {
+           e.stopPropagation();
+           moveNodeDown(nodeId);
+diff --git a/src/uiframework/gui/tree-view/TreeNodeRow.tsx b/src/uiframework/gui/tree-view/TreeNodeRow.tsx
+index 5af7547..bc9ebc6 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeRow.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeRow.tsx
+@@ -18,6 +18,8 @@ export function TreeNodeRow({
+   moveNodeDown,
+   duplicateNode,
+   canDuplicate,
++  deleteNode,
++  canDelete,
+ }: {
+   nodeId: string;
+   node: TreeNodeData;
+@@ -32,6 +34,8 @@ export function TreeNodeRow({
+   moveNodeDown: (nodeId: string) => void;
+   duplicateNode: (nodeId: string) => string | null;
+   canDuplicate: boolean;
++  deleteNode: (nodeId: string) => void;
++  canDelete: boolean;
+ }) {
+   return (
+     <div
+@@ -65,6 +69,8 @@ export function TreeNodeRow({
+         moveNodeDown={moveNodeDown}
+         duplicateNode={duplicateNode}
+         canDuplicate={canDuplicate}
++        deleteNode={deleteNode}
++        canDelete={canDelete}
+       />
+     </div>
+   );
+diff --git a/src/uiframework/gui/tree-view/TreeView.tsx b/src/uiframework/gui/tree-view/TreeView.tsx
+index 1005cff..f2edf17 100644
+--- a/src/uiframework/gui/tree-view/TreeView.tsx
++++ b/src/uiframework/gui/tree-view/TreeView.tsx
+@@ -1,4 +1,6 @@
+ import { getPage } from "../../core/document";
++import { buildDocumentIndex } from "../../core/document-index";
++import { canAcceptManualChildren } from "../../repeat/RepeatBehavior";
+ import { useEditorStore } from "../../editor-store";
+ import { TreeNode } from "./TreeNode";
+ 
+@@ -11,7 +13,9 @@ export function TreeView() {
+   const moveNodeUp = useEditorStore((state) => state.moveNodeUp);
+   const moveNodeDown = useEditorStore((state) => state.moveNodeDown);
+   const duplicateNode = useEditorStore((state) => state.duplicateNode);
++  const deleteNode = useEditorStore((state) => state.deleteNode);
+   const page = getPage(document, activePageId);
++  const index = buildDocumentIndex(document, page.rootId);
+ 
+   if (!document.nodes[page.rootId]) return null;
+ 
+@@ -37,7 +41,14 @@ export function TreeView() {
+         moveNodeUp={moveNodeUp}
+         moveNodeDown={moveNodeDown}
+         duplicateNode={duplicateNode}
+-        canDuplicateNode={(nodeId) => nodeId !== page.rootId}
++        canDuplicateNode={(nodeId) => {
++          if (nodeId === page.rootId) return false;
++          const parentId = index.parentById.get(nodeId);
++          const parent = parentId ? document.nodes[parentId] : undefined;
++          return !!parent && canAcceptManualChildren(parent);
++        }}
++        deleteNode={deleteNode}
++        canDeleteNode={(nodeId) => nodeId !== page.rootId}
+       />
+     </div>
+   );
+diff --git a/src/uiframework/gui/tree-view/tree-view-types.ts b/src/uiframework/gui/tree-view/tree-view-types.ts
+index f9fab0c..863c396 100644
+--- a/src/uiframework/gui/tree-view/tree-view-types.ts
++++ b/src/uiframework/gui/tree-view/tree-view-types.ts
+@@ -23,4 +23,6 @@ export type TreeNodeProps = {
+   moveNodeDown: (nodeId: string) => void;
+   duplicateNode: (nodeId: string) => string | null;
+   canDuplicateNode: (nodeId: string) => boolean;
++  deleteNode: (nodeId: string) => void;
++  canDeleteNode: (nodeId: string) => boolean;
+ };
+diff --git a/src/uiframework/repeat/RepeatBehavior.ts b/src/uiframework/repeat/RepeatBehavior.ts
+index cc20c8e..c78ebb5 100644
+--- a/src/uiframework/repeat/RepeatBehavior.ts
++++ b/src/uiframework/repeat/RepeatBehavior.ts
+@@ -38,3 +38,22 @@ export function isContainerContentBehavior(
+     typeof (template as Record<string, unknown>).inputName === "string"
+   );
+ }
++
++
++export type ContainerChildHost = {
++  type: string;
++  contentBehavior?: ContainerContentBehavior | undefined;
++};
++
++/**
++ * Repeat containers own their rendered children at runtime. Static designer
++ * children would never be rendered, so all manual insert/move/duplicate paths
++ * must treat the container as read-only while repeat mode is active.
++ */
++export function canAcceptManualChildren(node: ContainerChildHost): boolean {
++  return !(node.type === "Container" && node.contentBehavior?.kind === "repeat");
++}
++
++export function isRepeatContainer(node: ContainerChildHost): boolean {
++  return node.type === "Container" && node.contentBehavior?.kind === "repeat";
++}
+diff --git a/src/uiframework/runtime/RenderPage.tsx b/src/uiframework/runtime/RenderPage.tsx
+index 891115e..7d4cda5 100644
+--- a/src/uiframework/runtime/RenderPage.tsx
++++ b/src/uiframework/runtime/RenderPage.tsx
+@@ -190,6 +190,7 @@ export function RenderPage() {
+                 : node.id;
+               const baseProps = {
+                 "data-node-id": runtimeNodeId,
++                "data-scadatomic-type": node.type,
+               };
+ 
+               if (node.type === "Text" || node.type === "Chart") {
