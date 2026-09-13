@@ -25,6 +25,18 @@ import {
   getMockSessionValue,
   setMockSessionValue,
 } from "./mock-session-state";
+import {
+  Executor,
+  ExecutionPlanner,
+  IntentCollector,
+  createIntentId,
+  publishExecutionTrace,
+  shadowKey,
+  type Intent,
+  type IntentSource,
+  type RuntimeEffects,
+} from "../execution";
+import { TypeRegistry } from "../uiframework/data/types/TypeRegistry";
 
 export type MockScriptEvent = {
   projectId: string;
@@ -139,6 +151,11 @@ type CreateComponentApiOptions = {
   includePrivateMethods?: boolean;
 };
 
+type MockScriptExecutionEnvironment = {
+  collector: IntentCollector;
+  source: IntentSource;
+};
+
 /**
  * Prototype-only JavaScript execution.
  *
@@ -150,9 +167,18 @@ export function executeMockScript(
   host: MockScriptHost
 ): void {
   const script = getMockScript(event.projectId, event.handlerId);
+  const collector = new IntentCollector();
+  const source: IntentSource = {
+    projectId: event.projectId,
+    handlerId: event.handlerId,
+    scriptId: event.handlerId,
+    sourceNodeId: event.sourceNodeId,
+    eventName: event.eventName,
+  };
+  const environment: MockScriptExecutionEnvironment = { collector, source };
   const ownerScope = host.resolveComponentScopeForRuntimeNode(event.sourceNodeId);
   const selfRef: { current: UiComponentScriptApi | undefined } = { current: undefined };
-  const ctx = createContext(event, host, () =>
+  const ctx = createContext(event, host, environment, () =>
     ownerScope && selfRef.current
       ? createInputsApi(ownerScope.definition, selfRef.current)
       : undefined
@@ -163,6 +189,7 @@ export function executeMockScript(
         host,
         event.projectId,
         () => ctx,
+        environment,
         {
           runtimeNodeId: ownerScope.runtimeInstanceId,
           includePrivateMethods: true,
@@ -176,7 +203,8 @@ export function executeMockScript(
         ownerScope.runtimeInstanceId,
         host,
         event.projectId,
-        () => ctx
+        () => ctx,
+        environment
       )
     : undefined;
 
@@ -187,10 +215,11 @@ export function executeMockScript(
       self,
       internal,
       args: [],
-      globals: createTagGlobals(host, ctx),
+      globals: createTagGlobals(host, ctx, environment),
       sourceUrl: `scadatomic://${encodeURIComponent(event.projectId)}/scripts/${encodeURIComponent(event.handlerId)}.js`,
     });
   } catch (error) {
+    collector.discard();
     console.error(
       `[mock-script-runtime] Handler ${event.handlerId} failed`,
       error
@@ -201,23 +230,84 @@ export function executeMockScript(
       sourceNodeId: event.sourceNodeId,
       message: error instanceof Error ? error.message : String(error),
     });
+    return;
   }
+
+  const intents = collector.takeIntents();
+  let graph;
+  try {
+    const planner = new ExecutionPlanner();
+    graph = planner.plan(intents, {
+      source,
+      validateIntent: (intent) => validateRuntimeIntent(intent, host),
+    });
+  } catch (error) {
+    console.error(
+      `[mock-script-runtime] Handler ${event.handlerId} planning failed`,
+      error
+    );
+    host.emit("execution.planning-error", {
+      handlerId: event.handlerId,
+      sourceNodeId: event.sourceNodeId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const execution = {
+    executionId: graph.executionId,
+    projectId: event.projectId,
+    handlerId: event.handlerId,
+    eventName: event.eventName,
+    sourceNodeId: event.sourceNodeId,
+    scriptId: event.handlerId,
+    intents,
+    graph,
+    createdAt: Date.now(),
+  };
+
+  publishExecutionTrace(execution);
+  void new Executor()
+    .execute(graph, createRuntimeEffects(event, host))
+    .then((result) => {
+      publishExecutionTrace({ ...execution, result });
+      if (result.status !== "success") {
+        host.emit("execution.error", {
+          handlerId: event.handlerId,
+          sourceNodeId: event.sourceNodeId,
+          executionId: graph.executionId,
+          status: result.status,
+        });
+      }
+    })
+    .catch((error) => {
+      console.error(
+        `[mock-script-runtime] Execution ${graph.executionId} failed`,
+        error
+      );
+      host.emit("execution.error", {
+        handlerId: event.handlerId,
+        sourceNodeId: event.sourceNodeId,
+        executionId: graph.executionId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    });
 }
 
 function createContext(
   event: MockScriptEvent,
   host: MockScriptHost,
+  environment: MockScriptExecutionEnvironment,
   getInputs?: () => MockScriptInputsApi | undefined
 ): MockScriptContext {
-  const ui = createUiApi(host, event.projectId, () => ctx);
-  const nav = createNavigationApi(host);
+  const ui = createUiApi(host, event.projectId, () => ctx, environment);
+  const nav = createNavigationApi(host, environment);
   const tagRuntime = host.getTagRuntime();
   const contextRef: { current?: MockScriptContext } = {};
+  const stateWrites = new Map<string, { deleted: boolean; value?: unknown }>();
+  let stateCleared = false;
   const tags = tagRuntime
-    ? createTagRuntimeProxy(tagRuntime, {
-        log: (...values) => contextRef.current?.log(...values),
-        emit: (eventName, payload) => contextRef.current?.emit(eventName, payload),
-      })
+    ? createTagRuntimeProxy(tagRuntime, createTagRuntimeContext(environment, () => contextRef.current))
     : undefined;
 
   const ctx: MockScriptContext = Object.freeze({
@@ -231,26 +321,66 @@ function createContext(
     },
     state: Object.freeze({
       get<T>(key: string, fallback?: T) {
+        const local = stateWrites.get(key);
+        if (local) return local.deleted ? fallback : local.value;
+        if (stateCleared) return fallback;
         return getMockSessionValue(event.projectId, key, fallback);
       },
       set(key: string, value: unknown) {
-        setMockSessionValue(event.projectId, key, value);
+        stateWrites.set(key, { deleted: false, value });
+        environment.collector.setShadow(shadowKey.state(event.projectId, key), value);
+        environment.collector.push({
+          id: createIntentId(),
+          type: "state-set",
+          source: environment.source,
+          key,
+          value,
+        });
       },
       delete(key: string) {
-        deleteMockSessionValue(event.projectId, key);
+        stateWrites.set(key, { deleted: true });
+        environment.collector.deleteShadow(shadowKey.state(event.projectId, key));
+        environment.collector.push({
+          id: createIntentId(),
+          type: "state-delete",
+          source: environment.source,
+          key,
+        });
       },
       clear() {
-        clearMockSessionState(event.projectId);
+        stateCleared = true;
+        stateWrites.clear();
+        environment.collector.clearShadow(`state:${event.projectId}:`);
+        environment.collector.push({
+          id: createIntentId(),
+          type: "state-clear",
+          source: environment.source,
+        });
       },
     }),
     ui,
     nav,
     ...(tags ? { tags } : {}),
     navigateTo(path: string) {
-      host.navigateTo(path);
+      environment.collector.push({
+        id: createIntentId(),
+        type: "navigate",
+        source: environment.source,
+        path,
+      });
     },
     emit(eventName: string, payload?: Record<string, unknown>) {
-      host.emit(eventName, payload);
+      environment.collector.push({
+        id: createIntentId(),
+        type: "emit-event",
+        source: environment.source,
+        event: {
+          kind: "event",
+          ownerId: event.sourceNodeId,
+          eventName,
+        },
+        ...(payload ? { payload } : {}),
+      });
     },
     random: Object.freeze({
       color: randomColor,
@@ -294,7 +424,10 @@ function createInputsApi(
   });
 }
 
-function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
+function createNavigationApi(
+  host: MockScriptHost,
+  environment: MockScriptExecutionEnvironment
+): MockScriptNavigationApi {
   const roots = host.getNavigationTree();
   const rootByName = new Map(roots.map((node) => [node.name, node]));
   const cache = new Map<string, MockScriptNavigationNodeApi>();
@@ -308,7 +441,12 @@ function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
       path: node.path,
       pageId: node.pageId,
       go() {
-        host.navigateTo(node.path);
+        environment.collector.push({
+          id: createIntentId(),
+          type: "navigate",
+          source: environment.source,
+          path: node.path,
+        });
       },
     } as MockScriptNavigationNodeApi;
 
@@ -339,7 +477,8 @@ function createNavigationApi(host: MockScriptHost): MockScriptNavigationApi {
 function createUiApi(
   host: MockScriptHost,
   projectId: string,
-  getContext: () => MockScriptContext
+  getContext: () => MockScriptContext,
+  environment: MockScriptExecutionEnvironment
 ): MockScriptUiApi {
   // Names are only API aliases. Stable node ids are the actual identity, so
   // Button1 on a page and Button1 inside a component never share a cache slot.
@@ -358,7 +497,13 @@ function createUiApi(
     const cached = componentCache.get(node.id);
     if (cached) return cached;
 
-    const api = createComponentApi(node, host, projectId, getContext);
+    const api = createComponentApi(
+      node,
+      host,
+      projectId,
+      getContext,
+      environment
+    );
     componentCache.set(node.id, api);
     return api;
   }
@@ -386,7 +531,8 @@ function createInternalUiApi(
   runtimeInstanceId: string,
   host: MockScriptHost,
   projectId: string,
-  getContext: () => MockScriptContext
+  getContext: () => MockScriptContext,
+  environment: MockScriptExecutionEnvironment
 ): MockScriptInternalApi {
   const nodesByName = new Map<string, UiNode>();
   const duplicateNames = new Set<string>();
@@ -415,9 +561,14 @@ function createInternalUiApi(
     if (cached) return cached;
 
     const runtimeNodeId = `${runtimeInstanceId}::${node.id}`;
-    const api = createComponentApi(node, host, projectId, getContext, {
-      runtimeNodeId,
-    });
+    const api = createComponentApi(
+      node,
+      host,
+      projectId,
+      getContext,
+      environment,
+      { runtimeNodeId }
+    );
     cache.set(node.id, api);
     return api;
   }
@@ -443,6 +594,7 @@ function createComponentApi(
   host: MockScriptHost,
   projectId: string,
   getContext: () => MockScriptContext,
+  environment: MockScriptExecutionEnvironment,
   options: CreateComponentApiOptions = {}
 ): UiComponentScriptApi {
   const runtimeNodeId = options.runtimeNodeId ?? node.id;
@@ -510,7 +662,22 @@ function createComponentApi(
 
     localProps[property] = value;
     localWrites.set(property, value);
-    host.setNodeProp(runtimeNodeId, property, value);
+    environment.collector.setShadow(
+      shadowKey.componentProperty(runtimeNodeId, property),
+      value
+    );
+    environment.collector.push({
+      id: createIntentId(),
+      type: "set-property",
+      source: environment.source,
+      target: {
+        kind: "component-property",
+        componentId: runtimeNodeId,
+        property,
+        path: `${node.name}.${property}`,
+      },
+      value,
+    });
   }
 
   function getInternalApi() {
@@ -520,7 +687,8 @@ function createComponentApi(
       runtimeNodeId,
       host,
       projectId,
-      getContext
+      getContext,
+      environment
     );
     return internalApi;
   }
@@ -539,6 +707,19 @@ function createComponentApi(
     if (!methodRef) return undefined;
 
     const callable = (...args: unknown[]) => {
+      environment.collector.push({
+        id: createIntentId(),
+        type: "call-method",
+        source: environment.source,
+        target: {
+          kind: "method",
+          ownerId: runtimeNodeId,
+          method: methodName,
+          path: node.name,
+        },
+        args,
+        expanded: true,
+      });
       const script = getMockScript(projectId, methodRef.scriptId);
       const baseContext = getContext();
       const executionContext = reusableDefinition
@@ -553,7 +734,7 @@ function createComponentApi(
         self: reusableDefinition ? componentSelfProxy : publicProxy,
         internal: getInternalApi(),
         args,
-        globals: createTagGlobals(host, executionContext),
+        globals: createTagGlobals(host, executionContext, environment),
         sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
       });
     };
@@ -576,7 +757,21 @@ function createComponentApi(
       for (const [property, value] of localWrites) localProps[property] = value;
     }
 
-    host.setNodeVariant(variantRuntimeNodeId, variantName);
+    environment.collector.setShadow(
+      shadowKey.componentVariant(variantRuntimeNodeId),
+      variantName
+    );
+    environment.collector.push({
+      id: createIntentId(),
+      type: "set-variant",
+      source: environment.source,
+      target: {
+        kind: "component-variant",
+        componentId: variantRuntimeNodeId,
+        path: `${node.name}.variant`,
+      },
+      variantName,
+    });
   }
 
   const variantApi =
@@ -627,9 +822,7 @@ function createComponentApi(
               return undefined;
             }
             return createUdtInstanceApi(tag.name, tagRuntime, {
-              writeSource: { kind: "script" },
-              log: (...values) => getContext().log(...values),
-              emit: (eventName, payload) => getContext().emit(eventName, payload),
+              ...createTagRuntimeContext(environment, getContext),
             });
           }
           return value;
@@ -735,14 +928,134 @@ function executeSource({
   return execute(ctx, self, args, ...globalValues);
 }
 
-function createTagGlobals(host: MockScriptHost, ctx: MockScriptContext) {
+function createTagGlobals(
+  host: MockScriptHost,
+  ctx: MockScriptContext,
+  environment: MockScriptExecutionEnvironment
+) {
   const tagRuntime = host.getTagRuntime();
   return tagRuntime
-    ? createTagRuntimeGlobals(tagRuntime, {
-        log: (...values) => ctx.log(...values),
-        emit: (eventName, payload) => ctx.emit(eventName, payload),
-      })
+    ? createTagRuntimeGlobals(
+        tagRuntime,
+        createTagRuntimeContext(environment, () => ctx)
+      )
     : {};
+}
+
+function createTagRuntimeContext(
+  environment: MockScriptExecutionEnvironment,
+  getContext: () => MockScriptContext | undefined
+) {
+  return {
+    writeSource: { kind: "script" } as const,
+    log: (...values: unknown[]) => getContext()?.log(...values),
+    emit: (eventName: string, payload?: Record<string, unknown>) =>
+      getContext()?.emit(eventName, payload),
+    readValue: (path: string, fallback: () => unknown) =>
+      environment.collector.readShadow(shadowKey.tag(path), fallback),
+    writeValue: (path: string, tagId: string, value: unknown) => {
+      environment.collector.setShadow(shadowKey.tag(path), value);
+      environment.collector.push({
+        id: createIntentId(),
+        type: "set-value",
+        source: environment.source,
+        target: {
+          kind: "tag",
+          id: tagId,
+          path,
+        },
+        value,
+      });
+    },
+    callMethod: (path: string, tagId: string, methodName: string, args: unknown[]) => {
+      environment.collector.push({
+        id: createIntentId(),
+        type: "call-method",
+        source: environment.source,
+        target: {
+          kind: "method",
+          ownerId: tagId,
+          method: methodName,
+          path,
+        },
+        args,
+        expanded: true,
+      });
+    },
+  };
+}
+
+function createRuntimeEffects(
+  event: MockScriptEvent,
+  host: MockScriptHost
+): RuntimeEffects {
+  return {
+    setValue(target, value) {
+      const tagRuntime = host.getTagRuntime();
+      if (!tagRuntime) {
+        throw new Error(`Tag runtime is unavailable for ${target.path}.`);
+      }
+      const owner = tagRuntime.listTags().find((tag) => tag.id === target.id);
+      if (!owner) {
+        throw new Error(`Tag ${target.id} no longer exists (${target.path}).`);
+      }
+      const result = tagRuntime.write(target.path, value, { kind: "script" });
+      if (!result.ok) throw new TypeError(result.error);
+    },
+    setProperty(target, value) {
+      host.setNodeProp(target.componentId, target.property, value);
+    },
+    setVariant(target, variantName) {
+      host.setNodeVariant(target.componentId, variantName);
+    },
+    emitEvent(intentEvent, payload) {
+      host.emit(intentEvent.eventName, payload);
+    },
+    navigate(path) {
+      host.navigateTo(path);
+    },
+    setState(key, value) {
+      setMockSessionValue(event.projectId, key, value);
+    },
+    deleteState(key) {
+      deleteMockSessionValue(event.projectId, key);
+    },
+    clearState() {
+      clearMockSessionState(event.projectId);
+    },
+    callMethod(target) {
+      throw new Error(
+        `Deferred runtime method execution is not registered: ${target.path ?? target.ownerId}.${target.method}`
+      );
+    },
+  };
+}
+
+function validateRuntimeIntent(intent: Intent, host: MockScriptHost): void {
+  if (intent.type !== "set-value") return;
+
+  const tagRuntime = host.getTagRuntime();
+  if (!tagRuntime) {
+    throw new TypeError(`Tag runtime is unavailable for ${intent.target.path}.`);
+  }
+
+  const resolved = tagRuntime.store.resolve(intent.target.path);
+  if (!resolved) {
+    throw new TypeError(`Unknown tag path: ${intent.target.path}`);
+  }
+  if (resolved.tag.id !== intent.target.id) {
+    throw new TypeError(
+      `Tag reference changed before execution: ${intent.target.path}.`
+    );
+  }
+  if (resolved.type.kind === "udt") {
+    throw new TypeError(`Cannot assign an entire UDT value: ${intent.target.path}`);
+  }
+  if (!TypeRegistry.validate(resolved.type, intent.value)) {
+    throw new TypeError(
+      `Invalid ${TypeRegistry.getDisplayName(resolved.type)} value for ${intent.target.path}.`
+    );
+  }
 }
 
 function hasOwn(target: object, property: string) {

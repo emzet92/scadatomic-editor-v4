@@ -1,4 +1,4 @@
-import { designerTagStore } from "../uiframework/data/tags/designer-tag-store";
+import { getDesignerTagStore } from "../uiframework/data/tags/designer-tag-store";
 import type { TagWriteSource } from "../uiframework/data/tags/TagEvents";
 import { getMockRuntimeSocket } from "./mock-runtime-socket";
 
@@ -29,7 +29,7 @@ export function connectMockDesignerTagBridge(projectId: string) {
         return;
       }
 
-      designerTagStore.set(payload.path, payload.newValue, {
+      getDesignerTagStore().set(payload.path, payload.newValue, {
         source: payload.source ?? { kind: "driver", id: "mock-runtime" },
       });
     } catch {

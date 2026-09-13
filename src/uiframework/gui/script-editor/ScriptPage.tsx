@@ -29,6 +29,8 @@ import type {
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
+import { AstGraphView } from "../../../execution/visualization/AstGraphView";
+import { ExecutionGraphView } from "../../../execution/visualization/ExecutionGraphView";
 
 export function ScriptPage() {
   const { scriptId, projectId } = useParams();
@@ -59,6 +61,7 @@ function ScriptEditor({
   const [projectName, setProjectName] = useState("");
   const [projectRevision, setProjectRevision] = useState<number | undefined>();
   const [apiError, setApiError] = useState<string | null>(null);
+  const [view, setView] = useState<"code" | "ast" | "execution">("code");
 
   const dirty = code !== savedCode;
   const allComponentApi = document
@@ -88,6 +91,9 @@ function ScriptEditor({
     document && componentScriptDefinition
       ? describeComponentScriptInternalApi(document, componentScriptDefinition)
       : [];
+  const supportsExecutionGraph =
+    scriptSelection?.kind === "handler" ||
+    scriptSelection?.kind === "componentHandler";
 
   useEffect(() => {
     let cancelled = false;
@@ -370,65 +376,114 @@ function ScriptEditor({
               </p>
             </div>
 
-            <JavaScriptCodeEditor
-              value={code}
-              onChange={setCode}
-              components={componentApi}
-              selfComponent={selfComponent}
-              internalComponents={internalComponents}
-              navigation={navigationTree}
-              projectData={document?.data}
-            />
+            <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+              <ScriptViewTab active={view === "code"} onClick={() => setView("code")}>
+                Code
+              </ScriptViewTab>
+              <ScriptViewTab active={view === "ast"} onClick={() => setView("ast")}>
+                Code Graph
+              </ScriptViewTab>
+              {supportsExecutionGraph ? (
+                <ScriptViewTab
+                  active={view === "execution"}
+                  onClick={() => setView("execution")}
+                >
+                  Execution Graph
+                </ScriptViewTab>
+              ) : null}
+            </div>
 
-            <div className="rounded-xl border border-zinc-200 bg-white p-4">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                ctx API
-              </div>
-              <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
-                <code>ctx.sourceNodeId</code>
-                <code>ctx.eventName</code>
-                <code>ctx.state.get(key, fallback?)</code>
-                <code>ctx.state.set(key, value)</code>
-                <code>ctx.ui.ComponentName</code>
-                <code>ctx.ui.ComponentName.prop = value</code>
-                <code>ctx.ui.ComponentName.variant.enabled()</code>
-                <code>ctx.ui.ComponentName.variant.current</code>
-                <code>ctx.navigateTo("Page/SubPage")</code>
-                <code>ctx.nav.Page1.go()</code>
-                <code>tags.LineSpeed</code>
-                <code>tags.LineSpeed = 1200</code>
-                <code>tags.Pump1.speed = 1450</code>
-                <code>tags.Pump1.start()</code>
-                <code>ctx.tags.Pump1.running</code>
-                {scriptSelection?.kind === "method" ||
-                scriptSelection?.kind === "componentMethod" ||
-                scriptSelection?.kind === "componentHandler" ? (
-                  <>
-                    <code>self.prop = value</code>
-                    <code>self.otherMethod()</code>
-                    {componentScriptDefinition ? (
+            {view === "code" ? (
+              <>
+                <JavaScriptCodeEditor
+                  value={code}
+                  onChange={setCode}
+                  components={componentApi}
+                  selfComponent={selfComponent}
+                  internalComponents={internalComponents}
+                  navigation={navigationTree}
+                  projectData={document?.data}
+                />
+
+                <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    ctx API
+                  </div>
+                  <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
+                    <code>ctx.sourceNodeId</code>
+                    <code>ctx.eventName</code>
+                    <code>ctx.state.get(key, fallback?)</code>
+                    <code>ctx.state.set(key, value)</code>
+                    <code>ctx.ui.ComponentName</code>
+                    <code>ctx.ui.ComponentName.prop = value</code>
+                    <code>ctx.ui.ComponentName.variant.enabled()</code>
+                    <code>ctx.ui.ComponentName.variant.current</code>
+                    <code>ctx.navigateTo("Page/SubPage")</code>
+                    <code>ctx.nav.Page1.go()</code>
+                    <code>tags.LineSpeed</code>
+                    <code>tags.LineSpeed = 1200</code>
+                    <code>tags.Pump1.speed = 1450</code>
+                    <code>tags.Pump1.start()</code>
+                    <code>ctx.tags.Pump1.running</code>
+                    {scriptSelection?.kind === "method" ||
+                    scriptSelection?.kind === "componentMethod" ||
+                    scriptSelection?.kind === "componentHandler" ? (
                       <>
-                        <code>internal.Button1.disabled = true</code>
-                        <code>internal.NestedComponent.publicMethod()</code>
-                        <code>ctx.ui.OtherComponent.publicMethod()</code>
+                        <code>self.prop = value</code>
+                        <code>self.otherMethod()</code>
+                        {componentScriptDefinition ? (
+                          <>
+                            <code>internal.Button1.disabled = true</code>
+                            <code>internal.NestedComponent.publicMethod()</code>
+                            <code>ctx.ui.OtherComponent.publicMethod()</code>
+                          </>
+                        ) : null}
+                        <code>args[0], args[1], ...</code>
                       </>
                     ) : null}
-                    <code>args[0], args[1], ...</code>
-                  </>
-                ) : null}
-                <code>ctx.emit(name, payload?)</code>
-                <code>ctx.random.color()</code>
-                <code>ctx.random.number(min, max)</code>
-                <code>ctx.log(...args)</code>
-              </div>
-              <p className="mt-3 text-xs text-amber-700">
-                Prototype only: handlers run with new Function and are not sandboxed.
-              </p>
-            </div>
+                    <code>ctx.emit(name, payload?)</code>
+                    <code>ctx.random.color()</code>
+                    <code>ctx.random.number(min, max)</code>
+                    <code>ctx.log(...args)</code>
+                  </div>
+                  <p className="mt-3 text-xs text-amber-700">
+                    Prototype only: handlers run with new Function and are not sandboxed.
+                  </p>
+                </div>
+              </>
+            ) : view === "ast" ? (
+              <AstGraphView source={code} />
+            ) : supportsExecutionGraph ? (
+              <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
+            ) : null}
           </div>
         </main>
       </div>
     </div>
+  );
+}
+
+function ScriptViewTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 font-medium transition ${
+        active
+          ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+          : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-800"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

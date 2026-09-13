@@ -27,6 +27,7 @@ export class MockSimulationRuntime {
     const driver = this.drivers.create("simulation", {
       tagStore: store,
       getProjectData: () => this.entries.get(projectId)?.data ?? resolvedData,
+      publish: (path, value, options) => store.set(path, value, options),
     });
     const entry: MockSimulationEntry = { data: resolvedData, driver };
     this.entries.set(projectId, entry);

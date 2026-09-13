@@ -7,6 +7,12 @@ export type TagRuntimeContext = {
   log?: (...args: unknown[]) => void;
   emit?: (eventName: string, payload?: Record<string, unknown>) => void;
   writeSource?: TagWriteSource | undefined;
+  /** Optional transactional read overlay used by script execution. */
+  readValue?: ((path: string, fallback: () => unknown) => unknown) | undefined;
+  /** Optional deferred write sink. When present, TagRuntime.write is not called here. */
+  writeValue?: ((path: string, tagId: string, value: unknown) => void) | undefined;
+  /** Records script-defined UDT method calls before their body is expanded. */
+  callMethod?: ((path: string, tagId: string, methodName: string, args: unknown[]) => void) | undefined;
 };
 
 export type TagRuntimeApi = Record<string, unknown> & {
@@ -60,7 +66,7 @@ export function createTagRuntimeProxy(
           const fieldPath = `${path}.${field.name}`;
           return field.type.kind === "udt"
             ? createScopedUdtProxy(fieldPath, field.type.udtId)
-            : tagRuntime.get(fieldPath);
+            : readValue(tagRuntime, fieldPath, context);
         }
 
         const method = definition.methods.find(
@@ -71,8 +77,12 @@ export function createTagRuntimeProxy(
         const callable = methodCache.get(method.id);
         if (callable) return callable;
 
-        const nextCallable = (...args: unknown[]) =>
-          executeUdtMethod(method, proxy, args, context);
+        const nextCallable = (...args: unknown[]) => {
+          const rootName = path.split(".")[0];
+          const owner = rootName ? tagRuntime.getTagByName(rootName) : undefined;
+          if (owner) context.callMethod?.(path, owner.id, method.name, args);
+          return executeUdtMethod(method, proxy, args, context);
+        };
         methodCache.set(method.id, nextCallable);
         return nextCallable;
       },
@@ -90,7 +100,7 @@ export function createTagRuntimeProxy(
             `Cannot assign an entire UDT value: ${path}.${property}`
           );
         }
-        setOrThrow(tagRuntime, `${path}.${property}`, value, context.writeSource);
+        setOrThrow(tagRuntime, `${path}.${property}`, value, context);
         return true;
       },
       ownKeys() {
@@ -122,10 +132,10 @@ export function createTagRuntimeProxy(
       if (typeof property !== "string") return undefined;
 
       if (property === "$get") {
-        return (path: string) => tagRuntime.get(path);
+        return (path: string) => readValue(tagRuntime, path, context);
       }
       if (property === "$set") {
-        return (path: string, value: unknown) => setOrThrow(tagRuntime, path, value, context.writeSource);
+        return (path: string, value: unknown) => setOrThrow(tagRuntime, path, value, context);
       }
       if (property === "$children") {
         return (path: string) => tagRuntime.children(path);
@@ -135,7 +145,7 @@ export function createTagRuntimeProxy(
       if (!tag) return undefined;
       return isUdtTag(tag)
         ? createScopedUdtProxy(tag.name, tag.type.udtId)
-        : tagRuntime.get(tag.name);
+        : readValue(tagRuntime, tag.name, context);
     },
     set(_target, property, value) {
       if (typeof property !== "string") return false;
@@ -147,7 +157,7 @@ export function createTagRuntimeProxy(
       if (!isPrimitiveTag(tag)) {
         throw new TypeError(`Cannot assign an entire UDT value: ${tag.name}`);
       }
-      setOrThrow(tagRuntime, tag.name, value, context.writeSource);
+      setOrThrow(tagRuntime, tag.name, value, context);
       return true;
     },
     ownKeys() {
@@ -238,10 +248,28 @@ function setOrThrow(
   tagRuntime: TagRuntime,
   path: string,
   value: unknown,
-  source: TagWriteSource | undefined
+  context: TagRuntimeContext
 ) {
-  const result = tagRuntime.write(path, value, source ?? { kind: "script" });
+  if (context.writeValue) {
+    const rootName = path.split(".")[0];
+    const tag = rootName ? tagRuntime.getTagByName(rootName) : undefined;
+    if (!tag) throw new TypeError(`Unknown tag path: ${path}`);
+    context.writeValue(path, tag.id, value);
+    return;
+  }
+
+  const result = tagRuntime.write(path, value, context.writeSource ?? { kind: "script" });
   if (!result.ok) throw new TypeError(result.error);
+}
+
+function readValue(
+  tagRuntime: TagRuntime,
+  path: string,
+  context: TagRuntimeContext
+): unknown {
+  return context.readValue
+    ? context.readValue(path, () => tagRuntime.get(path))
+    : tagRuntime.get(path);
 }
 
 function getDefinition(
