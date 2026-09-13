@@ -39,16 +39,27 @@ export function GraphCanvas({
       ...node.data,
       label: (
         <div className="px-4 py-3 text-left">
-          {node.data.eyebrow ? (
-            <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
-              {String(node.data.eyebrow)}
+          <div className="flex items-start gap-3">
+            {node.data.icon ? (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-sm font-semibold text-zinc-700">
+                {String(node.data.icon)}
+              </div>
+            ) : null}
+            <div className="min-w-0 flex-1">
+              {node.data.eyebrow ? (
+                <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+                  {String(node.data.eyebrow)}
+                </div>
+              ) : null}
+              <div className="text-xs font-semibold text-zinc-900">
+                {String(node.data.title ?? node.id)}
+              </div>
+              {node.data.detail ? (
+                <div className="mt-1 break-words text-[10px] leading-4 text-zinc-500">
+                  {String(node.data.detail)}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-          <div className="text-xs font-semibold text-zinc-900">
-            {String(node.data.title ?? node.id)}
-          </div>
-          <div className="mt-1 break-words text-[10px] leading-4 text-zinc-500">
-            {String(node.data.detail ?? "")}
           </div>
           {node.data.status ? (
             <div className="mt-2 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">

@@ -9,6 +9,7 @@ export type SemanticCodeFlowNodeData = Record<string, unknown> & {
   title: string;
   detail: string;
   eyebrow: string;
+  icon: string;
   kind: SemanticCodeNodeKind;
 };
 
@@ -30,6 +31,7 @@ export function semanticCodeGraphToReactFlow(graph: SemanticCodeGraph): {
         title: node.label,
         detail: node.detail ?? "",
         eyebrow: kindLabel(node.kind),
+        icon: kindIcon(node.kind),
         kind: node.kind,
       },
       style: nodeStyle(node.kind),
@@ -38,7 +40,7 @@ export function semanticCodeGraphToReactFlow(graph: SemanticCodeGraph): {
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      ...(edge.role !== "next" ? { label: edge.role } : {}),
+      ...(edge.role !== "next" ? { label: edgeRoleLabel(edge.role) } : {}),
       type: "smoothstep",
       markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
       labelStyle: { fontSize: 10, fontWeight: 600 },
@@ -50,17 +52,51 @@ function kindLabel(kind: SemanticCodeNodeKind): string {
   switch (kind) {
     case "start": return "FLOW";
     case "end": return "FLOW";
-    case "decision": return "DECISION";
-    case "loop": return "LOOP";
+    case "decision": return "CHECK";
+    case "loop": return "REPEAT";
     case "data": return "DATA";
     case "action": return "ACTION";
     case "event": return "EVENT";
-    case "navigation": return "NAVIGATION";
-    case "function": return "FUNCTION";
-    case "return": return "RETURN";
+    case "navigation": return "PAGE";
+    case "function": return "HELPER";
+    case "return": return "FINISH";
     case "error": return "ERROR";
   }
 }
+
+function kindIcon(kind: SemanticCodeNodeKind): string {
+  switch (kind) {
+    case "start": return "▶";
+    case "end": return "✓";
+    case "decision": return "?";
+    case "loop": return "↻";
+    case "data": return "≡";
+    case "action": return "→";
+    case "event": return "⚡";
+    case "navigation": return "↗";
+    case "function": return "◆";
+    case "return": return "↩";
+    case "error": return "!";
+  }
+}
+
+function edgeRoleLabel(role: string): string {
+  switch (role) {
+    case "true": return "Yes";
+    case "false": return "No";
+    case "body": return "Repeat";
+    case "done": return "Continue";
+    case "try": return "Continue";
+    case "catch": return "On error";
+    case "return": return "Finish";
+    case "error": return "Stop";
+    default:
+      if (role.startsWith("case ")) return "Option";
+      if (role === "default") return "Otherwise";
+      return role;
+  }
+}
+
 
 function nodeStyle(kind: SemanticCodeNodeKind): Record<string, string | number> {
   const base: Record<string, string | number> = {

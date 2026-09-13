@@ -1,17 +1,31 @@
-# SCADAtomic semantic Code Graph patch
+# Friendly Code Graph patch
 
-Base: `scadatomic-editor-execution-plan-source.zip`
+Incremental patch for `scadatomic-editor-semantic-code-graph-source.zip`.
 
-This patch changes only the **Code Graph** visualization. Execution Plan and Execution Graph semantics remain unchanged.
+## What changed
 
-## Apply
+The Code Graph no longer exposes JavaScript-looking details to the user.
 
-Preferred:
+- generic `Call X()` labels were replaced with user-facing actions such as `Start Pump1`, `Reset Pump1`, `Process item`
+- assignments are shown as `Update ...` without the right-hand JavaScript expression
+- decisions are shown as `Check ...` with `Yes / No` branches
+- loops are shown as `Repeat ...`
+- events, navigation, session state and logs use product-facing wording
+- variable declarations are collapsed to `Prepare data`
+- raw source snippets are no longer used as node details
+- parser/Acorn wording was removed from the user-facing graph panel
+- semantic nodes have small visual glyphs and friendlier categories
+- parse errors no longer expose parser error text inside this visualization
 
-```bash
-patch -p1 < PATCH_SEMANTIC_CODE_GRAPH.diff
-```
+The AST parser is still used internally. This only changes the semantic projection and visualization; runtime execution is untouched.
 
-or copy the included `src/...` files into the project. The diff also removes the old `AstGraphView.tsx`, which has been replaced by `CodeGraphView.tsx`.
+## Files
 
-See `SEMANTIC_CODE_GRAPH.md` for the architecture and file locations.
+- `src/execution/ast/semantic-code-graph-builder.ts`
+- `src/execution/visualization/semantic-code-graph-adapter.ts`
+- `src/execution/visualization/CodeGraphView.tsx`
+- `src/execution/visualization/GraphCanvas.tsx`
+
+## Validation
+
+Validated with the project TypeScript compiler and ESLint on all changed files. A semantic graph smoke test confirmed that a handler containing variable preparation, an if branch, property update, method action, emitted event, logging and navigation is rendered without source-code fragments.

@@ -42,8 +42,7 @@ type NodeLike = AcornNode & Record<string, unknown>;
 type Incoming = { id: string; role?: string | undefined };
 
 export function buildSemanticCodeGraph(
-  program: Program,
-  source: string
+  program: Program
 ): SemanticCodeGraph {
   const nodes: SemanticCodeGraphNode[] = [];
   const edges: SemanticCodeGraphEdge[] = [];
@@ -119,22 +118,11 @@ export function buildSemanticCodeGraph(
 
       case "VariableDeclaration": {
         const declarations = nodeArray(statement.declarations);
-        const names = declarations
-          .map((declaration) => patternSummary(asNode(declaration.id)))
-          .filter(Boolean);
-        const assignments = declarations
-          .map((declaration) => {
-            const name = patternSummary(asNode(declaration.id));
-            const init = asNode(declaration.init);
-            return init ? `${name} = ${expressionSummary(init)}` : name;
-          })
-          .filter(Boolean)
-          .join(" · ");
         const id = addNode(
           statement,
           "data",
-          names.length > 0 ? `Prepare ${names.join(", ")}` : "Prepare data",
-          assignments || undefined
+          "Prepare data",
+          declarations.length > 1 ? `Prepare ${declarations.length} working values` : "Prepare a working value"
         );
         connect(incoming, id);
         return [{ id }];
@@ -148,11 +136,12 @@ export function buildSemanticCodeGraph(
 
       case "IfStatement": {
         const test = asNode(statement.test);
+        const decision = describeCondition(test);
         const decisionId = addNode(
           statement,
           "decision",
-          "IF",
-          test ? expressionSummary(test) : "condition"
+          decision.label,
+          decision.detail
         );
         connect(incoming, decisionId);
 
@@ -176,7 +165,7 @@ export function buildSemanticCodeGraph(
           statement,
           "loop",
           loopLabel(statement),
-          loopDetail(statement, source)
+          loopDetail(statement)
         );
         connect(incoming, loopId);
         const body = asNode(statement.body);
@@ -195,8 +184,8 @@ export function buildSemanticCodeGraph(
         const id = addNode(
           statement,
           "return",
-          "Return",
-          argument ? expressionSummary(argument) : "finish handler"
+          "Finish handler",
+          argument ? "Return a result" : "Stop this flow"
         );
         connect(incoming, id);
         terminalNodes.push({ id, role: "return" });
@@ -208,8 +197,8 @@ export function buildSemanticCodeGraph(
         const id = addNode(
           statement,
           "error",
-          "Throw error",
-          argument ? expressionSummary(argument) : undefined
+          "Stop with error",
+          argument ? "Report an error and stop" : "Stop this flow"
         );
         connect(incoming, id);
         terminalNodes.push({ id, role: "error" });
@@ -228,16 +217,14 @@ export function buildSemanticCodeGraph(
       }
 
       case "FunctionDeclaration": {
-        const fnId = asNode(statement.id);
-        const name = fnId && typeof fnId.name === "string" ? fnId.name : "function";
         const params = nodeArray(statement.params)
           .map((param) => patternSummary(param))
           .filter(Boolean);
         const id = addNode(
           statement,
           "function",
-          `Define ${name}()`,
-          params.length > 0 ? `inputs: ${params.join(", ")}` : "no inputs"
+          "Prepare helper step",
+          params.length > 0 ? "Reusable logic with inputs" : "Reusable logic"
         );
         connect(incoming, id);
         return [{ id }];
@@ -248,8 +235,8 @@ export function buildSemanticCodeGraph(
         const switchId = addNode(
           statement,
           "decision",
-          "Switch",
-          discriminant ? expressionSummary(discriminant) : "value"
+          "Choose path",
+          discriminant ? `Based on ${describeSubject(discriminant)}` : "Choose one path"
         );
         connect(incoming, switchId);
         const cases = nodeArray(statement.cases);
@@ -269,7 +256,7 @@ export function buildSemanticCodeGraph(
       }
 
       case "TryStatement": {
-        const tryId = addNode(statement, "action", "Try");
+        const tryId = addNode(statement, "action", "Run protected step", "Continue even if an error is possible");
         connect(incoming, tryId);
         const block = asNode(statement.block);
         let exits = block ? buildStatement(block, [{ id: tryId, role: "try" }]) : [{ id: tryId }];
@@ -294,8 +281,7 @@ export function buildSemanticCodeGraph(
         const id = addNode(
           statement,
           "action",
-          humanizeStatement(statement.type),
-          compactSource(source, statement.start, statement.end)
+          friendlyUnknownAction(statement.type)
         );
         connect(incoming, id);
         return [{ id }];
@@ -311,13 +297,12 @@ export function buildSemanticCodeGraph(
     if (expression.type === "AssignmentExpression") {
       const left = asNode(expression.left);
       const right = asNode(expression.right);
-      const target = left ? expressionSummary(left) : "value";
-      const displayTarget = friendlyPath(target);
+      const displayTarget = left ? describeTarget(left) : "value";
       const id = addNode(
         statement,
         "action",
-        `Set ${displayTarget}`,
-        right ? expressionSummary(right) : undefined
+        `Update ${displayTarget}`,
+        right ? describeValueSource(right) : "Use a new value"
       );
       connect(incoming, id);
       return [{ id }];
@@ -337,12 +322,11 @@ export function buildSemanticCodeGraph(
 
     if (expression.type === "UpdateExpression") {
       const argument = asNode(expression.argument);
-      const operator = typeof expression.operator === "string" ? expression.operator : "update";
       const id = addNode(
         statement,
         "action",
-        `Update ${argument ? friendlyPath(expressionSummary(argument)) : "value"}`,
-        operator
+        `Update ${argument ? describeTarget(argument) : "value"}`,
+        "Adjust the current value"
       );
       connect(incoming, id);
       return [{ id }];
@@ -353,8 +337,8 @@ export function buildSemanticCodeGraph(
       const id = addNode(
         statement,
         "action",
-        "Await",
-        argument ? expressionSummary(argument) : undefined
+        "Wait for operation",
+        argument ? describeOperation(argument) : "Wait until the step finishes"
       );
       connect(incoming, id);
       return [{ id }];
@@ -363,8 +347,8 @@ export function buildSemanticCodeGraph(
     const id = addNode(
       statement,
       "action",
-      "Evaluate",
-      expressionSummary(expression)
+      "Run action",
+      "Perform the next handler step"
     );
     connect(incoming, id);
     return [{ id }];
@@ -385,75 +369,71 @@ export function buildSemanticCodeGraph(
         : friendlyPath(calleePath.slice(0, -".emit".length));
       return {
         kind: "event",
-        label: `Emit ${eventName}`,
-        ...(args.length > 1 ? { detail: `payload: ${args[1]}` } : {}),
+        label: "Send event",
+        detail: eventName ? `Event: ${humanizeName(eventName)}` : "Notify the next flow",
       };
     }
 
     if (calleePath === "ctx.navigateTo") {
       return {
         kind: "navigation",
-        label: "Navigate",
-        detail: friendlyValue(args[0] ?? "page"),
+        label: "Open page",
+        detail: humanizeName(friendlyValue(args[0] ?? "page")),
       };
     }
 
     if (calleePath.startsWith("ctx.nav.") && calleePath.endsWith(".go")) {
       return {
         kind: "navigation",
-        label: "Navigate",
-        detail: calleePath.slice("ctx.nav.".length, -".go".length),
+        label: "Open page",
+        detail: humanizeName(calleePath.slice("ctx.nav.".length, -".go".length)),
       };
     }
 
     if (calleePath === "ctx.log" || calleePath.startsWith("console.")) {
       return {
         kind: "action",
-        label: "Log",
-        ...(args[0] ? { detail: args[0] } : {}),
+        label: "Record message",
+        detail: "Write information to the runtime log",
       };
     }
 
     if (calleePath === "ctx.state.set") {
       return {
         kind: "data",
-        label: "Set session state",
-        detail: args.length > 0 ? args.join(" = ") : undefined,
+        label: "Update session data",
+        detail: "Remember a value for this session",
       };
     }
 
     if (calleePath === "ctx.state.delete") {
       return {
         kind: "data",
-        label: "Delete session state",
-        detail: args[0],
+        label: "Remove session data",
+        detail: "Forget a stored session value",
       };
     }
 
     if (calleePath === "ctx.state.clear") {
-      return { kind: "data", label: "Clear session state" };
+      return { kind: "data", label: "Clear session data", detail: "Forget all stored session values" };
     }
 
     const variantMatch = calleePath.match(/^(.*)\.variant\.([^.]*)$/);
     if (variantMatch) {
       return {
         kind: "action",
-        label: `Variant ${friendlyPath(variantMatch[1] ?? "component")}`,
-        detail: variantMatch[2] ?? "variant",
+        label: `Change ${humanizePath(variantMatch[1] ?? "component")} appearance`,
+        detail: variantMatch[2] ? `Use ${humanizeName(variantMatch[2])}` : "Use another variant",
       };
     }
 
-    return {
-      kind: "action",
-      label: `Call ${friendlyPath(calleePath)}()`,
-      ...(args.length > 0 ? { detail: summarizeArgs(args) } : {}),
-    };
+    return describeFriendlyCall(calleePath);
   }
 
-  const startId = addSyntheticNode("start", "Start", "handler entry");
+  const startId = addSyntheticNode("start", "Start", "Handler begins");
   const programBody = nodeArray((program as unknown as NodeLike).body);
   const exits = buildStatements(programBody, [{ id: startId }]);
-  const endId = addSyntheticNode("end", "End", "handler finished");
+  const endId = addSyntheticNode("end", "Done", "Handler finished");
   connect([...exits, ...terminalNodes], endId);
 
   if (programBody.length === 0) {
@@ -582,37 +562,198 @@ function expressionSummary(node: NodeLike): string {
 
 function loopLabel(statement: NodeLike): string {
   switch (statement.type) {
-    case "ForOfStatement": return "For each";
-    case "ForInStatement": return "For each key";
-    case "WhileStatement": return "While";
-    case "DoWhileStatement": return "Do / while";
-    default: return "Loop";
+    case "ForOfStatement": return "Repeat for each item";
+    case "ForInStatement": return "Repeat for each entry";
+    case "WhileStatement": return "Repeat while needed";
+    case "DoWhileStatement": return "Repeat step";
+    default: return "Repeat";
   }
 }
 
-function loopDetail(statement: NodeLike, source: string): string {
+function loopDetail(statement: NodeLike): string {
   if (statement.type === "ForOfStatement" || statement.type === "ForInStatement") {
-    const left = asNode(statement.left);
     const right = asNode(statement.right);
-    return compactText(
-      `${loopBindingSummary(left)} ${statement.type === "ForOfStatement" ? "of" : "in"} ${right ? expressionSummary(right) : "collection"}`
-    );
+    return right ? `Use items from ${describeSubject(right)}` : "Process each available item";
   }
 
   const test = asNode(statement.test);
-  if (test) return expressionSummary(test);
+  if (test) return describeCondition(test).detail ?? "Repeat while the condition is met";
 
-  return compactSource(source, statement.start, statement.end) ?? "repeat";
+  return "Repeat until the flow can continue";
 }
 
 
-function loopBindingSummary(node: NodeLike | undefined): string {
-  if (!node) return "item";
-  if (node.type === "VariableDeclaration") {
-    const declaration = nodeArray(node.declarations)[0];
-    return declaration ? patternSummary(asNode(declaration.id)) : "item";
+function describeCondition(node: NodeLike | undefined): { label: string; detail?: string } {
+  if (!node) return { label: "Check condition", detail: "Choose the next path" };
+
+  if (node.type === "BinaryExpression" || node.type === "LogicalExpression") {
+    const left = asNode(node.left);
+    const right = asNode(node.right);
+    const subject = left ? describeSubject(left) : "value";
+    const operator = typeof node.operator === "string" ? node.operator : "";
+    return {
+      label: `Check ${subject}`,
+      detail: comparisonDescription(operator, right),
+    };
   }
-  return expressionSummary(node);
+
+  if (node.type === "UnaryExpression" && node.operator === "!") {
+    const argument = asNode(node.argument);
+    return {
+      label: `Check ${argument ? describeSubject(argument) : "condition"}`,
+      detail: "Continue when it is not active",
+    };
+  }
+
+  return {
+    label: `Check ${describeSubject(node)}`,
+    detail: "Choose Yes or No",
+  };
+}
+
+function comparisonDescription(operator: string, right: NodeLike | undefined): string {
+  const value = right ? describeFriendlyValue(right) : undefined;
+  switch (operator) {
+    case ">": return value ? `Is above ${value}` : "Is above the expected level";
+    case ">=": return value ? `Is at least ${value}` : "Reached the expected level";
+    case "<": return value ? `Is below ${value}` : "Is below the expected level";
+    case "<=": return value ? `Is at most ${value}` : "Is within the upper limit";
+    case "==":
+    case "===": return value ? `Matches ${value}` : "Matches the expected value";
+    case "!=":
+    case "!==": return value ? `Does not match ${value}` : "Differs from the expected value";
+    case "&&": return "Both conditions must be met";
+    case "||": return "At least one condition must be met";
+    default: return "Choose Yes or No";
+  }
+}
+
+function describeTarget(node: NodeLike): string {
+  return humanizePath(expressionSummary(node));
+}
+
+function describeSubject(node: NodeLike): string {
+  if (node.type === "CallExpression") {
+    const callee = asNode(node.callee);
+    return callee ? humanizePath(expressionSummary(callee)) : "operation result";
+  }
+  return humanizePath(expressionSummary(node));
+}
+
+function describeFriendlyValue(node: NodeLike): string {
+  if (node.type === "Literal") {
+    if (typeof node.value === "string") return humanizeName(String(node.value));
+    if (typeof node.value === "number" || typeof node.value === "boolean") return String(node.value);
+    if (node.value === null) return "empty value";
+  }
+  return "the expected value";
+}
+
+function describeValueSource(node: NodeLike): string {
+  switch (node.type) {
+    case "Literal": return "Use a fixed value";
+    case "Identifier": return "Use a prepared value";
+    case "MemberExpression": return `Use ${describeSubject(node)}`;
+    case "BinaryExpression":
+    case "LogicalExpression": return "Use a calculated value";
+    case "CallExpression": return "Use the result of another action";
+    case "ConditionalExpression": return "Choose the value from a condition";
+    case "ObjectExpression": return "Use structured data";
+    case "ArrayExpression": return "Use a list of values";
+    default: return "Use a new value";
+  }
+}
+
+function describeOperation(node: NodeLike): string {
+  if (node.type === "CallExpression") {
+    const callee = asNode(node.callee);
+    if (callee) {
+      const action = describeFriendlyCall(expressionSummary(callee));
+      return action.label;
+    }
+  }
+  return "Wait until the current action finishes";
+}
+
+function describeFriendlyCall(
+  calleePath: string
+): { kind: SemanticCodeNodeKind; label: string; detail?: string } {
+  const clean = friendlyPath(calleePath);
+  const parts = clean.split(".").filter(Boolean);
+  const method = parts.pop() ?? clean;
+  const owner = parts.length > 0 ? humanizeName(parts.join(" ")) : undefined;
+  const verb = friendlyVerb(method);
+
+  if (owner) {
+    return {
+      kind: "action",
+      label: `${verb} ${owner}`,
+      detail: "Run this action",
+    };
+  }
+
+  return {
+    kind: "action",
+    label: verb,
+    detail: "Run this action",
+  };
+}
+
+function friendlyVerb(method: string): string {
+  const normalized = method.toLowerCase();
+  const known: Record<string, string> = {
+    start: "Start",
+    stop: "Stop",
+    reset: "Reset",
+    open: "Open",
+    close: "Close",
+    enable: "Enable",
+    disable: "Disable",
+    toggle: "Toggle",
+    refresh: "Refresh",
+    reload: "Reload",
+    save: "Save",
+    load: "Load",
+    clear: "Clear",
+    delete: "Remove",
+    remove: "Remove",
+    add: "Add",
+    create: "Create",
+    update: "Update",
+    process: "Process",
+    calculate: "Calculate",
+    validate: "Validate",
+    send: "Send",
+    publish: "Publish",
+    connect: "Connect",
+    disconnect: "Disconnect",
+  };
+  return known[normalized] ?? humanizeName(method);
+}
+
+function humanizePath(path: string): string {
+  const clean = friendlyPath(path)
+    .replace(/\[[^\]]+\]/g, " item ")
+    .replace(/[(){}]/g, " ")
+    .replace(/[+\-*/%<>=!?&|:]+/g, " ");
+  return humanizeName(clean.replace(/\./g, " "));
+}
+
+function humanizeName(value: string): string {
+  const clean = friendlyValue(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!clean) return "item";
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function friendlyUnknownAction(type: string): string {
+  const name = humanizeStatement(type);
+  if (/declaration/i.test(type)) return "Prepare data";
+  if (/class/i.test(type)) return "Prepare reusable behavior";
+  return name ? `Run ${name.toLowerCase()}` : "Run action";
 }
 
 function friendlyValue(value: string): string {
@@ -645,13 +786,6 @@ function formatLiteral(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "boolean" || typeof value === "number") return String(value);
   return "value";
-}
-
-function compactSource(source: string, start: number, end: number): string | undefined {
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return undefined;
-  const text = compactText(source.slice(start, end));
-  if (!text) return undefined;
-  return text.length > 72 ? `${text.slice(0, 69)}…` : text;
 }
 
 function compactText(value: string): string {
