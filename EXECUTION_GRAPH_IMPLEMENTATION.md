@@ -56,3 +56,21 @@ Two existing TypeScript breakages in the supplied archive were corrected so `tsc
 
 - old `designerTagStore` import changed to `getDesignerTagStore()`
 - mock simulation driver context now supplies the required `publish()` port
+
+## Execution Plan visualization
+
+A dedicated **Execution Plan** tab was added next to **Execution Graph** in the Script Editor.
+
+The distinction is intentional:
+
+- **Execution Plan** is captured immediately after `ExecutionPlanner.plan(...)` and before `Executor.execute(...)` starts. It is immutable and every intent node is shown as `planned`.
+- **Execution Graph** remains the runtime trace and displays actual executor statuses such as `success`, `failed`, and `skipped`.
+
+Files:
+
+- `src/execution/runtime/handler-execution-plan.ts` — immutable plan snapshot type.
+- `src/execution/debug/execution-plan.ts` — latest-plan storage + subscriptions.
+- `src/execution/visualization/execution-plan-adapter.ts` — domain plan to React Flow adapter.
+- `src/execution/visualization/ExecutionPlanView.tsx` — Plan UI.
+- `src/mock/mock-script-runtime.ts` — publishes the plan before the executor starts.
+- `src/uiframework/gui/script-editor/ScriptPage.tsx` — adds the `Execution Plan` tab.

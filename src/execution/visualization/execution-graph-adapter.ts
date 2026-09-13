@@ -75,7 +75,7 @@ export function executionToReactFlow(execution: HandlerExecution): {
   return { nodes, edges };
 }
 
-function intentTitle(intent: Intent): string {
+export function intentTitle(intent: Intent): string {
   switch (intent.type) {
     case "set-value": return `Set ${intent.target.path}`;
     case "set-property": return `Set ${intent.target.path ?? intent.target.property}`;
@@ -89,7 +89,7 @@ function intentTitle(intent: Intent): string {
   }
 }
 
-function intentDetail(intent: Intent): string {
+export function intentDetail(intent: Intent): string {
   switch (intent.type) {
     case "set-value": return formatValue(intent.value);
     case "set-property": return formatValue(intent.value);

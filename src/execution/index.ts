@@ -6,3 +6,5 @@ export * from "./model/execution-graph";
 export * from "./model/intent";
 export * from "./planner/execution-planner";
 export * from "./runtime/handler-execution";
+export * from "./debug/execution-plan";
+export * from "./runtime/handler-execution-plan";

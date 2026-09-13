@@ -30,6 +30,7 @@ import {
   ExecutionPlanner,
   IntentCollector,
   createIntentId,
+  publishExecutionPlan,
   publishExecutionTrace,
   shadowKey,
   type Intent,
@@ -266,6 +267,9 @@ export function executeMockScript(
     createdAt: Date.now(),
   };
 
+  // Freeze the exact planner output before the Executor is allowed to run.
+  // The plan view therefore never confuses planned operations with results.
+  publishExecutionPlan(execution);
   publishExecutionTrace(execution);
   void new Executor()
     .execute(graph, createRuntimeEffects(event, host))

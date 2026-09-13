@@ -31,6 +31,7 @@ import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
 import { AstGraphView } from "../../../execution/visualization/AstGraphView";
 import { ExecutionGraphView } from "../../../execution/visualization/ExecutionGraphView";
+import { ExecutionPlanView } from "../../../execution/visualization/ExecutionPlanView";
 
 export function ScriptPage() {
   const { scriptId, projectId } = useParams();
@@ -61,7 +62,7 @@ function ScriptEditor({
   const [projectName, setProjectName] = useState("");
   const [projectRevision, setProjectRevision] = useState<number | undefined>();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [view, setView] = useState<"code" | "ast" | "execution">("code");
+  const [view, setView] = useState<"code" | "ast" | "plan" | "execution">("code");
 
   const dirty = code !== savedCode;
   const allComponentApi = document
@@ -384,12 +385,20 @@ function ScriptEditor({
                 Code Graph
               </ScriptViewTab>
               {supportsExecutionGraph ? (
-                <ScriptViewTab
-                  active={view === "execution"}
-                  onClick={() => setView("execution")}
-                >
-                  Execution Graph
-                </ScriptViewTab>
+                <>
+                  <ScriptViewTab
+                    active={view === "plan"}
+                    onClick={() => setView("plan")}
+                  >
+                    Execution Plan
+                  </ScriptViewTab>
+                  <ScriptViewTab
+                    active={view === "execution"}
+                    onClick={() => setView("execution")}
+                  >
+                    Execution Graph
+                  </ScriptViewTab>
+                </>
               ) : null}
             </div>
 
@@ -453,6 +462,8 @@ function ScriptEditor({
               </>
             ) : view === "ast" ? (
               <AstGraphView source={code} />
+            ) : view === "plan" && supportsExecutionGraph ? (
+              <ExecutionPlanView projectId={projectId} handlerId={scriptId} />
             ) : supportsExecutionGraph ? (
               <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
             ) : null}

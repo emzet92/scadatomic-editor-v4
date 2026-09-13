@@ -1,0 +1,389 @@
+--- a/EXECUTION_GRAPH_IMPLEMENTATION.md
++++ b/EXECUTION_GRAPH_IMPLEMENTATION.md
+@@ -56,3 +56,21 @@
+ 
+ - old `designerTagStore` import changed to `getDesignerTagStore()`
+ - mock simulation driver context now supplies the required `publish()` port
++
++## Execution Plan visualization
++
++A dedicated **Execution Plan** tab was added next to **Execution Graph** in the Script Editor.
++
++The distinction is intentional:
++
++- **Execution Plan** is captured immediately after `ExecutionPlanner.plan(...)` and before `Executor.execute(...)` starts. It is immutable and every intent node is shown as `planned`.
++- **Execution Graph** remains the runtime trace and displays actual executor statuses such as `success`, `failed`, and `skipped`.
++
++Files:
++
++- `src/execution/runtime/handler-execution-plan.ts` — immutable plan snapshot type.
++- `src/execution/debug/execution-plan.ts` — latest-plan storage + subscriptions.
++- `src/execution/visualization/execution-plan-adapter.ts` — domain plan to React Flow adapter.
++- `src/execution/visualization/ExecutionPlanView.tsx` — Plan UI.
++- `src/mock/mock-script-runtime.ts` — publishes the plan before the executor starts.
++- `src/uiframework/gui/script-editor/ScriptPage.tsx` — adds the `Execution Plan` tab.
+--- a/src/execution/index.ts
++++ b/src/execution/index.ts
+@@ -6,3 +6,5 @@
+ export * from "./model/intent";
+ export * from "./planner/execution-planner";
+ export * from "./runtime/handler-execution";
++export * from "./debug/execution-plan";
++export * from "./runtime/handler-execution-plan";
+--- a/src/execution/debug/execution-plan.ts
++++ b/src/execution/debug/execution-plan.ts
+@@ -0,0 +1,92 @@
++import type { HandlerExecutionPlan } from "../runtime/handler-execution-plan";
++
++const STORAGE_PREFIX = "scadatomic.execution-plan.v1.";
++const localListeners = new Set<(plan: HandlerExecutionPlan) => void>();
++let channel: BroadcastChannel | undefined;
++
++function getChannel(): BroadcastChannel | undefined {
++  if (typeof BroadcastChannel === "undefined") return undefined;
++  channel ??= new BroadcastChannel("scadatomic.execution-plan.v1");
++  return channel;
++}
++
++/**
++ * Stores the planner output before execution starts. This snapshot is never
++ * updated with executor statuses, so it remains a faithful view of the plan.
++ */
++export function publishExecutionPlan(plan: HandlerExecutionPlan): void {
++  const safePlan = makeSerializable(plan);
++  try {
++    localStorage.setItem(
++      storageKey(plan.projectId, plan.handlerId),
++      JSON.stringify(safePlan)
++    );
++  } catch {
++    // Debug plan persistence is best effort only.
++  }
++
++  for (const listener of localListeners) listener(safePlan);
++  try {
++    getChannel()?.postMessage(safePlan);
++  } catch {
++    // Cross-tab debugging is best effort only.
++  }
++}
++
++export function getLatestExecutionPlan(
++  projectId: string,
++  handlerId: string
++): HandlerExecutionPlan | null {
++  try {
++    const raw = localStorage.getItem(storageKey(projectId, handlerId));
++    return raw ? (JSON.parse(raw) as HandlerExecutionPlan) : null;
++  } catch {
++    return null;
++  }
++}
++
++export function subscribeExecutionPlan(
++  projectId: string,
++  handlerId: string,
++  listener: (plan: HandlerExecutionPlan) => void
++): () => void {
++  const local = (plan: HandlerExecutionPlan) => {
++    if (plan.projectId === projectId && plan.handlerId === handlerId) {
++      listener(plan);
++    }
++  };
++  localListeners.add(local);
++
++  const broadcast = (event: MessageEvent<HandlerExecutionPlan>) => {
++    const plan = event.data;
++    if (plan?.projectId === projectId && plan.handlerId === handlerId) {
++      listener(plan);
++    }
++  };
++  getChannel()?.addEventListener("message", broadcast);
++
++  return () => {
++    localListeners.delete(local);
++    getChannel()?.removeEventListener("message", broadcast);
++  };
++}
++
++function storageKey(projectId: string, handlerId: string): string {
++  return `${STORAGE_PREFIX}${encodeURIComponent(projectId)}.${encodeURIComponent(handlerId)}`;
++}
++
++function makeSerializable(plan: HandlerExecutionPlan): HandlerExecutionPlan {
++  try {
++    return structuredClone(plan);
++  } catch {
++    return JSON.parse(
++      JSON.stringify(plan, (_key, value) => {
++        if (typeof value === "function") {
++          return `[Function ${value.name || "anonymous"}]`;
++        }
++        if (typeof value === "bigint") return String(value);
++        return value;
++      })
++    ) as HandlerExecutionPlan;
++  }
++}
+--- a/src/execution/runtime/handler-execution-plan.ts
++++ b/src/execution/runtime/handler-execution-plan.ts
+@@ -0,0 +1,20 @@
++import type { ExecutionGraph } from "../model/execution-graph";
++import type { Intent } from "../model/intent";
++
++/**
++ * Immutable snapshot of what the planner produced before the Executor starts.
++ * This is intentionally separate from HandlerExecution so the UI can compare
++ * "planned" with the later execution result.
++ */
++export type HandlerExecutionPlan = {
++  executionId: string;
++  parentExecutionId?: string | undefined;
++  projectId: string;
++  handlerId: string;
++  eventName: string;
++  sourceNodeId: string;
++  scriptId: string;
++  intents: Intent[];
++  graph: ExecutionGraph;
++  createdAt: number;
++};
+--- a/src/execution/visualization/execution-plan-adapter.ts
++++ b/src/execution/visualization/execution-plan-adapter.ts
+@@ -0,0 +1,80 @@
++import { MarkerType, type Edge, type Node } from "@xyflow/react";
++import type { HandlerExecutionPlan } from "../runtime/handler-execution-plan";
++import { intentDetail, intentTitle } from "./execution-graph-adapter";
++import { layoutDirectedGraph } from "./graph-layout";
++
++export type ExecutionPlanFlowNodeData = Record<string, unknown> & {
++  title: string;
++  detail: string;
++  kind: "event" | "script" | "intent";
++  status?: string | undefined;
++};
++
++export type ExecutionPlanFlowNode = Node<ExecutionPlanFlowNodeData>;
++
++export function executionPlanToReactFlow(plan: HandlerExecutionPlan): {
++  nodes: ExecutionPlanFlowNode[];
++  edges: Edge[];
++} {
++  const eventId = `${plan.executionId}:plan:source-event`;
++  const scriptId = `${plan.executionId}:plan:script`;
++  const executionNodes = plan.graph.nodes.map((node) => node.id);
++  const rawEdges = [
++    { source: eventId, target: scriptId },
++    ...(executionNodes[0]
++      ? [{ source: scriptId, target: executionNodes[0] }]
++      : []),
++    ...plan.graph.edges.map((edge) => ({
++      source: edge.source,
++      target: edge.target,
++    })),
++  ];
++  const allIds = [eventId, scriptId, ...executionNodes];
++  const layout = layoutDirectedGraph(allIds, rawEdges, {
++    rowHeight: 145,
++    columnWidth: 300,
++  });
++
++  const nodes: ExecutionPlanFlowNode[] = [
++    {
++      id: eventId,
++      position: layout.get(eventId) ?? { x: 0, y: 0 },
++      data: {
++        title: plan.eventName,
++        detail: `source ${plan.sourceNodeId}`,
++        kind: "event",
++        status: "source",
++      },
++    },
++    {
++      id: scriptId,
++      position: layout.get(scriptId) ?? { x: 0, y: 145 },
++      data: {
++        title: plan.handlerId,
++        detail: `${plan.intents.length} intent${plan.intents.length === 1 ? "" : "s"} collected`,
++        kind: "script",
++        status: "planned",
++      },
++    },
++    ...plan.graph.nodes.map((node) => ({
++      id: node.id,
++      position: layout.get(node.id) ?? { x: 0, y: 290 },
++      data: {
++        title: intentTitle(node.intent),
++        detail: intentDetail(node.intent),
++        kind: "intent" as const,
++        status: "planned",
++      },
++    })),
++  ];
++
++  const edges: Edge[] = rawEdges.map((edge, index) => ({
++    id: `${plan.executionId}:plan-flow-edge:${index}`,
++    source: edge.source,
++    target: edge.target,
++    type: "smoothstep",
++    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
++  }));
++
++  return { nodes, edges };
++}
+--- a/src/execution/visualization/ExecutionPlanView.tsx
++++ b/src/execution/visualization/ExecutionPlanView.tsx
+@@ -0,0 +1,58 @@
++import { useEffect, useMemo, useState } from "react";
++import {
++  getLatestExecutionPlan,
++  subscribeExecutionPlan,
++} from "../debug/execution-plan";
++import type { HandlerExecutionPlan } from "../runtime/handler-execution-plan";
++import { GraphCanvas } from "./GraphCanvas";
++import { executionPlanToReactFlow } from "./execution-plan-adapter";
++
++export function ExecutionPlanView({
++  projectId,
++  handlerId,
++}: {
++  projectId: string;
++  handlerId: string;
++}) {
++  const [plan, setPlan] = useState<HandlerExecutionPlan | null>(() =>
++    getLatestExecutionPlan(projectId, handlerId)
++  );
++
++  useEffect(
++    () => subscribeExecutionPlan(projectId, handlerId, setPlan),
++    [projectId, handlerId]
++  );
++
++  const flow = useMemo(
++    () => (plan ? executionPlanToReactFlow(plan) : { nodes: [], edges: [] }),
++    [plan]
++  );
++
++  if (!plan) {
++    return (
++      <GraphCanvas
++        nodes={[]}
++        edges={[]}
++        emptyMessage="No execution plan available. Run the handler in simulation/runtime to let the Script generate intents and the Planner build a plan."
++      />
++    );
++  }
++
++  return (
++    <div className="space-y-3">
++      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
++        <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 font-mono">
++          {plan.executionId}
++        </span>
++        <span>{plan.intents.length} intents</span>
++        <span>{plan.graph.nodes.length} planned nodes</span>
++        <span>captured before executor</span>
++      </div>
++      <GraphCanvas
++        nodes={flow.nodes}
++        edges={flow.edges}
++        emptyMessage="The planner produced an empty plan because the handler generated no side effects."
++      />
++    </div>
++  );
++}
+--- a/src/execution/visualization/execution-graph-adapter.ts
++++ b/src/execution/visualization/execution-graph-adapter.ts
+@@ -75,7 +75,7 @@
+   return { nodes, edges };
+ }
+ 
+-function intentTitle(intent: Intent): string {
++export function intentTitle(intent: Intent): string {
+   switch (intent.type) {
+     case "set-value": return `Set ${intent.target.path}`;
+     case "set-property": return `Set ${intent.target.path ?? intent.target.property}`;
+@@ -89,7 +89,7 @@
+   }
+ }
+ 
+-function intentDetail(intent: Intent): string {
++export function intentDetail(intent: Intent): string {
+   switch (intent.type) {
+     case "set-value": return formatValue(intent.value);
+     case "set-property": return formatValue(intent.value);
+--- a/src/mock/mock-script-runtime.ts
++++ b/src/mock/mock-script-runtime.ts
+@@ -30,6 +30,7 @@
+   ExecutionPlanner,
+   IntentCollector,
+   createIntentId,
++  publishExecutionPlan,
+   publishExecutionTrace,
+   shadowKey,
+   type Intent,
+@@ -266,6 +267,9 @@
+     createdAt: Date.now(),
+   };
+ 
++  // Freeze the exact planner output before the Executor is allowed to run.
++  // The plan view therefore never confuses planned operations with results.
++  publishExecutionPlan(execution);
+   publishExecutionTrace(execution);
+   void new Executor()
+     .execute(graph, createRuntimeEffects(event, host))
+--- a/src/uiframework/gui/script-editor/ScriptPage.tsx
++++ b/src/uiframework/gui/script-editor/ScriptPage.tsx
+@@ -31,6 +31,7 @@
+ import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
+ import { AstGraphView } from "../../../execution/visualization/AstGraphView";
+ import { ExecutionGraphView } from "../../../execution/visualization/ExecutionGraphView";
++import { ExecutionPlanView } from "../../../execution/visualization/ExecutionPlanView";
+ 
+ export function ScriptPage() {
+   const { scriptId, projectId } = useParams();
+@@ -61,7 +62,7 @@
+   const [projectName, setProjectName] = useState("");
+   const [projectRevision, setProjectRevision] = useState<number | undefined>();
+   const [apiError, setApiError] = useState<string | null>(null);
+-  const [view, setView] = useState<"code" | "ast" | "execution">("code");
++  const [view, setView] = useState<"code" | "ast" | "plan" | "execution">("code");
+ 
+   const dirty = code !== savedCode;
+   const allComponentApi = document
+@@ -384,12 +385,20 @@
+                 Code Graph
+               </ScriptViewTab>
+               {supportsExecutionGraph ? (
+-                <ScriptViewTab
+-                  active={view === "execution"}
+-                  onClick={() => setView("execution")}
+-                >
+-                  Execution Graph
+-                </ScriptViewTab>
++                <>
++                  <ScriptViewTab
++                    active={view === "plan"}
++                    onClick={() => setView("plan")}
++                  >
++                    Execution Plan
++                  </ScriptViewTab>
++                  <ScriptViewTab
++                    active={view === "execution"}
++                    onClick={() => setView("execution")}
++                  >
++                    Execution Graph
++                  </ScriptViewTab>
++                </>
+               ) : null}
+             </div>
+ 
+@@ -453,6 +462,8 @@
+               </>
+             ) : view === "ast" ? (
+               <AstGraphView source={code} />
++            ) : view === "plan" && supportsExecutionGraph ? (
++              <ExecutionPlanView projectId={projectId} handlerId={scriptId} />
+             ) : supportsExecutionGraph ? (
+               <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
+             ) : null}
