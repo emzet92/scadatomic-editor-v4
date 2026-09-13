@@ -1,0 +1,16 @@
+Semantic Code Graph validation
+
+- TypeScript: PASS (`tsc -b` using the dependency snapshot from editorv4.zip)
+- ESLint: PASS for all changed/new TypeScript/TSX files
+- Smoke test: PASS
+  Example source was reduced to semantic nodes including:
+  Start
+  Prepare speed
+  IF speed < 1000
+  Set Pump1.speed
+  Emit pump.updated
+  For each item of items
+  Call process()
+  Navigate Overview
+  End
+- Raw parser nodes are not rendered as individual React Flow nodes.

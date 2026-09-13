@@ -74,3 +74,19 @@ Files:
 - `src/execution/visualization/ExecutionPlanView.tsx` — Plan UI.
 - `src/mock/mock-script-runtime.ts` — publishes the plan before the executor starts.
 - `src/uiframework/gui/script-editor/ScriptPage.tsx` — adds the `Execution Plan` tab.
+
+## Semantic Code Graph update
+
+`Code Graph` no longer renders the Acorn AST one parser node at a time. Acorn remains the parser/source of truth, but a semantic projection is built before React Flow:
+
+```text
+JavaScript -> Acorn AST -> SemanticCodeGraph -> React Flow
+```
+
+Implemented in:
+
+- `src/execution/ast/semantic-code-graph-builder.ts`
+- `src/execution/visualization/semantic-code-graph-adapter.ts`
+- `src/execution/visualization/AstGraphView.tsx`
+
+The graph intentionally collapses `Literal`, `Identifier`, `MemberExpression`, `ExpressionStatement` and similar syntax-only AST nodes into higher-level nodes such as `IF`, `Set Pump1.speed`, `Call Pump1.start()`, `Emit event`, `Navigate`, `Loop`, `Return` and `Throw error`. Branch edges are labeled with semantic roles such as `true`, `false`, `body`, `done`, `case ...` and `default`.

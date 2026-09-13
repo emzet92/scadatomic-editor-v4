@@ -39,6 +39,11 @@ export function GraphCanvas({
       ...node.data,
       label: (
         <div className="px-4 py-3 text-left">
+          {node.data.eyebrow ? (
+            <div className="mb-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+              {String(node.data.eyebrow)}
+            </div>
+          ) : null}
           <div className="text-xs font-semibold text-zinc-900">
             {String(node.data.title ?? node.id)}
           </div>

@@ -29,7 +29,7 @@ import type {
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
 import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
-import { AstGraphView } from "../../../execution/visualization/AstGraphView";
+import { CodeGraphView } from "../../../execution/visualization/CodeGraphView";
 import { ExecutionGraphView } from "../../../execution/visualization/ExecutionGraphView";
 import { ExecutionPlanView } from "../../../execution/visualization/ExecutionPlanView";
 
@@ -461,7 +461,7 @@ function ScriptEditor({
                 </div>
               </>
             ) : view === "ast" ? (
-              <AstGraphView source={code} />
+              <CodeGraphView source={code} />
             ) : view === "plan" && supportsExecutionGraph ? (
               <ExecutionPlanView projectId={projectId} handlerId={scriptId} />
             ) : supportsExecutionGraph ? (

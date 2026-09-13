@@ -1,30 +1,17 @@
-# SCADAtomic — Execution Plan visualization patch
+# SCADAtomic semantic Code Graph patch
 
-This patch is incremental on top of `scadatomic-editor-execution-graph-source.zip`.
+Base: `scadatomic-editor-execution-plan-source.zip`
 
-## What changed
+This patch changes only the **Code Graph** visualization. Execution Plan and Execution Graph semantics remain unchanged.
 
-The Script Editor now exposes four handler views:
+## Apply
 
-- Code
-- Code Graph
-- Execution Plan
-- Execution Graph
+Preferred:
 
-`Execution Plan` is an immutable snapshot created immediately after `ExecutionPlanner.plan(...)` and before `Executor.execute(...)` starts. It shows the exact operations the planner scheduled, all marked as `planned`.
+```bash
+patch -p1 < PATCH_SEMANTIC_CODE_GRAPH.diff
+```
 
-`Execution Graph` remains the execution trace and shows actual runtime statuses such as `success`, `failed`, and `skipped`.
+or copy the included `src/...` files into the project. The diff also removes the old `AstGraphView.tsx`, which has been replaced by `CodeGraphView.tsx`.
 
-## Integration points
-
-- `src/mock/mock-script-runtime.ts` — calls `publishExecutionPlan(execution)` after planning and before execution.
-- `src/uiframework/gui/script-editor/ScriptPage.tsx` — adds the `Execution Plan` tab.
-- `src/execution/debug/execution-plan.ts` — persists/subscribes to latest plan per handler.
-- `src/execution/runtime/handler-execution-plan.ts` — plan snapshot model.
-- `src/execution/visualization/ExecutionPlanView.tsx` — plan UI.
-- `src/execution/visualization/execution-plan-adapter.ts` — plan → React Flow adapter.
-
-## Validation
-
-- `tsc -b --pretty false` — PASS
-- ESLint on `src/execution`, `src/mock/mock-script-runtime.ts`, and `ScriptPage.tsx` — PASS
+See `SEMANTIC_CODE_GRAPH.md` for the architecture and file locations.
