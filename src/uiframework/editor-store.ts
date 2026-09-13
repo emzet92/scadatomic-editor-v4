@@ -36,6 +36,7 @@ import {
   validateNodeName,
 } from "./core/node-name";
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
+import { duplicateNodeSubtree } from "./core/duplicate-node";
 import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
@@ -143,6 +144,10 @@ type EditorState = {
     componentId: string,
     nodeId: NodeId
   ) => void;
+  duplicateComponentDefinitionNode: (
+    componentId: string,
+    nodeId: NodeId
+  ) => NodeId | null;
   moveComponentDefinitionNode: (
     componentId: string,
     nodeId: NodeId,
@@ -157,6 +162,7 @@ type EditorState = {
   ) => void;
 
   deleteNode: (id: NodeId) => void;
+  duplicateNode: (id: NodeId) => NodeId | null;
   moveNodeUp: (nodeId: NodeId) => void;
   moveNodeDown: (nodeId: NodeId) => void;
 
@@ -821,6 +827,38 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
   },
 
+  duplicateComponentDefinitionNode: (componentId, nodeId) => {
+    let duplicatedNodeId: NodeId | null = null;
+
+    set((state) => {
+      const definition = state.document.components?.[componentId];
+      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
+        return state;
+      }
+
+      const syntheticDocument = createComponentDefinitionDocument(
+        state.document,
+        definition
+      );
+      const result = duplicateNodeSubtree(
+        syntheticDocument,
+        nodeId,
+        definition.rootId
+      );
+      if (!result.duplicatedNodeId) return state;
+
+      duplicatedNodeId = result.duplicatedNodeId;
+      return {
+        document: createProjectComponentRepository(state.document).upsert({
+          ...definition,
+          nodes: result.document.nodes,
+        }),
+      };
+    });
+
+    return duplicatedNodeId;
+  },
+
   moveComponentDefinitionNode: (
     componentId,
     nodeId,
@@ -923,6 +961,30 @@ export const useEditorStore = create<EditorState>((set) => ({
             : state.selectedNodeIds.find((nodeId) => !!document.nodes[nodeId]) ?? null,
       };
     });
+  },
+
+  duplicateNode: (id) => {
+    let duplicatedNodeId: NodeId | null = null;
+
+    set((state) => {
+      const result = duplicateNodeSubtree(
+        state.document,
+        id,
+        getActiveRootId(state)
+      );
+      if (!result.duplicatedNodeId) return state;
+
+      duplicatedNodeId = result.duplicatedNodeId;
+      return {
+        document: result.document,
+        selectedNodeId: result.duplicatedNodeId,
+        selectedNodeIds: [result.duplicatedNodeId],
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+      };
+    });
+
+    return duplicatedNodeId;
   },
 
   moveNodeUp: (nodeId) => {

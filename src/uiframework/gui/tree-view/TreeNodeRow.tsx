@@ -16,6 +16,8 @@ export function TreeNodeRow({
   selectNode,
   moveNodeUp,
   moveNodeDown,
+  duplicateNode,
+  canDuplicate,
 }: {
   nodeId: string;
   node: TreeNodeData;
@@ -28,6 +30,8 @@ export function TreeNodeRow({
   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
+  duplicateNode: (nodeId: string) => string | null;
+  canDuplicate: boolean;
 }) {
   return (
     <div
@@ -59,6 +63,8 @@ export function TreeNodeRow({
         nodeId={nodeId}
         moveNodeUp={moveNodeUp}
         moveNodeDown={moveNodeDown}
+        duplicateNode={duplicateNode}
+        canDuplicate={canDuplicate}
       />
     </div>
   );

@@ -10,6 +10,8 @@ export function TreeNodeChildren({
   selectNode,
   moveNodeUp,
   moveNodeDown,
+  duplicateNode,
+  canDuplicateNode,
 }: {
   node: TreeNodeData;
   level: number;
@@ -19,6 +21,8 @@ export function TreeNodeChildren({
   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
+  duplicateNode: (nodeId: string) => string | null;
+  canDuplicateNode: (nodeId: string) => boolean;
 }) {
   return (
     <>
@@ -33,6 +37,8 @@ export function TreeNodeChildren({
           selectNode={selectNode}
           moveNodeUp={moveNodeUp}
           moveNodeDown={moveNodeDown}
+          duplicateNode={duplicateNode}
+          canDuplicateNode={canDuplicateNode}
         />
       ))}
     </>

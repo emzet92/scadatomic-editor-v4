@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import type { RectInfo } from "../interaction/geometry";
 
 const selectedColor = "var(--editor-selected)";
@@ -10,12 +10,16 @@ export function SelectionOverlay({
   rect,
   nodeType,
   canDelete,
+  canDuplicate,
   onDelete,
+  onDuplicate,
 }: {
   rect: RectInfo | null;
   nodeType?: string | undefined;
   canDelete: boolean;
+  canDuplicate: boolean;
   onDelete: () => void;
+  onDuplicate: () => void;
 }) {
   if (!rect) {
     return null;
@@ -50,6 +54,31 @@ export function SelectionOverlay({
         >
           {nodeType ?? "Node"}
         </div>
+
+        {canDuplicate && (
+          <button
+            data-editor-ignore
+            type="button"
+            aria-label="Duplicate node"
+            title="Duplicate"
+            onClick={onDuplicate}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              border: `1px solid ${editorBorder}`,
+              background: editorSurface,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "var(--editor-text-muted)",
+              boxShadow: "0 1px 2px rgba(0,0,0,.08)",
+            }}
+          >
+            <Copy size={14} />
+          </button>
+        )}
 
         {canDelete && (
           <button

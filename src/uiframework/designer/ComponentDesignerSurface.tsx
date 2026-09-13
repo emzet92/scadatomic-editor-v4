@@ -97,8 +97,17 @@ export function ComponentDesignerSurface({
           .deleteComponentDefinitionNode(componentId, nodeId);
         onSelectNode(rootId);
       },
+      duplicateNode: (nodeId) => {
+        if (nodeId === rootId) return null;
+        const duplicatedNodeId = useEditorStore
+          .getState()
+          .duplicateComponentDefinitionNode(componentId, nodeId);
+        if (duplicatedNodeId) onSelectNode(duplicatedNodeId);
+        return duplicatedNodeId;
+      },
       canMoveNode: (nodeId) => nodeId !== rootId,
       canDeleteNode: (nodeId) => nodeId !== rootId,
+      canDuplicateNode: (nodeId) => nodeId !== rootId,
     };
   }, [
     componentDocument,

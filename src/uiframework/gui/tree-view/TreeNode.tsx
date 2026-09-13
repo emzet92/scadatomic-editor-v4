@@ -12,6 +12,8 @@ export function TreeNode({
   selectNode,
   moveNodeUp,
   moveNodeDown,
+  duplicateNode,
+  canDuplicateNode,
 }: TreeNodeProps) {
   const node = nodes[nodeId];
   const [collapsed, setCollapsed] = useState(level > 0);
@@ -35,6 +37,8 @@ export function TreeNode({
         selectNode={selectNode}
         moveNodeUp={moveNodeUp}
         moveNodeDown={moveNodeDown}
+        duplicateNode={duplicateNode}
+        canDuplicate={canDuplicateNode(nodeId)}
       />
 
       {!collapsed && (
@@ -47,6 +51,8 @@ export function TreeNode({
           selectNode={selectNode}
           moveNodeUp={moveNodeUp}
           moveNodeDown={moveNodeDown}
+          duplicateNode={duplicateNode}
+          canDuplicateNode={canDuplicateNode}
         />
       )}
     </>

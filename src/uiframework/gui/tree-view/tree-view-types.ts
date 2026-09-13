@@ -21,4 +21,6 @@ export type TreeNodeProps = {
   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
   moveNodeUp: (nodeId: string) => void;
   moveNodeDown: (nodeId: string) => void;
+  duplicateNode: (nodeId: string) => string | null;
+  canDuplicateNode: (nodeId: string) => boolean;
 };

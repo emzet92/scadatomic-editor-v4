@@ -10,6 +10,7 @@ export function TreeView() {
   const selectNode = useEditorStore((state) => state.selectNode);
   const moveNodeUp = useEditorStore((state) => state.moveNodeUp);
   const moveNodeDown = useEditorStore((state) => state.moveNodeDown);
+  const duplicateNode = useEditorStore((state) => state.duplicateNode);
   const page = getPage(document, activePageId);
 
   if (!document.nodes[page.rootId]) return null;
@@ -35,6 +36,8 @@ export function TreeView() {
         selectNode={selectNode}
         moveNodeUp={moveNodeUp}
         moveNodeDown={moveNodeDown}
+        duplicateNode={duplicateNode}
+        canDuplicateNode={(nodeId) => nodeId !== page.rootId}
       />
     </div>
   );

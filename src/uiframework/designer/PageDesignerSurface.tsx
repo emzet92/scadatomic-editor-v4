@@ -69,9 +69,15 @@ export function PageDesignerSurface({
         if (!ownedNodeIds.has(nodeId)) return;
         useEditorStore.getState().deleteNode(nodeId);
       },
+      duplicateNode: (nodeId) => {
+        if (!ownedNodeIds.has(nodeId) || nodeId === activePage.rootId) return null;
+        return useEditorStore.getState().duplicateNode(nodeId);
+      },
       canMoveNode: (nodeId) =>
         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
       canDeleteNode: (nodeId) =>
+        ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+      canDuplicateNode: (nodeId) =>
         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
     }),
     [

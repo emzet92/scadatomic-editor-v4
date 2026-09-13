@@ -41,6 +41,8 @@ export type DesignerAdapter = {
     targetIndex: number
   ) => void;
   deleteNode: (nodeId: NodeId) => void;
+  duplicateNode: (nodeId: NodeId) => NodeId | null;
   canMoveNode: (nodeId: NodeId) => boolean;
   canDeleteNode: (nodeId: NodeId) => boolean;
+  canDuplicateNode: (nodeId: NodeId) => boolean;
 };

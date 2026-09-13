@@ -322,6 +322,16 @@ export function DesignerSurface({
           !!snapshot.selectedNodeId &&
           adapter.canDeleteNode(snapshot.selectedNodeId)
         }
+        canDuplicate={
+          !!snapshot.selectedNodeId &&
+          adapter.canDuplicateNode(snapshot.selectedNodeId)
+        }
+        onDuplicate={() => {
+          const nodeId = adapterRef.current.read().selectedNodeId;
+          if (nodeId && adapterRef.current.canDuplicateNode(nodeId)) {
+            adapterRef.current.duplicateNode(nodeId);
+          }
+        }}
         onDelete={() => {
           const nodeId = adapterRef.current.read().selectedNodeId;
           if (nodeId && adapterRef.current.canDeleteNode(nodeId)) {

@@ -1,79 +1,43 @@
-# React + TypeScript + Vite
+# SCADAtomic — Duplicate component patch
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Patch prepared against the supplied `editorv4.zip`.
 
-Currently, two official plugins are available:
+## Behavior
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Adds a Duplicate icon to every duplicable node in the component tree.
+- Adds a Duplicate icon to the toolbar above the currently selected node on the designer canvas.
+- Both UI entry points use the same store/core duplication logic.
+- The duplicate is inserted immediately after the source in the same parent's `children` array.
+- Duplicating a Container recursively copies its complete subtree.
+- Every copied node receives a fresh `crypto.randomUUID()` technical `id`.
+- Every copied node also receives a fresh page/component-scoped `name`, so script-facing names do not collide (`Button1 -> Button3`, etc., depending on names already in the scope).
+- Existing props, bindings, variants, event handler references, method script references, content behavior and component-definition references are copied.
+- Page/component roots cannot be duplicated.
+- After duplicating a page node, the new root copy becomes selected.
+- Duplicating inside a reusable-component definition is supported by the designer overlay as well.
 
-## React Compiler
+## Files
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The ZIP contains the complete replacement versions of modified files and `PATCH.diff`.
 
-## Expanding the ESLint configuration
+Apply with either:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git apply PATCH.diff
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+or copy the included `src/...` files over the corresponding project files.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Verification performed
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- `git diff --check` passes.
+- `src/uiframework/core/duplicate-node.ts` passes an isolated TypeScript type-check.
+- Runtime smoke tests passed for:
+  - nested node duplication at the same parent/index + 1,
+  - recursive Container duplication,
+  - fresh UUIDs for all descendants,
+  - fresh script-facing names for all descendants,
+  - source object immutability,
+  - root duplication rejection.
 
-## Backendless development
-
-This build uses a mock project API backed by `localStorage` and a mock runtime WebSocket that generates random SCADA values. No backend process is required. See `MOCK_BACKEND.md`.
-
-Try `/project/demo` for the editor and `/render/demo` for the runtime preview.
+The supplied project currently has unrelated pre-existing TypeScript errors in mock/tag code when running the full project type-check. The supplied `node_modules` also lacks the Linux Rolldown native binding required by Vite, so a full Vite build cannot be completed from this archive without reinstalling dependencies.

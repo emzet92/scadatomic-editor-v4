@@ -1,149 +1,575 @@
-diff --git a/src/uiframework/gui/reusable-component/ReusableComponentPanels.tsx b/src/uiframework/gui/reusable-component/ReusableComponentPanels.tsx
-index 109af58..7e81128 100644
---- a/src/uiframework/gui/reusable-component/ReusableComponentPanels.tsx
-+++ b/src/uiframework/gui/reusable-component/ReusableComponentPanels.tsx
-@@ -21,6 +21,7 @@ import type {
- import {
-   createComponentInput,
-   getComponentDefinitionForInstance,
-+  getComponentInputTargetType,
-   getResolvedComponentInstanceProps,
- } from "../../reusable-components";
- import { getComponentApiPropertyNames } from "../../component-api";
-@@ -304,7 +305,12 @@ function PublicInputsEditor({
-     setAdding(true);
-     setProperty(first);
-     setName(first);
--    setType(inferTypeFromProperty(first));
-+    setType(
-+      selectedNode
-+        ? getComponentInputTargetType(projectDocument, selectedNode, first) ??
-+            inferTypeFromProperty(first)
-+        : inferTypeFromProperty(first)
-+    );
-     setError(null);
-   }
- 
-@@ -316,7 +322,8 @@ function PublicInputsEditor({
-         selectedNode,
-         property,
-         name,
--        type
-+        type,
-+        projectDocument
-       );
-       const inputName = name.trim();
-       updateDefinition((current) => ({
-@@ -427,7 +434,15 @@ function PublicInputsEditor({
-                 const next = event.target.value;
-                 setProperty(next);
-                 if (!name) setName(next);
--                setType(inferTypeFromProperty(next));
-+                setType(
-+                  selectedNode
-+                    ? getComponentInputTargetType(
-+                        projectDocument,
-+                        selectedNode,
-+                        next
-+                      ) ?? inferTypeFromProperty(next)
-+                    : inferTypeFromProperty(next)
-+                );
-               }}
-               className="h-8 w-full rounded border border-zinc-200 bg-white px-2 font-mono text-xs outline-none focus:border-violet-400"
-             >
-diff --git a/src/uiframework/reusable-components.ts b/src/uiframework/reusable-components.ts
-index 0370bac..249ba0f 100644
---- a/src/uiframework/reusable-components.ts
-+++ b/src/uiframework/reusable-components.ts
-@@ -287,7 +287,8 @@ export function createComponentInput(
-   internalNode: UiNode,
-   property: string,
-   requestedName: string,
--  requestedType?: ComponentInputType
-+  requestedType?: ComponentInputType,
-+  projectDocument?: UiDocument
- ): ComponentInputDefinition {
-   const name = requestedName.trim();
-   if (!isJsIdentifier(name)) {
-@@ -300,6 +301,50 @@ export function createComponentInput(
-     throw new Error(`“${name}” conflicts with the component API.`);
-   }
- 
-+  const nestedDefinition = projectDocument
-+    ? getComponentDefinitionForInstance(projectDocument, internalNode)
-+    : undefined;
+diff --git a/src/uiframework/core/duplicate-node.ts b/src/uiframework/core/duplicate-node.ts
+new file mode 100644
+index 0000000..3ae80af
+--- /dev/null
++++ b/src/uiframework/core/duplicate-node.ts
+@@ -0,0 +1,141 @@
++import { buildDocumentIndex } from "./document-index";
++import type { NodeId, UiDocument, UiNode } from "./document";
 +
-+  if (internalNode.type === "ComponentInstance") {
-+    if (!nestedDefinition) {
-+      throw new Error(
-+        `Missing component definition for nested component “${internalNode.name}”.`
-+      );
-+    }
++export type DuplicateNodeSubtreeResult = {
++  document: UiDocument;
++  duplicatedNodeId: NodeId | null;
++};
 +
-+    const nestedInput = nestedDefinition.inputs?.[property];
-+    if (!nestedInput) {
-+      throw new Error(
-+        `Unknown public property “${property}” on ${internalNode.name}.`
-+      );
-+    }
-+
-+    if (requestedType && requestedType !== nestedInput.type) {
-+      throw new Error(
-+        `“${internalNode.name}.${property}” is ${nestedInput.type}; the mapped public input must use the same type.`
-+      );
-+    }
-+
-+    const resolvedProps = getResolvedComponentInstanceProps(
-+      nestedDefinition,
-+      internalNode
-+    );
-+
-+    return {
-+      type: nestedInput.type,
-+      defaultValue: resolvedProps[property],
-+      target: {
-+        nodeId: internalNode.id,
-+        property,
-+        // A nested user component receives its public contract through the
-+        // ComponentInstance props. Even a `tag` input must be forwarded as a
-+        // prop; the child definition is responsible for mapping that value to
-+        // its own primitive binding target.
-+        kind: "prop",
-+      },
-+    };
-+  }
-+
-   const definitionForNode = getComponentDefinition(internalNode.type);
-   const propertyNames = Array.from(new Set([
-     ...Object.keys(definitionForNode?.defaults ?? {}),
-@@ -331,6 +376,30 @@ export function createComponentInput(
-   };
- }
- 
-+export function getComponentInputTargetType(
++/**
++ * Duplicates a node directly after the source inside the same parent.
++ *
++ * Every node in the copied subtree receives both:
++ * - a fresh technical UUID (`node.id`)
++ * - a fresh page/component-scoped script name (`node.name`)
++ *
++ * References to component definitions, scripts, bindings, variants and props are
++ * intentionally preserved, while the parent/child node ids are remapped to the
++ * newly created subtree.
++ */
++export function duplicateNodeSubtree(
 +  document: UiDocument,
-+  internalNode: UiNode,
-+  property: string
-+): ComponentInputType | undefined {
-+  const nestedDefinition = getComponentDefinitionForInstance(document, internalNode);
-+  if (nestedDefinition) {
-+    return nestedDefinition.inputs?.[property]?.type;
++  nodeId: NodeId,
++  rootId: NodeId = document.rootId
++): DuplicateNodeSubtreeResult {
++  if (nodeId === rootId || !document.nodes[nodeId]) {
++    return { document, duplicatedNodeId: null };
 +  }
 +
-+  const primitiveDefinition = getComponentDefinition(internalNode.type);
-+  const hasProperty = new Set([
-+    ...Object.keys(primitiveDefinition?.defaults ?? {}),
-+    ...Object.keys(primitiveDefinition?.inspector ?? {}),
-+    ...Object.keys(internalNode.props ?? {}),
-+  ]).has(property);
++  const index = buildDocumentIndex(document, rootId);
++  const parentId = index.parentById.get(nodeId);
++  const parent = parentId ? document.nodes[parentId] : undefined;
++  if (!parent?.children) {
++    return { document, duplicatedNodeId: null };
++  }
 +
-+  if (!hasProperty) return undefined;
++  const sourceIndex = parent.children.indexOf(nodeId);
++  if (sourceIndex < 0) {
++    return { document, duplicatedNodeId: null };
++  }
 +
-+  const value =
-+    internalNode.props?.[property] ?? primitiveDefinition?.defaults?.[property];
-+  return inferInputType(property, value);
++  const subtreeIds = collectSubtreeIds(document, nodeId);
++  if (subtreeIds.length === 0) {
++    return { document, duplicatedNodeId: null };
++  }
++
++  const idMap = new Map<NodeId, NodeId>();
++  for (const sourceId of subtreeIds) {
++    idMap.set(sourceId, crypto.randomUUID());
++  }
++
++  const usedNames = collectUsedNames(document, rootId);
++  const nextNodes: Record<NodeId, UiNode> = { ...document.nodes };
++
++  for (const sourceId of subtreeIds) {
++    const source = document.nodes[sourceId];
++    const duplicateId = idMap.get(sourceId);
++    if (!source || !duplicateId) continue;
++
++    const duplicateName = createUniqueDuplicateName(source.name, usedNames);
++    usedNames.add(duplicateName);
++
++    const duplicate = structuredClone(source);
++    duplicate.id = duplicateId;
++    duplicate.name = duplicateName;
++    if (source.children !== undefined) {
++      duplicate.children = source.children
++        .filter((childId) => idMap.has(childId))
++        .map((childId) => idMap.get(childId) as NodeId);
++    }
++
++    nextNodes[duplicateId] = duplicate;
++  }
++
++  const duplicatedNodeId = idMap.get(nodeId) ?? null;
++  if (!duplicatedNodeId) {
++    return { document, duplicatedNodeId: null };
++  }
++
++  nextNodes[parent.id] = {
++    ...parent,
++    children: [
++      ...parent.children.slice(0, sourceIndex + 1),
++      duplicatedNodeId,
++      ...parent.children.slice(sourceIndex + 1),
++    ],
++  };
++
++  return {
++    document: {
++      ...document,
++      nodes: nextNodes,
++    },
++    duplicatedNodeId,
++  };
 +}
 +
- export function inferInputType(
-   property: string,
-   value: unknown
++function collectSubtreeIds(document: UiDocument, rootId: NodeId): NodeId[] {
++  const result: NodeId[] = [];
++  const visited = new Set<NodeId>();
++
++  function visit(currentId: NodeId) {
++    if (visited.has(currentId)) return;
++    visited.add(currentId);
++
++    const node = document.nodes[currentId];
++    if (!node) return;
++
++    result.push(currentId);
++    for (const childId of node.children ?? []) {
++      visit(childId);
++    }
++  }
++
++  visit(rootId);
++  return result;
++}
++
++function collectUsedNames(document: UiDocument, rootId: NodeId): Set<string> {
++  return new Set(
++    collectSubtreeIds(document, rootId)
++      .map((id) => document.nodes[id]?.name)
++      .filter((name): name is string => !!name)
++  );
++}
++
++function createUniqueDuplicateName(
++  sourceName: string,
++  usedNames: ReadonlySet<string>
++): string {
++  const numericSuffix = /^(.*?)(\d+)$/.exec(sourceName);
++  const base = numericSuffix?.[1] || sourceName;
++  let index = numericSuffix ? Number(numericSuffix[2]) + 1 : 2;
++  let candidate = `${base}${index}`;
++
++  while (usedNames.has(candidate)) {
++    index += 1;
++    candidate = `${base}${index}`;
++  }
++
++  return candidate;
++}
+diff --git a/src/uiframework/designer/ComponentDesignerSurface.tsx b/src/uiframework/designer/ComponentDesignerSurface.tsx
+index 88e7e87..0165f02 100644
+--- a/src/uiframework/designer/ComponentDesignerSurface.tsx
++++ b/src/uiframework/designer/ComponentDesignerSurface.tsx
+@@ -97,8 +97,17 @@ export function ComponentDesignerSurface({
+           .deleteComponentDefinitionNode(componentId, nodeId);
+         onSelectNode(rootId);
+       },
++      duplicateNode: (nodeId) => {
++        if (nodeId === rootId) return null;
++        const duplicatedNodeId = useEditorStore
++          .getState()
++          .duplicateComponentDefinitionNode(componentId, nodeId);
++        if (duplicatedNodeId) onSelectNode(duplicatedNodeId);
++        return duplicatedNodeId;
++      },
+       canMoveNode: (nodeId) => nodeId !== rootId,
+       canDeleteNode: (nodeId) => nodeId !== rootId,
++      canDuplicateNode: (nodeId) => nodeId !== rootId,
+     };
+   }, [
+     componentDocument,
+diff --git a/src/uiframework/designer/DesignerSurface.tsx b/src/uiframework/designer/DesignerSurface.tsx
+index e6d07a3..4e92759 100644
+--- a/src/uiframework/designer/DesignerSurface.tsx
++++ b/src/uiframework/designer/DesignerSurface.tsx
+@@ -322,6 +322,16 @@ export function DesignerSurface({
+           !!snapshot.selectedNodeId &&
+           adapter.canDeleteNode(snapshot.selectedNodeId)
+         }
++        canDuplicate={
++          !!snapshot.selectedNodeId &&
++          adapter.canDuplicateNode(snapshot.selectedNodeId)
++        }
++        onDuplicate={() => {
++          const nodeId = adapterRef.current.read().selectedNodeId;
++          if (nodeId && adapterRef.current.canDuplicateNode(nodeId)) {
++            adapterRef.current.duplicateNode(nodeId);
++          }
++        }}
+         onDelete={() => {
+           const nodeId = adapterRef.current.read().selectedNodeId;
+           if (nodeId && adapterRef.current.canDeleteNode(nodeId)) {
+diff --git a/src/uiframework/designer/PageDesignerSurface.tsx b/src/uiframework/designer/PageDesignerSurface.tsx
+index c1d1f6b..c09891e 100644
+--- a/src/uiframework/designer/PageDesignerSurface.tsx
++++ b/src/uiframework/designer/PageDesignerSurface.tsx
+@@ -69,10 +69,16 @@ export function PageDesignerSurface({
+         if (!ownedNodeIds.has(nodeId)) return;
+         useEditorStore.getState().deleteNode(nodeId);
+       },
++      duplicateNode: (nodeId) => {
++        if (!ownedNodeIds.has(nodeId) || nodeId === activePage.rootId) return null;
++        return useEditorStore.getState().duplicateNode(nodeId);
++      },
+       canMoveNode: (nodeId) =>
+         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+       canDeleteNode: (nodeId) =>
+         ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
++      canDuplicateNode: (nodeId) =>
++        ownedNodeIds.has(nodeId) && nodeId !== activePage.rootId,
+     }),
+     [
+       activePage.id,
+diff --git a/src/uiframework/designer/designer-adapter.ts b/src/uiframework/designer/designer-adapter.ts
+index ca90f29..f30fc1c 100644
+--- a/src/uiframework/designer/designer-adapter.ts
++++ b/src/uiframework/designer/designer-adapter.ts
+@@ -41,6 +41,8 @@ export type DesignerAdapter = {
+     targetIndex: number
+   ) => void;
+   deleteNode: (nodeId: NodeId) => void;
++  duplicateNode: (nodeId: NodeId) => NodeId | null;
+   canMoveNode: (nodeId: NodeId) => boolean;
+   canDeleteNode: (nodeId: NodeId) => boolean;
++  canDuplicateNode: (nodeId: NodeId) => boolean;
+ };
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 630bb87..c062f63 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -36,6 +36,7 @@ import {
+   validateNodeName,
+ } from "./core/node-name";
+ import { createPageDeletionPlan, withStartPage } from "./core/pages";
++import { duplicateNodeSubtree } from "./core/duplicate-node";
+ import type { ProjectData } from "./data/tags/TagDefinition";
+ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+ import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
+@@ -143,6 +144,10 @@ type EditorState = {
+     componentId: string,
+     nodeId: NodeId
+   ) => void;
++  duplicateComponentDefinitionNode: (
++    componentId: string,
++    nodeId: NodeId
++  ) => NodeId | null;
+   moveComponentDefinitionNode: (
+     componentId: string,
+     nodeId: NodeId,
+@@ -157,6 +162,7 @@ type EditorState = {
+   ) => void;
+ 
+   deleteNode: (id: NodeId) => void;
++  duplicateNode: (id: NodeId) => NodeId | null;
+   moveNodeUp: (nodeId: NodeId) => void;
+   moveNodeDown: (nodeId: NodeId) => void;
+ 
+@@ -821,6 +827,38 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  duplicateComponentDefinitionNode: (componentId, nodeId) => {
++    let duplicatedNodeId: NodeId | null = null;
++
++    set((state) => {
++      const definition = state.document.components?.[componentId];
++      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
++        return state;
++      }
++
++      const syntheticDocument = createComponentDefinitionDocument(
++        state.document,
++        definition
++      );
++      const result = duplicateNodeSubtree(
++        syntheticDocument,
++        nodeId,
++        definition.rootId
++      );
++      if (!result.duplicatedNodeId) return state;
++
++      duplicatedNodeId = result.duplicatedNodeId;
++      return {
++        document: createProjectComponentRepository(state.document).upsert({
++          ...definition,
++          nodes: result.document.nodes,
++        }),
++      };
++    });
++
++    return duplicatedNodeId;
++  },
++
+   moveComponentDefinitionNode: (
+     componentId,
+     nodeId,
+@@ -925,6 +963,30 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  duplicateNode: (id) => {
++    let duplicatedNodeId: NodeId | null = null;
++
++    set((state) => {
++      const result = duplicateNodeSubtree(
++        state.document,
++        id,
++        getActiveRootId(state)
++      );
++      if (!result.duplicatedNodeId) return state;
++
++      duplicatedNodeId = result.duplicatedNodeId;
++      return {
++        document: result.document,
++        selectedNodeId: result.duplicatedNodeId,
++        selectedNodeIds: [result.duplicatedNodeId],
++        draggedNodeId: null,
++        nodeDragCandidate: null,
++      };
++    });
++
++    return duplicatedNodeId;
++  },
++
+   moveNodeUp: (nodeId) => {
+     set((state) => ({
+       document: applyActiveCommand(state, {
+diff --git a/src/uiframework/editor/overlay/SelectionOverlay.tsx b/src/uiframework/editor/overlay/SelectionOverlay.tsx
+index 1742fad..84017a4 100644
+--- a/src/uiframework/editor/overlay/SelectionOverlay.tsx
++++ b/src/uiframework/editor/overlay/SelectionOverlay.tsx
+@@ -1,4 +1,4 @@
+-import { Trash2 } from "lucide-react";
++import { Copy, Trash2 } from "lucide-react";
+ import type { RectInfo } from "../interaction/geometry";
+ 
+ const selectedColor = "var(--editor-selected)";
+@@ -10,12 +10,16 @@ export function SelectionOverlay({
+   rect,
+   nodeType,
+   canDelete,
++  canDuplicate,
+   onDelete,
++  onDuplicate,
+ }: {
+   rect: RectInfo | null;
+   nodeType?: string | undefined;
+   canDelete: boolean;
++  canDuplicate: boolean;
+   onDelete: () => void;
++  onDuplicate: () => void;
+ }) {
+   if (!rect) {
+     return null;
+@@ -51,6 +55,31 @@ export function SelectionOverlay({
+           {nodeType ?? "Node"}
+         </div>
+ 
++        {canDuplicate && (
++          <button
++            data-editor-ignore
++            type="button"
++            aria-label="Duplicate node"
++            title="Duplicate"
++            onClick={onDuplicate}
++            style={{
++              width: 24,
++              height: 24,
++              borderRadius: 6,
++              border: `1px solid ${editorBorder}`,
++              background: editorSurface,
++              display: "flex",
++              alignItems: "center",
++              justifyContent: "center",
++              cursor: "pointer",
++              color: "var(--editor-text-muted)",
++              boxShadow: "0 1px 2px rgba(0,0,0,.08)",
++            }}
++          >
++            <Copy size={14} />
++          </button>
++        )}
++
+         {canDelete && (
+           <button
+             data-editor-ignore
+diff --git a/src/uiframework/gui/tree-view/TreeNode.tsx b/src/uiframework/gui/tree-view/TreeNode.tsx
+index cc293d9..7b18c3b 100644
+--- a/src/uiframework/gui/tree-view/TreeNode.tsx
++++ b/src/uiframework/gui/tree-view/TreeNode.tsx
+@@ -12,6 +12,8 @@ export function TreeNode({
+   selectNode,
+   moveNodeUp,
+   moveNodeDown,
++  duplicateNode,
++  canDuplicateNode,
+ }: TreeNodeProps) {
+   const node = nodes[nodeId];
+   const [collapsed, setCollapsed] = useState(level > 0);
+@@ -35,6 +37,8 @@ export function TreeNode({
+         selectNode={selectNode}
+         moveNodeUp={moveNodeUp}
+         moveNodeDown={moveNodeDown}
++        duplicateNode={duplicateNode}
++        canDuplicate={canDuplicateNode(nodeId)}
+       />
+ 
+       {!collapsed && (
+@@ -47,6 +51,8 @@ export function TreeNode({
+           selectNode={selectNode}
+           moveNodeUp={moveNodeUp}
+           moveNodeDown={moveNodeDown}
++          duplicateNode={duplicateNode}
++          canDuplicateNode={canDuplicateNode}
+         />
+       )}
+     </>
+diff --git a/src/uiframework/gui/tree-view/TreeNodeChildren.tsx b/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
+index 001276d..838419a 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeChildren.tsx
+@@ -10,6 +10,8 @@ export function TreeNodeChildren({
+   selectNode,
+   moveNodeUp,
+   moveNodeDown,
++  duplicateNode,
++  canDuplicateNode,
+ }: {
+   node: TreeNodeData;
+   level: number;
+@@ -19,6 +21,8 @@ export function TreeNodeChildren({
+   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
+   moveNodeUp: (nodeId: string) => void;
+   moveNodeDown: (nodeId: string) => void;
++  duplicateNode: (nodeId: string) => string | null;
++  canDuplicateNode: (nodeId: string) => boolean;
+ }) {
+   return (
+     <>
+@@ -33,6 +37,8 @@ export function TreeNodeChildren({
+           selectNode={selectNode}
+           moveNodeUp={moveNodeUp}
+           moveNodeDown={moveNodeDown}
++          duplicateNode={duplicateNode}
++          canDuplicateNode={canDuplicateNode}
+         />
+       ))}
+     </>
+diff --git a/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx b/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
+index 21168c5..c9a7102 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeMoveActions.tsx
+@@ -1,18 +1,23 @@
+ import {
+   ChevronUp,
+   ChevronDown,
++  Copy,
+ } from "lucide-react";
+ 
+ export function TreeNodeMoveActions({
+   nodeId,
+   moveNodeUp,
+   moveNodeDown,
++  duplicateNode,
++  canDuplicate,
+ }: {
+   nodeId: string;
+   moveNodeUp: (nodeId: string) => void;
+   moveNodeDown: (nodeId: string) => void;
++  duplicateNode: (nodeId: string) => string | null;
++  canDuplicate: boolean;
+ }) {
+-  if (nodeId === "root") {
++  if (nodeId === "root" && !canDuplicate) {
+     return null;
+   }
+ 
+@@ -25,6 +30,29 @@ export function TreeNodeMoveActions({
+         shrink-0
+       "
+     >
++      {canDuplicate ? (
++        <button
++          data-editor-ignore
++          type="button"
++          aria-label="Duplicate node"
++          title="Duplicate"
++          onClick={(e) => {
++            e.stopPropagation();
++            duplicateNode(nodeId);
++          }}
++          className="
++            p-1
++            rounded-md
++            text-[var(--editor-text-soft)]
++            hover:bg-[var(--editor-accent-soft)]
++            hover:text-[var(--editor-accent)]
++            transition
++          "
++        >
++          <Copy size={14} />
++        </button>
++      ) : null}
++
+       <button
+         data-editor-ignore
+         onClick={(e) => {
+@@ -62,4 +90,4 @@ export function TreeNodeMoveActions({
+       </button>
+     </div>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/src/uiframework/gui/tree-view/TreeNodeRow.tsx b/src/uiframework/gui/tree-view/TreeNodeRow.tsx
+index c4a35c6..5af7547 100644
+--- a/src/uiframework/gui/tree-view/TreeNodeRow.tsx
++++ b/src/uiframework/gui/tree-view/TreeNodeRow.tsx
+@@ -16,6 +16,8 @@ export function TreeNodeRow({
+   selectNode,
+   moveNodeUp,
+   moveNodeDown,
++  duplicateNode,
++  canDuplicate,
+ }: {
+   nodeId: string;
+   node: TreeNodeData;
+@@ -28,6 +30,8 @@ export function TreeNodeRow({
+   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
+   moveNodeUp: (nodeId: string) => void;
+   moveNodeDown: (nodeId: string) => void;
++  duplicateNode: (nodeId: string) => string | null;
++  canDuplicate: boolean;
+ }) {
+   return (
+     <div
+@@ -59,6 +63,8 @@ export function TreeNodeRow({
+         nodeId={nodeId}
+         moveNodeUp={moveNodeUp}
+         moveNodeDown={moveNodeDown}
++        duplicateNode={duplicateNode}
++        canDuplicate={canDuplicate}
+       />
+     </div>
+   );
+diff --git a/src/uiframework/gui/tree-view/TreeView.tsx b/src/uiframework/gui/tree-view/TreeView.tsx
+index 6fcc047..1005cff 100644
+--- a/src/uiframework/gui/tree-view/TreeView.tsx
++++ b/src/uiframework/gui/tree-view/TreeView.tsx
+@@ -10,6 +10,7 @@ export function TreeView() {
+   const selectNode = useEditorStore((state) => state.selectNode);
+   const moveNodeUp = useEditorStore((state) => state.moveNodeUp);
+   const moveNodeDown = useEditorStore((state) => state.moveNodeDown);
++  const duplicateNode = useEditorStore((state) => state.duplicateNode);
+   const page = getPage(document, activePageId);
+ 
+   if (!document.nodes[page.rootId]) return null;
+@@ -35,6 +36,8 @@ export function TreeView() {
+         selectNode={selectNode}
+         moveNodeUp={moveNodeUp}
+         moveNodeDown={moveNodeDown}
++        duplicateNode={duplicateNode}
++        canDuplicateNode={(nodeId) => nodeId !== page.rootId}
+       />
+     </div>
+   );
+diff --git a/src/uiframework/gui/tree-view/tree-view-types.ts b/src/uiframework/gui/tree-view/tree-view-types.ts
+index f9b1aec..f9fab0c 100644
+--- a/src/uiframework/gui/tree-view/tree-view-types.ts
++++ b/src/uiframework/gui/tree-view/tree-view-types.ts
+@@ -21,4 +21,6 @@ export type TreeNodeProps = {
+   selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
+   moveNodeUp: (nodeId: string) => void;
+   moveNodeDown: (nodeId: string) => void;
++  duplicateNode: (nodeId: string) => string | null;
++  canDuplicateNode: (nodeId: string) => boolean;
+ };
