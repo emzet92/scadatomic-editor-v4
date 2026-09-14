@@ -1,27 +1,36 @@
+import {
+  countTokenReferences,
+  isDesignTokenReference,
+  isRecord,
+  replaceTokenReferences,
+  type DesignTokenBase,
+  type DesignTokenReference,
+} from "./tokens";
+import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
+
 export type ColorTokenId = string;
 
-export type ColorToken = {
-  id: ColorTokenId;
-  name: string;
+export type ColorToken = DesignTokenBase & {
   value: string;
-  description?: string | undefined;
 };
 
-export type ColorTokenRef = {
-  kind: "color-token";
-  tokenId: ColorTokenId;
-};
-
+export type ColorTokenRef = DesignTokenReference<"color-token">;
 export type ColorValue = string | ColorTokenRef;
 
+/**
+ * Project-local design token collection.
+ * Token families deliberately live under one stable designSystem root so new
+ * families can be added without changing component/document ownership.
+ */
 export type DesignSystem = {
   colors: Record<ColorTokenId, ColorToken>;
+  typography?: Record<TypographyTokenId, TypographyToken> | undefined;
 };
 
 export const DEFAULT_COLOR_LITERAL = "#18181b";
 
 export function createEmptyDesignSystem(): DesignSystem {
-  return { colors: {} };
+  return { colors: {}, typography: {} };
 }
 
 export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
@@ -29,16 +38,13 @@ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
 }
 
 export function isColorTokenRef(value: unknown): value is ColorTokenRef {
-  return (
-    isRecord(value) &&
-    value.kind === "color-token" &&
-    typeof value.tokenId === "string"
-  );
+  return isDesignTokenReference(value, "color-token");
 }
 
+/** Accepts legacy color-only design systems and current multi-family systems. */
 export function isDesignSystem(value: unknown): value is DesignSystem {
   if (!isRecord(value) || !isRecord(value.colors)) return false;
-  return Object.entries(value.colors).every(([id, token]) => {
+  const colorsValid = Object.entries(value.colors).every(([id, token]) => {
     if (!isRecord(token)) return false;
     return (
       token.id === id &&
@@ -49,6 +55,11 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
       (token.description === undefined || typeof token.description === "string")
     );
   });
+  if (!colorsValid) return false;
+
+  if (value.typography === undefined) return true;
+  if (!isRecord(value.typography)) return false;
+  return Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id));
 }
 
 export function normalizeColorForNativeInput(value: string, fallback = "#18181b") {
@@ -73,63 +84,22 @@ export function resolveColorValue(
   return fallback;
 }
 
-/**
- * Resolve design-token references immediately before rendering.
- *
- * Documents keep stable references while React components continue receiving
- * plain values. The resolver is deliberately independent from React so future
- * renderers (native, PDF, server-side, etc.) can use the same contract.
- */
-export function resolveDesignTokenReferences(
-  value: unknown,
-  designSystem: DesignSystem | undefined
-): unknown {
-  if (isColorTokenRef(value)) {
-    return resolveColorValue(value, designSystem);
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => resolveDesignTokenReferences(item, designSystem));
-  }
-  if (!isRecord(value)) return value;
-
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nested]) => [
-      key,
-      resolveDesignTokenReferences(nested, designSystem),
-    ])
-  );
-}
-
 export function detachColorTokenReference(
   value: unknown,
   tokenId: ColorTokenId,
   replacement: string
 ): unknown {
-  if (isColorTokenRef(value)) {
-    return value.tokenId === tokenId ? replacement : value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => detachColorTokenReference(item, tokenId, replacement));
-  }
-  if (!isRecord(value)) return value;
-
-  return Object.fromEntries(
-    Object.entries(value).map(([key, nested]) => [
-      key,
-      detachColorTokenReference(nested, tokenId, replacement),
-    ])
+  return replaceTokenReferences(
+    value,
+    (candidate) => isColorTokenRef(candidate) && candidate.tokenId === tokenId,
+    () => replacement
   );
 }
 
 export function countColorTokenReferences(value: unknown, tokenId: ColorTokenId): number {
-  if (isColorTokenRef(value)) return value.tokenId === tokenId ? 1 : 0;
-  if (Array.isArray(value)) {
-    return value.reduce((sum, item) => sum + countColorTokenReferences(item, tokenId), 0);
-  }
-  if (!isRecord(value)) return 0;
-  return Object.values(value).reduce<number>(
-    (sum, nested) => sum + countColorTokenReferences(nested, tokenId),
-    0
+  return countTokenReferences(
+    value,
+    (candidate) => isColorTokenRef(candidate) && candidate.tokenId === tokenId
   );
 }
 
@@ -153,8 +123,4 @@ function createToken(name: string, value: string): ColorToken {
     name,
     value,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
 }

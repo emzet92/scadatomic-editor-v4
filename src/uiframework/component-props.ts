@@ -1,3 +1,4 @@
+import type { TypographyStyle } from "./design-system/typography";
 import {
   DEFAULT_CHART_TIME_RANGE,
   type RelativeChartTimeRange,
@@ -77,9 +78,13 @@ export type TextVariant = "body" | "label" | "title" | "caption";
 export type TextNodeProps = {
   value?: string | number;
   color?: string;
+  /** Resolved local/token typography style. Legacy individual fields remain compatible. */
+  textStyle?: TypographyStyle;
+  fontFamily?: string;
   fontSize?: number;
   lineHeight?: CssSize;
   fontWeight?: TextWeight;
+  letterSpacing?: number;
   align?: TextAlign;
   variant?: TextVariant;
   italic?: boolean;

@@ -9,6 +9,7 @@ export type InspectorControl =
   | { kind: "tag-ref"; udtId: string }
   | { kind: "time-range" }
   | { kind: "chart-series" }
+  | { kind: "typography" }
   | { kind: "text-format" }
   | { kind: "text-align" }
   | { kind: "border-size"; min?: number; max?: number; step?: number }

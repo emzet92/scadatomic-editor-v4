@@ -16,3 +16,6 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 
 export { Dialog } from "./Dialog";
 export type { DialogProps, DialogSize } from "./Dialog";
+
+export { ColorPickerInput } from "./ColorPickerInput";
+export type { ColorPickerInputProps } from "./ColorPickerInput";

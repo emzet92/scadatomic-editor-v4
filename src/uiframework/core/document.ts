@@ -127,7 +127,7 @@ export type UiDocument = {
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
   /** Project-local data definitions and persisted designer values. */
   data?: ProjectData | undefined;
-  /** Project-local design tokens. Colors are the first token family. */
+  /** Project-local design tokens shared by pages and reusable components. */
   designSystem?: DesignSystem | undefined;
   /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
   reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;

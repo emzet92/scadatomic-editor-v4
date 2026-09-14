@@ -53,6 +53,14 @@ import {
   type ColorTokenId,
 } from "./design-system/colors";
 import { detachColorTokenFromDocument } from "./design-system/document-colors";
+import {
+  createStarterTypographyTokens,
+  typographyTokenToStyle,
+  type TypographyToken,
+  type TypographyTokenId,
+} from "./design-system/typography";
+import { detachTypographyTokenFromDocument } from "./design-system/document-typography";
+import { createUniqueTokenName } from "./design-system/tokens";
 
 export type DragPreview = {
   type: string;
@@ -85,6 +93,10 @@ type EditorState = {
   addStarterColorPalette: () => void;
   updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
   deleteColorToken: (tokenId: ColorTokenId) => void;
+  addTypographyToken: (draft?: Partial<Omit<TypographyToken, "id">>) => TypographyTokenId;
+  addStarterTypographyPalette: () => void;
+  updateTypographyToken: (tokenId: TypographyTokenId, patch: Partial<Omit<TypographyToken, "id">>) => void;
+  deleteTypographyToken: (tokenId: TypographyTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -206,23 +218,6 @@ type EditorState = {
   ) => void;
 };
 
-function createUniqueColorTokenName(
-  colors: Record<string, ColorToken>,
-  requestedName: string,
-  exceptId?: string
-) {
-  const occupied = new Set(
-    Object.values(colors)
-      .filter((token) => token.id !== exceptId)
-      .map((token) => token.name.toLocaleLowerCase())
-  );
-  if (!occupied.has(requestedName.toLocaleLowerCase())) return requestedName;
-
-  let index = 2;
-  while (occupied.has(`${requestedName} ${index}`.toLocaleLowerCase())) index += 1;
-  return `${requestedName} ${index}`;
-}
-
 const NODE_DRAG_THRESHOLD_PX = 4;
 
 const initialEditorDocument = createEmptyUiDocument();
@@ -313,7 +308,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     const tokenId = crypto.randomUUID();
     set((state) => {
       const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
-      const name = createUniqueColorTokenName(
+      const name = createUniqueTokenName(
         designSystem.colors,
         draft?.name?.trim() || "Color"
       );
@@ -340,7 +335,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
       const nextColors = { ...designSystem.colors };
       for (const token of createStarterColorTokens()) {
-        const name = createUniqueColorTokenName(nextColors, token.name);
+        const name = createUniqueTokenName(nextColors, token.name);
         nextColors[token.id] = { ...token, name };
       }
       return {
@@ -359,7 +354,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (!current) return state;
       const nextName = patch.name === undefined
         ? current.name
-        : createUniqueColorTokenName(
+        : createUniqueTokenName(
             designSystem.colors,
             patch.name.trim() || current.name,
             tokenId
@@ -397,6 +392,103 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: {
           ...detached,
           designSystem: { ...designSystem, colors: nextColors },
+        },
+      };
+    });
+  },
+
+  addTypographyToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const typography = designSystem.typography ?? {};
+      const fallback = createStarterTypographyTokens()[4]!;
+      const name = createUniqueTokenName(typography, draft?.name?.trim() || "Text style");
+      const token: TypographyToken = {
+        ...fallback,
+        ...draft,
+        id: tokenId,
+        name,
+        fontFamily: draft?.fontFamily?.trim() || fallback.fontFamily,
+        lineHeight: draft?.lineHeight?.trim() || fallback.lineHeight,
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            typography: { ...typography, [tokenId]: token },
+          },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterTypographyPalette: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextTypography = { ...(designSystem.typography ?? {}) };
+      for (const token of createStarterTypographyTokens()) {
+        const name = createUniqueTokenName(nextTypography, token.name);
+        nextTypography[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, typography: nextTypography },
+        },
+      };
+    });
+  },
+
+  updateTypographyToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const typography = designSystem.typography ?? {};
+      const current = typography[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueTokenName(typography, patch.name.trim() || current.name, tokenId);
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            typography: {
+              ...typography,
+              [tokenId]: {
+                ...current,
+                ...patch,
+                name: nextName,
+                fontFamily: patch.fontFamily?.trim() || current.fontFamily,
+                lineHeight: patch.lineHeight?.trim() || current.lineHeight,
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+
+  deleteTypographyToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const typography = designSystem.typography ?? {};
+      const token = typography[tokenId];
+      if (!token) return state;
+      const detached = detachTypographyTokenFromDocument(
+        state.document,
+        tokenId,
+        typographyTokenToStyle(token)
+      );
+      const nextTypography = { ...typography };
+      delete nextTypography[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, typography: nextTypography },
         },
       };
     });

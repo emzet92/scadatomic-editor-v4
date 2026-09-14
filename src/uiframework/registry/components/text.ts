@@ -13,8 +13,7 @@ export const textDefinition = {
   inspector: {
     value: { kind: "text" },
     color: { kind: "color" },
-    fontSize: { kind: "number", min: 1 },
-    lineHeight: { kind: "text" },
+    textStyle: { kind: "typography" },
     formatting: { kind: "text-format" },
     align: { kind: "text-align" },
     variant: { kind: "select", options: ["body", "label", "title", "caption"] },

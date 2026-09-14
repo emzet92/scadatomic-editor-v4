@@ -58,3 +58,14 @@ Deleting a token does not leave broken references. All usages are detached to th
 ## Future token families
 
 The `DesignSystem` root intentionally leaves room for additional token families such as typography, spacing, radii, shadows and motion. They should follow the same stable-ID reference pattern rather than storing raw CSS expressions as the project-domain model.
+
+## Color picker and property references
+
+The color library exposes a visible swatch picker for every token. Clicking the swatch opens the browser/native color picker while the adjacent value field remains available for exact HEX/CSS editing.
+
+Every inspector control declared with `kind: "color"` supports two sources:
+
+- **Local color** — literal color edited with the shared color picker.
+- **Design System** — stable `ColorTokenRef` selected from the project color list. The list shows the token path/name and current value.
+
+Because reusable component public inputs of type `color` are mapped to the same inspector control, component instances receive the same Local / Design System selector automatically. Variant property editing also reuses this control.

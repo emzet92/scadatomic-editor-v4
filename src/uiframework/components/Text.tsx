@@ -27,9 +27,12 @@ export function Text({
   value,
 
   color,
+  textStyle,
+  fontFamily,
   fontSize,
   lineHeight,
   fontWeight,
+  letterSpacing,
   align,
   variant,
 
@@ -49,6 +52,8 @@ export function Text({
 
   const variantDefaults: TextNodeProps =
     defaultTextPropsByVariant[resolvedVariant];
+  const resolvedFontFamily = textStyle?.fontFamily ?? fontFamily;
+  const resolvedLetterSpacing = textStyle?.letterSpacing ?? letterSpacing;
 
   const resolvedProps: TextNodeProps = {
     ...defaultTextProps,
@@ -62,20 +67,27 @@ export function Text({
       variantDefaults.color ??
       defaultTextProps.color,
 
+    ...(resolvedFontFamily !== undefined ? { fontFamily: resolvedFontFamily } : {}),
+
     fontSize:
+      textStyle?.fontSize ??
       fontSize ??
       variantDefaults.fontSize ??
       defaultTextProps.fontSize,
 
     lineHeight:
+      textStyle?.lineHeight ??
       lineHeight ??
       variantDefaults.lineHeight ??
       defaultTextProps.lineHeight,
 
     fontWeight:
+      textStyle?.fontWeight ??
       fontWeight ??
       variantDefaults.fontWeight ??
       defaultTextProps.fontWeight,
+
+    ...(resolvedLetterSpacing !== undefined ? { letterSpacing: resolvedLetterSpacing } : {}),
 
     align:
       align ??
@@ -124,11 +136,17 @@ export function Text({
         color:
           resolvedProps.color,
 
+        fontFamily:
+          resolvedProps.fontFamily,
+
         fontSize:
           resolvedProps.fontSize,
 
         lineHeight:
           resolvedProps.lineHeight,
+
+        letterSpacing:
+          resolvedProps.letterSpacing,
 
         fontWeight:
           resolvedProps.fontWeight

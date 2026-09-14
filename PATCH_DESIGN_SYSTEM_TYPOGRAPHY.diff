@@ -1,0 +1,1489 @@
+diff --git a/DESIGN_SYSTEM_TYPOGRAPHY.md b/DESIGN_SYSTEM_TYPOGRAPHY.md
+new file mode 100644
+index 0000000..9170c6c
+--- /dev/null
++++ b/DESIGN_SYSTEM_TYPOGRAPHY.md
+@@ -0,0 +1,65 @@
++# SCADAtomic Design System — Typography
++
++Typography is the second project-local design-token family after Colors.
++
++## Document model
++
++The project design system now supports multiple token families:
++
++```ts
++designSystem: {
++  colors: Record<ColorTokenId, ColorToken>,
++  typography?: Record<TypographyTokenId, TypographyToken>
++}
++```
++
++Every token uses a stable UUID. Names such as `Heading/Large` are presentation paths and can be renamed without breaking references.
++
++A typography token contains:
++
++```ts
++{
++  id,
++  name,
++  fontFamily,
++  fontSize,
++  fontWeight,
++  lineHeight,
++  letterSpacing
++}
++```
++
++A Text node references it through one `textStyle` value:
++
++```ts
++textStyle: {
++  kind: "typography-token",
++  tokenId: "..."
++}
++```
++
++The renderer resolves that reference immediately before rendering. Text components receive an ordinary resolved typography style and do not know about token storage.
++
++## Local vs Design System
++
++The Text property panel exposes:
++
++- **Local style** — font family, size, weight, line height and letter spacing stored locally.
++- **Design System** — a stable reference selected from the project Typography library.
++
++Legacy Text nodes that still contain `fontSize`, `fontWeight` and `lineHeight` continue to work. They are converted to the new `textStyle` model only when the user opts into the Typography control.
++
++## Delete behavior
++
++Deleting a typography token never leaves a broken reference. Every use is detached to an equivalent local `TypographyStyle`, preserving the current visual appearance.
++
++## Generic token foundation
++
++Shared token primitives now live in `src/uiframework/design-system/tokens.ts`:
++
++- `DesignTokenBase`
++- `DesignTokenReference<TKind>`
++- generic reference traversal/counting
++- shared unique-name generation
++
++The renderer uses `design-system/resolver.ts`, which resolves both color and typography references. Future families such as spacing, radius and shadow can plug into the same boundary.
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index 46126c6..9ccd9dd 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -44,8 +44,9 @@ import {
+ import { initialDocument } from "./registry/initial-values";
+ import { DataPanel } from "./gui/data/DataPanel";
+ import { DataWorkspace } from "./gui/data/DataWorkspace";
+-import { DesignSystemPanel } from "./gui/design-system/DesignSystemPanel";
++import { DesignSystemPanel, type DesignSystemSection } from "./gui/design-system/DesignSystemPanel";
+ import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
++import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -201,6 +202,7 @@ export function EditorPage() {
+     "idle" | "saving" | "saved" | "error"
+   >("idle");
+   const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
++  const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("colors");
+   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
+ 
+   const loadedRef = useRef(false);
+@@ -535,7 +537,10 @@ export function EditorPage() {
+               projectId={projectId}
+             />
+           ) : editorArea === "designSystem" ? (
+-            <DesignSystemPanel />
++            <DesignSystemPanel
++              activeSection={designSystemSection}
++              onSelectSection={setDesignSystemSection}
++            />
+           ) : componentDefinitionMode && focusedDefinition ? (
+             <>
+               <ComponentStructureTree
+@@ -594,7 +599,11 @@ export function EditorPage() {
+             </div>
+           ) : editorArea === "designSystem" ? (
+             <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+-              <ColorLibraryWorkspace />
++              {designSystemSection === "colors" ? (
++                <ColorLibraryWorkspace />
++              ) : (
++                <TypographyLibraryWorkspace />
++              )}
+             </div>
+           ) : (
+             <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
+diff --git a/src/uiframework/Renderer.tsx b/src/uiframework/Renderer.tsx
+index 62d54bc..20b52ce 100644
+--- a/src/uiframework/Renderer.tsx
++++ b/src/uiframework/Renderer.tsx
+@@ -5,7 +5,7 @@ import { getDefaultComponentVariantProps } from "./component-variants";
+ import { resolveTagCollection } from "./data/collections/TagCollectionSource";
+ import { createTagRef } from "./data/collections/TagRef";
+ import { createRepeatInstanceId } from "./repeat/RepeatRuntime";
+-import { resolveDesignTokenReferences } from "./design-system/colors";
++import { resolveDesignTokenReferences } from "./design-system/resolver";
+ import {
+   applyComponentInstanceInputs,
+   getComponentDefinitionForInstance,
+diff --git a/src/uiframework/component-props.ts b/src/uiframework/component-props.ts
+index 4605111..6777ae1 100644
+--- a/src/uiframework/component-props.ts
++++ b/src/uiframework/component-props.ts
+@@ -1,3 +1,4 @@
++import type { TypographyStyle } from "./design-system/typography";
+ import {
+   DEFAULT_CHART_TIME_RANGE,
+   type RelativeChartTimeRange,
+@@ -77,9 +78,13 @@ export type TextVariant = "body" | "label" | "title" | "caption";
+ export type TextNodeProps = {
+   value?: string | number;
+   color?: string;
++  /** Resolved local/token typography style. Legacy individual fields remain compatible. */
++  textStyle?: TypographyStyle;
++  fontFamily?: string;
+   fontSize?: number;
+   lineHeight?: CssSize;
+   fontWeight?: TextWeight;
++  letterSpacing?: number;
+   align?: TextAlign;
+   variant?: TextVariant;
+   italic?: boolean;
+diff --git a/src/uiframework/components/Text.tsx b/src/uiframework/components/Text.tsx
+index c1852e3..f5c947d 100644
+--- a/src/uiframework/components/Text.tsx
++++ b/src/uiframework/components/Text.tsx
+@@ -27,9 +27,12 @@ export function Text({
+   value,
+ 
+   color,
++  textStyle,
++  fontFamily,
+   fontSize,
+   lineHeight,
+   fontWeight,
++  letterSpacing,
+   align,
+   variant,
+ 
+@@ -49,6 +52,8 @@ export function Text({
+ 
+   const variantDefaults: TextNodeProps =
+     defaultTextPropsByVariant[resolvedVariant];
++  const resolvedFontFamily = textStyle?.fontFamily ?? fontFamily;
++  const resolvedLetterSpacing = textStyle?.letterSpacing ?? letterSpacing;
+ 
+   const resolvedProps: TextNodeProps = {
+     ...defaultTextProps,
+@@ -62,21 +67,28 @@ export function Text({
+       variantDefaults.color ??
+       defaultTextProps.color,
+ 
++    ...(resolvedFontFamily !== undefined ? { fontFamily: resolvedFontFamily } : {}),
++
+     fontSize:
++      textStyle?.fontSize ??
+       fontSize ??
+       variantDefaults.fontSize ??
+       defaultTextProps.fontSize,
+ 
+     lineHeight:
++      textStyle?.lineHeight ??
+       lineHeight ??
+       variantDefaults.lineHeight ??
+       defaultTextProps.lineHeight,
+ 
+     fontWeight:
++      textStyle?.fontWeight ??
+       fontWeight ??
+       variantDefaults.fontWeight ??
+       defaultTextProps.fontWeight,
+ 
++    ...(resolvedLetterSpacing !== undefined ? { letterSpacing: resolvedLetterSpacing } : {}),
++
+     align:
+       align ??
+       defaultTextProps.align,
+@@ -124,12 +136,18 @@ export function Text({
+         color:
+           resolvedProps.color,
+ 
++        fontFamily:
++          resolvedProps.fontFamily,
++
+         fontSize:
+           resolvedProps.fontSize,
+ 
+         lineHeight:
+           resolvedProps.lineHeight,
+ 
++        letterSpacing:
++          resolvedProps.letterSpacing,
++
+         fontWeight:
+           resolvedProps.fontWeight
+             ? fontWeightMap[
+diff --git a/src/uiframework/core/document.ts b/src/uiframework/core/document.ts
+index c986e0c..88fad36 100644
+--- a/src/uiframework/core/document.ts
++++ b/src/uiframework/core/document.ts
+@@ -127,7 +127,7 @@ export type UiDocument = {
+   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
+   /** Project-local data definitions and persisted designer values. */
+   data?: ProjectData | undefined;
+-  /** Project-local design tokens. Colors are the first token family. */
++  /** Project-local design tokens shared by pages and reusable components. */
+   designSystem?: DesignSystem | undefined;
+   /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
+   reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+index 3ce91ec..ad282ad 100644
+--- a/src/uiframework/design-system/colors.ts
++++ b/src/uiframework/design-system/colors.ts
+@@ -1,27 +1,36 @@
++import {
++  countTokenReferences,
++  isDesignTokenReference,
++  isRecord,
++  replaceTokenReferences,
++  type DesignTokenBase,
++  type DesignTokenReference,
++} from "./tokens";
++import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
++
+ export type ColorTokenId = string;
+ 
+-export type ColorToken = {
+-  id: ColorTokenId;
+-  name: string;
++export type ColorToken = DesignTokenBase & {
+   value: string;
+-  description?: string | undefined;
+-};
+-
+-export type ColorTokenRef = {
+-  kind: "color-token";
+-  tokenId: ColorTokenId;
+ };
+ 
++export type ColorTokenRef = DesignTokenReference<"color-token">;
+ export type ColorValue = string | ColorTokenRef;
+ 
++/**
++ * Project-local design token collection.
++ * Token families deliberately live under one stable designSystem root so new
++ * families can be added without changing component/document ownership.
++ */
+ export type DesignSystem = {
+   colors: Record<ColorTokenId, ColorToken>;
++  typography?: Record<TypographyTokenId, TypographyToken> | undefined;
+ };
+ 
+ export const DEFAULT_COLOR_LITERAL = "#18181b";
+ 
+ export function createEmptyDesignSystem(): DesignSystem {
+-  return { colors: {} };
++  return { colors: {}, typography: {} };
+ }
+ 
+ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+@@ -29,16 +38,13 @@ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+ }
+ 
+ export function isColorTokenRef(value: unknown): value is ColorTokenRef {
+-  return (
+-    isRecord(value) &&
+-    value.kind === "color-token" &&
+-    typeof value.tokenId === "string"
+-  );
++  return isDesignTokenReference(value, "color-token");
+ }
+ 
++/** Accepts legacy color-only design systems and current multi-family systems. */
+ export function isDesignSystem(value: unknown): value is DesignSystem {
+   if (!isRecord(value) || !isRecord(value.colors)) return false;
+-  return Object.entries(value.colors).every(([id, token]) => {
++  const colorsValid = Object.entries(value.colors).every(([id, token]) => {
+     if (!isRecord(token)) return false;
+     return (
+       token.id === id &&
+@@ -49,6 +55,11 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
+       (token.description === undefined || typeof token.description === "string")
+     );
+   });
++  if (!colorsValid) return false;
++
++  if (value.typography === undefined) return true;
++  if (!isRecord(value.typography)) return false;
++  return Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id));
+ }
+ 
+ export function normalizeColorForNativeInput(value: string, fallback = "#18181b") {
+@@ -73,63 +84,22 @@ export function resolveColorValue(
+   return fallback;
+ }
+ 
+-/**
+- * Resolve design-token references immediately before rendering.
+- *
+- * Documents keep stable references while React components continue receiving
+- * plain values. The resolver is deliberately independent from React so future
+- * renderers (native, PDF, server-side, etc.) can use the same contract.
+- */
+-export function resolveDesignTokenReferences(
+-  value: unknown,
+-  designSystem: DesignSystem | undefined
+-): unknown {
+-  if (isColorTokenRef(value)) {
+-    return resolveColorValue(value, designSystem);
+-  }
+-  if (Array.isArray(value)) {
+-    return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+-  }
+-  if (!isRecord(value)) return value;
+-
+-  return Object.fromEntries(
+-    Object.entries(value).map(([key, nested]) => [
+-      key,
+-      resolveDesignTokenReferences(nested, designSystem),
+-    ])
+-  );
+-}
+-
+ export function detachColorTokenReference(
+   value: unknown,
+   tokenId: ColorTokenId,
+   replacement: string
+ ): unknown {
+-  if (isColorTokenRef(value)) {
+-    return value.tokenId === tokenId ? replacement : value;
+-  }
+-  if (Array.isArray(value)) {
+-    return value.map((item) => detachColorTokenReference(item, tokenId, replacement));
+-  }
+-  if (!isRecord(value)) return value;
+-
+-  return Object.fromEntries(
+-    Object.entries(value).map(([key, nested]) => [
+-      key,
+-      detachColorTokenReference(nested, tokenId, replacement),
+-    ])
++  return replaceTokenReferences(
++    value,
++    (candidate) => isColorTokenRef(candidate) && candidate.tokenId === tokenId,
++    () => replacement
+   );
+ }
+ 
+ export function countColorTokenReferences(value: unknown, tokenId: ColorTokenId): number {
+-  if (isColorTokenRef(value)) return value.tokenId === tokenId ? 1 : 0;
+-  if (Array.isArray(value)) {
+-    return value.reduce((sum, item) => sum + countColorTokenReferences(item, tokenId), 0);
+-  }
+-  if (!isRecord(value)) return 0;
+-  return Object.values(value).reduce<number>(
+-    (sum, nested) => sum + countColorTokenReferences(nested, tokenId),
+-    0
++  return countTokenReferences(
++    value,
++    (candidate) => isColorTokenRef(candidate) && candidate.tokenId === tokenId
+   );
+ }
+ 
+@@ -154,7 +124,3 @@ function createToken(name: string, value: string): ColorToken {
+     value,
+   };
+ }
+-
+-function isRecord(value: unknown): value is Record<string, unknown> {
+-  return !!value && typeof value === "object" && !Array.isArray(value);
+-}
+diff --git a/src/uiframework/design-system/document-typography.ts b/src/uiframework/design-system/document-typography.ts
+new file mode 100644
+index 0000000..5497de9
+--- /dev/null
++++ b/src/uiframework/design-system/document-typography.ts
+@@ -0,0 +1,101 @@
++import type { ComponentInputDefinition, UiDocument, UiNode } from "../core/document";
++import {
++  countTypographyTokenReferences,
++  detachTypographyTokenReference,
++  type TypographyStyle,
++  type TypographyTokenId,
++} from "./typography";
++
++export function detachTypographyTokenFromDocument(
++  document: UiDocument,
++  tokenId: TypographyTokenId,
++  replacement: TypographyStyle
++): UiDocument {
++  return {
++    ...document,
++    nodes: mapNodes(document.nodes, tokenId, replacement),
++    components: document.components
++      ? Object.fromEntries(
++          Object.entries(document.components).map(([id, definition]) => [
++            id,
++            {
++              ...definition,
++              nodes: mapNodes(definition.nodes, tokenId, replacement),
++              inputs: definition.inputs
++                ? mapInputs(definition.inputs, tokenId, replacement)
++                : undefined,
++            },
++          ])
++        )
++      : document.components,
++  };
++}
++
++export function countTypographyTokenUsages(
++  document: UiDocument,
++  tokenId: TypographyTokenId
++): number {
++  let count = countTypographyTokenReferences(document.nodes, tokenId);
++  for (const definition of Object.values(document.components ?? {})) {
++    count += countTypographyTokenReferences(definition.nodes, tokenId);
++    count += countTypographyTokenReferences(definition.inputs, tokenId);
++  }
++  return count;
++}
++
++function mapNodes(
++  nodes: Record<string, UiNode>,
++  tokenId: TypographyTokenId,
++  replacement: TypographyStyle
++): Record<string, UiNode> {
++  return Object.fromEntries(
++    Object.entries(nodes).map(([id, node]) => [id, detachTokenFromNode(node, tokenId, replacement)])
++  );
++}
++
++function detachTokenFromNode(
++  node: UiNode,
++  tokenId: TypographyTokenId,
++  replacement: TypographyStyle
++): UiNode {
++  return {
++    ...node,
++    props: node.props
++      ? (detachTypographyTokenReference(node.props, tokenId, replacement) as Record<string, unknown>)
++      : node.props,
++    variants: node.variants
++      ? Object.fromEntries(
++          Object.entries(node.variants).map(([name, variant]) => [
++            name,
++            {
++              ...variant,
++              props: detachTypographyTokenReference(
++                variant.props,
++                tokenId,
++                replacement
++              ) as Record<string, unknown>,
++            },
++          ])
++        )
++      : node.variants,
++  };
++}
++
++function mapInputs(
++  inputs: Record<string, ComponentInputDefinition>,
++  tokenId: TypographyTokenId,
++  replacement: TypographyStyle
++): Record<string, ComponentInputDefinition> {
++  return Object.fromEntries(
++    Object.entries(inputs).map(([name, input]) => {
++      if (input.type === "tagRef" || input.defaultValue === undefined) return [name, input];
++      return [
++        name,
++        {
++          ...input,
++          defaultValue: detachTypographyTokenReference(input.defaultValue, tokenId, replacement),
++        },
++      ];
++    })
++  );
++}
+diff --git a/src/uiframework/design-system/resolver.ts b/src/uiframework/design-system/resolver.ts
+new file mode 100644
+index 0000000..f80ccea
+--- /dev/null
++++ b/src/uiframework/design-system/resolver.ts
+@@ -0,0 +1,26 @@
++import { isColorTokenRef, resolveColorValue, type DesignSystem } from "./colors";
++import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
++import { isRecord } from "./tokens";
++
++/**
++ * Resolve project design-token references immediately before rendering.
++ * Components stay renderer-agnostic and receive ordinary resolved values.
++ */
++export function resolveDesignTokenReferences(
++  value: unknown,
++  designSystem: DesignSystem | undefined
++): unknown {
++  if (isColorTokenRef(value)) return resolveColorValue(value, designSystem);
++  if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
++  if (Array.isArray(value)) {
++    return value.map((item) => resolveDesignTokenReferences(item, designSystem));
++  }
++  if (!isRecord(value)) return value;
++
++  return Object.fromEntries(
++    Object.entries(value).map(([key, nested]) => [
++      key,
++      resolveDesignTokenReferences(nested, designSystem),
++    ])
++  );
++}
+diff --git a/src/uiframework/design-system/tokens.ts b/src/uiframework/design-system/tokens.ts
+new file mode 100644
+index 0000000..39ce88d
+--- /dev/null
++++ b/src/uiframework/design-system/tokens.ts
+@@ -0,0 +1,80 @@
++export type DesignTokenId = string;
++
++export type DesignTokenBase = {
++  id: DesignTokenId;
++  name: string;
++  description?: string | undefined;
++};
++
++export type DesignTokenReference<TKind extends string> = {
++  kind: TKind;
++  tokenId: DesignTokenId;
++};
++
++export function isDesignTokenReference<TKind extends string>(
++  value: unknown,
++  kind: TKind
++): value is DesignTokenReference<TKind> {
++  return (
++    isRecord(value) &&
++    value.kind === kind &&
++    typeof value.tokenId === "string" &&
++    value.tokenId.length > 0
++  );
++}
++
++/** Recursively replace references without coupling document traversal to a token family. */
++export function replaceTokenReferences(
++  value: unknown,
++  matcher: (candidate: unknown) => boolean,
++  replacement: (candidate: unknown) => unknown
++): unknown {
++  if (matcher(value)) return replacement(value);
++  if (Array.isArray(value)) {
++    return value.map((item) => replaceTokenReferences(item, matcher, replacement));
++  }
++  if (!isRecord(value)) return value;
++
++  return Object.fromEntries(
++    Object.entries(value).map(([key, nested]) => [
++      key,
++      replaceTokenReferences(nested, matcher, replacement),
++    ])
++  );
++}
++
++export function countTokenReferences(
++  value: unknown,
++  matcher: (candidate: unknown) => boolean
++): number {
++  if (matcher(value)) return 1;
++  if (Array.isArray(value)) {
++    return value.reduce((sum, item) => sum + countTokenReferences(item, matcher), 0);
++  }
++  if (!isRecord(value)) return 0;
++  return Object.values(value).reduce<number>(
++    (sum, nested) => sum + countTokenReferences(nested, matcher),
++    0
++  );
++}
++
++export function createUniqueTokenName<TToken extends DesignTokenBase>(
++  tokens: Record<string, TToken>,
++  requestedName: string,
++  exceptId?: string
++) {
++  const occupied = new Set(
++    Object.values(tokens)
++      .filter((token) => token.id !== exceptId)
++      .map((token) => token.name.toLocaleLowerCase())
++  );
++  if (!occupied.has(requestedName.toLocaleLowerCase())) return requestedName;
++
++  let index = 2;
++  while (occupied.has(`${requestedName} ${index}`.toLocaleLowerCase())) index += 1;
++  return `${requestedName} ${index}`;
++}
++
++export function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/uiframework/design-system/typography.ts b/src/uiframework/design-system/typography.ts
+new file mode 100644
+index 0000000..9eb39bf
+--- /dev/null
++++ b/src/uiframework/design-system/typography.ts
+@@ -0,0 +1,142 @@
++import type { DesignSystem } from "./colors";
++import {
++  countTokenReferences,
++  isDesignTokenReference,
++  isRecord,
++  replaceTokenReferences,
++  type DesignTokenBase,
++  type DesignTokenReference,
++} from "./tokens";
++
++export type TypographyTokenId = string;
++export type TypographyWeight = "normal" | "medium" | "semibold" | "bold";
++
++export type TypographyStyle = {
++  fontFamily: string;
++  fontSize: number;
++  fontWeight: TypographyWeight;
++  lineHeight: string;
++  letterSpacing: number;
++};
++
++export type TypographyToken = DesignTokenBase & TypographyStyle;
++export type TypographyTokenRef = DesignTokenReference<"typography-token">;
++export type TypographyValue = TypographyStyle | TypographyTokenRef;
++
++export const DEFAULT_TYPOGRAPHY_STYLE: TypographyStyle = {
++  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
++  fontSize: 14,
++  fontWeight: "normal",
++  lineHeight: "20px",
++  letterSpacing: 0,
++};
++
++export function createTypographyTokenRef(tokenId: TypographyTokenId): TypographyTokenRef {
++  return { kind: "typography-token", tokenId };
++}
++
++export function isTypographyTokenRef(value: unknown): value is TypographyTokenRef {
++  return isDesignTokenReference(value, "typography-token");
++}
++
++export function isTypographyStyle(value: unknown): value is TypographyStyle {
++  return (
++    isRecord(value) &&
++    typeof value.fontFamily === "string" &&
++    typeof value.fontSize === "number" &&
++    isTypographyWeight(value.fontWeight) &&
++    typeof value.lineHeight === "string" &&
++    typeof value.letterSpacing === "number"
++  );
++}
++
++export function isTypographyToken(value: unknown, id?: string): value is TypographyToken {
++  if (!isRecord(value) || !isTypographyStyle(value)) return false;
++  const candidate = value as Record<string, unknown>;
++  return (
++    typeof candidate.id === "string" &&
++    (id === undefined || candidate.id === id) &&
++    typeof candidate.name === "string" &&
++    candidate.name.trim().length > 0 &&
++    (candidate.description === undefined || typeof candidate.description === "string")
++  );
++}
++
++export function resolveTypographyValue(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback: TypographyStyle = DEFAULT_TYPOGRAPHY_STYLE
++): TypographyStyle {
++  if (isTypographyStyle(value)) return value;
++  if (isTypographyTokenRef(value)) {
++    const token = designSystem?.typography?.[value.tokenId];
++    return token ? typographyTokenToStyle(token) : fallback;
++  }
++  return fallback;
++}
++
++export function typographyTokenToStyle(token: TypographyToken): TypographyStyle {
++  return {
++    fontFamily: token.fontFamily,
++    fontSize: token.fontSize,
++    fontWeight: token.fontWeight,
++    lineHeight: token.lineHeight,
++    letterSpacing: token.letterSpacing,
++  };
++}
++
++export function detachTypographyTokenReference(
++  value: unknown,
++  tokenId: TypographyTokenId,
++  replacement: TypographyStyle
++): unknown {
++  return replaceTokenReferences(
++    value,
++    (candidate) => isTypographyTokenRef(candidate) && candidate.tokenId === tokenId,
++    () => replacement
++  );
++}
++
++export function countTypographyTokenReferences(
++  value: unknown,
++  tokenId: TypographyTokenId
++): number {
++  return countTokenReferences(
++    value,
++    (candidate) => isTypographyTokenRef(candidate) && candidate.tokenId === tokenId
++  );
++}
++
++export function createStarterTypographyTokens(): TypographyToken[] {
++  return [
++    createToken("Display/Large", 40, "bold", "48px", -0.6),
++    createToken("Heading/Large", 28, "semibold", "36px", -0.3),
++    createToken("Heading/Medium", 22, "semibold", "30px", -0.2),
++    createToken("Body/Large", 16, "normal", "24px", 0),
++    createToken("Body/Medium", 14, "normal", "20px", 0),
++    createToken("Label/Medium", 12, "medium", "16px", 0.1),
++    createToken("Caption/Small", 11, "normal", "16px", 0.1),
++  ];
++}
++
++function createToken(
++  name: string,
++  fontSize: number,
++  fontWeight: TypographyWeight,
++  lineHeight: string,
++  letterSpacing: number
++): TypographyToken {
++  return {
++    id: crypto.randomUUID(),
++    name,
++    fontFamily: DEFAULT_TYPOGRAPHY_STYLE.fontFamily,
++    fontSize,
++    fontWeight,
++    lineHeight,
++    letterSpacing,
++  };
++}
++
++function isTypographyWeight(value: unknown): value is TypographyWeight {
++  return value === "normal" || value === "medium" || value === "semibold" || value === "bold";
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 87ef807..bc56313 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -53,6 +53,14 @@ import {
+   type ColorTokenId,
+ } from "./design-system/colors";
+ import { detachColorTokenFromDocument } from "./design-system/document-colors";
++import {
++  createStarterTypographyTokens,
++  typographyTokenToStyle,
++  type TypographyToken,
++  type TypographyTokenId,
++} from "./design-system/typography";
++import { detachTypographyTokenFromDocument } from "./design-system/document-typography";
++import { createUniqueTokenName } from "./design-system/tokens";
+ 
+ export type DragPreview = {
+   type: string;
+@@ -85,6 +93,10 @@ type EditorState = {
+   addStarterColorPalette: () => void;
+   updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
+   deleteColorToken: (tokenId: ColorTokenId) => void;
++  addTypographyToken: (draft?: Partial<Omit<TypographyToken, "id">>) => TypographyTokenId;
++  addStarterTypographyPalette: () => void;
++  updateTypographyToken: (tokenId: TypographyTokenId, patch: Partial<Omit<TypographyToken, "id">>) => void;
++  deleteTypographyToken: (tokenId: TypographyTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -206,23 +218,6 @@ type EditorState = {
+   ) => void;
+ };
+ 
+-function createUniqueColorTokenName(
+-  colors: Record<string, ColorToken>,
+-  requestedName: string,
+-  exceptId?: string
+-) {
+-  const occupied = new Set(
+-    Object.values(colors)
+-      .filter((token) => token.id !== exceptId)
+-      .map((token) => token.name.toLocaleLowerCase())
+-  );
+-  if (!occupied.has(requestedName.toLocaleLowerCase())) return requestedName;
+-
+-  let index = 2;
+-  while (occupied.has(`${requestedName} ${index}`.toLocaleLowerCase())) index += 1;
+-  return `${requestedName} ${index}`;
+-}
+-
+ const NODE_DRAG_THRESHOLD_PX = 4;
+ 
+ const initialEditorDocument = createEmptyUiDocument();
+@@ -313,7 +308,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+     const tokenId = crypto.randomUUID();
+     set((state) => {
+       const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+-      const name = createUniqueColorTokenName(
++      const name = createUniqueTokenName(
+         designSystem.colors,
+         draft?.name?.trim() || "Color"
+       );
+@@ -340,7 +335,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+       const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+       const nextColors = { ...designSystem.colors };
+       for (const token of createStarterColorTokens()) {
+-        const name = createUniqueColorTokenName(nextColors, token.name);
++        const name = createUniqueTokenName(nextColors, token.name);
+         nextColors[token.id] = { ...token, name };
+       }
+       return {
+@@ -359,7 +354,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+       if (!current) return state;
+       const nextName = patch.name === undefined
+         ? current.name
+-        : createUniqueColorTokenName(
++        : createUniqueTokenName(
+             designSystem.colors,
+             patch.name.trim() || current.name,
+             tokenId
+@@ -402,6 +397,103 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addTypographyToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const typography = designSystem.typography ?? {};
++      const fallback = createStarterTypographyTokens()[4]!;
++      const name = createUniqueTokenName(typography, draft?.name?.trim() || "Text style");
++      const token: TypographyToken = {
++        ...fallback,
++        ...draft,
++        id: tokenId,
++        name,
++        fontFamily: draft?.fontFamily?.trim() || fallback.fontFamily,
++        lineHeight: draft?.lineHeight?.trim() || fallback.lineHeight,
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            typography: { ...typography, [tokenId]: token },
++          },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterTypographyPalette: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextTypography = { ...(designSystem.typography ?? {}) };
++      for (const token of createStarterTypographyTokens()) {
++        const name = createUniqueTokenName(nextTypography, token.name);
++        nextTypography[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, typography: nextTypography },
++        },
++      };
++    });
++  },
++
++  updateTypographyToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const typography = designSystem.typography ?? {};
++      const current = typography[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueTokenName(typography, patch.name.trim() || current.name, tokenId);
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            typography: {
++              ...typography,
++              [tokenId]: {
++                ...current,
++                ...patch,
++                name: nextName,
++                fontFamily: patch.fontFamily?.trim() || current.fontFamily,
++                lineHeight: patch.lineHeight?.trim() || current.lineHeight,
++              },
++            },
++          },
++        },
++      };
++    });
++  },
++
++  deleteTypographyToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const typography = designSystem.typography ?? {};
++      const token = typography[tokenId];
++      if (!token) return state;
++      const detached = detachTypographyTokenFromDocument(
++        state.document,
++        tokenId,
++        typographyTokenToStyle(token)
++      );
++      const nextTypography = { ...typography };
++      delete nextTypography[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, typography: nextTypography },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+index 6b63e0c..6b048f6 100644
+--- a/src/uiframework/gui/design-system/DesignSystemPanel.tsx
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -1,11 +1,23 @@
+-import { Palette } from "lucide-react";
++import type { ReactNode } from "react";
++import { Palette, Type } from "lucide-react";
+ import { useEditorStore } from "../../editor-store";
+ import { SectionHeader } from "../ui";
+ 
+-export function DesignSystemPanel() {
++export type DesignSystemSection = "colors" | "typography";
++
++export function DesignSystemPanel({
++  activeSection,
++  onSelectSection,
++}: {
++  activeSection: DesignSystemSection;
++  onSelectSection: (section: DesignSystemSection) => void;
++}) {
+   const colorCount = useEditorStore(
+     (state) => Object.keys(state.document.designSystem?.colors ?? {}).length
+   );
++  const typographyCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.typography ?? {}).length
++  );
+ 
+   return (
+     <div className="space-y-3">
+@@ -13,17 +25,56 @@ export function DesignSystemPanel() {
+         title="Design System"
+         description="Project-local tokens shared by every page and reusable component."
+       />
+-      <div className="rounded-xl border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-3">
+-        <div className="flex items-center gap-2 text-sm font-medium text-[var(--editor-accent)]">
+-          <Palette size={15} /> Colors
+-        </div>
+-        <div className="mt-1 text-xs text-[var(--editor-text-muted)]">
+-          {colorCount} {colorCount === 1 ? "token" : "tokens"}
+-        </div>
+-      </div>
++      <TokenSectionButton
++        active={activeSection === "colors"}
++        icon={<Palette size={15} />}
++        title="Colors"
++        count={colorCount}
++        onClick={() => onSelectSection("colors")}
++      />
++      <TokenSectionButton
++        active={activeSection === "typography"}
++        icon={<Type size={15} />}
++        title="Typography"
++        count={typographyCount}
++        onClick={() => onSelectSection("typography")}
++      />
+       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
+-        Typography, spacing, radii and shadows can be added here later using the same token model.
++        Spacing, radii, shadows and motion can use the same token reference model next.
+       </div>
+     </div>
+   );
+ }
++
++function TokenSectionButton({
++  active,
++  icon,
++  title,
++  count,
++  onClick,
++}: {
++  active: boolean;
++  icon: ReactNode;
++  title: string;
++  count: number;
++  onClick: () => void;
++}) {
++  return (
++    <button
++      type="button"
++      onClick={onClick}
++      className={`w-full rounded-xl border p-3 text-left transition ${
++        active
++          ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)]"
++          : "border-[var(--editor-border)] bg-[var(--editor-surface)] hover:bg-[var(--editor-surface-muted)]"
++      }`}
++    >
++      <div className={`flex items-center gap-2 text-sm font-medium ${active ? "text-[var(--editor-accent)]" : "text-[var(--editor-text)]"}`}>
++        {icon} {title}
++      </div>
++      <div className="mt-1 text-xs text-[var(--editor-text-muted)]">
++        {count} {count === 1 ? "token" : "tokens"}
++      </div>
++    </button>
++  );
++}
+diff --git a/src/uiframework/gui/design-system/TypographyLibraryWorkspace.tsx b/src/uiframework/gui/design-system/TypographyLibraryWorkspace.tsx
+new file mode 100644
+index 0000000..0b38148
+--- /dev/null
++++ b/src/uiframework/gui/design-system/TypographyLibraryWorkspace.tsx
+@@ -0,0 +1,152 @@
++import { Plus, Trash2, Type } from "lucide-react";
++import { useMemo } from "react";
++import type { TypographyWeight } from "../../design-system/typography";
++import { countTypographyTokenUsages } from "../../design-system/document-typography";
++import { useEditorStore } from "../../editor-store";
++import { Button, PanelCard, Select, TextInput } from "../ui";
++
++export function TypographyLibraryWorkspace() {
++  const document = useEditorStore((state) => state.document);
++  const addTypographyToken = useEditorStore((state) => state.addTypographyToken);
++  const addStarterTypographyPalette = useEditorStore((state) => state.addStarterTypographyPalette);
++  const updateTypographyToken = useEditorStore((state) => state.updateTypographyToken);
++  const deleteTypographyToken = useEditorStore((state) => state.deleteTypographyToken);
++
++  const tokens = useMemo(
++    () => Object.values(document.designSystem?.typography ?? {}).sort((a, b) => a.name.localeCompare(b.name)),
++    [document.designSystem?.typography]
++  );
++
++  return (
++    <div className="mx-auto w-full max-w-6xl p-8">
++      <div className="mb-7 flex items-start justify-between gap-5">
++        <div>
++          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++            <Type size={14} /> Design System
++          </div>
++          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Typography</h1>
++          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++            Define reusable text styles once and reference them from Text components. Token references use stable IDs, so renaming styles is safe.
++          </p>
++        </div>
++        <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
++          <Plus size={14} /> Add text style
++        </Button>
++      </div>
++
++      {tokens.length === 0 ? (
++        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
++          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++            <Type size={20} />
++          </div>
++          <div className="text-sm font-semibold text-[var(--editor-text)]">No typography tokens yet</div>
++          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
++            Create a text style or seed a starter scale for display, headings, body, labels and captions.
++          </div>
++          <div className="mt-4 flex items-center gap-2">
++            <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
++              <Plus size={14} /> Add text style
++            </Button>
++            <Button size="sm" variant="secondary" onClick={addStarterTypographyPalette}>
++              Create starter scale
++            </Button>
++          </div>
++        </PanelCard>
++      ) : (
++        <div className="space-y-3">
++          {tokens.map((token) => {
++            const usageCount = countTypographyTokenUsages(document, token.id);
++            return (
++              <div
++                key={token.id}
++                className="grid grid-cols-[minmax(210px,1fr)_minmax(260px,1.6fr)_86px] gap-4 rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm"
++              >
++                <div className="space-y-2">
++                  <TextInput
++                    aria-label="Typography token name"
++                    value={token.name}
++                    onChange={(event) => updateTypographyToken(token.id, { name: event.target.value })}
++                  />
++                  <div className="text-[10px] text-[var(--editor-text-soft)]">
++                    {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
++                  </div>
++                </div>
++
++                <div className="space-y-3">
++                  <div
++                    className="min-h-14 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4 py-3 text-[var(--editor-text)]"
++                    style={{
++                      fontFamily: token.fontFamily,
++                      fontSize: token.fontSize,
++                      fontWeight: weightToCss(token.fontWeight),
++                      lineHeight: token.lineHeight,
++                      letterSpacing: token.letterSpacing,
++                    }}
++                  >
++                    The quick brown fox jumps over the lazy dog
++                  </div>
++
++                  <div className="grid grid-cols-[minmax(180px,1.4fr)_90px_120px_90px_90px] gap-2">
++                    <TextInput
++                      aria-label="Font family"
++                      value={token.fontFamily}
++                      onChange={(event) => updateTypographyToken(token.id, { fontFamily: event.target.value })}
++                    />
++                    <TextInput
++                      aria-label="Font size"
++                      type="number"
++                      min={1}
++                      value={token.fontSize}
++                      onChange={(event) => updateTypographyToken(token.id, { fontSize: Number(event.target.value) })}
++                    />
++                    <Select
++                      aria-label="Font weight"
++                      value={token.fontWeight}
++                      onChange={(event) => updateTypographyToken(token.id, { fontWeight: event.target.value as TypographyWeight })}
++                    >
++                      <option value="normal">Regular</option>
++                      <option value="medium">Medium</option>
++                      <option value="semibold">Semibold</option>
++                      <option value="bold">Bold</option>
++                    </Select>
++                    <TextInput
++                      aria-label="Line height"
++                      value={token.lineHeight}
++                      onChange={(event) => updateTypographyToken(token.id, { lineHeight: event.target.value })}
++                    />
++                    <TextInput
++                      aria-label="Letter spacing"
++                      type="number"
++                      step={0.1}
++                      value={token.letterSpacing}
++                      onChange={(event) => updateTypographyToken(token.id, { letterSpacing: Number(event.target.value) })}
++                    />
++                  </div>
++                </div>
++
++                <div className="flex items-start justify-end">
++                  <button
++                    type="button"
++                    title="Delete style and detach usages"
++                    onClick={() => deleteTypographyToken(token.id)}
++                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
++                  >
++                    <Trash2 size={14} />
++                  </button>
++                </div>
++              </div>
++            );
++          })}
++        </div>
++      )}
++
++      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Deleting a typography token detaches every reference to an equivalent local text style, preserving the visual result.
++      </div>
++    </div>
++  );
++}
++
++function weightToCss(weight: TypographyWeight) {
++  return weight === "bold" ? 700 : weight === "semibold" ? 600 : weight === "medium" ? 500 : 400;
++}
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index 35d917c..0775292 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -7,6 +7,15 @@ import {
+   isColorTokenRef,
+   resolveColorValue,
+ } from "../../design-system/colors";
++import {
++  createTypographyTokenRef,
++  DEFAULT_TYPOGRAPHY_STYLE,
++  isTypographyStyle,
++  isTypographyTokenRef,
++  resolveTypographyValue,
++  type TypographyStyle,
++  type TypographyWeight,
++} from "../../design-system/typography";
+ import { createTagRef, isTagRef } from "../../data/collections/TagRef";
+ import { isUdtTag } from "../../data/tags/TagDefinition";
+ import {
+@@ -49,6 +58,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
+   "chart-series": (props) => <ChartSeriesControl {...props} />,
+   "time-range": (props) => <TimeRangeControl {...props} />,
+   "image-asset": (props) => <ImageAssetControl {...props} />,
++  typography: (props) => <TypographyControl {...props} />,
+   "text-format": (props) => <TextFormatControl {...props} />,
+   "text-align": (props) => <TextAlignControl {...props} />,
+   "border-size": (props) => <BorderSizeControl {...props} />,
+@@ -145,9 +155,195 @@ function ImageAssetControl({ control, value, updateProp }: PropertyControlRender
+   );
+ }
+ 
++
++function TypographyControl({
++  control,
++  nodeId,
++  value,
++  values,
++  updateNode,
++  updateProp,
++}: PropertyControlRendererProps) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
++  if (control.kind !== "typography") return null;
++
++  const tokens = Object.values(designSystem?.typography ?? {}).sort((a, b) =>
++    a.name.localeCompare(b.name)
++  );
++  const tokenRef = isTypographyTokenRef(value) ? value : undefined;
++  const selectedToken = tokenRef ? designSystem?.typography?.[tokenRef.tokenId] : undefined;
++  const mode = tokenRef ? "token" : "local";
++  const localStyle = getLocalTypographyStyle(value, values, designSystem);
++
++  function replaceTypographyValue(nextValue: unknown) {
++    updateNode(nodeId, (currentNode) => {
++      const nextProps: Record<string, unknown> = { ...(currentNode.props ?? {}), textStyle: nextValue };
++      // New token/local style owns these fields. Legacy documents continue to
++      // render unchanged until the user opts into the new typography control.
++      delete nextProps.fontFamily;
++      delete nextProps.fontSize;
++      delete nextProps.fontWeight;
++      delete nextProps.lineHeight;
++      delete nextProps.letterSpacing;
++      return { ...currentNode, props: nextProps };
++    });
++  }
++
++  function switchMode(nextMode: "local" | "token") {
++    if (nextMode === mode) return;
++    if (nextMode === "local") {
++      replaceTypographyValue(resolveTypographyValue(value, designSystem, localStyle));
++      return;
++    }
++    const firstToken = tokens[0];
++    if (firstToken) replaceTypographyValue(createTypographyTokenRef(firstToken.id));
++  }
++
++  function updateLocal(patch: Partial<TypographyStyle>) {
++    const next = { ...localStyle, ...patch };
++    if (isTypographyStyle(value)) updateProp(next);
++    else replaceTypographyValue(next);
++  }
++
++  return (
++    <FormField label="Typography">
++      <div className="space-y-2">
++        <SegmentedControl className="w-full">
++          <SegmentedControlItem
++            active={mode === "local"}
++            className="flex-1 text-xs"
++            onClick={() => switchMode("local")}
++          >
++            Local style
++          </SegmentedControlItem>
++          <SegmentedControlItem
++            active={mode === "token"}
++            disabled={tokens.length === 0}
++            className="flex-1 text-xs"
++            onClick={() => switchMode("token")}
++          >
++            Design System
++          </SegmentedControlItem>
++        </SegmentedControl>
++
++        {mode === "token" ? (
++          <div className="space-y-2">
++            <Select
++              aria-label="Design system typography"
++              value={tokenRef?.tokenId ?? ""}
++              onChange={(event) => updateProp(createTypographyTokenRef(event.target.value))}
++            >
++              {tokens.map((token) => (
++                <option key={token.id} value={token.id}>
++                  {token.name} — {token.fontSize}px / {token.lineHeight}
++                </option>
++              ))}
++            </Select>
++            {selectedToken ? (
++              <div
++                className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2 text-[var(--editor-text)]"
++                style={{
++                  fontFamily: selectedToken.fontFamily,
++                  fontSize: selectedToken.fontSize,
++                  fontWeight: typographyWeightToCss(selectedToken.fontWeight),
++                  lineHeight: selectedToken.lineHeight,
++                  letterSpacing: selectedToken.letterSpacing,
++                }}
++              >
++                The quick brown fox
++              </div>
++            ) : (
++              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
++                Missing typography token. Choose another style or switch to Local.
++              </div>
++            )}
++          </div>
++        ) : (
++          <div className="grid grid-cols-2 gap-2">
++            <div className="col-span-2">
++              <TextInput
++                aria-label="Font family"
++                value={localStyle.fontFamily}
++                onChange={(event) => updateLocal({ fontFamily: event.target.value })}
++                placeholder="Inter, sans-serif"
++              />
++            </div>
++            <TextInput
++              aria-label="Font size"
++              type="number"
++              min={1}
++              value={localStyle.fontSize}
++              onChange={(event) => updateLocal({ fontSize: Number(event.target.value) })}
++            />
++            <Select
++              aria-label="Font weight"
++              value={localStyle.fontWeight}
++              onChange={(event) => updateLocal({ fontWeight: event.target.value as TypographyWeight })}
++            >
++              <option value="normal">Regular</option>
++              <option value="medium">Medium</option>
++              <option value="semibold">Semibold</option>
++              <option value="bold">Bold</option>
++            </Select>
++            <TextInput
++              aria-label="Line height"
++              value={localStyle.lineHeight}
++              onChange={(event) => updateLocal({ lineHeight: event.target.value })}
++              placeholder="20px"
++            />
++            <TextInput
++              aria-label="Letter spacing"
++              type="number"
++              step={0.1}
++              value={localStyle.letterSpacing}
++              onChange={(event) => updateLocal({ letterSpacing: Number(event.target.value) })}
++            />
++          </div>
++        )}
++
++        {tokens.length === 0 ? (
++          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
++            Add text styles in Design System → Typography to enable references.
++          </div>
++        ) : null}
++      </div>
++    </FormField>
++  );
++}
++
++function getLocalTypographyStyle(
++  value: unknown,
++  values: Record<string, unknown>,
++  designSystem: ReturnType<typeof useEditorStore.getState>["document"]["designSystem"]
++): TypographyStyle {
++  if (isTypographyStyle(value)) return value;
++  if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
++  return {
++    fontFamily: typeof values.fontFamily === "string" ? values.fontFamily : DEFAULT_TYPOGRAPHY_STYLE.fontFamily,
++    fontSize: typeof values.fontSize === "number" ? values.fontSize : DEFAULT_TYPOGRAPHY_STYLE.fontSize,
++    fontWeight: isTypographyWeightValue(values.fontWeight) ? values.fontWeight : DEFAULT_TYPOGRAPHY_STYLE.fontWeight,
++    lineHeight: typeof values.lineHeight === "string" ? values.lineHeight : DEFAULT_TYPOGRAPHY_STYLE.lineHeight,
++    letterSpacing: typeof values.letterSpacing === "number" ? values.letterSpacing : DEFAULT_TYPOGRAPHY_STYLE.letterSpacing,
++  };
++}
++
++function isTypographyWeightValue(value: unknown): value is TypographyWeight {
++  return value === "normal" || value === "medium" || value === "semibold" || value === "bold";
++}
++
++function typographyWeightToCss(weight: TypographyWeight) {
++  return weight === "bold" ? 700 : weight === "semibold" ? 600 : weight === "medium" ? 500 : 400;
++}
++
+ function TextFormatControl({ control, nodeId, values, updateNode }: PropertyControlRendererProps) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
+   if (control.kind !== "text-format") return null;
+-  const bold = values.fontWeight === "bold";
++  const typographyValue = values.textStyle;
++  const hasTypographyStyle = isTypographyStyle(typographyValue) || isTypographyTokenRef(typographyValue);
++  const resolvedTypography = hasTypographyStyle
++    ? resolveTypographyValue(typographyValue, designSystem)
++    : undefined;
++  const bold = resolvedTypography ? resolvedTypography.fontWeight === "bold" : values.fontWeight === "bold";
+   const italic = Boolean(values.italic);
+   const underline = Boolean(values.underline);
+ 
+@@ -156,9 +352,18 @@ function TextFormatControl({ control, nodeId, values, updateNode }: PropertyCont
+     enabled: boolean
+   ) {
+     updateNode(nodeId, (currentNode) => {
+-      const nextProps = { ...(currentNode.props ?? {}) };
+-      if (enabled) nextProps[property] = property === "fontWeight" ? "bold" : true;
+-      else delete nextProps[property];
++      const nextProps: Record<string, unknown> = { ...(currentNode.props ?? {}) };
++      if (property === "fontWeight" && resolvedTypography) {
++        nextProps.textStyle = {
++          ...resolvedTypography,
++          fontWeight: enabled ? "bold" : "normal",
++        } satisfies TypographyStyle;
++        delete nextProps.fontWeight;
++      } else if (enabled) {
++        nextProps[property] = property === "fontWeight" ? "bold" : true;
++      } else {
++        delete nextProps[property];
++      }
+       return { ...currentNode, props: nextProps };
+     });
+   }
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index 0371b01..6d07cd9 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -9,6 +9,7 @@ export type InspectorControl =
+   | { kind: "tag-ref"; udtId: string }
+   | { kind: "time-range" }
+   | { kind: "chart-series" }
++  | { kind: "typography" }
+   | { kind: "text-format" }
+   | { kind: "text-align" }
+   | { kind: "border-size"; min?: number; max?: number; step?: number }
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+index 4a82aed..9dafea1 100644
+--- a/src/uiframework/registry/components/text.ts
++++ b/src/uiframework/registry/components/text.ts
+@@ -13,8 +13,7 @@ export const textDefinition = {
+   inspector: {
+     value: { kind: "text" },
+     color: { kind: "color" },
+-    fontSize: { kind: "number", min: 1 },
+-    lineHeight: { kind: "text" },
++    textStyle: { kind: "typography" },
+     formatting: { kind: "text-format" },
+     align: { kind: "text-align" },
+     variant: { kind: "select", options: ["body", "label", "title", "caption"] },

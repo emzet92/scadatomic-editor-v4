@@ -44,8 +44,9 @@ import {
 import { initialDocument } from "./registry/initial-values";
 import { DataPanel } from "./gui/data/DataPanel";
 import { DataWorkspace } from "./gui/data/DataWorkspace";
-import { DesignSystemPanel } from "./gui/design-system/DesignSystemPanel";
+import { DesignSystemPanel, type DesignSystemSection } from "./gui/design-system/DesignSystemPanel";
 import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
+import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
@@ -201,6 +202,7 @@ export function EditorPage() {
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
+  const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("colors");
   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
 
   const loadedRef = useRef(false);
@@ -535,7 +537,10 @@ export function EditorPage() {
               projectId={projectId}
             />
           ) : editorArea === "designSystem" ? (
-            <DesignSystemPanel />
+            <DesignSystemPanel
+              activeSection={designSystemSection}
+              onSelectSection={setDesignSystemSection}
+            />
           ) : componentDefinitionMode && focusedDefinition ? (
             <>
               <ComponentStructureTree
@@ -594,7 +599,11 @@ export function EditorPage() {
             </div>
           ) : editorArea === "designSystem" ? (
             <div className="min-h-full bg-[var(--editor-canvas-bg)]">
-              <ColorLibraryWorkspace />
+              {designSystemSection === "colors" ? (
+                <ColorLibraryWorkspace />
+              ) : (
+                <TypographyLibraryWorkspace />
+              )}
             </div>
           ) : (
             <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">

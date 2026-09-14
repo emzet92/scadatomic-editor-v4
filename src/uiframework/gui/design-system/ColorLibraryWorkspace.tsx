@@ -1,9 +1,9 @@
 import { Copy, Palette, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { normalizeColorForNativeInput, type ColorToken } from "../../design-system/colors";
+import type { ColorToken } from "../../design-system/colors";
 import { countColorTokenUsages } from "../../design-system/document-colors";
 import { useEditorStore } from "../../editor-store";
-import { Button, PanelCard, TextInput } from "../ui";
+import { Button, ColorPickerInput, PanelCard, TextInput } from "../ui";
 
 export function ColorLibraryWorkspace() {
   const document = useEditorStore((state) => state.document);
@@ -83,16 +83,15 @@ export function ColorLibraryWorkspace() {
                 key={token.id}
                 className="grid grid-cols-[56px_minmax(180px,1.3fr)_minmax(160px,.8fr)_100px_84px] items-center gap-3 border-b border-[var(--editor-border)] px-4 py-3 last:border-b-0"
               >
-                <label className="relative block h-9 w-9 cursor-pointer overflow-hidden rounded-xl border border-[var(--editor-border)] shadow-sm">
-                  <span className="absolute inset-0" style={{ background: token.value }} />
-                  <input
-                    type="color"
-                    aria-label={`Choose ${token.name}`}
-                    value={normalizeColorForNativeInput(token.value)}
-                    onChange={(event) => updateColorToken(token.id, { value: event.target.value })}
-                    className="absolute inset-0 cursor-pointer opacity-0"
+                <div className="flex items-center justify-center">
+                  <ColorPickerInput
+                    compact
+                    ariaLabel={`Choose ${token.name}`}
+                    value={token.value}
+                    onChange={(value) => updateColorToken(token.id, { value })}
+                    showValue={false}
                   />
-                </label>
+                </div>
 
                 <TextInput
                   aria-label="Color token name"

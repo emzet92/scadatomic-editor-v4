@@ -5,9 +5,17 @@ import { useEditorStore } from "../../editor-store";
 import {
   createColorTokenRef,
   isColorTokenRef,
-  normalizeColorForNativeInput,
   resolveColorValue,
 } from "../../design-system/colors";
+import {
+  createTypographyTokenRef,
+  DEFAULT_TYPOGRAPHY_STYLE,
+  isTypographyStyle,
+  isTypographyTokenRef,
+  resolveTypographyValue,
+  type TypographyStyle,
+  type TypographyWeight,
+} from "../../design-system/typography";
 import { createTagRef, isTagRef } from "../../data/collections/TagRef";
 import { isUdtTag } from "../../data/tags/TagDefinition";
 import {
@@ -20,6 +28,7 @@ import { ChartSeriesInput } from "./ChartSeriesInput";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
+  ColorPickerInput,
   FormField,
   SectionHeader,
   SegmentedControl,
@@ -42,22 +51,14 @@ export type PropertyControlRendererProps = {
 
 type PropertyControlRenderer = (props: PropertyControlRendererProps) => ReactNode;
 
-const namedColors: Record<string, string> = {
-  black: "#000000",
-  white: "#ffffff",
-  red: "#ef4444",
-  green: "#22c55e",
-  blue: "#3b82f6",
-  yellow: "#eab308",
-  gray: "#71717a",
-  zinc: "#71717a",
-};
+
 
 const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRenderer>> = {
   "tag-ref": (props) => <TagRefControl {...props} />,
   "chart-series": (props) => <ChartSeriesControl {...props} />,
   "time-range": (props) => <TimeRangeControl {...props} />,
   "image-asset": (props) => <ImageAssetControl {...props} />,
+  typography: (props) => <TypographyControl {...props} />,
   "text-format": (props) => <TextFormatControl {...props} />,
   "text-align": (props) => <TextAlignControl {...props} />,
   "border-size": (props) => <BorderSizeControl {...props} />,
@@ -154,9 +155,195 @@ function ImageAssetControl({ control, value, updateProp }: PropertyControlRender
   );
 }
 
+
+function TypographyControl({
+  control,
+  nodeId,
+  value,
+  values,
+  updateNode,
+  updateProp,
+}: PropertyControlRendererProps) {
+  const designSystem = useEditorStore((state) => state.document.designSystem);
+  if (control.kind !== "typography") return null;
+
+  const tokens = Object.values(designSystem?.typography ?? {}).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  const tokenRef = isTypographyTokenRef(value) ? value : undefined;
+  const selectedToken = tokenRef ? designSystem?.typography?.[tokenRef.tokenId] : undefined;
+  const mode = tokenRef ? "token" : "local";
+  const localStyle = getLocalTypographyStyle(value, values, designSystem);
+
+  function replaceTypographyValue(nextValue: unknown) {
+    updateNode(nodeId, (currentNode) => {
+      const nextProps: Record<string, unknown> = { ...(currentNode.props ?? {}), textStyle: nextValue };
+      // New token/local style owns these fields. Legacy documents continue to
+      // render unchanged until the user opts into the new typography control.
+      delete nextProps.fontFamily;
+      delete nextProps.fontSize;
+      delete nextProps.fontWeight;
+      delete nextProps.lineHeight;
+      delete nextProps.letterSpacing;
+      return { ...currentNode, props: nextProps };
+    });
+  }
+
+  function switchMode(nextMode: "local" | "token") {
+    if (nextMode === mode) return;
+    if (nextMode === "local") {
+      replaceTypographyValue(resolveTypographyValue(value, designSystem, localStyle));
+      return;
+    }
+    const firstToken = tokens[0];
+    if (firstToken) replaceTypographyValue(createTypographyTokenRef(firstToken.id));
+  }
+
+  function updateLocal(patch: Partial<TypographyStyle>) {
+    const next = { ...localStyle, ...patch };
+    if (isTypographyStyle(value)) updateProp(next);
+    else replaceTypographyValue(next);
+  }
+
+  return (
+    <FormField label="Typography">
+      <div className="space-y-2">
+        <SegmentedControl className="w-full">
+          <SegmentedControlItem
+            active={mode === "local"}
+            className="flex-1 text-xs"
+            onClick={() => switchMode("local")}
+          >
+            Local style
+          </SegmentedControlItem>
+          <SegmentedControlItem
+            active={mode === "token"}
+            disabled={tokens.length === 0}
+            className="flex-1 text-xs"
+            onClick={() => switchMode("token")}
+          >
+            Design System
+          </SegmentedControlItem>
+        </SegmentedControl>
+
+        {mode === "token" ? (
+          <div className="space-y-2">
+            <Select
+              aria-label="Design system typography"
+              value={tokenRef?.tokenId ?? ""}
+              onChange={(event) => updateProp(createTypographyTokenRef(event.target.value))}
+            >
+              {tokens.map((token) => (
+                <option key={token.id} value={token.id}>
+                  {token.name} — {token.fontSize}px / {token.lineHeight}
+                </option>
+              ))}
+            </Select>
+            {selectedToken ? (
+              <div
+                className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2 text-[var(--editor-text)]"
+                style={{
+                  fontFamily: selectedToken.fontFamily,
+                  fontSize: selectedToken.fontSize,
+                  fontWeight: typographyWeightToCss(selectedToken.fontWeight),
+                  lineHeight: selectedToken.lineHeight,
+                  letterSpacing: selectedToken.letterSpacing,
+                }}
+              >
+                The quick brown fox
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+                Missing typography token. Choose another style or switch to Local.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="col-span-2">
+              <TextInput
+                aria-label="Font family"
+                value={localStyle.fontFamily}
+                onChange={(event) => updateLocal({ fontFamily: event.target.value })}
+                placeholder="Inter, sans-serif"
+              />
+            </div>
+            <TextInput
+              aria-label="Font size"
+              type="number"
+              min={1}
+              value={localStyle.fontSize}
+              onChange={(event) => updateLocal({ fontSize: Number(event.target.value) })}
+            />
+            <Select
+              aria-label="Font weight"
+              value={localStyle.fontWeight}
+              onChange={(event) => updateLocal({ fontWeight: event.target.value as TypographyWeight })}
+            >
+              <option value="normal">Regular</option>
+              <option value="medium">Medium</option>
+              <option value="semibold">Semibold</option>
+              <option value="bold">Bold</option>
+            </Select>
+            <TextInput
+              aria-label="Line height"
+              value={localStyle.lineHeight}
+              onChange={(event) => updateLocal({ lineHeight: event.target.value })}
+              placeholder="20px"
+            />
+            <TextInput
+              aria-label="Letter spacing"
+              type="number"
+              step={0.1}
+              value={localStyle.letterSpacing}
+              onChange={(event) => updateLocal({ letterSpacing: Number(event.target.value) })}
+            />
+          </div>
+        )}
+
+        {tokens.length === 0 ? (
+          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+            Add text styles in Design System → Typography to enable references.
+          </div>
+        ) : null}
+      </div>
+    </FormField>
+  );
+}
+
+function getLocalTypographyStyle(
+  value: unknown,
+  values: Record<string, unknown>,
+  designSystem: ReturnType<typeof useEditorStore.getState>["document"]["designSystem"]
+): TypographyStyle {
+  if (isTypographyStyle(value)) return value;
+  if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
+  return {
+    fontFamily: typeof values.fontFamily === "string" ? values.fontFamily : DEFAULT_TYPOGRAPHY_STYLE.fontFamily,
+    fontSize: typeof values.fontSize === "number" ? values.fontSize : DEFAULT_TYPOGRAPHY_STYLE.fontSize,
+    fontWeight: isTypographyWeightValue(values.fontWeight) ? values.fontWeight : DEFAULT_TYPOGRAPHY_STYLE.fontWeight,
+    lineHeight: typeof values.lineHeight === "string" ? values.lineHeight : DEFAULT_TYPOGRAPHY_STYLE.lineHeight,
+    letterSpacing: typeof values.letterSpacing === "number" ? values.letterSpacing : DEFAULT_TYPOGRAPHY_STYLE.letterSpacing,
+  };
+}
+
+function isTypographyWeightValue(value: unknown): value is TypographyWeight {
+  return value === "normal" || value === "medium" || value === "semibold" || value === "bold";
+}
+
+function typographyWeightToCss(weight: TypographyWeight) {
+  return weight === "bold" ? 700 : weight === "semibold" ? 600 : weight === "medium" ? 500 : 400;
+}
+
 function TextFormatControl({ control, nodeId, values, updateNode }: PropertyControlRendererProps) {
+  const designSystem = useEditorStore((state) => state.document.designSystem);
   if (control.kind !== "text-format") return null;
-  const bold = values.fontWeight === "bold";
+  const typographyValue = values.textStyle;
+  const hasTypographyStyle = isTypographyStyle(typographyValue) || isTypographyTokenRef(typographyValue);
+  const resolvedTypography = hasTypographyStyle
+    ? resolveTypographyValue(typographyValue, designSystem)
+    : undefined;
+  const bold = resolvedTypography ? resolvedTypography.fontWeight === "bold" : values.fontWeight === "bold";
   const italic = Boolean(values.italic);
   const underline = Boolean(values.underline);
 
@@ -165,9 +352,18 @@ function TextFormatControl({ control, nodeId, values, updateNode }: PropertyCont
     enabled: boolean
   ) {
     updateNode(nodeId, (currentNode) => {
-      const nextProps = { ...(currentNode.props ?? {}) };
-      if (enabled) nextProps[property] = property === "fontWeight" ? "bold" : true;
-      else delete nextProps[property];
+      const nextProps: Record<string, unknown> = { ...(currentNode.props ?? {}) };
+      if (property === "fontWeight" && resolvedTypography) {
+        nextProps.textStyle = {
+          ...resolvedTypography,
+          fontWeight: enabled ? "bold" : "normal",
+        } satisfies TypographyStyle;
+        delete nextProps.fontWeight;
+      } else if (enabled) {
+        nextProps[property] = property === "fontWeight" ? "bold" : true;
+      } else {
+        delete nextProps[property];
+      }
       return { ...currentNode, props: nextProps };
     });
   }
@@ -292,7 +488,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
             className="flex-1 text-xs"
             onClick={() => switchMode("local")}
           >
-            Local
+            Local color
           </SegmentedControlItem>
           <SegmentedControlItem
             active={mode === "token"}
@@ -300,7 +496,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
             className="flex-1 text-xs"
             onClick={() => switchMode("token")}
           >
-            Token
+            Design System
           </SegmentedControlItem>
         </SegmentedControl>
 
@@ -312,13 +508,14 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
                 style={{ background: selectedToken?.value ?? resolved }}
               />
               <Select
+                aria-label={`${propName} design system color`}
                 value={tokenRef?.tokenId ?? ""}
                 onChange={(event) => updateProp(createColorTokenRef(event.target.value))}
                 className="min-w-0 flex-1"
               >
                 {colors.map((token) => (
                   <option key={token.id} value={token.id}>
-                    {token.name}
+                    {token.name} — {token.value}
                   </option>
                 ))}
               </Select>
@@ -335,16 +532,11 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <input
-              data-editor-ignore
-              type="color"
-              value={normalizeColorForNativeInput(namedColors[literalValue.toLowerCase()] ?? literalValue)}
-              onChange={(event) => updateProp(event.target.value)}
-              className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
-            />
-            <TextInput value={literalValue} onChange={(event) => updateProp(event.target.value)} />
-          </div>
+          <ColorPickerInput
+            ariaLabel={`${propName} color`}
+            value={literalValue}
+            onChange={updateProp}
+          />
         )}
 
         {colors.length === 0 ? (

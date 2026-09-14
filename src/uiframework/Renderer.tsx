@@ -5,7 +5,7 @@ import { getDefaultComponentVariantProps } from "./component-variants";
 import { resolveTagCollection } from "./data/collections/TagCollectionSource";
 import { createTagRef } from "./data/collections/TagRef";
 import { createRepeatInstanceId } from "./repeat/RepeatRuntime";
-import { resolveDesignTokenReferences } from "./design-system/colors";
+import { resolveDesignTokenReferences } from "./design-system/resolver";
 import {
   applyComponentInstanceInputs,
   getComponentDefinitionForInstance,
