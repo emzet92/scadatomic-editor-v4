@@ -1,26 +1,30 @@
-# SCADAtomic Cloud / Fleet Management patch
+# SCADAtomic Storybook UI Framework patch
 
-Base: `scadatomic-editor-reactive-runtime-fixed-source.zip`
+Base: `scadatomic-editor-cloud-fleet-source.zip`
 
-Adds:
-- `/cloud/fleet` module and route,
-- Cloud entry in the existing workspace header,
-- SCADAtomic Cloud shell with top navigation and left project navigation,
-- Fleet Management dashboard with mock Edge devices,
-- Edge registration key creation/copy/delete flow,
-- IndexedDB persistence,
-- `FleetApi` abstraction,
-- IndexedDB development adapter,
-- ready-to-use HTTP adapter matching the future backend contract.
+Adds Storybook 10.6 for the shared SCADAtomic application UI framework only.
 
-Apply the diff from the project root:
+## Included stories
+
+- Foundations / design tokens
+- Button + IconButton
+- Form controls
+- Panels
+- Segmented control
+- Dialog + ConfirmDialog
+- WorkspaceHeader pattern
+
+Runtime, tags, execution graph, canvas widgets and domain feature screens are intentionally excluded.
+
+## Install and run
+
+After applying the patch, run once:
 
 ```bash
-git apply PATCH_CLOUD_FLEET_MANAGEMENT.diff
+npm install
+npm run storybook
 ```
 
-Validation:
-- `tsc -b`: PASS
-- ESLint for changed files: PASS
-- `git apply --check`: PASS
-- Vite bundling is blocked in this environment by the pre-existing missing optional Rolldown Linux native binding in the supplied node_modules archive.
+Then open `http://localhost:6006`.
+
+`package.json` contains Storybook 10.6 dependencies. The supplied base lockfile is intentionally left untouched because npm registry access was unavailable in the build environment; the first local `npm install` will regenerate the Storybook entries in `package-lock.json`. Commit that regenerated lockfile before returning to `npm ci`.
