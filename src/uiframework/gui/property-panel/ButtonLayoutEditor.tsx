@@ -4,6 +4,7 @@ import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
+import { ShadowValueControl } from "./ShadowValueControl";
 
 export function ButtonLayoutEditor({
   node,
@@ -18,6 +19,7 @@ export function ButtonLayoutEditor({
   const marginX = props.marginX ?? defaultButtonProps.marginX;
   const marginY = props.marginY ?? defaultButtonProps.marginY;
   const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
+  const shadow = props.shadow;
 
   function patch(next: Record<string, unknown>) {
     updateNode(node.id, (current) => ({
@@ -99,6 +101,14 @@ export function ButtonLayoutEditor({
             min={0}
             max={999}
             onChange={(value) => patch({ borderRadius: value })}
+          />
+        </div>
+
+        <div className="mt-2">
+          <ShadowValueControl
+            label="Shadow / elevation"
+            value={shadow}
+            onChange={(value) => patch({ shadow: value })}
           />
         </div>
       </div>

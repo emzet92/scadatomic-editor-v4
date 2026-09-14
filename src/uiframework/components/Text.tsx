@@ -43,6 +43,7 @@ export function Text({
   borderSize,
   borderColor,
   borderRadius,
+  shadow,
 
   style,
   ...domProps
@@ -180,6 +181,8 @@ export function Text({
 
         borderRadius:
           resolvedProps.borderRadius,
+
+        boxShadow: shadow,
 
         padding:
           hasBorder

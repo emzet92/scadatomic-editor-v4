@@ -13,6 +13,7 @@ export function Navigation({
   gap = 4,
   padding = 4,
   borderRadius = 8,
+  shadow,
   style,
   ...props
 }: NavigationProps) {
@@ -31,6 +32,7 @@ export function Navigation({
         padding,
         borderRadius,
         backgroundColor,
+        boxShadow: shadow,
         overflow: "visible",
       }}
     >

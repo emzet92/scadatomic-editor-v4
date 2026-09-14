@@ -11,6 +11,7 @@ import { useEditorStore } from "../../editor-store";
 import type { UpdateNode } from "./property-panel-types";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
+import { ShadowValueControl } from "./ShadowValueControl";
 
 type GridPreset = {
   id: string;
@@ -94,6 +95,7 @@ export function ContainerLayoutEditor({
   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
   const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
+  const shadowValue = rawProps.shadow;
   const gap = clampInt(
     resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
     0,
@@ -385,6 +387,11 @@ export function ContainerLayoutEditor({
             min={0}
             max={999}
             onChange={(value) => patch({ borderRadius: value })}
+          />
+          <ShadowValueControl
+            label="Shadow / elevation"
+            value={shadowValue}
+            onChange={(value) => patch({ shadow: value })}
           />
         </div>
       </div>

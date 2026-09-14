@@ -21,6 +21,7 @@ export const textDefinition = {
     borderSize: { kind: "border-size", min: 0 },
     borderColor: { kind: "color" },
     borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
   },
   bindings: {
     value: { label: "Value", valueType: "string" },

@@ -5,6 +5,7 @@ export type InspectorControl =
   | { kind: "number"; min?: number; max?: number; step?: number }
   | { kind: "spacing"; min?: number; max?: number; step?: number }
   | { kind: "radius"; min?: number; max?: number; step?: number }
+  | { kind: "shadow" }
   | { kind: "color" }
   | { kind: "toggle" }
   | { kind: "image-asset" }

@@ -27,6 +27,7 @@ export const containerDefinition = {
     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
     borderSize: { kind: "border-size", min: 0 },
     borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
     display: { kind: "select", options: ["grid", "flex"] },
   },
   bindings: {

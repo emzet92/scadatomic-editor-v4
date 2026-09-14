@@ -95,7 +95,6 @@ export function RuntimeModalLayer({
               closeProjectModal(projectId, modal.id, { reason: "backdrop" });
             }}
           >
-            <div className="shadow-2xl">
               <RenderNode
                 id={modal.rootId}
                 document={{ ...document, rootId: modal.rootId }}
@@ -126,7 +125,6 @@ export function RuntimeModalLayer({
                   return base;
                 }}
               />
-            </div>
           </div>
         );
       })}

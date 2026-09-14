@@ -16,6 +16,7 @@ export function Button({
   marginX = defaultButtonProps.marginX,
   marginY = defaultButtonProps.marginY,
   borderRadius = defaultButtonProps.borderRadius,
+  shadow,
   className,
   style,
   ...props
@@ -37,6 +38,7 @@ export function Button({
         marginInline: safeMarginX,
         marginBlock: safeMarginY,
         borderRadius: safeRadius,
+        boxShadow: shadow,
         boxSizing: "border-box",
       }}
       className={

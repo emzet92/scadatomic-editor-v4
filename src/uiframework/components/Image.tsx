@@ -18,6 +18,7 @@ export function Image({
   alt = defaultImageProps.alt,
   borderRadius = defaultImageProps.borderRadius,
   backgroundColor = defaultImageProps.backgroundColor,
+  shadow,
   style,
   className,
   ...domProps
@@ -37,6 +38,7 @@ export function Image({
         overflow: "hidden",
         borderRadius,
         backgroundColor,
+        boxShadow: shadow,
         boxSizing: "border-box",
         position: "relative",
         ...style,

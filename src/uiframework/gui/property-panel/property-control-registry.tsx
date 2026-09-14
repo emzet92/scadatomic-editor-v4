@@ -27,6 +27,7 @@ import type { UpdateNode } from "./property-panel-types";
 import { ChartSeriesInput } from "./ChartSeriesInput";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
+import { ShadowValueControl } from "./ShadowValueControl";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
@@ -69,6 +70,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
   toggle: (props) => <ToggleControl {...props} />,
   spacing: (props) => <SpacingControl {...props} />,
   radius: (props) => <RadiusControl {...props} />,
+  shadow: (props) => <ShadowControl {...props} />,
   number: (props) => <NumberControl {...props} />,
   text: (props) => <TextControl {...props} />,
 };
@@ -610,6 +612,11 @@ function RadiusControl({ control, propName, value, updateProp }: PropertyControl
       onChange={updateProp}
     />
   );
+}
+
+function ShadowControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+  if (control.kind !== "shadow") return null;
+  return <ShadowValueControl label={propName} value={value} onChange={updateProp} />;
 }
 
 function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {

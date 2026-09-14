@@ -49,6 +49,7 @@ import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace
 import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
 import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
 import { RadiusLibraryWorkspace } from "./gui/design-system/RadiusLibraryWorkspace";
+import { ShadowLibraryWorkspace } from "./gui/design-system/ShadowLibraryWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
@@ -607,8 +608,10 @@ export function EditorPage() {
                 <TypographyLibraryWorkspace />
               ) : designSystemSection === "spacing" ? (
                 <SpacingLibraryWorkspace />
-              ) : (
+              ) : designSystemSection === "radius" ? (
                 <RadiusLibraryWorkspace />
+              ) : (
+                <ShadowLibraryWorkspace />
               )}
             </div>
           ) : (

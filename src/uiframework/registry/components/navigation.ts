@@ -16,6 +16,7 @@ export const navigationDefinition = {
     gap: { kind: "spacing", min: 0, max: 48 },
     padding: { kind: "spacing", min: 0, max: 48 },
     borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
   },
   bindings: {
     visible: { label: "Visible", valueType: "boolean" },

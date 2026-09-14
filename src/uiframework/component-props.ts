@@ -54,6 +54,7 @@ export type ContainerNodeProps = {
   gridItemAlignment?: ContainerGridItemAlignment;
   borderSize?: number;
   borderRadius?: number;
+  shadow?: string;
   display?: "grid" | "flex";
 };
 
@@ -95,6 +96,7 @@ export type TextNodeProps = {
   borderSize?: number;
   borderColor?: string;
   borderRadius?: number;
+  shadow?: string;
 };
 
 export const defaultTextProps = {
@@ -146,6 +148,7 @@ export type ButtonNodeProps = {
   marginX?: number;
   marginY?: number;
   borderRadius?: number;
+  shadow?: string;
 };
 
 export const defaultButtonProps = {
@@ -169,6 +172,7 @@ export type ImageNodeProps = {
   alt?: string;
   borderRadius?: number;
   backgroundColor?: string;
+  shadow?: string;
 };
 
 export const defaultImageProps = {
@@ -229,6 +233,7 @@ export type NavigationNodeProps = {
   gap?: number;
   padding?: number;
   borderRadius?: number;
+  shadow?: string;
 };
 
 export const defaultNavigationProps = {

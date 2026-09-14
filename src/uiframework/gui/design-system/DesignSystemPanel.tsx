@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { MoveHorizontal, Palette, Radius, Type } from "lucide-react";
+import { Layers, MoveHorizontal, Palette, Radius, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { SectionHeader } from "../ui";
 
-export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius";
+export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows";
 
 export function DesignSystemPanel({
   activeSection,
@@ -23,6 +23,9 @@ export function DesignSystemPanel({
   );
   const radiusCount = useEditorStore(
     (state) => Object.keys(state.document.designSystem?.radius ?? {}).length
+  );
+  const shadowCount = useEditorStore(
+    (state) => Object.keys(state.document.designSystem?.shadows ?? {}).length
   );
 
   return (
@@ -59,8 +62,15 @@ export function DesignSystemPanel({
         count={radiusCount}
         onClick={() => onSelectSection("radius")}
       />
+      <TokenSectionButton
+        active={activeSection === "shadows"}
+        icon={<Layers size={15} />}
+        title="Shadows / Elevation"
+        count={shadowCount}
+        onClick={() => onSelectSection("shadows")}
+      />
       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
-        Shadows, borders and motion can use the same token reference model next.
+        Borders, opacity and motion can use the same token reference model next.
       </div>
     </div>
   );

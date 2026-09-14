@@ -1,0 +1,1281 @@
+diff --git a/DESIGN_SYSTEM_SHADOWS.md b/DESIGN_SYSTEM_SHADOWS.md
+new file mode 100644
+index 0000000..863dfab
+--- /dev/null
++++ b/DESIGN_SYSTEM_SHADOWS.md
+@@ -0,0 +1,71 @@
++# Design System — Shadows / Elevation
++
++SCADAtomic now supports project-local shadow/elevation design tokens.
++
++## Token model
++
++A shadow token stores structured renderer-independent data:
++
++```ts
++{
++  id: "...",
++  name: "Elevation/2",
++  x: 0,
++  y: 4,
++  blur: 10,
++  spread: -2,
++  color: "rgba(15, 23, 42, 0.12)"
++}
++```
++
++Components reference the token by stable ID:
++
++```ts
++{
++  kind: "shadow-token",
++  tokenId: "..."
++}
++```
++
++The design-system resolver converts the structured token to the final renderer value immediately before rendering. Components therefore receive an ordinary CSS `box-shadow` string and do not know about design tokens.
++
++## Editor
++
++`System → Shadows / Elevation` provides:
++
++- token creation / rename / delete,
++- X and Y offsets,
++- blur and spread,
++- color picker + CSS color value,
++- live elevation preview,
++- usage count,
++- starter `Elevation/None` through `Elevation/4` scale.
++
++Shadow-capable properties offer:
++
++- `None`,
++- `Local shadow`,
++- any project shadow/elevation token.
++
++Local shadows keep the same structured `{x,y,blur,spread,color}` shape.
++
++## Supported components
++
++The first milestone exposes shadow/elevation on:
++
++- Button,
++- Container,
++- Modal,
++- Image,
++- Navigation,
++- Text.
++
++Button and Container use the same `ShadowValueControl` even though they have specialized property editors.
++
++## Safe token deletion
++
++Deleting a shadow token does not leave broken references. Every reference is detached to a local structured shadow using the token's current values, preserving the rendered appearance.
++
++## Modal behavior
++
++The previous hard-coded runtime `shadow-2xl` wrapper was removed. New modals receive an equivalent local structured default shadow, so their elevation can now be fully controlled by the Design System, including `None`.
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index 84ec66a..aeaf131 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -49,6 +49,7 @@ import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace
+ import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
+ import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
+ import { RadiusLibraryWorkspace } from "./gui/design-system/RadiusLibraryWorkspace";
++import { ShadowLibraryWorkspace } from "./gui/design-system/ShadowLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -607,8 +608,10 @@ export function EditorPage() {
+                 <TypographyLibraryWorkspace />
+               ) : designSystemSection === "spacing" ? (
+                 <SpacingLibraryWorkspace />
+-              ) : (
++              ) : designSystemSection === "radius" ? (
+                 <RadiusLibraryWorkspace />
++              ) : (
++                <ShadowLibraryWorkspace />
+               )}
+             </div>
+           ) : (
+diff --git a/src/uiframework/component-props.ts b/src/uiframework/component-props.ts
+index dab049e..8043940 100644
+--- a/src/uiframework/component-props.ts
++++ b/src/uiframework/component-props.ts
+@@ -54,6 +54,7 @@ export type ContainerNodeProps = {
+   gridItemAlignment?: ContainerGridItemAlignment;
+   borderSize?: number;
+   borderRadius?: number;
++  shadow?: string;
+   display?: "grid" | "flex";
+ };
+ 
+@@ -95,6 +96,7 @@ export type TextNodeProps = {
+   borderSize?: number;
+   borderColor?: string;
+   borderRadius?: number;
++  shadow?: string;
+ };
+ 
+ export const defaultTextProps = {
+@@ -146,6 +148,7 @@ export type ButtonNodeProps = {
+   marginX?: number;
+   marginY?: number;
+   borderRadius?: number;
++  shadow?: string;
+ };
+ 
+ export const defaultButtonProps = {
+@@ -169,6 +172,7 @@ export type ImageNodeProps = {
+   alt?: string;
+   borderRadius?: number;
+   backgroundColor?: string;
++  shadow?: string;
+ };
+ 
+ export const defaultImageProps = {
+@@ -229,6 +233,7 @@ export type NavigationNodeProps = {
+   gap?: number;
+   padding?: number;
+   borderRadius?: number;
++  shadow?: string;
+ };
+ 
+ export const defaultNavigationProps = {
+diff --git a/src/uiframework/components/Button.tsx b/src/uiframework/components/Button.tsx
+index 2d18413..4340a3b 100644
+--- a/src/uiframework/components/Button.tsx
++++ b/src/uiframework/components/Button.tsx
+@@ -16,6 +16,7 @@ export function Button({
+   marginX = defaultButtonProps.marginX,
+   marginY = defaultButtonProps.marginY,
+   borderRadius = defaultButtonProps.borderRadius,
++  shadow,
+   className,
+   style,
+   ...props
+@@ -37,6 +38,7 @@ export function Button({
+         marginInline: safeMarginX,
+         marginBlock: safeMarginY,
+         borderRadius: safeRadius,
++        boxShadow: shadow,
+         boxSizing: "border-box",
+       }}
+       className={
+diff --git a/src/uiframework/components/Container.tsx b/src/uiframework/components/Container.tsx
+index ab27f9d..55b4ad8 100644
+--- a/src/uiframework/components/Container.tsx
++++ b/src/uiframework/components/Container.tsx
+@@ -18,6 +18,7 @@ export function Container({
+   maxHeight,
+   borderSize = defaultContainerProps.borderSize,
+   borderRadius = defaultContainerProps.borderRadius,
++  shadow,
+   padding = defaultContainerProps.padding,
+   gap = defaultContainerProps.gap,
+   columns = defaultContainerProps.columns,
+@@ -46,6 +47,7 @@ export function Container({
+     maxHeight: toCssSize(maxHeight),
+     border: borderSize > 0 ? `${borderSize}px solid #d4d4d8` : undefined,
+     borderRadius,
++    boxShadow: shadow,
+     padding,
+     display,
+     gap,
+diff --git a/src/uiframework/components/Image.tsx b/src/uiframework/components/Image.tsx
+index 58b2e1d..f53df50 100644
+--- a/src/uiframework/components/Image.tsx
++++ b/src/uiframework/components/Image.tsx
+@@ -18,6 +18,7 @@ export function Image({
+   alt = defaultImageProps.alt,
+   borderRadius = defaultImageProps.borderRadius,
+   backgroundColor = defaultImageProps.backgroundColor,
++  shadow,
+   style,
+   className,
+   ...domProps
+@@ -37,6 +38,7 @@ export function Image({
+         overflow: "hidden",
+         borderRadius,
+         backgroundColor,
++        boxShadow: shadow,
+         boxSizing: "border-box",
+         position: "relative",
+         ...style,
+diff --git a/src/uiframework/components/Modal.tsx b/src/uiframework/components/Modal.tsx
+index 45dd9ea..0b1ce51 100644
+--- a/src/uiframework/components/Modal.tsx
++++ b/src/uiframework/components/Modal.tsx
+@@ -9,6 +9,7 @@ export type ModalProps = HTMLAttributes<HTMLDivElement> & {
+   columns?: number;
+   display?: "grid" | "flex";
+   borderRadius?: number;
++  shadow?: string;
+   closeOnBackdrop?: boolean;
+   closeOnEscape?: boolean;
+ };
+@@ -22,6 +23,7 @@ export function Modal({
+   columns = 1,
+   display = "grid",
+   borderRadius = 18,
++  shadow,
+   closeOnBackdrop = true,
+   closeOnEscape = true,
+   children,
+@@ -47,6 +49,7 @@ export function Modal({
+     boxSizing: "border-box",
+     position: "relative",
+     borderRadius,
++    boxShadow: shadow,
+     ...style,
+   };
+ 
+diff --git a/src/uiframework/components/Navigation.tsx b/src/uiframework/components/Navigation.tsx
+index 78a43ad..7e105d6 100644
+--- a/src/uiframework/components/Navigation.tsx
++++ b/src/uiframework/components/Navigation.tsx
+@@ -13,6 +13,7 @@ export function Navigation({
+   gap = 4,
+   padding = 4,
+   borderRadius = 8,
++  shadow,
+   style,
+   ...props
+ }: NavigationProps) {
+@@ -31,6 +32,7 @@ export function Navigation({
+         padding,
+         borderRadius,
+         backgroundColor,
++        boxShadow: shadow,
+         overflow: "visible",
+       }}
+     >
+diff --git a/src/uiframework/components/Text.tsx b/src/uiframework/components/Text.tsx
+index f5c947d..a362903 100644
+--- a/src/uiframework/components/Text.tsx
++++ b/src/uiframework/components/Text.tsx
+@@ -43,6 +43,7 @@ export function Text({
+   borderSize,
+   borderColor,
+   borderRadius,
++  shadow,
+ 
+   style,
+   ...domProps
+@@ -181,6 +182,8 @@ export function Text({
+         borderRadius:
+           resolvedProps.borderRadius,
+ 
++        boxShadow: shadow,
++
+         padding:
+           hasBorder
+             ? "4px 6px"
+diff --git a/src/uiframework/core/document.ts b/src/uiframework/core/document.ts
+index 88fad36..a840883 100644
+--- a/src/uiframework/core/document.ts
++++ b/src/uiframework/core/document.ts
+@@ -225,6 +225,7 @@ export function createModalRootNode(name: string): UiNode {
+       columns: 1,
+       display: "grid",
+       borderRadius: 18,
++      shadow: { x: 0, y: 18, blur: 40, spread: -8, color: "rgba(15, 23, 42, 0.20)" },
+       closeOnBackdrop: true,
+       closeOnEscape: true,
+     },
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+index a1bb69f..488e23d 100644
+--- a/src/uiframework/design-system/colors.ts
++++ b/src/uiframework/design-system/colors.ts
+@@ -9,6 +9,7 @@ import {
+ import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
+ import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
+ import { isRadiusToken, type RadiusToken, type RadiusTokenId } from "./radius";
++import { isShadowToken, type ShadowToken, type ShadowTokenId } from "./shadows";
+ 
+ export type ColorTokenId = string;
+ 
+@@ -29,12 +30,13 @@ export type DesignSystem = {
+   typography?: Record<TypographyTokenId, TypographyToken> | undefined;
+   spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
+   radius?: Record<RadiusTokenId, RadiusToken> | undefined;
++  shadows?: Record<ShadowTokenId, ShadowToken> | undefined;
+ };
+ 
+ export const DEFAULT_COLOR_LITERAL = "#18181b";
+ 
+ export function createEmptyDesignSystem(): DesignSystem {
+-  return { colors: {}, typography: {}, spacing: {}, radius: {} };
++  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {} };
+ }
+ 
+ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+@@ -82,6 +84,13 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
+     }
+   }
+ 
++  if (value.shadows !== undefined) {
++    if (!isRecord(value.shadows)) return false;
++    if (!Object.entries(value.shadows).every(([id, token]) => isShadowToken(token, id))) {
++      return false;
++    }
++  }
++
+   return true;
+ }
+ 
+diff --git a/src/uiframework/design-system/document-shadows.ts b/src/uiframework/design-system/document-shadows.ts
+new file mode 100644
+index 0000000..f861493
+--- /dev/null
++++ b/src/uiframework/design-system/document-shadows.ts
+@@ -0,0 +1,98 @@
++import type { ComponentInputDefinition, UiDocument, UiNode } from "../core/document";
++import {
++  countShadowTokenReferences,
++  detachShadowTokenReference,
++  type ShadowStyle,
++  type ShadowTokenId,
++} from "./shadows";
++
++export function detachShadowTokenFromDocument(
++  document: UiDocument,
++  tokenId: ShadowTokenId,
++  replacement: ShadowStyle
++): UiDocument {
++  return {
++    ...document,
++    nodes: mapNodes(document.nodes, tokenId, replacement),
++    components: document.components
++      ? Object.fromEntries(
++          Object.entries(document.components).map(([id, definition]) => [
++            id,
++            {
++              ...definition,
++              nodes: mapNodes(definition.nodes, tokenId, replacement),
++              inputs: definition.inputs
++                ? mapInputs(definition.inputs, tokenId, replacement)
++                : undefined,
++            },
++          ])
++        )
++      : document.components,
++  };
++}
++
++export function countShadowTokenUsages(document: UiDocument, tokenId: ShadowTokenId): number {
++  let count = countShadowTokenReferences(document.nodes, tokenId);
++  for (const definition of Object.values(document.components ?? {})) {
++    count += countShadowTokenReferences(definition.nodes, tokenId);
++    count += countShadowTokenReferences(definition.inputs, tokenId);
++  }
++  return count;
++}
++
++function mapNodes(
++  nodes: Record<string, UiNode>,
++  tokenId: ShadowTokenId,
++  replacement: ShadowStyle
++): Record<string, UiNode> {
++  return Object.fromEntries(
++    Object.entries(nodes).map(([id, node]) => [id, detachTokenFromNode(node, tokenId, replacement)])
++  );
++}
++
++function detachTokenFromNode(
++  node: UiNode,
++  tokenId: ShadowTokenId,
++  replacement: ShadowStyle
++): UiNode {
++  return {
++    ...node,
++    props: node.props
++      ? (detachShadowTokenReference(node.props, tokenId, replacement) as Record<string, unknown>)
++      : node.props,
++    variants: node.variants
++      ? Object.fromEntries(
++          Object.entries(node.variants).map(([name, variant]) => [
++            name,
++            {
++              ...variant,
++              props: detachShadowTokenReference(
++                variant.props,
++                tokenId,
++                replacement
++              ) as Record<string, unknown>,
++            },
++          ])
++        )
++      : node.variants,
++  };
++}
++
++function mapInputs(
++  inputs: Record<string, ComponentInputDefinition>,
++  tokenId: ShadowTokenId,
++  replacement: ShadowStyle
++): Record<string, ComponentInputDefinition> {
++  return Object.fromEntries(
++    Object.entries(inputs).map(([name, input]) => {
++      if (input.type === "tagRef" || input.defaultValue === undefined) return [name, input];
++      return [
++        name,
++        {
++          ...input,
++          defaultValue: detachShadowTokenReference(input.defaultValue, tokenId, replacement),
++        },
++      ];
++    })
++  );
++}
+diff --git a/src/uiframework/design-system/resolver.ts b/src/uiframework/design-system/resolver.ts
+index 650d293..e76c29b 100644
+--- a/src/uiframework/design-system/resolver.ts
++++ b/src/uiframework/design-system/resolver.ts
+@@ -2,6 +2,7 @@ import { isColorTokenRef, resolveColorValue, type DesignSystem } from "./colors"
+ import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
+ import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
+ import { isRadiusTokenRef, resolveRadiusValue } from "./radius";
++import { isShadowStyle, isShadowTokenRef, resolveShadowValue } from "./shadows";
+ import { isRecord } from "./tokens";
+ 
+ /**
+@@ -16,6 +17,7 @@ export function resolveDesignTokenReferences(
+   if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
+   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
+   if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
++  if (isShadowTokenRef(value) || isShadowStyle(value)) return resolveShadowValue(value, designSystem);
+   if (Array.isArray(value)) {
+     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+   }
+diff --git a/src/uiframework/design-system/shadows.ts b/src/uiframework/design-system/shadows.ts
+new file mode 100644
+index 0000000..11f5df1
+--- /dev/null
++++ b/src/uiframework/design-system/shadows.ts
+@@ -0,0 +1,143 @@
++import type { DesignSystem } from "./colors";
++import {
++  countTokenReferences,
++  isDesignTokenReference,
++  isRecord,
++  replaceTokenReferences,
++  type DesignTokenBase,
++  type DesignTokenReference,
++} from "./tokens";
++
++export type ShadowTokenId = string;
++
++export type ShadowStyle = {
++  x: number;
++  y: number;
++  blur: number;
++  spread: number;
++  color: string;
++};
++
++export type ShadowToken = DesignTokenBase & ShadowStyle;
++export type ShadowTokenRef = DesignTokenReference<"shadow-token">;
++export type ShadowValue = ShadowStyle | ShadowTokenRef;
++
++export const DEFAULT_SHADOW_STYLE: ShadowStyle = {
++  x: 0,
++  y: 4,
++  blur: 12,
++  spread: -2,
++  color: "rgba(15, 23, 42, 0.12)",
++};
++
++export function createShadowTokenRef(tokenId: ShadowTokenId): ShadowTokenRef {
++  return { kind: "shadow-token", tokenId };
++}
++
++export function isShadowTokenRef(value: unknown): value is ShadowTokenRef {
++  return isDesignTokenReference(value, "shadow-token");
++}
++
++export function isShadowStyle(value: unknown): value is ShadowStyle {
++  if (!isRecord(value)) return false;
++  return (
++    isFiniteNumber(value.x) &&
++    isFiniteNumber(value.y) &&
++    isFiniteNumber(value.blur) && value.blur >= 0 &&
++    isFiniteNumber(value.spread) &&
++    typeof value.color === "string" && value.color.trim().length > 0
++  );
++}
++
++export function isShadowToken(value: unknown, id?: string): value is ShadowToken {
++  if (!isRecord(value) || !isShadowStyle(value)) return false;
++  const candidate = value as ShadowStyle & Record<string, unknown>;
++  return (
++    typeof candidate.id === "string" &&
++    (id === undefined || candidate.id === id) &&
++    typeof candidate.name === "string" &&
++    candidate.name.trim().length > 0 &&
++    (candidate.description === undefined || typeof candidate.description === "string")
++  );
++}
++
++export function resolveShadowStyle(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback: ShadowStyle = DEFAULT_SHADOW_STYLE
++): ShadowStyle {
++  if (isShadowStyle(value)) return value;
++  if (isShadowTokenRef(value)) {
++    const token = designSystem?.shadows?.[value.tokenId];
++    if (token) return pickStyle(token);
++  }
++  return fallback;
++}
++
++export function resolveShadowValue(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback = "none"
++): string {
++  if (typeof value === "string" && value.trim()) return value;
++  if (!isShadowStyle(value) && !isShadowTokenRef(value)) return fallback;
++  return shadowStyleToCss(resolveShadowStyle(value, designSystem));
++}
++
++export function shadowStyleToCss(style: ShadowStyle): string {
++  return `${style.x}px ${style.y}px ${style.blur}px ${style.spread}px ${style.color}`;
++}
++
++export function detachShadowTokenReference(
++  value: unknown,
++  tokenId: ShadowTokenId,
++  replacement: ShadowStyle
++): unknown {
++  return replaceTokenReferences(
++    value,
++    (candidate) => isShadowTokenRef(candidate) && candidate.tokenId === tokenId,
++    () => ({ ...replacement })
++  );
++}
++
++export function countShadowTokenReferences(value: unknown, tokenId: ShadowTokenId): number {
++  return countTokenReferences(
++    value,
++    (candidate) => isShadowTokenRef(candidate) && candidate.tokenId === tokenId
++  );
++}
++
++export function createStarterShadowTokens(): ShadowToken[] {
++  return [
++    createToken("Elevation/None", 0, 0, 0, 0, "rgba(15, 23, 42, 0)"),
++    createToken("Elevation/1", 0, 1, 2, 0, "rgba(15, 23, 42, 0.08)"),
++    createToken("Elevation/2", 0, 4, 10, -2, "rgba(15, 23, 42, 0.12)"),
++    createToken("Elevation/3", 0, 10, 24, -6, "rgba(15, 23, 42, 0.16)"),
++    createToken("Elevation/4", 0, 18, 40, -8, "rgba(15, 23, 42, 0.20)"),
++  ];
++}
++
++function createToken(
++  name: string,
++  x: number,
++  y: number,
++  blur: number,
++  spread: number,
++  color: string
++): ShadowToken {
++  return { id: crypto.randomUUID(), name, x, y, blur, spread, color };
++}
++
++function pickStyle(token: ShadowToken): ShadowStyle {
++  return {
++    x: token.x,
++    y: token.y,
++    blur: token.blur,
++    spread: token.spread,
++    color: token.color,
++  };
++}
++
++function isFiniteNumber(value: unknown): value is number {
++  return typeof value === "number" && Number.isFinite(value);
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 144cd37..baf59a8 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -72,6 +72,13 @@ import {
+   type RadiusTokenId,
+ } from "./design-system/radius";
+ import { detachRadiusTokenFromDocument } from "./design-system/document-radius";
++import {
++  createStarterShadowTokens,
++  type ShadowStyle,
++  type ShadowToken,
++  type ShadowTokenId,
++} from "./design-system/shadows";
++import { detachShadowTokenFromDocument } from "./design-system/document-shadows";
+ import { createUniqueTokenName } from "./design-system/tokens";
+ 
+ export type DragPreview = {
+@@ -117,6 +124,10 @@ type EditorState = {
+   addStarterRadiusScale: () => void;
+   updateRadiusToken: (tokenId: RadiusTokenId, patch: Partial<Omit<RadiusToken, "id">>) => void;
+   deleteRadiusToken: (tokenId: RadiusTokenId) => void;
++  addShadowToken: (draft?: Partial<Omit<ShadowToken, "id">>) => ShadowTokenId;
++  addStarterShadowScale: () => void;
++  updateShadowToken: (tokenId: ShadowTokenId, patch: Partial<Omit<ShadowToken, "id">>) => void;
++  deleteShadowToken: (tokenId: ShadowTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -708,6 +719,102 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addShadowToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const shadows = designSystem.shadows ?? {};
++      const name = createUniqueTokenName(shadows, draft?.name?.trim() || "Elevation");
++      const token: ShadowToken = {
++        id: tokenId,
++        name,
++        x: finiteOr(draft?.x, 0),
++        y: finiteOr(draft?.y, 4),
++        blur: Math.max(0, finiteOr(draft?.blur, 12)),
++        spread: finiteOr(draft?.spread, -2),
++        color: draft?.color?.trim() || "rgba(15, 23, 42, 0.12)",
++        ...(draft?.description !== undefined ? { description: draft.description } : {}),
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, shadows: { ...shadows, [tokenId]: token } },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterShadowScale: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextShadows = { ...(designSystem.shadows ?? {}) };
++      for (const token of createStarterShadowTokens()) {
++        const name = createUniqueTokenName(nextShadows, token.name);
++        nextShadows[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, shadows: nextShadows },
++        },
++      };
++    });
++  },
++
++  updateShadowToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const shadows = designSystem.shadows ?? {};
++      const current = shadows[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueTokenName(shadows, patch.name.trim() || current.name, tokenId);
++      const nextToken: ShadowToken = {
++        ...current,
++        ...patch,
++        name: nextName,
++        x: patch.x === undefined ? current.x : finiteOr(patch.x, current.x),
++        y: patch.y === undefined ? current.y : finiteOr(patch.y, current.y),
++        blur: patch.blur === undefined ? current.blur : Math.max(0, finiteOr(patch.blur, current.blur)),
++        spread: patch.spread === undefined ? current.spread : finiteOr(patch.spread, current.spread),
++        color: patch.color === undefined ? current.color : patch.color.trim() || current.color,
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, shadows: { ...shadows, [tokenId]: nextToken } },
++        },
++      };
++    });
++  },
++
++  deleteShadowToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const shadows = designSystem.shadows ?? {};
++      const token = shadows[tokenId];
++      if (!token) return state;
++      const replacement: ShadowStyle = {
++        x: token.x,
++        y: token.y,
++        blur: token.blur,
++        spread: token.spread,
++        color: token.color,
++      };
++      const detached = detachShadowTokenFromDocument(state.document, tokenId, replacement);
++      const nextShadows = { ...shadows };
++      delete nextShadows[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, shadows: nextShadows },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+@@ -1526,3 +1633,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+     }));
+   },
+ }));
++
++function finiteOr(value: number | undefined, fallback: number): number {
++  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
++}
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+index 56a8b32..93ca351 100644
+--- a/src/uiframework/gui/design-system/DesignSystemPanel.tsx
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -1,9 +1,9 @@
+ import type { ReactNode } from "react";
+-import { MoveHorizontal, Palette, Radius, Type } from "lucide-react";
++import { Layers, MoveHorizontal, Palette, Radius, Type } from "lucide-react";
+ import { useEditorStore } from "../../editor-store";
+ import { SectionHeader } from "../ui";
+ 
+-export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius";
++export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows";
+ 
+ export function DesignSystemPanel({
+   activeSection,
+@@ -24,6 +24,9 @@ export function DesignSystemPanel({
+   const radiusCount = useEditorStore(
+     (state) => Object.keys(state.document.designSystem?.radius ?? {}).length
+   );
++  const shadowCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.shadows ?? {}).length
++  );
+ 
+   return (
+     <div className="space-y-3">
+@@ -59,8 +62,15 @@ export function DesignSystemPanel({
+         count={radiusCount}
+         onClick={() => onSelectSection("radius")}
+       />
++      <TokenSectionButton
++        active={activeSection === "shadows"}
++        icon={<Layers size={15} />}
++        title="Shadows / Elevation"
++        count={shadowCount}
++        onClick={() => onSelectSection("shadows")}
++      />
+       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
+-        Shadows, borders and motion can use the same token reference model next.
++        Borders, opacity and motion can use the same token reference model next.
+       </div>
+     </div>
+   );
+diff --git a/src/uiframework/gui/design-system/ShadowLibraryWorkspace.tsx b/src/uiframework/gui/design-system/ShadowLibraryWorkspace.tsx
+new file mode 100644
+index 0000000..eb9f8a8
+--- /dev/null
++++ b/src/uiframework/gui/design-system/ShadowLibraryWorkspace.tsx
+@@ -0,0 +1,145 @@
++import { Layers, Plus, Trash2 } from "lucide-react";
++import { useMemo } from "react";
++import { countShadowTokenUsages } from "../../design-system/document-shadows";
++import { shadowStyleToCss } from "../../design-system/shadows";
++import { useEditorStore } from "../../editor-store";
++import { Button, ColorPickerInput, PanelCard, TextInput } from "../ui";
++
++export function ShadowLibraryWorkspace() {
++  const document = useEditorStore((state) => state.document);
++  const addShadowToken = useEditorStore((state) => state.addShadowToken);
++  const addStarterShadowScale = useEditorStore((state) => state.addStarterShadowScale);
++  const updateShadowToken = useEditorStore((state) => state.updateShadowToken);
++  const deleteShadowToken = useEditorStore((state) => state.deleteShadowToken);
++
++  const tokens = useMemo(
++    () => Object.values(document.designSystem?.shadows ?? {}).sort((a, b) =>
++      a.name.localeCompare(b.name)
++    ),
++    [document.designSystem?.shadows]
++  );
++
++  return (
++    <div className="mx-auto w-full max-w-7xl p-8">
++      <div className="mb-7 flex items-start justify-between gap-5">
++        <div>
++          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++            <Layers size={14} /> Design System
++          </div>
++          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Shadows / Elevation</h1>
++          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++            Define structural elevation tokens with X/Y offset, blur, spread and color. Components keep stable token references while renderers receive the final shadow value.
++          </p>
++        </div>
++        <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
++          <Plus size={14} /> Add shadow
++        </Button>
++      </div>
++
++      {tokens.length === 0 ? (
++        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
++          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++            <Layers size={20} />
++          </div>
++          <div className="text-sm font-semibold text-[var(--editor-text)]">No shadow tokens yet</div>
++          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
++            Create individual shadows or seed a practical Elevation/None through Elevation/4 scale.
++          </div>
++          <div className="mt-4 flex items-center gap-2">
++            <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
++              <Plus size={14} /> Add shadow
++            </Button>
++            <Button size="sm" variant="secondary" onClick={addStarterShadowScale}>
++              Create elevation scale
++            </Button>
++          </div>
++        </PanelCard>
++      ) : (
++        <div className="space-y-3">
++          {tokens.map((token) => {
++            const usageCount = countShadowTokenUsages(document, token.id);
++            return (
++              <div
++                key={token.id}
++                className="grid grid-cols-[minmax(190px,.9fr)_minmax(230px,1.1fr)_minmax(380px,1.8fr)_44px] items-center gap-4 rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm"
++              >
++                <div className="space-y-2">
++                  <TextInput
++                    aria-label="Shadow token name"
++                    value={token.name}
++                    onChange={(event) => updateShadowToken(token.id, { name: event.target.value })}
++                  />
++                  <div className="text-[10px] text-[var(--editor-text-soft)]">
++                    {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
++                  </div>
++                </div>
++
++                <div className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
++                  <div
++                    className="h-10 w-24 rounded-xl bg-[var(--editor-surface)]"
++                    style={{ boxShadow: shadowStyleToCss(token) }}
++                  />
++                </div>
++
++                <div className="space-y-2">
++                  <div className="grid grid-cols-4 gap-2">
++                    <ShadowNumber label="X" value={token.x} onChange={(x) => updateShadowToken(token.id, { x })} />
++                    <ShadowNumber label="Y" value={token.y} onChange={(y) => updateShadowToken(token.id, { y })} />
++                    <ShadowNumber label="Blur" min={0} value={token.blur} onChange={(blur) => updateShadowToken(token.id, { blur: Math.max(0, blur) })} />
++                    <ShadowNumber label="Spread" value={token.spread} onChange={(spread) => updateShadowToken(token.id, { spread })} />
++                  </div>
++                  <ColorPickerInput
++                    compact
++                    ariaLabel={`${token.name} shadow color`}
++                    value={token.color}
++                    onChange={(color) => updateShadowToken(token.id, { color })}
++                  />
++                </div>
++
++                <button
++                  type="button"
++                  title="Delete shadow token and detach usages"
++                  onClick={() => deleteShadowToken(token.id)}
++                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
++                >
++                  <Trash2 size={14} />
++                </button>
++              </div>
++            );
++          })}
++        </div>
++      )}
++
++      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Deleting a shadow token detaches each reference to a local structured shadow with the same X/Y/blur/spread/color values, preserving the rendered elevation.
++      </div>
++    </div>
++  );
++}
++
++function ShadowNumber({
++  label,
++  value,
++  min,
++  onChange,
++}: {
++  label: string;
++  value: number;
++  min?: number | undefined;
++  onChange: (value: number) => void;
++}) {
++  return (
++    <label className="min-w-0">
++      <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">{label}</span>
++      <TextInput
++        controlSize="sm"
++        aria-label={`Shadow ${label}`}
++        type="number"
++        min={min}
++        step={1}
++        value={value}
++        onChange={(event) => onChange(Number(event.target.value))}
++      />
++    </label>
++  );
++}
+diff --git a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+index 639b608..6af0cbc 100644
+--- a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+@@ -4,6 +4,7 @@ import type { UiNode } from "../../core/document";
+ import type { UpdateNode } from "./property-panel-types";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
++import { ShadowValueControl } from "./ShadowValueControl";
+ 
+ export function ButtonLayoutEditor({
+   node,
+@@ -18,6 +19,7 @@ export function ButtonLayoutEditor({
+   const marginX = props.marginX ?? defaultButtonProps.marginX;
+   const marginY = props.marginY ?? defaultButtonProps.marginY;
+   const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
++  const shadow = props.shadow;
+ 
+   function patch(next: Record<string, unknown>) {
+     updateNode(node.id, (current) => ({
+@@ -101,6 +103,14 @@ export function ButtonLayoutEditor({
+             onChange={(value) => patch({ borderRadius: value })}
+           />
+         </div>
++
++        <div className="mt-2">
++          <ShadowValueControl
++            label="Shadow / elevation"
++            value={shadow}
++            onChange={(value) => patch({ shadow: value })}
++          />
++        </div>
+       </div>
+     </section>
+   );
+diff --git a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+index fb0bb00..4ad9736 100644
+--- a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+@@ -11,6 +11,7 @@ import { useEditorStore } from "../../editor-store";
+ import type { UpdateNode } from "./property-panel-types";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
++import { ShadowValueControl } from "./ShadowValueControl";
+ 
+ type GridPreset = {
+   id: string;
+@@ -94,6 +95,7 @@ export function ContainerLayoutEditor({
+   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
+   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
+   const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
++  const shadowValue = rawProps.shadow;
+   const gap = clampInt(
+     resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
+     0,
+@@ -386,6 +388,11 @@ export function ContainerLayoutEditor({
+             max={999}
+             onChange={(value) => patch({ borderRadius: value })}
+           />
++          <ShadowValueControl
++            label="Shadow / elevation"
++            value={shadowValue}
++            onChange={(value) => patch({ shadow: value })}
++          />
+         </div>
+       </div>
+     </section>
+diff --git a/src/uiframework/gui/property-panel/ShadowValueControl.tsx b/src/uiframework/gui/property-panel/ShadowValueControl.tsx
+new file mode 100644
+index 0000000..cded226
+--- /dev/null
++++ b/src/uiframework/gui/property-panel/ShadowValueControl.tsx
+@@ -0,0 +1,130 @@
++import {
++  createShadowTokenRef,
++  DEFAULT_SHADOW_STYLE,
++  isShadowStyle,
++  isShadowTokenRef,
++  resolveShadowStyle,
++  shadowStyleToCss,
++  type ShadowStyle,
++} from "../../design-system/shadows";
++import { useEditorStore } from "../../editor-store";
++import { ColorPickerInput, FormField, Select, TextInput } from "../ui";
++
++export function ShadowValueControl({
++  label,
++  value,
++  onChange,
++}: {
++  label: string;
++  value: unknown;
++  onChange: (value: unknown) => void;
++}) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
++  const tokens = Object.values(designSystem?.shadows ?? {}).sort((a, b) =>
++    a.name.localeCompare(b.name)
++  );
++  const tokenRef = isShadowTokenRef(value) ? value : undefined;
++  const localStyle = isShadowStyle(value) ? value : undefined;
++  const selectedToken = tokenRef ? designSystem?.shadows?.[tokenRef.tokenId] : undefined;
++  const selection = tokenRef?.tokenId ?? (localStyle ? "__local__" : "__none__");
++  const editableStyle = localStyle ?? resolveShadowStyle(value, designSystem, DEFAULT_SHADOW_STYLE);
++
++  function select(next: string) {
++    if (next === "__none__") {
++      onChange(undefined);
++      return;
++    }
++    if (next === "__local__") {
++      onChange({ ...editableStyle });
++      return;
++    }
++    onChange(createShadowTokenRef(next));
++  }
++
++  function updateLocal(patch: Partial<ShadowStyle>) {
++    onChange({ ...editableStyle, ...patch });
++  }
++
++  return (
++    <FormField label={label}>
++      <div className="space-y-2">
++        <Select value={selection} onChange={(event) => select(event.target.value)}>
++          <option value="__none__">None</option>
++          <option value="__local__">Local shadow</option>
++          {tokens.map((token) => (
++            <option key={token.id} value={token.id}>
++              {token.name} — {token.y}px / {token.blur}px
++            </option>
++          ))}
++        </Select>
++
++        {localStyle ? (
++          <div className="space-y-2 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5">
++            <div className="grid grid-cols-4 gap-1.5">
++              <NumberCell label="X" value={editableStyle.x} onChange={(x) => updateLocal({ x })} />
++              <NumberCell label="Y" value={editableStyle.y} onChange={(y) => updateLocal({ y })} />
++              <NumberCell label="Blur" min={0} value={editableStyle.blur} onChange={(blur) => updateLocal({ blur: Math.max(0, blur) })} />
++              <NumberCell label="Spread" value={editableStyle.spread} onChange={(spread) => updateLocal({ spread })} />
++            </div>
++            <ColorPickerInput
++              compact
++              ariaLabel={`${label} shadow color`}
++              value={editableStyle.color}
++              onChange={(color) => updateLocal({ color })}
++            />
++            <div className="flex h-14 items-center justify-center rounded-lg bg-[var(--editor-canvas-bg)]">
++              <div
++                className="h-8 w-20 rounded-lg bg-[var(--editor-surface)]"
++                style={{ boxShadow: shadowStyleToCss(editableStyle) }}
++              />
++            </div>
++          </div>
++        ) : selectedToken ? (
++          <div className="flex h-14 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
++            <div
++              className="h-8 w-20 rounded-lg bg-[var(--editor-surface)]"
++              style={{ boxShadow: shadowStyleToCss(selectedToken) }}
++            />
++          </div>
++        ) : tokenRef ? (
++          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
++            Missing shadow token. Choose another elevation or switch to Local.
++          </div>
++        ) : null}
++
++        {tokens.length === 0 ? (
++          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
++            Add elevations in Design System → Shadows to enable token references.
++          </div>
++        ) : null}
++      </div>
++    </FormField>
++  );
++}
++
++function NumberCell({
++  label,
++  value,
++  min,
++  onChange,
++}: {
++  label: string;
++  value: number;
++  min?: number | undefined;
++  onChange: (value: number) => void;
++}) {
++  return (
++    <label className="min-w-0">
++      <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">{label}</span>
++      <TextInput
++        controlSize="sm"
++        aria-label={`Shadow ${label}`}
++        type="number"
++        min={min}
++        step={1}
++        value={value}
++        onChange={(event) => onChange(Number(event.target.value))}
++      />
++    </label>
++  );
++}
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index f65848f..202bebb 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -27,6 +27,7 @@ import type { UpdateNode } from "./property-panel-types";
+ import { ChartSeriesInput } from "./ChartSeriesInput";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
++import { ShadowValueControl } from "./ShadowValueControl";
+ import { ImageAssetPicker } from "../assets/ImageAssetPicker";
+ import {
+   Checkbox,
+@@ -69,6 +70,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
+   toggle: (props) => <ToggleControl {...props} />,
+   spacing: (props) => <SpacingControl {...props} />,
+   radius: (props) => <RadiusControl {...props} />,
++  shadow: (props) => <ShadowControl {...props} />,
+   number: (props) => <NumberControl {...props} />,
+   text: (props) => <TextControl {...props} />,
+ };
+@@ -612,6 +614,11 @@ function RadiusControl({ control, propName, value, updateProp }: PropertyControl
+   );
+ }
+ 
++function ShadowControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "shadow") return null;
++  return <ShadowValueControl label={propName} value={value} onChange={updateProp} />;
++}
++
+ function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+   if (control.kind !== "number") return null;
+   return (
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index 25150a0..f3c4b10 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -5,6 +5,7 @@ export type InspectorControl =
+   | { kind: "number"; min?: number; max?: number; step?: number }
+   | { kind: "spacing"; min?: number; max?: number; step?: number }
+   | { kind: "radius"; min?: number; max?: number; step?: number }
++  | { kind: "shadow" }
+   | { kind: "color" }
+   | { kind: "toggle" }
+   | { kind: "image-asset" }
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+index 0661103..4f11e73 100644
+--- a/src/uiframework/registry/components/button.ts
++++ b/src/uiframework/registry/components/button.ts
+@@ -19,6 +19,7 @@ export const buttonDefinition = {
+     marginX: { kind: "spacing", min: 0, max: 64 },
+     marginY: { kind: "spacing", min: 0, max: 64 },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+   },
+ 
+   bindings: {
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+index d084611..7f00169 100644
+--- a/src/uiframework/registry/components/container.ts
++++ b/src/uiframework/registry/components/container.ts
+@@ -27,6 +27,7 @@ export const containerDefinition = {
+     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
+     borderSize: { kind: "border-size", min: 0 },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+     display: { kind: "select", options: ["grid", "flex"] },
+   },
+   bindings: {
+diff --git a/src/uiframework/registry/components/image.ts b/src/uiframework/registry/components/image.ts
+index d30b76f..2651fc7 100644
+--- a/src/uiframework/registry/components/image.ts
++++ b/src/uiframework/registry/components/image.ts
+@@ -16,6 +16,7 @@ export const imageDefinition = {
+     fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
+     alt: { kind: "text" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+     backgroundColor: { kind: "color" },
+   },
+   bindings: {
+diff --git a/src/uiframework/registry/components/modal.ts b/src/uiframework/registry/components/modal.ts
+index 3680350..7eb9992 100644
+--- a/src/uiframework/registry/components/modal.ts
++++ b/src/uiframework/registry/components/modal.ts
+@@ -16,6 +16,7 @@ export const modalDefinition = {
+     columns: 1,
+     display: "grid",
+     borderRadius: 18,
++    shadow: { x: 0, y: 18, blur: 40, spread: -8, color: "rgba(15, 23, 42, 0.20)" },
+     closeOnBackdrop: true,
+     closeOnEscape: true,
+   },
+@@ -29,6 +30,7 @@ export const modalDefinition = {
+     columns: { kind: "number", min: 1, max: 24 },
+     display: { kind: "select", options: ["grid", "flex"] },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+     closeOnBackdrop: { kind: "toggle" },
+     closeOnEscape: { kind: "toggle" },
+   },
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+index e203e22..a75e4d9 100644
+--- a/src/uiframework/registry/components/navigation.ts
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -16,6 +16,7 @@ export const navigationDefinition = {
+     gap: { kind: "spacing", min: 0, max: 48 },
+     padding: { kind: "spacing", min: 0, max: 48 },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+   },
+   bindings: {
+     visible: { label: "Visible", valueType: "boolean" },
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+index b2e347a..705e571 100644
+--- a/src/uiframework/registry/components/text.ts
++++ b/src/uiframework/registry/components/text.ts
+@@ -21,6 +21,7 @@ export const textDefinition = {
+     borderSize: { kind: "border-size", min: 0 },
+     borderColor: { kind: "color" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
++    shadow: { kind: "shadow" },
+   },
+   bindings: {
+     value: { label: "Value", valueType: "string" },
+diff --git a/src/uiframework/runtime/RuntimeModalLayer.tsx b/src/uiframework/runtime/RuntimeModalLayer.tsx
+index aa85b3e..b8d9aa5 100644
+--- a/src/uiframework/runtime/RuntimeModalLayer.tsx
++++ b/src/uiframework/runtime/RuntimeModalLayer.tsx
+@@ -95,7 +95,6 @@ export function RuntimeModalLayer({
+               closeProjectModal(projectId, modal.id, { reason: "backdrop" });
+             }}
+           >
+-            <div className="shadow-2xl">
+               <RenderNode
+                 id={modal.rootId}
+                 document={{ ...document, rootId: modal.rootId }}
+@@ -126,7 +125,6 @@ export function RuntimeModalLayer({
+                   return base;
+                 }}
+               />
+-            </div>
+           </div>
+         );
+       })}

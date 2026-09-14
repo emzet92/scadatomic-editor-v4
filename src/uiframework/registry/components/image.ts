@@ -16,6 +16,7 @@ export const imageDefinition = {
     fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
     alt: { kind: "text" },
     borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
     backgroundColor: { kind: "color" },
   },
   bindings: {

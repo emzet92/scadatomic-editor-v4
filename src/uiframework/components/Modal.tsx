@@ -9,6 +9,7 @@ export type ModalProps = HTMLAttributes<HTMLDivElement> & {
   columns?: number;
   display?: "grid" | "flex";
   borderRadius?: number;
+  shadow?: string;
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
 };
@@ -22,6 +23,7 @@ export function Modal({
   columns = 1,
   display = "grid",
   borderRadius = 18,
+  shadow,
   closeOnBackdrop = true,
   closeOnEscape = true,
   children,
@@ -47,6 +49,7 @@ export function Modal({
     boxSizing: "border-box",
     position: "relative",
     borderRadius,
+    boxShadow: shadow,
     ...style,
   };
 

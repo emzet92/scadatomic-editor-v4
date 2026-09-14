@@ -225,6 +225,7 @@ export function createModalRootNode(name: string): UiNode {
       columns: 1,
       display: "grid",
       borderRadius: 18,
+      shadow: { x: 0, y: 18, blur: 40, spread: -8, color: "rgba(15, 23, 42, 0.20)" },
       closeOnBackdrop: true,
       closeOnEscape: true,
     },

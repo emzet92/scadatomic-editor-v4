@@ -19,6 +19,7 @@ export const buttonDefinition = {
     marginX: { kind: "spacing", min: 0, max: 64 },
     marginY: { kind: "spacing", min: 0, max: 64 },
     borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
   },
 
   bindings: {

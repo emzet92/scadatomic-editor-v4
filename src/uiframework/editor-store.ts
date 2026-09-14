@@ -72,6 +72,13 @@ import {
   type RadiusTokenId,
 } from "./design-system/radius";
 import { detachRadiusTokenFromDocument } from "./design-system/document-radius";
+import {
+  createStarterShadowTokens,
+  type ShadowStyle,
+  type ShadowToken,
+  type ShadowTokenId,
+} from "./design-system/shadows";
+import { detachShadowTokenFromDocument } from "./design-system/document-shadows";
 import { createUniqueTokenName } from "./design-system/tokens";
 
 export type DragPreview = {
@@ -117,6 +124,10 @@ type EditorState = {
   addStarterRadiusScale: () => void;
   updateRadiusToken: (tokenId: RadiusTokenId, patch: Partial<Omit<RadiusToken, "id">>) => void;
   deleteRadiusToken: (tokenId: RadiusTokenId) => void;
+  addShadowToken: (draft?: Partial<Omit<ShadowToken, "id">>) => ShadowTokenId;
+  addStarterShadowScale: () => void;
+  updateShadowToken: (tokenId: ShadowTokenId, patch: Partial<Omit<ShadowToken, "id">>) => void;
+  deleteShadowToken: (tokenId: ShadowTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -703,6 +714,102 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: {
           ...detached,
           designSystem: { ...designSystem, radius: nextRadius },
+        },
+      };
+    });
+  },
+
+  addShadowToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const shadows = designSystem.shadows ?? {};
+      const name = createUniqueTokenName(shadows, draft?.name?.trim() || "Elevation");
+      const token: ShadowToken = {
+        id: tokenId,
+        name,
+        x: finiteOr(draft?.x, 0),
+        y: finiteOr(draft?.y, 4),
+        blur: Math.max(0, finiteOr(draft?.blur, 12)),
+        spread: finiteOr(draft?.spread, -2),
+        color: draft?.color?.trim() || "rgba(15, 23, 42, 0.12)",
+        ...(draft?.description !== undefined ? { description: draft.description } : {}),
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, shadows: { ...shadows, [tokenId]: token } },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterShadowScale: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextShadows = { ...(designSystem.shadows ?? {}) };
+      for (const token of createStarterShadowTokens()) {
+        const name = createUniqueTokenName(nextShadows, token.name);
+        nextShadows[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, shadows: nextShadows },
+        },
+      };
+    });
+  },
+
+  updateShadowToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const shadows = designSystem.shadows ?? {};
+      const current = shadows[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueTokenName(shadows, patch.name.trim() || current.name, tokenId);
+      const nextToken: ShadowToken = {
+        ...current,
+        ...patch,
+        name: nextName,
+        x: patch.x === undefined ? current.x : finiteOr(patch.x, current.x),
+        y: patch.y === undefined ? current.y : finiteOr(patch.y, current.y),
+        blur: patch.blur === undefined ? current.blur : Math.max(0, finiteOr(patch.blur, current.blur)),
+        spread: patch.spread === undefined ? current.spread : finiteOr(patch.spread, current.spread),
+        color: patch.color === undefined ? current.color : patch.color.trim() || current.color,
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, shadows: { ...shadows, [tokenId]: nextToken } },
+        },
+      };
+    });
+  },
+
+  deleteShadowToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const shadows = designSystem.shadows ?? {};
+      const token = shadows[tokenId];
+      if (!token) return state;
+      const replacement: ShadowStyle = {
+        x: token.x,
+        y: token.y,
+        blur: token.blur,
+        spread: token.spread,
+        color: token.color,
+      };
+      const detached = detachShadowTokenFromDocument(state.document, tokenId, replacement);
+      const nextShadows = { ...shadows };
+      delete nextShadows[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, shadows: nextShadows },
         },
       };
     });
@@ -1526,3 +1633,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     }));
   },
 }));
+
+function finiteOr(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
