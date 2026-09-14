@@ -20,25 +20,26 @@ import {
   type UiNode,
   type PageKind,
 } from "./core/document";
-import { getComponentDefinition } from "./registry/component-definitions";
 import { setOptionalRecordEntry } from "./core/optional-record";
-import {
-  createProjectComponentRepository,
-  wouldCreateComponentCycle,
-} from "./component-repository";
+import { createProjectComponentRepository } from "./component-repository";
 import {
   createReusableComponentFromNode,
   createReusableComponentFromSelection,
   createComponentDefinitionDocument,
 } from "./reusable-components";
-import {
-  createUniqueNodeName,
-  validateNodeName,
-} from "./core/node-name";
+import { validateNodeName } from "./core/node-name";
 import { createPageDeletionPlan, withStartPage } from "./core/pages";
-import { duplicateNodeSubtree } from "./core/duplicate-node";
 import { buildDocumentIndex } from "./core/document-index";
-import { canAcceptManualChildren } from "./repeat/RepeatBehavior";
+import {
+  deleteNodeFromTree,
+  duplicateNodeInTree,
+  insertNodeIntoTree,
+  moveNodeByInTree,
+  moveNodeInTree,
+  updateNodeInTree,
+  type NodeInsertDraft,
+  type NodeTreeEditingContext,
+} from "./editing/node-tree-editor";
 import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
@@ -50,11 +51,7 @@ export type DragPreview = {
   label?: string | undefined;
 };
 
-export type NewNode = {
-  type: UiNode["type"];
-  props?: Record<string, unknown>;
-  componentDefinitionId?: string | undefined;
-};
+export type NewNode = NodeInsertDraft;
 
 export type RenameNodeResult =
   | { ok: true }
@@ -197,6 +194,37 @@ function getActiveRootId(state: Pick<EditorState, "document" | "activePageId">) 
 
 function applyActiveCommand(state: EditorState, command: DocumentCommand) {
   return applyDocumentCommand(state.document, command, getActiveRootId(state));
+}
+
+function createActiveTreeContext(state: EditorState): NodeTreeEditingContext {
+  return { treeDocument: state.document, rootId: getActiveRootId(state) };
+}
+
+function createComponentTreeContext(
+  state: EditorState,
+  componentId: string
+): NodeTreeEditingContext | null {
+  const definition = state.document.components?.[componentId];
+  if (!definition) return null;
+  return {
+    treeDocument: createComponentDefinitionDocument(state.document, definition),
+    projectDocument: state.document,
+    rootId: definition.rootId,
+    ownerComponentId: componentId,
+  };
+}
+
+function persistComponentTree(
+  state: EditorState,
+  componentId: string,
+  treeDocument: UiDocument
+): UiDocument {
+  const definition = state.document.components?.[componentId];
+  if (!definition) return state.document;
+  return createProjectComponentRepository(state.document).upsert({
+    ...definition,
+    nodes: treeDocument.nodes,
+  });
 }
 
 function createUniquePageName(
@@ -573,19 +601,9 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   updateNode: (id, updater) => {
-    set((state) => {
-      const current = state.document.nodes[id];
-      if (!current) {
-        return state;
-      }
-
-      return {
-        document: applyActiveCommand(state, {
-          type: "node.replace",
-          node: updater(current),
-        }),
-      };
-    });
+    set((state) => ({
+      document: updateNodeInTree(createActiveTreeContext(state), id, updater),
+    }));
   },
 
   setBinding: (nodeId, property, binding) => {
@@ -690,22 +708,11 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   updateComponentDefinitionNode: (componentId, nodeId, updater) => {
     set((state) => {
-      const current = state.document.components?.[componentId];
-      const node = current?.nodes[nodeId];
-      if (!current || !node) return state;
-
-      const nextDefinition = {
-        ...current,
-        nodes: {
-          ...current.nodes,
-          [nodeId]: updater(node),
-        },
-      };
-
+      const context = createComponentTreeContext(state, componentId);
+      if (!context) return state;
+      const treeDocument = updateNodeInTree(context, nodeId, updater);
       return {
-        document: createProjectComponentRepository(state.document).upsert(
-          nextDefinition
-        ),
+        document: persistComponentTree(state, componentId, treeDocument),
       };
     });
   },
@@ -730,139 +737,44 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   insertComponentDefinitionNode: (componentId, parentId, insertIndex, node) => {
     let insertedId: NodeId | null = null;
-
     set((state) => {
-      const definition = state.document.components?.[componentId];
-      const parent = definition?.nodes[parentId];
-      if (!definition || !parent) return state;
-
-      const parentDefinition = getComponentDefinition(parent.type);
-      if (!parentDefinition?.acceptsChildren || !canAcceptManualChildren(parent)) {
-        return state;
-      }
-
-      if (
-        node.componentDefinitionId &&
-        wouldCreateComponentCycle(
-          state.document,
-          componentId,
-          node.componentDefinitionId
-        )
-      ) {
-        console.warn("Ignoring component insertion that would create a recursive component graph.");
-        return state;
-      }
-
-      const syntheticDocument = createComponentDefinitionDocument(
-        state.document,
-        definition
-      );
-      const registeredDefinition = getComponentDefinition(node.type);
-      const id = crypto.randomUUID();
-      const reusableName = node.componentDefinitionId
-        ? state.document.components?.[node.componentDefinitionId]?.name
-        : undefined;
-      const name = createUniqueNodeName(
-        syntheticDocument,
-        reusableName ?? node.type,
-        definition.rootId
-      );
-      const newNode: UiNode = {
-        id,
-        name,
-        type: node.type,
-        componentDefinitionId: node.componentDefinitionId,
-        props: { ...(node.props ?? {}) },
-        children: registeredDefinition?.acceptsChildren ? [] : undefined,
-      };
-      const updatedSynthetic = applyDocumentCommand(
-        syntheticDocument,
-        {
-          type: "node.insert",
-          parentId,
-          insertIndex,
-          node: newNode,
-        },
-        definition.rootId
-      );
-
-      if (!updatedSynthetic.nodes[id]) return state;
-      insertedId = id;
-
+      const context = createComponentTreeContext(state, componentId);
+      if (!context) return state;
+      const result = insertNodeIntoTree(context, parentId, insertIndex, node);
+      if (!result.insertedNodeId) return state;
+      insertedId = result.insertedNodeId;
       return {
-        document: createProjectComponentRepository(state.document).upsert({
-          ...definition,
-          nodes: updatedSynthetic.nodes,
-        }),
+        document: persistComponentTree(state, componentId, result.document),
         dragPreview: null,
         draggedNodeId: null,
         nodeDragCandidate: null,
       };
     });
-
     return insertedId;
   },
 
   deleteComponentDefinitionNode: (componentId, nodeId) => {
     set((state) => {
-      const definition = state.document.components?.[componentId];
-      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
-        return state;
-      }
-
-      const syntheticDocument = createComponentDefinitionDocument(
-        state.document,
-        definition
-      );
-      const updatedSynthetic = applyDocumentCommand(
-        syntheticDocument,
-        { type: "node.delete", nodeId },
-        definition.rootId
-      );
-
-      if (updatedSynthetic.nodes === syntheticDocument.nodes) return state;
-
-      return {
-        document: createProjectComponentRepository(state.document).upsert({
-          ...definition,
-          nodes: updatedSynthetic.nodes,
-        }),
-      };
+      const context = createComponentTreeContext(state, componentId);
+      if (!context) return state;
+      const treeDocument = deleteNodeFromTree(context, nodeId);
+      if (treeDocument === context.treeDocument) return state;
+      return { document: persistComponentTree(state, componentId, treeDocument) };
     });
   },
 
   duplicateComponentDefinitionNode: (componentId, nodeId) => {
     let duplicatedNodeId: NodeId | null = null;
-
     set((state) => {
-      const definition = state.document.components?.[componentId];
-      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
-        return state;
-      }
-
-      const syntheticDocument = createComponentDefinitionDocument(
-        state.document,
-        definition
-      );
-      if (!canDuplicateIntoCurrentParent(syntheticDocument, definition.rootId, nodeId)) {
-        return state;
-      }
-      const result = duplicateNodeSubtree(
-        syntheticDocument,
-        nodeId,
-        definition.rootId
-      );
+      const context = createComponentTreeContext(state, componentId);
+      if (!context) return state;
+      const result = duplicateNodeInTree(context, nodeId);
       if (!result.duplicatedNodeId) return state;
-
       duplicatedNodeId = result.duplicatedNodeId;
       return {
-        document: createProjectComponentRepository(state.document).upsert({
-          ...definition,
-          nodes: result.document.nodes,
-        }),
+        document: persistComponentTree(state, componentId, result.document),
       };
     });
-
     return duplicatedNodeId;
   },
 
@@ -873,41 +785,16 @@ export const useEditorStore = create<EditorState>((set) => ({
     targetIndex
   ) => {
     set((state) => {
-      const definition = state.document.components?.[componentId];
-      if (!definition) return state;
-
-      const targetParent = definition.nodes[targetParentId];
-      const targetDefinition = targetParent
-        ? getComponentDefinition(targetParent.type)
-        : undefined;
-      if (
-        !targetParent ||
-        !targetDefinition?.acceptsChildren ||
-        !canAcceptManualChildren(targetParent)
-      ) {
-        return state;
-      }
-
-      const syntheticDocument = createComponentDefinitionDocument(
-        state.document,
-        definition
+      const context = createComponentTreeContext(state, componentId);
+      if (!context) return state;
+      const treeDocument = moveNodeInTree(
+        context,
+        nodeId,
+        targetParentId,
+        targetIndex
       );
-      const updatedSynthetic = applyDocumentCommand(
-        syntheticDocument,
-        {
-          type: "node.move",
-          nodeId,
-          targetParentId,
-          targetIndex,
-        },
-        definition.rootId
-      );
-
       return {
-        document: createProjectComponentRepository(state.document).upsert({
-          ...definition,
-          nodes: updatedSynthetic.nodes,
-        }),
+        document: persistComponentTree(state, componentId, treeDocument),
         draggedNodeId: null,
         nodeDragCandidate: null,
       };
@@ -916,41 +803,17 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   insertNode: (parentId, insertIndex, node) => {
     set((state) => {
-      const parent = state.document.nodes[parentId];
-      if (!parent || !canAcceptManualChildren(parent)) {
-        return state;
-      }
-
-      const definition = getComponentDefinition(node.type);
-      const id = crypto.randomUUID();
-      const reusableName = node.componentDefinitionId
-        ? state.document.components?.[node.componentDefinitionId]?.name
-        : undefined;
-      const name = createUniqueNodeName(
-        state.document,
-        reusableName ?? node.type,
-        getActiveRootId(state)
-      );
-      const newNode: UiNode = {
-        id,
-        name,
-        type: node.type,
-        componentDefinitionId: node.componentDefinitionId,
-        props: { ...(node.props ?? {}) },
-        children: definition?.acceptsChildren ? [] : undefined,
-      };
-
-      const document = applyActiveCommand(state, {
-        type: "node.insert",
+      const result = insertNodeIntoTree(
+        createActiveTreeContext(state),
         parentId,
         insertIndex,
-        node: newNode,
-      });
-
+        node
+      );
+      const insertedId = result.insertedNodeId;
       return {
-        document,
-        selectedNodeId: document.nodes[id] ? id : state.selectedNodeId,
-        selectedNodeIds: document.nodes[id] ? [id] : state.selectedNodeIds,
+        document: result.document,
+        selectedNodeId: insertedId ?? state.selectedNodeId,
+        selectedNodeIds: insertedId ? [insertedId] : state.selectedNodeIds,
         dragPreview: null,
         draggedNodeId: null,
         nodeDragCandidate: null,
@@ -960,19 +823,15 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   deleteNode: (id) => {
     set((state) => {
-      const rootId = getActiveRootId(state);
-      const parentId = buildDocumentIndex(state.document, rootId).parentById.get(id);
-      const document = applyActiveCommand(state, {
-        type: "node.delete",
-        nodeId: id,
-      });
+      const context = createActiveTreeContext(state);
+      const parentId = buildDocumentIndex(state.document, context.rootId).parentById.get(id);
+      const document = deleteNodeFromTree(context, id);
       const selectedNodeIds = state.selectedNodeIds.filter(
         (nodeId) => !!document.nodes[nodeId]
       );
       const fallbackSelection =
         selectedNodeIds[0] ??
         (parentId && document.nodes[parentId] ? parentId : null);
-
       return {
         document,
         selectedNodeIds: fallbackSelection ? [fallbackSelection] : [],
@@ -986,19 +845,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   duplicateNode: (id) => {
     let duplicatedNodeId: NodeId | null = null;
-
     set((state) => {
-      const rootId = getActiveRootId(state);
-      if (!canDuplicateIntoCurrentParent(state.document, rootId, id)) {
-        return state;
-      }
-      const result = duplicateNodeSubtree(
-        state.document,
-        id,
-        rootId
-      );
+      const result = duplicateNodeInTree(createActiveTreeContext(state), id);
       if (!result.duplicatedNodeId) return state;
-
       duplicatedNodeId = result.duplicatedNodeId;
       return {
         document: result.document,
@@ -1008,27 +857,18 @@ export const useEditorStore = create<EditorState>((set) => ({
         nodeDragCandidate: null,
       };
     });
-
     return duplicatedNodeId;
   },
 
   moveNodeUp: (nodeId) => {
     set((state) => ({
-      document: applyActiveCommand(state, {
-        type: "node.moveBy",
-        nodeId,
-        offset: -1,
-      }),
+      document: moveNodeByInTree(createActiveTreeContext(state), nodeId, -1),
     }));
   },
 
   moveNodeDown: (nodeId) => {
     set((state) => ({
-      document: applyActiveCommand(state, {
-        type: "node.moveBy",
-        nodeId,
-        offset: 1,
-      }),
+      document: moveNodeByInTree(createActiveTreeContext(state), nodeId, 1),
     }));
   },
 
@@ -1085,41 +925,17 @@ export const useEditorStore = create<EditorState>((set) => ({
   },
 
   moveNode: (nodeId, targetParentId, targetIndex) => {
-    set((state) => {
-      const targetParent = state.document.nodes[targetParentId];
-      if (!targetParent || !canAcceptManualChildren(targetParent)) {
-        return {
-          ...state,
-          draggedNodeId: null,
-          nodeDragCandidate: null,
-        };
-      }
-
-      return {
-        document: applyActiveCommand(state, {
-          type: "node.move",
-          nodeId,
-          targetParentId,
-          targetIndex,
-        }),
-        draggedNodeId: null,
-        nodeDragCandidate: null,
-        selectedNodeId: nodeId,
-        selectedNodeIds: [nodeId],
-      };
-    });
+    set((state) => ({
+      document: moveNodeInTree(
+        createActiveTreeContext(state),
+        nodeId,
+        targetParentId,
+        targetIndex
+      ),
+      draggedNodeId: null,
+      nodeDragCandidate: null,
+      selectedNodeId: nodeId,
+      selectedNodeIds: [nodeId],
+    }));
   },
 }));
-
-function canDuplicateIntoCurrentParent(
-  document: UiDocument,
-  rootId: NodeId,
-  nodeId: NodeId
-): boolean {
-  const index = buildDocumentIndex(document, rootId);
-  const parentId = index.parentById.get(nodeId);
-  if (!parentId) return false;
-  const parent = document.nodes[parentId];
-  return !!parent && canAcceptManualChildren(parent);
-}
-

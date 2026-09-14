@@ -1,208 +1,24 @@
-import type { ElementType } from "react";
-import { Button } from "../components/Button";
-import { Chart } from "../components/Chart";
-import { Container } from "../components/Container";
-import { Page } from "../components/Page";
-import { EditorPageSlot, RuntimePageSlot } from "../components/PageSlot";
-import { Navigation } from "../components/Navigation";
-import { Image } from "../components/Image";
-import { RuntimeButton } from "../components/RuntimeButton";
-import { RuntimeChart } from "../components/RuntimeChart";
-import { RuntimeText } from "../components/RuntimeText";
-import { Text } from "../components/Text";
-import {
-  defaultButtonProps,
-  defaultPageProps,
-  defaultChartProps,
-  defaultContainerProps,
-  defaultTextProps,
-  defaultNavigationProps,
-  defaultImageProps,
-} from "../component-props";
+import type { ComponentDefinition } from "./component-definition-types";
+import { buttonDefinition } from "./components/button";
+import { chartDefinition } from "./components/chart";
+import { containerDefinition } from "./components/container";
+import { imageDefinition } from "./components/image";
+import { navigationDefinition } from "./components/navigation";
+import { pageDefinition } from "./components/page";
+import { pageSlotDefinition } from "./components/page-slot";
+import { textDefinition } from "./components/text";
 
-export type InspectorControl =
-  | { kind: "text" }
-  | { kind: "number"; min?: number; max?: number; step?: number }
-  | { kind: "color" }
-  | { kind: "toggle" }
-  | { kind: "image-asset" }
-  | { kind: "tag-ref"; udtId: string }
-  | { kind: "time-range" }
-  | { kind: "chart-series" }
-  | { kind: "text-format" }
-  | { kind: "text-align" }
-  | { kind: "border-size"; min?: number; max?: number; step?: number }
-  | { kind: "select"; options: readonly string[] };
-
-export type ComponentDefinition = {
-  type: string;
-  label: string;
-  description: string;
-  editor: ElementType;
-  runtime: ElementType;
-  defaults: Record<string, unknown>;
-  acceptsChildren?: boolean;
-  inspector: Record<string, InspectorControl>;
-  bindings?: Record<string, { label: string }>;
-  events?: Record<string, { label: string; defaultSuffix: string }>;
-};
+export type { ComponentDefinition, InspectorControl } from "./component-definition-types";
 
 export const componentDefinitions = {
-  Page: {
-    type: "Page",
-    label: "Page",
-    description: "Root viewport",
-    editor: Page,
-    runtime: Page,
-    defaults: defaultPageProps,
-    acceptsChildren: true,
-    inspector: {
-      backgroundColor: { kind: "color" },
-      padding: { kind: "number", min: 0 },
-      gap: { kind: "number", min: 0 },
-      columns: { kind: "number", min: 1, max: 24 },
-      display: { kind: "select", options: ["grid", "flex"] },
-    },
-  },
-  PageSlot: {
-    type: "PageSlot",
-    label: "Page Slot",
-    description: "Content outlet for a Page Layout",
-    editor: EditorPageSlot,
-    runtime: RuntimePageSlot,
-    defaults: { slotName: "content" },
-    inspector: {
-      slotName: { kind: "select", options: ["content"] },
-    },
-  },
-  Navigation: {
-    type: "Navigation",
-    label: "Navigation",
-    description: "Top-level page navigation",
-    editor: Navigation,
-    runtime: Navigation,
-    defaults: defaultNavigationProps,
-    inspector: {
-      backgroundColor: { kind: "color" },
-      color: { kind: "color" },
-      activeColor: { kind: "color" },
-      gap: { kind: "number", min: 0, max: 48 },
-      padding: { kind: "number", min: 0, max: 48 },
-      borderRadius: { kind: "number", min: 0, max: 48 },
-    },
-  },
-  Container: {
-    type: "Container",
-    label: "Container",
-    description: "Layout container",
-    editor: Container,
-    runtime: Container,
-    defaults: defaultContainerProps,
-    acceptsChildren: true,
-    inspector: {
-      width: { kind: "text" },
-      height: { kind: "text" },
-      minWidth: { kind: "text" },
-      minHeight: { kind: "text" },
-      maxWidth: { kind: "text" },
-      maxHeight: { kind: "text" },
-      padding: { kind: "number", min: 0 },
-      gap: { kind: "number", min: 0 },
-      columns: { kind: "number", min: 1, max: 24 },
-      gridMode: { kind: "select", options: ["fixed", "adaptive"] },
-      minColumnWidth: { kind: "number", min: 96, max: 640 },
-      minRowHeight: { kind: "number", min: 24, max: 480 },
-      gridRowMode: { kind: "select", options: ["content", "minimum"] },
-      gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
-      borderSize: { kind: "border-size", min: 0 },
-      display: { kind: "select", options: ["grid", "flex"] },
-    },
-  },
-  Text: {
-    type: "Text",
-    label: "Text",
-    description: "Static or bound text",
-    editor: Text,
-    runtime: RuntimeText,
-    defaults: defaultTextProps,
-    inspector: {
-      value: { kind: "text" },
-      color: { kind: "color" },
-      fontSize: { kind: "number", min: 1 },
-      lineHeight: { kind: "text" },
-      formatting: { kind: "text-format" },
-      align: { kind: "text-align" },
-      variant: {
-        kind: "select",
-        options: ["body", "label", "title", "caption"],
-      },
-      uppercase: { kind: "toggle" },
-      borderSize: { kind: "border-size", min: 0 },
-      borderColor: { kind: "color" },
-      borderRadius: { kind: "number", min: 0 },
-    },
-    bindings: {
-      value: { label: "Runtime tag" },
-    },
-  },
-  Button: {
-    type: "Button",
-    label: "Button",
-    description: "User action",
-    editor: Button,
-    runtime: RuntimeButton,
-    defaults: defaultButtonProps,
-    inspector: {
-      label: { kind: "text" },
-      disabled: { kind: "toggle" },
-      backgroundColor: { kind: "color" },
-      paddingX: { kind: "number", min: 0, max: 64 },
-      paddingY: { kind: "number", min: 0, max: 48 },
-      marginX: { kind: "number", min: 0, max: 64 },
-      marginY: { kind: "number", min: 0, max: 64 },
-      borderRadius: { kind: "number", min: 0, max: 64 },
-    },
-    events: {
-      click: { label: "Click", defaultSuffix: "Clicked" },
-      doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },
-    },
-  },
-  Image: {
-    type: "Image",
-    label: "Image",
-    description: "Local image asset",
-    editor: Image,
-    runtime: Image,
-    defaults: defaultImageProps,
-    inspector: {
-      assetId: { kind: "image-asset" },
-      width: { kind: "text" },
-      height: { kind: "text" },
-      fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
-      alt: { kind: "text" },
-      borderRadius: { kind: "number", min: 0 },
-      backgroundColor: { kind: "color" },
-    },
-  },
-  Chart: {
-    type: "Chart",
-    label: "Chart",
-    description: "Line or bar chart",
-    editor: Chart,
-    runtime: RuntimeChart,
-    defaults: defaultChartProps,
-    inspector: {
-      title: { kind: "text" },
-      kind: { kind: "select", options: ["line", "bar"] },
-      width: { kind: "text" },
-      height: { kind: "text" },
-      minHeight: { kind: "text" },
-      series: { kind: "chart-series" },
-      showLegend: { kind: "toggle" },
-      showGrid: { kind: "toggle" },
-      timeRange: { kind: "time-range" },
-    },
-  },
+  Page: pageDefinition,
+  PageSlot: pageSlotDefinition,
+  Navigation: navigationDefinition,
+  Container: containerDefinition,
+  Text: textDefinition,
+  Button: buttonDefinition,
+  Image: imageDefinition,
+  Chart: chartDefinition,
 } satisfies Record<string, ComponentDefinition>;
 
 export type RegisteredComponentType = keyof typeof componentDefinitions;
@@ -212,7 +28,5 @@ export function getComponentDefinition(type: string): ComponentDefinition | unde
 }
 
 export function getDefaultPropsForType(type: string): Record<string, unknown> {
-  return {
-    ...(getComponentDefinition(type)?.defaults ?? {}),
-  };
+  return { ...(getComponentDefinition(type)?.defaults ?? {}) };
 }

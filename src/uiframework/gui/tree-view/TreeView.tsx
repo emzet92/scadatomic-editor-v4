@@ -2,7 +2,7 @@ import { getPage } from "../../core/document";
 import { buildDocumentIndex } from "../../core/document-index";
 import { canAcceptManualChildren } from "../../repeat/RepeatBehavior";
 import { useEditorStore } from "../../editor-store";
-import { TreeNode } from "./TreeNode";
+import { NodeTree } from "./NodeTree";
 
 export function TreeView() {
   const document = useEditorStore((state) => state.document);
@@ -32,8 +32,8 @@ export function TreeView() {
         ) : null}
       </div>
 
-      <TreeNode
-        nodeId={page.rootId}
+      <NodeTree
+        rootId={page.rootId}
         nodes={document.nodes}
         selectedNodeId={selectedNodeId}
         selectedNodeIds={selectedNodeIds}

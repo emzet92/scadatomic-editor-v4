@@ -1,37 +1,26 @@
-# Grid hug sizing + rounded property inputs
+# SCADAtomic modularization refactor patch
 
-Incremental patch on top of `scadatomic-editor-component-grid-button-spacing-source.zip`.
+Base: `scadatomic-editor-grid-hug-rounded-inputs-source.zip` (the latest source before this refactor).
 
-## Grid vertical behavior
+Apply either by copying the included files over the project or with:
 
-Grid containers now default to:
+```bash
+git apply PATCH_MODULARIZATION_REFACTOR.diff
+```
 
-- `gridRowMode: "content"` — rows hug their content instead of reserving/filling vertical space.
-- `gridItemAlignment: "start"` — children keep their natural height at the top of the row instead of stretching downward.
+Main changes:
 
-The Layout property editor exposes:
+- one shared node-tree editing core for Page and reusable-component definitions
+- one shared recursive tree renderer
+- property inspector renderer registry
+- split script runtime orchestration/proxies/effects/types
+- per-component registry definition modules
+- no project-data migration and no public store API migration
 
-- Row sizing: `Hug content` / `Minimum row`
-- Item alignment: `Top` / `Center` / `Bottom` / `Fill`
-- `Minimum row` height only when that row mode is enabled
+Validation:
 
-The designer grid overlay uses the same row mode and derives row heights from the actual rendered child heights, so the overlay no longer paints fake full-height rows down the container.
-
-## Property panel inputs
-
-The existing generic `TextInput` from `src/uiframework/gui/ui/FormControls.tsx` remains the single text/number input primitive and now uses the same 12px rounding language as the grid settings.
-
-Reused by:
-
-- ordinary string/number props
-- component name
-- button spacing values
-- grid gap/padding compact values
-- chart series text inputs
-
-Selects and compound property controls were visually aligned to the same radius.
-
-## Validation
-
-- TypeScript `tsc -b`: pass
-- ESLint on all touched TS/TSX files: pass
+- `tsc -b`: PASS
+- ESLint on every changed/new file: PASS
+- `git apply --check`: PASS against the stated base
+- Vite bundle not runnable in this Linux environment because the uploaded dependencies do not contain the Linux Rolldown native binding
+- full-project ESLint has one pre-existing Fast Refresh error in `navigation-context.tsx`, outside this patch

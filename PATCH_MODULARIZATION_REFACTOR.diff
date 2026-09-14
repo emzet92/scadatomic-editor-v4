@@ -1,0 +1,4406 @@
+diff --git a/MODULARIZATION_REFACTOR.md b/MODULARIZATION_REFACTOR.md
+new file mode 100644
+index 0000000..af7b829
+--- /dev/null
++++ b/MODULARIZATION_REFACTOR.md
+@@ -0,0 +1,107 @@
++# SCADAtomic modularization refactor
++
++This refactor is intentionally behavior-preserving. It reorganizes editing/runtime code so upcoming reactive bindings and new components can be added without duplicating Page vs ComponentDefinition logic.
++
++## 1. Unified node-tree editing
++
++New module:
++
++- `src/uiframework/editing/node-tree-editor.ts`
++
++It owns shared structural operations:
++
++- insert
++- delete
++- duplicate
++- move
++- move-by
++- update
++- validation of child acceptance
++- repeat/loop manual-child guard
++- reusable-component cycle guard
++- unique node name creation
++
++`editor-store.ts` keeps its existing public API so callers do not need migration, but both Page and reusable-component definition actions delegate to the same tree editor.
++
++## 2. Shared tree renderer
++
++New:
++
++- `src/uiframework/gui/tree-view/NodeTree.tsx`
++
++Both:
++
++- normal page `TreeView`
++- reusable-component `ComponentStructureTree`
++
++now use the same recursive renderer. Their differences are capabilities/callbacks, not duplicated tree rendering code.
++
++## 3. Property control registry
++
++`PropInput.tsx` is now a thin dispatcher instead of a ~440-line chain of `control.kind` branches.
++
++New:
++
++- `src/uiframework/gui/property-panel/property-control-registry.tsx`
++
++The registry maps inspector kinds to dedicated renderers. Adding new controls such as slider/tag binding/table-specific configuration no longer requires growing `PropInput`.
++
++## 4. Script runtime split
++
++`src/mock/mock-script-runtime.ts` now contains only handler orchestration:
++
++`script -> collect intents -> planner -> graph -> executor`
++
++The previous responsibilities were split into:
++
++- `script-runtime/types.ts`
++- `script-runtime/context-factory.ts`
++- `script-runtime/component-api.ts`
++- `script-runtime/navigation-api.ts`
++- `script-runtime/tag-api.ts`
++- `script-runtime/javascript-executor.ts`
++- `script-runtime/runtime-effects-adapter.ts`
++- `script-runtime/object-utils.ts`
++
++The execution semantics are unchanged: JavaScript is evaluated to make decisions and collect intents; actual side effects still flow through `Executor -> RuntimeEffects`.
++
++## 5. Component definition registry split
++
++The central registry remains the lookup point, but definitions now live next to a per-component module:
++
++- `registry/components/button.ts`
++- `registry/components/chart.ts`
++- `registry/components/container.ts`
++- `registry/components/image.ts`
++- `registry/components/navigation.ts`
++- `registry/components/page.ts`
++- `registry/components/page-slot.ts`
++- `registry/components/text.ts`
++
++Shared types moved to `registry/component-definition-types.ts`.
++
++This makes future `TextInput`, `NumberInput`, `Switch`, `Table`, etc. additive instead of editing a growing monolith.
++
++## Compatibility
++
++No project document migration is required.
++
++Existing public store methods are preserved, including:
++
++- `insertNode`
++- `deleteNode`
++- `duplicateNode`
++- `moveNode`
++- `insertComponentDefinitionNode`
++- `deleteComponentDefinitionNode`
++- `duplicateComponentDefinitionNode`
++- `moveComponentDefinitionNode`
++
++Existing script API is also preserved.
++
++## Validation
++
++- Full TypeScript project typecheck: PASS (`tsc -b`)
++- ESLint for every changed/new module: PASS
++- Full-project ESLint still reports the pre-existing `react-refresh/only-export-components` issue in `src/uiframework/navigation/navigation-context.tsx`; this refactor does not touch that file.
++- Vite bundling cannot run in the Linux validation environment because the uploaded `node_modules` contains no Linux Rolldown native binding (`@rolldown/binding-linux-x64-gnu`).
+diff --git a/src/mock/mock-script-runtime.ts b/src/mock/mock-script-runtime.ts
+index 7311f27..deece4c 100644
+--- a/src/mock/mock-script-runtime.ts
++++ b/src/mock/mock-script-runtime.ts
+@@ -1,167 +1,50 @@
+-import type { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
+-import {
+-  createTagRuntimeGlobals,
+-  createTagRuntimeProxy,
+-  createUdtInstanceApi,
+-  type TagRuntimeApi,
+-} from "../uiframework/data/runtime/TagRuntimeProxy";
+-import { isTagRef } from "../uiframework/data/collections/TagRef";
+-import type { UiComponentDefinition, UiNode } from "../uiframework/core/document";
+-import type { NavigationTreeNode } from "../uiframework/navigation/navigation";
+-import {
+-  getComponentApiMethodNames,
+-  getComponentApiPropertyNames,
+-  getComponentColorProperty,
+-  getResolvedComponentProps,
+-} from "../uiframework/component-api";
+-import {
+-  getComponentVariantNames,
+-  getComponentVariantProps,
+-} from "../uiframework/component-variants";
+-import { getMockScript } from "./mock-script-store";
+-import {
+-  clearMockSessionState,
+-  deleteMockSessionValue,
+-  getMockSessionValue,
+-  setMockSessionValue,
+-} from "./mock-session-state";
+ import {
+   Executor,
+   ExecutionPlanner,
+   IntentCollector,
+-  createIntentId,
+   publishExecutionPlan,
+   publishExecutionTrace,
+-  shadowKey,
+-  type Intent,
+   type IntentSource,
+-  type RuntimeEffects,
+ } from "../execution";
+-import { TypeRegistry } from "../uiframework/data/types/TypeRegistry";
+-
+-export type MockScriptEvent = {
+-  projectId: string;
+-  pageId?: string | undefined;
+-  handlerId: string;
+-  sourceNodeId: string;
+-  eventName: string;
+-  payload?: Record<string, unknown> | undefined;
+-};
+-
+-/**
+- * A concrete reusable-component instance that owns a scoped runtime node.
+- * runtimeInstanceId is cumulative for nested user components, e.g.
+- * "PumpCard1::AlarmBadge1".
+- */
+-export type MockRuntimeComponentScope = {
+-  instance: UiNode;
+-  definition: UiComponentDefinition;
+-  runtimeInstanceId: string;
+-};
+-
+-export type MockScriptHost = {
+-  setNodeProp(nodeId: string, property: string, value: unknown): void;
+-  getNodeProps(nodeId: string): Record<string, unknown>;
+-  setNodeVariant(nodeId: string, variantName: string): void;
+-  getNodeVariant(nodeId: string): string | undefined;
+-  resolveUiNode(name: string): UiNode | undefined;
+-  resolveComponentDefinition(
+-    componentDefinitionId: string
+-  ): UiComponentDefinition | undefined;
+-  resolveComponentScopeForRuntimeNode(
+-    runtimeNodeId: string
+-  ): MockRuntimeComponentScope | undefined;
+-  getTagRuntime(): TagRuntime | undefined;
+-  getNavigationTree(): NavigationTreeNode[];
+-  navigateTo(path: string): void;
+-  emit(eventName: string, payload?: Record<string, unknown>): void;
+-};
+-
+-export type UiComponentVariantScriptApi = {
+-  readonly current: string | undefined;
+-  [key: string]: unknown;
+-};
+-
+-export type UiComponentScriptApi = {
+-  /** Framework metadata/helpers exist on primitive nodes only. */
+-  readonly id?: string;
+-  readonly name?: string;
+-  readonly type?: string;
+-  readonly variant?: UiComponentVariantScriptApi;
+-  setProp?(property: string, value: unknown): void;
+-  setColor?(color: string): void;
+-  [key: string]: unknown;
+-};
+-
+-export type MockScriptUiApi = {
+-  get(name: string): UiComponentScriptApi;
+-  [key: string]: unknown;
+-};
+-
+-/** Private component-definition tree, injected only into component-owned code. */
+-export type MockScriptInternalApi = {
+-  get(name: string): UiComponentScriptApi;
+-  [key: string]: unknown;
+-};
+-
+-export type MockScriptNavigationNodeApi = {
+-  readonly path: string;
+-  readonly pageId: string;
+-  go(): void;
+-  [key: string]: unknown;
+-};
+-
+-export type MockScriptNavigationApi = {
+-  [key: string]: MockScriptNavigationNodeApi | unknown;
+-};
+-
+-export type MockScriptInputsApi = Record<string, unknown>;
+-
+-export type MockScriptContext = {
+-  projectId: string;
+-  handlerId: string;
+-  sourceNodeId: string;
+-  eventName: string;
+-  payload: Record<string, unknown>;
+-  state: {
+-    get<T>(key: string, fallback?: T): unknown | T;
+-    set(key: string, value: unknown): void;
+-    delete(key: string): void;
+-    clear(): void;
+-  };
+-  /** Public API of components on the current runtime page. */
+-  ui: MockScriptUiApi;
+-  nav: MockScriptNavigationApi;
+-  /** Current reusable-component public inputs. TagRef inputs are live tag proxies. */
+-  inputs?: MockScriptInputsApi | undefined;
+-  /** Dynamic typed tag namespace. Writes are routed through the owning tag driver. */
+-  tags?: TagRuntimeApi | undefined;
+-  navigateTo(path: string): void;
+-  emit(eventName: string, payload?: Record<string, unknown>): void;
+-  random: {
+-    color(): string;
+-    number(min?: number, max?: number): number;
+-  };
+-  log(...args: unknown[]): void;
+-};
+-
+-type CreateComponentApiOptions = {
+-  /** Runtime identity used for scoped props/variants. Defaults to node.id. */
+-  runtimeNodeId?: string;
+-  /** Component-owned scripts receive private methods through self. */
+-  includePrivateMethods?: boolean;
+-};
+-
+-type MockScriptExecutionEnvironment = {
+-  collector: IntentCollector;
+-  source: IntentSource;
+-};
++import { getMockScript } from "./mock-script-store";
++import {
++  createComponentApi,
++  createInputsApi,
++  createInternalUiApi,
++} from "./script-runtime/component-api";
++import { createScriptContext } from "./script-runtime/context-factory";
++import { createTagGlobals } from "./script-runtime/tag-api";
++import { executeJavaScriptSource } from "./script-runtime/javascript-executor";
++import {
++  createMockRuntimeEffects,
++  validateMockRuntimeIntent,
++} from "./script-runtime/runtime-effects-adapter";
++import type {
++  MockScriptEvent,
++  MockScriptExecutionEnvironment,
++  MockScriptHost,
++  UiComponentScriptApi,
++} from "./script-runtime/types";
++
++export type {
++  MockRuntimeComponentScope,
++  MockScriptContext,
++  MockScriptEvent,
++  MockScriptHost,
++  MockScriptInputsApi,
++  MockScriptInternalApi,
++  MockScriptNavigationApi,
++  MockScriptNavigationNodeApi,
++  MockScriptUiApi,
++  UiComponentScriptApi,
++  UiComponentVariantScriptApi,
++} from "./script-runtime/types";
+ 
+ /**
+- * Prototype-only JavaScript execution.
++ * Handler orchestration only.
+  *
+- * This deliberately executes trusted local developer code with new Function.
+- * It is not a sandbox and must not be used for untrusted production scripts.
++ * JavaScript computes decisions and collects intents. Side effects are committed
++ * only after planning, through Executor -> RuntimeEffects.
+  */
+ export function executeMockScript(
+   event: MockScriptEvent,
+@@ -178,8 +61,10 @@ export function executeMockScript(
+   };
+   const environment: MockScriptExecutionEnvironment = { collector, source };
+   const ownerScope = host.resolveComponentScopeForRuntimeNode(event.sourceNodeId);
+-  const selfRef: { current: UiComponentScriptApi | undefined } = { current: undefined };
+-  const ctx = createContext(event, host, environment, () =>
++  const selfRef: { current: UiComponentScriptApi | undefined } = {
++    current: undefined,
++  };
++  const ctx = createScriptContext(event, host, environment, () =>
+     ownerScope && selfRef.current
+       ? createInputsApi(ownerScope.definition, selfRef.current)
+       : undefined
+@@ -210,7 +95,7 @@ export function executeMockScript(
+     : undefined;
+ 
+   try {
+-    executeSource({
++    executeJavaScriptSource({
+       code: script.code,
+       ctx,
+       self,
+@@ -221,11 +106,7 @@ export function executeMockScript(
+     });
+   } catch (error) {
+     collector.discard();
+-    console.error(
+-      `[mock-script-runtime] Handler ${event.handlerId} failed`,
+-      error
+-    );
+-
++    console.error(`[mock-script-runtime] Handler ${event.handlerId} failed`, error);
+     host.emit("script.error", {
+       handlerId: event.handlerId,
+       sourceNodeId: event.sourceNodeId,
+@@ -237,10 +118,9 @@ export function executeMockScript(
+   const intents = collector.takeIntents();
+   let graph;
+   try {
+-    const planner = new ExecutionPlanner();
+-    graph = planner.plan(intents, {
++    graph = new ExecutionPlanner().plan(intents, {
+       source,
+-      validateIntent: (intent) => validateRuntimeIntent(intent, host),
++      validateIntent: (intent) => validateMockRuntimeIntent(intent, host),
+     });
+   } catch (error) {
+     console.error(
+@@ -267,12 +147,10 @@ export function executeMockScript(
+     createdAt: Date.now(),
+   };
+ 
+-  // Freeze the exact planner output before the Executor is allowed to run.
+-  // The plan view therefore never confuses planned operations with results.
+   publishExecutionPlan(execution);
+   publishExecutionTrace(execution);
+   void new Executor()
+-    .execute(graph, createRuntimeEffects(event, host))
++    .execute(graph, createMockRuntimeEffects(event, host))
+     .then((result) => {
+       publishExecutionTrace({ ...execution, result });
+       if (result.status !== "success") {
+@@ -285,10 +163,7 @@ export function executeMockScript(
+       }
+     })
+     .catch((error) => {
+-      console.error(
+-        `[mock-script-runtime] Execution ${graph.executionId} failed`,
+-        error
+-      );
++      console.error(`[mock-script-runtime] Execution ${graph.executionId} failed`, error);
+       host.emit("execution.error", {
+         handlerId: event.handlerId,
+         sourceNodeId: event.sourceNodeId,
+@@ -297,776 +172,3 @@ export function executeMockScript(
+       });
+     });
+ }
+-
+-function createContext(
+-  event: MockScriptEvent,
+-  host: MockScriptHost,
+-  environment: MockScriptExecutionEnvironment,
+-  getInputs?: () => MockScriptInputsApi | undefined
+-): MockScriptContext {
+-  const ui = createUiApi(host, event.projectId, () => ctx, environment);
+-  const nav = createNavigationApi(host, environment);
+-  const tagRuntime = host.getTagRuntime();
+-  const contextRef: { current?: MockScriptContext } = {};
+-  const stateWrites = new Map<string, { deleted: boolean; value?: unknown }>();
+-  let stateCleared = false;
+-  const tags = tagRuntime
+-    ? createTagRuntimeProxy(tagRuntime, createTagRuntimeContext(environment, () => contextRef.current))
+-    : undefined;
+-
+-  const ctx: MockScriptContext = Object.freeze({
+-    projectId: event.projectId,
+-    handlerId: event.handlerId,
+-    sourceNodeId: event.sourceNodeId,
+-    eventName: event.eventName,
+-    payload: Object.freeze({ ...(event.payload ?? {}) }),
+-    get inputs() {
+-      return getInputs?.();
+-    },
+-    state: Object.freeze({
+-      get<T>(key: string, fallback?: T) {
+-        const local = stateWrites.get(key);
+-        if (local) return local.deleted ? fallback : local.value;
+-        if (stateCleared) return fallback;
+-        return getMockSessionValue(event.projectId, key, fallback);
+-      },
+-      set(key: string, value: unknown) {
+-        stateWrites.set(key, { deleted: false, value });
+-        environment.collector.setShadow(shadowKey.state(event.projectId, key), value);
+-        environment.collector.push({
+-          id: createIntentId(),
+-          type: "state-set",
+-          source: environment.source,
+-          key,
+-          value,
+-        });
+-      },
+-      delete(key: string) {
+-        stateWrites.set(key, { deleted: true });
+-        environment.collector.deleteShadow(shadowKey.state(event.projectId, key));
+-        environment.collector.push({
+-          id: createIntentId(),
+-          type: "state-delete",
+-          source: environment.source,
+-          key,
+-        });
+-      },
+-      clear() {
+-        stateCleared = true;
+-        stateWrites.clear();
+-        environment.collector.clearShadow(`state:${event.projectId}:`);
+-        environment.collector.push({
+-          id: createIntentId(),
+-          type: "state-clear",
+-          source: environment.source,
+-        });
+-      },
+-    }),
+-    ui,
+-    nav,
+-    ...(tags ? { tags } : {}),
+-    navigateTo(path: string) {
+-      environment.collector.push({
+-        id: createIntentId(),
+-        type: "navigate",
+-        source: environment.source,
+-        path,
+-      });
+-    },
+-    emit(eventName: string, payload?: Record<string, unknown>) {
+-      environment.collector.push({
+-        id: createIntentId(),
+-        type: "emit-event",
+-        source: environment.source,
+-        event: {
+-          kind: "event",
+-          ownerId: event.sourceNodeId,
+-          eventName,
+-        },
+-        ...(payload ? { payload } : {}),
+-      });
+-    },
+-    random: Object.freeze({
+-      color: randomColor,
+-      number(min = 0, max = 1) {
+-        const low = Math.min(min, max);
+-        const high = Math.max(min, max);
+-        return low + Math.random() * (high - low);
+-      },
+-    }),
+-    log(...args: unknown[]) {
+-      console.log(`[script:${event.handlerId}]`, ...args);
+-    },
+-  });
+-  contextRef.current = ctx;
+-
+-  return ctx;
+-}
+-
+-function createInputsApi(
+-  definition: UiComponentDefinition,
+-  self: UiComponentScriptApi
+-): MockScriptInputsApi {
+-  const inputNames = new Set(Object.keys(definition.inputs ?? {}));
+-  return new Proxy({} as MockScriptInputsApi, {
+-    get(_target, property) {
+-      return typeof property === "string" && inputNames.has(property)
+-        ? self[property]
+-        : undefined;
+-    },
+-    set(_target, property, value) {
+-      if (typeof property !== "string" || !inputNames.has(property)) return false;
+-      self[property] = value;
+-      return true;
+-    },
+-    ownKeys() {
+-      return [...inputNames];
+-    },
+-    getOwnPropertyDescriptor() {
+-      return { enumerable: true, configurable: true };
+-    },
+-  });
+-}
+-
+-function createNavigationApi(
+-  host: MockScriptHost,
+-  environment: MockScriptExecutionEnvironment
+-): MockScriptNavigationApi {
+-  const roots = host.getNavigationTree();
+-  const rootByName = new Map(roots.map((node) => [node.name, node]));
+-  const cache = new Map<string, MockScriptNavigationNodeApi>();
+-
+-  function createNodeApi(node: NavigationTreeNode): MockScriptNavigationNodeApi {
+-    const cached = cache.get(node.pageId);
+-    if (cached) return cached;
+-
+-    const childByName = new Map(node.children.map((child) => [child.name, child]));
+-    const target = {
+-      path: node.path,
+-      pageId: node.pageId,
+-      go() {
+-        environment.collector.push({
+-          id: createIntentId(),
+-          type: "navigate",
+-          source: environment.source,
+-          path: node.path,
+-        });
+-      },
+-    } as MockScriptNavigationNodeApi;
+-
+-    const proxy = new Proxy(target, {
+-      get(apiTarget, property, receiver) {
+-        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+-          return Reflect.get(apiTarget, property, receiver);
+-        }
+-        const child = childByName.get(property);
+-        return child ? createNodeApi(child) : undefined;
+-      },
+-    });
+-
+-    cache.set(node.pageId, proxy);
+-    return proxy;
+-  }
+-
+-  return new Proxy({} as MockScriptNavigationApi, {
+-    get(_target, property) {
+-      if (typeof property !== "string") return undefined;
+-      const node = rootByName.get(property);
+-      return node ? createNodeApi(node) : undefined;
+-    },
+-  });
+-}
+-
+-/** Public scene facade. Reusable components expose public inputs/methods only. */
+-function createUiApi(
+-  host: MockScriptHost,
+-  projectId: string,
+-  getContext: () => MockScriptContext,
+-  environment: MockScriptExecutionEnvironment
+-): MockScriptUiApi {
+-  // Names are only API aliases. Stable node ids are the actual identity, so
+-  // Button1 on a page and Button1 inside a component never share a cache slot.
+-  const componentCache = new Map<string, UiComponentScriptApi>();
+-
+-  const baseApi = {
+-    get(name: string) {
+-      return resolveComponent(name);
+-    },
+-  };
+-
+-  function resolveComponent(name: string): UiComponentScriptApi {
+-    const node = host.resolveUiNode(name);
+-    if (!node) throw new Error(`Unknown UI component on current scene: ${name}`);
+-
+-    const cached = componentCache.get(node.id);
+-    if (cached) return cached;
+-
+-    const api = createComponentApi(
+-      node,
+-      host,
+-      projectId,
+-      getContext,
+-      environment
+-    );
+-    componentCache.set(node.id, api);
+-    return api;
+-  }
+-
+-  return new Proxy(baseApi as MockScriptUiApi, {
+-    get(target, property, receiver) {
+-      if (typeof property !== "string" || hasOwn(target, property)) {
+-        return Reflect.get(target, property, receiver);
+-      }
+-
+-      return resolveComponent(property);
+-    },
+-  });
+-}
+-
+-/**
+- * Private facade for a reusable component definition.
+- *
+- * It contains only nodes physically owned by this definition. Nested reusable
+- * components are deliberately represented by their PUBLIC facade, so a parent
+- * component cannot pierce the private tree of a child component.
+- */
+-function createInternalUiApi(
+-  definition: UiComponentDefinition,
+-  runtimeInstanceId: string,
+-  host: MockScriptHost,
+-  projectId: string,
+-  getContext: () => MockScriptContext,
+-  environment: MockScriptExecutionEnvironment
+-): MockScriptInternalApi {
+-  const nodesByName = new Map<string, UiNode>();
+-  const duplicateNames = new Set<string>();
+-  const cache = new Map<string, UiComponentScriptApi>();
+-
+-  for (const node of Object.values(definition.nodes)) {
+-    if (nodesByName.has(node.name)) duplicateNames.add(node.name);
+-    else nodesByName.set(node.name, node);
+-  }
+-
+-  function resolveInternal(name: string): UiComponentScriptApi {
+-    if (duplicateNames.has(name)) {
+-      throw new Error(
+-        `Ambiguous internal component name “${name}” in ${definition.name}. Rename internal nodes to unique API names.`
+-      );
+-    }
+-
+-    const node = nodesByName.get(name);
+-    if (!node) {
+-      throw new Error(
+-        `Unknown internal component: ${definition.name}.${name}`
+-      );
+-    }
+-
+-    const cached = cache.get(node.id);
+-    if (cached) return cached;
+-
+-    const runtimeNodeId = `${runtimeInstanceId}::${node.id}`;
+-    const api = createComponentApi(
+-      node,
+-      host,
+-      projectId,
+-      getContext,
+-      environment,
+-      { runtimeNodeId }
+-    );
+-    cache.set(node.id, api);
+-    return api;
+-  }
+-
+-  const baseApi = {
+-    get(name: string) {
+-      return resolveInternal(name);
+-    },
+-  } as MockScriptInternalApi;
+-
+-  return new Proxy(baseApi, {
+-    get(target, property, receiver) {
+-      if (typeof property !== "string" || hasOwn(target, property)) {
+-        return Reflect.get(target, property, receiver);
+-      }
+-      return resolveInternal(property);
+-    },
+-  });
+-}
+-
+-function createComponentApi(
+-  node: UiNode,
+-  host: MockScriptHost,
+-  projectId: string,
+-  getContext: () => MockScriptContext,
+-  environment: MockScriptExecutionEnvironment,
+-  options: CreateComponentApiOptions = {}
+-): UiComponentScriptApi {
+-  const runtimeNodeId = options.runtimeNodeId ?? node.id;
+-  const reusableDefinition = node.componentDefinitionId
+-    ? host.resolveComponentDefinition(node.componentDefinitionId)
+-    : undefined;
+-  const allowedProps = new Set(
+-    reusableDefinition
+-      ? Object.keys(reusableDefinition.inputs ?? {})
+-      : getComponentApiPropertyNames(node)
+-  );
+-  const publicMethods = reusableDefinition
+-    ? Object.entries(reusableDefinition.methods ?? {})
+-        .filter(([, method]) => method.visibility === "public")
+-        .map(([name]) => name)
+-    : getComponentApiMethodNames(node);
+-  const allMethods = reusableDefinition
+-    ? Object.keys(reusableDefinition.methods ?? {})
+-    : publicMethods;
+-  const allowedMethods = new Set(publicMethods);
+-  const allMethodNames = new Set(allMethods);
+-  const localProps = reusableDefinition
+-    ? {
+-        ...Object.fromEntries(
+-          Object.entries(reusableDefinition.inputs ?? {}).map(([name, input]) => [
+-            name,
+-            input.defaultValue,
+-          ])
+-        ),
+-        ...(node.props ?? {}),
+-        ...host.getNodeProps(runtimeNodeId),
+-      }
+-    : {
+-        ...getResolvedComponentProps(node),
+-        ...host.getNodeProps(runtimeNodeId),
+-      };
+-  const colorProperty = reusableDefinition
+-    ? Object.entries(reusableDefinition.inputs ?? {}).find(
+-        ([, input]) => input.type === "color"
+-      )?.[0]
+-    : getComponentColorProperty(node);
+-  const methodCache = new Map<string, (...args: unknown[]) => unknown>();
+-  const variantSource = reusableDefinition?.nodes[reusableDefinition.rootId] ?? node;
+-  const variantNames = getComponentVariantNames(variantSource);
+-  const variantRuntimeNodeId = reusableDefinition
+-    ? `${runtimeNodeId}::${variantSource.id}`
+-    : runtimeNodeId;
+-  const localWrites = new Map<string, unknown>();
+-  const storedVariant = host.getNodeVariant(variantRuntimeNodeId);
+-  let localVariant =
+-    storedVariant && variantSource.variants?.[storedVariant]
+-      ? storedVariant
+-      : variantSource.defaultVariant;
+-
+-  let internalApi: MockScriptInternalApi | undefined;
+-
+-  function setProp(property: string, value: unknown) {
+-    if (!allowedProps.has(property)) {
+-      throw new Error(
+-        `${node.name} (${reusableDefinition?.name ?? node.type}) has no public property “${property}”. Available: ${[
+-          ...allowedProps,
+-        ].join(", ")}`
+-      );
+-    }
+-
+-    localProps[property] = value;
+-    localWrites.set(property, value);
+-    environment.collector.setShadow(
+-      shadowKey.componentProperty(runtimeNodeId, property),
+-      value
+-    );
+-    environment.collector.push({
+-      id: createIntentId(),
+-      type: "set-property",
+-      source: environment.source,
+-      target: {
+-        kind: "component-property",
+-        componentId: runtimeNodeId,
+-        property,
+-        path: `${node.name}.${property}`,
+-      },
+-      value,
+-    });
+-  }
+-
+-  function getInternalApi() {
+-    if (!reusableDefinition) return undefined;
+-    internalApi ??= createInternalUiApi(
+-      reusableDefinition,
+-      runtimeNodeId,
+-      host,
+-      projectId,
+-      getContext,
+-      environment
+-    );
+-    return internalApi;
+-  }
+-
+-  function getMethod(methodName: string, allowPrivate: boolean) {
+-    if (!allowPrivate && !allowedMethods.has(methodName)) return undefined;
+-    if (allowPrivate && !allMethodNames.has(methodName)) return undefined;
+-
+-    const cacheKey = `${allowPrivate ? "all" : "public"}:${methodName}`;
+-    const cached = methodCache.get(cacheKey);
+-    if (cached) return cached;
+-
+-    const methodRef = reusableDefinition
+-      ? reusableDefinition.methods?.[methodName]
+-      : node.methods?.[methodName];
+-    if (!methodRef) return undefined;
+-
+-    const callable = (...args: unknown[]) => {
+-      environment.collector.push({
+-        id: createIntentId(),
+-        type: "call-method",
+-        source: environment.source,
+-        target: {
+-          kind: "method",
+-          ownerId: runtimeNodeId,
+-          method: methodName,
+-          path: node.name,
+-        },
+-        args,
+-        expanded: true,
+-      });
+-      const script = getMockScript(projectId, methodRef.scriptId);
+-      const baseContext = getContext();
+-      const executionContext = reusableDefinition
+-        ? Object.freeze({
+-            ...baseContext,
+-            inputs: createInputsApi(reusableDefinition, componentSelfProxy),
+-          })
+-        : baseContext;
+-      return executeSource({
+-        code: script.code,
+-        ctx: executionContext,
+-        self: reusableDefinition ? componentSelfProxy : publicProxy,
+-        internal: getInternalApi(),
+-        args,
+-        globals: createTagGlobals(host, executionContext, environment),
+-        sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
+-      });
+-    };
+-
+-    methodCache.set(cacheKey, callable);
+-    return callable;
+-  }
+-
+-  function setVariant(variantName: string) {
+-    if (!variantSource.variants?.[variantName]) {
+-      throw new Error(
+-        `${node.name} (${reusableDefinition?.name ?? node.type}) has no variant “${variantName}”.`
+-      );
+-    }
+-
+-    localVariant = variantName;
+-
+-    if (!reusableDefinition) {
+-      Object.assign(localProps, getComponentVariantProps(variantSource, variantName));
+-      for (const [property, value] of localWrites) localProps[property] = value;
+-    }
+-
+-    environment.collector.setShadow(
+-      shadowKey.componentVariant(variantRuntimeNodeId),
+-      variantName
+-    );
+-    environment.collector.push({
+-      id: createIntentId(),
+-      type: "set-variant",
+-      source: environment.source,
+-      target: {
+-        kind: "component-variant",
+-        componentId: variantRuntimeNodeId,
+-        path: `${node.name}.variant`,
+-      },
+-      variantName,
+-    });
+-  }
+-
+-  const variantApi =
+-    variantNames.length > 0
+-      ? createVariantApi({
+-          variantNames,
+-          getCurrent: () => localVariant,
+-          setVariant,
+-        })
+-      : undefined;
+-
+-  // Reusable components are strict facades: only explicitly declared inputs,
+-  // public methods and variants are visible externally. Primitive nodes keep
+-  // framework metadata/helpers for low-level component scripting.
+-  const target = reusableDefinition
+-    ? ({
+-        ...(variantApi ? { variant: variantApi } : {}),
+-      } as UiComponentScriptApi)
+-    : ({
+-        id: runtimeNodeId,
+-        name: node.name,
+-        type: node.type,
+-        ...(variantApi ? { variant: variantApi } : {}),
+-        setProp,
+-        setColor(color: string) {
+-          if (!colorProperty) {
+-            throw new Error(
+-              `${node.name} (${node.type}) has no color property.`
+-            );
+-          }
+-          setProp(colorProperty, color);
+-        },
+-      } as UiComponentScriptApi);
+-
+-  function makeProxy(includePrivateMethods: boolean) {
+-    return new Proxy(target, {
+-      get(apiTarget, property, receiver) {
+-        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+-          return Reflect.get(apiTarget, property, receiver);
+-        }
+-        if (allowedProps.has(property)) {
+-          const input = reusableDefinition?.inputs?.[property];
+-          const value = localProps[property];
+-          if (input?.type === "tagRef" && isTagRef(value)) {
+-            const tagRuntime = host.getTagRuntime();
+-            const tag = tagRuntime?.listTags().find((candidate) => candidate.id === value.tagId);
+-            if (!tagRuntime || !tag || tag.type.kind !== "udt" || tag.type.udtId !== input.udtId) {
+-              return undefined;
+-            }
+-            return createUdtInstanceApi(tag.name, tagRuntime, {
+-              ...createTagRuntimeContext(environment, getContext),
+-            });
+-          }
+-          return value;
+-        }
+-        return getMethod(property, includePrivateMethods);
+-      },
+-      set(_apiTarget, property, value) {
+-        if (typeof property !== "string") return false;
+-        setProp(property, value);
+-        return true;
+-      },
+-    }) as UiComponentScriptApi;
+-  }
+-
+-  const publicProxy = makeProxy(false);
+-  const componentSelfProxy = reusableDefinition ? makeProxy(true) : publicProxy;
+-  return options.includePrivateMethods ? componentSelfProxy : publicProxy;
+-}
+-
+-function createVariantApi({
+-  variantNames,
+-  getCurrent,
+-  setVariant,
+-}: {
+-  variantNames: string[];
+-  getCurrent: () => string | undefined;
+-  setVariant: (variantName: string) => void;
+-}): UiComponentVariantScriptApi {
+-  const methods = new Map<string, () => void>();
+-
+-  const target = {
+-    get current() {
+-      return getCurrent();
+-    },
+-  } as UiComponentVariantScriptApi;
+-
+-  return new Proxy(target, {
+-    get(apiTarget, property, receiver) {
+-      if (typeof property !== "string" || hasOwn(apiTarget, property)) {
+-        return Reflect.get(apiTarget, property, receiver);
+-      }
+-
+-      if (!variantNames.includes(property)) return undefined;
+-
+-      const cached = methods.get(property);
+-      if (cached) return cached;
+-
+-      const callable = () => {
+-        setVariant(property);
+-      };
+-
+-      methods.set(property, callable);
+-      return callable;
+-    },
+-  });
+-}
+-
+-function executeSource({
+-  code,
+-  ctx,
+-  self,
+-  internal,
+-  args,
+-  globals = {},
+-  sourceUrl,
+-}: {
+-  code: string;
+-  ctx: MockScriptContext;
+-  self: UiComponentScriptApi | undefined;
+-  internal?: MockScriptInternalApi | undefined;
+-  args: unknown[];
+-  globals?: Record<string, unknown> | undefined;
+-  sourceUrl: string;
+-}) {
+-  const reserved = new Set(["ctx", "self", "internal", "args"]);
+-  const globalEntries = Object.entries(globals).filter(
+-    ([name]) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !reserved.has(name)
+-  );
+-  const globalNames = globalEntries.map(([name]) => name);
+-  const globalValues = globalEntries.map(([, value]) => value);
+-
+-  if (internal) {
+-    const execute = new Function(
+-      "ctx",
+-      "self",
+-      "internal",
+-      "args",
+-      ...globalNames,
+-      `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
+-    ) as (...values: unknown[]) => unknown;
+-
+-    return execute(ctx, self, internal, args, ...globalValues);
+-  }
+-
+-  const execute = new Function(
+-    "ctx",
+-    "self",
+-    "args",
+-    ...globalNames,
+-    `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
+-  ) as (...values: unknown[]) => unknown;
+-
+-  return execute(ctx, self, args, ...globalValues);
+-}
+-
+-function createTagGlobals(
+-  host: MockScriptHost,
+-  ctx: MockScriptContext,
+-  environment: MockScriptExecutionEnvironment
+-) {
+-  const tagRuntime = host.getTagRuntime();
+-  return tagRuntime
+-    ? createTagRuntimeGlobals(
+-        tagRuntime,
+-        createTagRuntimeContext(environment, () => ctx)
+-      )
+-    : {};
+-}
+-
+-function createTagRuntimeContext(
+-  environment: MockScriptExecutionEnvironment,
+-  getContext: () => MockScriptContext | undefined
+-) {
+-  return {
+-    writeSource: { kind: "script" } as const,
+-    log: (...values: unknown[]) => getContext()?.log(...values),
+-    emit: (eventName: string, payload?: Record<string, unknown>) =>
+-      getContext()?.emit(eventName, payload),
+-    readValue: (path: string, fallback: () => unknown) =>
+-      environment.collector.readShadow(shadowKey.tag(path), fallback),
+-    writeValue: (path: string, tagId: string, value: unknown) => {
+-      environment.collector.setShadow(shadowKey.tag(path), value);
+-      environment.collector.push({
+-        id: createIntentId(),
+-        type: "set-value",
+-        source: environment.source,
+-        target: {
+-          kind: "tag",
+-          id: tagId,
+-          path,
+-        },
+-        value,
+-      });
+-    },
+-    callMethod: (path: string, tagId: string, methodName: string, args: unknown[]) => {
+-      environment.collector.push({
+-        id: createIntentId(),
+-        type: "call-method",
+-        source: environment.source,
+-        target: {
+-          kind: "method",
+-          ownerId: tagId,
+-          method: methodName,
+-          path,
+-        },
+-        args,
+-        expanded: true,
+-      });
+-    },
+-  };
+-}
+-
+-function createRuntimeEffects(
+-  event: MockScriptEvent,
+-  host: MockScriptHost
+-): RuntimeEffects {
+-  return {
+-    setValue(target, value) {
+-      const tagRuntime = host.getTagRuntime();
+-      if (!tagRuntime) {
+-        throw new Error(`Tag runtime is unavailable for ${target.path}.`);
+-      }
+-      const owner = tagRuntime.listTags().find((tag) => tag.id === target.id);
+-      if (!owner) {
+-        throw new Error(`Tag ${target.id} no longer exists (${target.path}).`);
+-      }
+-      const result = tagRuntime.write(target.path, value, { kind: "script" });
+-      if (!result.ok) throw new TypeError(result.error);
+-    },
+-    setProperty(target, value) {
+-      host.setNodeProp(target.componentId, target.property, value);
+-    },
+-    setVariant(target, variantName) {
+-      host.setNodeVariant(target.componentId, variantName);
+-    },
+-    emitEvent(intentEvent, payload) {
+-      host.emit(intentEvent.eventName, payload);
+-    },
+-    navigate(path) {
+-      host.navigateTo(path);
+-    },
+-    setState(key, value) {
+-      setMockSessionValue(event.projectId, key, value);
+-    },
+-    deleteState(key) {
+-      deleteMockSessionValue(event.projectId, key);
+-    },
+-    clearState() {
+-      clearMockSessionState(event.projectId);
+-    },
+-    callMethod(target) {
+-      throw new Error(
+-        `Deferred runtime method execution is not registered: ${target.path ?? target.ownerId}.${target.method}`
+-      );
+-    },
+-  };
+-}
+-
+-function validateRuntimeIntent(intent: Intent, host: MockScriptHost): void {
+-  if (intent.type !== "set-value") return;
+-
+-  const tagRuntime = host.getTagRuntime();
+-  if (!tagRuntime) {
+-    throw new TypeError(`Tag runtime is unavailable for ${intent.target.path}.`);
+-  }
+-
+-  const resolved = tagRuntime.store.resolve(intent.target.path);
+-  if (!resolved) {
+-    throw new TypeError(`Unknown tag path: ${intent.target.path}`);
+-  }
+-  if (resolved.tag.id !== intent.target.id) {
+-    throw new TypeError(
+-      `Tag reference changed before execution: ${intent.target.path}.`
+-    );
+-  }
+-  if (resolved.type.kind === "udt") {
+-    throw new TypeError(`Cannot assign an entire UDT value: ${intent.target.path}`);
+-  }
+-  if (!TypeRegistry.validate(resolved.type, intent.value)) {
+-    throw new TypeError(
+-      `Invalid ${TypeRegistry.getDisplayName(resolved.type)} value for ${intent.target.path}.`
+-    );
+-  }
+-}
+-
+-function hasOwn(target: object, property: string) {
+-  return Object.prototype.hasOwnProperty.call(target, property);
+-}
+-
+-function randomColor() {
+-  const value = Math.floor(Math.random() * 0x1000000);
+-  return `#${value.toString(16).padStart(6, "0")}`;
+-}
+diff --git a/src/mock/script-runtime/component-api.ts b/src/mock/script-runtime/component-api.ts
+new file mode 100644
+index 0000000..2d39154
+--- /dev/null
++++ b/src/mock/script-runtime/component-api.ts
+@@ -0,0 +1,461 @@
++import { createUdtInstanceApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
++import { isTagRef } from "../../uiframework/data/collections/TagRef";
++import type { UiComponentDefinition, UiNode } from "../../uiframework/core/document";
++import {
++  getComponentApiMethodNames,
++  getComponentApiPropertyNames,
++  getComponentColorProperty,
++  getResolvedComponentProps,
++} from "../../uiframework/component-api";
++import {
++  getComponentVariantNames,
++  getComponentVariantProps,
++} from "../../uiframework/component-variants";
++import { createIntentId, shadowKey } from "../../execution";
++import { getMockScript } from "../mock-script-store";
++import { executeJavaScriptSource } from "./javascript-executor";
++import { createTagGlobals, createTagRuntimeContext } from "./tag-api";
++import { hasOwn } from "./object-utils";
++import type {
++  CreateComponentApiOptions,
++  MockScriptContext,
++  MockScriptExecutionEnvironment,
++  MockScriptHost,
++  MockScriptInputsApi,
++  MockScriptInternalApi,
++  MockScriptUiApi,
++  UiComponentScriptApi,
++  UiComponentVariantScriptApi,
++} from "./types";
++
++export function createInputsApi(
++  definition: UiComponentDefinition,
++  self: UiComponentScriptApi
++): MockScriptInputsApi {
++  const inputNames = new Set(Object.keys(definition.inputs ?? {}));
++  return new Proxy({} as MockScriptInputsApi, {
++    get(_target, property) {
++      return typeof property === "string" && inputNames.has(property)
++        ? self[property]
++        : undefined;
++    },
++    set(_target, property, value) {
++      if (typeof property !== "string" || !inputNames.has(property)) return false;
++      self[property] = value;
++      return true;
++    },
++    ownKeys() {
++      return [...inputNames];
++    },
++    getOwnPropertyDescriptor() {
++      return { enumerable: true, configurable: true };
++    },
++  });
++}
++
++export function createUiApi(
++  host: MockScriptHost,
++  projectId: string,
++  getContext: () => MockScriptContext,
++  environment: MockScriptExecutionEnvironment
++): MockScriptUiApi {
++  // Names are only API aliases. Stable node ids are the actual identity, so
++  // Button1 on a page and Button1 inside a component never share a cache slot.
++  const componentCache = new Map<string, UiComponentScriptApi>();
++
++  const baseApi = {
++    get(name: string) {
++      return resolveComponent(name);
++    },
++  };
++
++  function resolveComponent(name: string): UiComponentScriptApi {
++    const node = host.resolveUiNode(name);
++    if (!node) throw new Error(`Unknown UI component on current scene: ${name}`);
++
++    const cached = componentCache.get(node.id);
++    if (cached) return cached;
++
++    const api = createComponentApi(
++      node,
++      host,
++      projectId,
++      getContext,
++      environment
++    );
++    componentCache.set(node.id, api);
++    return api;
++  }
++
++  return new Proxy(baseApi as MockScriptUiApi, {
++    get(target, property, receiver) {
++      if (typeof property !== "string" || hasOwn(target, property)) {
++        return Reflect.get(target, property, receiver);
++      }
++
++      return resolveComponent(property);
++    },
++  });
++}
++
++/**
++ * Private facade for a reusable component definition.
++ *
++ * It contains only nodes physically owned by this definition. Nested reusable
++ * components are deliberately represented by their PUBLIC facade, so a parent
++ * component cannot pierce the private tree of a child component.
++ */
++export function createInternalUiApi(
++  definition: UiComponentDefinition,
++  runtimeInstanceId: string,
++  host: MockScriptHost,
++  projectId: string,
++  getContext: () => MockScriptContext,
++  environment: MockScriptExecutionEnvironment
++): MockScriptInternalApi {
++  const nodesByName = new Map<string, UiNode>();
++  const duplicateNames = new Set<string>();
++  const cache = new Map<string, UiComponentScriptApi>();
++
++  for (const node of Object.values(definition.nodes)) {
++    if (nodesByName.has(node.name)) duplicateNames.add(node.name);
++    else nodesByName.set(node.name, node);
++  }
++
++  function resolveInternal(name: string): UiComponentScriptApi {
++    if (duplicateNames.has(name)) {
++      throw new Error(
++        `Ambiguous internal component name “${name}” in ${definition.name}. Rename internal nodes to unique API names.`
++      );
++    }
++
++    const node = nodesByName.get(name);
++    if (!node) {
++      throw new Error(
++        `Unknown internal component: ${definition.name}.${name}`
++      );
++    }
++
++    const cached = cache.get(node.id);
++    if (cached) return cached;
++
++    const runtimeNodeId = `${runtimeInstanceId}::${node.id}`;
++    const api = createComponentApi(
++      node,
++      host,
++      projectId,
++      getContext,
++      environment,
++      { runtimeNodeId }
++    );
++    cache.set(node.id, api);
++    return api;
++  }
++
++  const baseApi = {
++    get(name: string) {
++      return resolveInternal(name);
++    },
++  } as MockScriptInternalApi;
++
++  return new Proxy(baseApi, {
++    get(target, property, receiver) {
++      if (typeof property !== "string" || hasOwn(target, property)) {
++        return Reflect.get(target, property, receiver);
++      }
++      return resolveInternal(property);
++    },
++  });
++}
++
++export function createComponentApi(
++  node: UiNode,
++  host: MockScriptHost,
++  projectId: string,
++  getContext: () => MockScriptContext,
++  environment: MockScriptExecutionEnvironment,
++  options: CreateComponentApiOptions = {}
++): UiComponentScriptApi {
++  const runtimeNodeId = options.runtimeNodeId ?? node.id;
++  const reusableDefinition = node.componentDefinitionId
++    ? host.resolveComponentDefinition(node.componentDefinitionId)
++    : undefined;
++  const allowedProps = new Set(
++    reusableDefinition
++      ? Object.keys(reusableDefinition.inputs ?? {})
++      : getComponentApiPropertyNames(node)
++  );
++  const publicMethods = reusableDefinition
++    ? Object.entries(reusableDefinition.methods ?? {})
++        .filter(([, method]) => method.visibility === "public")
++        .map(([name]) => name)
++    : getComponentApiMethodNames(node);
++  const allMethods = reusableDefinition
++    ? Object.keys(reusableDefinition.methods ?? {})
++    : publicMethods;
++  const allowedMethods = new Set(publicMethods);
++  const allMethodNames = new Set(allMethods);
++  const localProps = reusableDefinition
++    ? {
++        ...Object.fromEntries(
++          Object.entries(reusableDefinition.inputs ?? {}).map(([name, input]) => [
++            name,
++            input.defaultValue,
++          ])
++        ),
++        ...(node.props ?? {}),
++        ...host.getNodeProps(runtimeNodeId),
++      }
++    : {
++        ...getResolvedComponentProps(node),
++        ...host.getNodeProps(runtimeNodeId),
++      };
++  const colorProperty = reusableDefinition
++    ? Object.entries(reusableDefinition.inputs ?? {}).find(
++        ([, input]) => input.type === "color"
++      )?.[0]
++    : getComponentColorProperty(node);
++  const methodCache = new Map<string, (...args: unknown[]) => unknown>();
++  const variantSource = reusableDefinition?.nodes[reusableDefinition.rootId] ?? node;
++  const variantNames = getComponentVariantNames(variantSource);
++  const variantRuntimeNodeId = reusableDefinition
++    ? `${runtimeNodeId}::${variantSource.id}`
++    : runtimeNodeId;
++  const localWrites = new Map<string, unknown>();
++  const storedVariant = host.getNodeVariant(variantRuntimeNodeId);
++  let localVariant =
++    storedVariant && variantSource.variants?.[storedVariant]
++      ? storedVariant
++      : variantSource.defaultVariant;
++
++  let internalApi: MockScriptInternalApi | undefined;
++
++  function setProp(property: string, value: unknown) {
++    if (!allowedProps.has(property)) {
++      throw new Error(
++        `${node.name} (${reusableDefinition?.name ?? node.type}) has no public property “${property}”. Available: ${[
++          ...allowedProps,
++        ].join(", ")}`
++      );
++    }
++
++    localProps[property] = value;
++    localWrites.set(property, value);
++    environment.collector.setShadow(
++      shadowKey.componentProperty(runtimeNodeId, property),
++      value
++    );
++    environment.collector.push({
++      id: createIntentId(),
++      type: "set-property",
++      source: environment.source,
++      target: {
++        kind: "component-property",
++        componentId: runtimeNodeId,
++        property,
++        path: `${node.name}.${property}`,
++      },
++      value,
++    });
++  }
++
++  function getInternalApi() {
++    if (!reusableDefinition) return undefined;
++    internalApi ??= createInternalUiApi(
++      reusableDefinition,
++      runtimeNodeId,
++      host,
++      projectId,
++      getContext,
++      environment
++    );
++    return internalApi;
++  }
++
++  function getMethod(methodName: string, allowPrivate: boolean) {
++    if (!allowPrivate && !allowedMethods.has(methodName)) return undefined;
++    if (allowPrivate && !allMethodNames.has(methodName)) return undefined;
++
++    const cacheKey = `${allowPrivate ? "all" : "public"}:${methodName}`;
++    const cached = methodCache.get(cacheKey);
++    if (cached) return cached;
++
++    const methodRef = reusableDefinition
++      ? reusableDefinition.methods?.[methodName]
++      : node.methods?.[methodName];
++    if (!methodRef) return undefined;
++
++    const callable = (...args: unknown[]) => {
++      environment.collector.push({
++        id: createIntentId(),
++        type: "call-method",
++        source: environment.source,
++        target: {
++          kind: "method",
++          ownerId: runtimeNodeId,
++          method: methodName,
++          path: node.name,
++        },
++        args,
++        expanded: true,
++      });
++      const script = getMockScript(projectId, methodRef.scriptId);
++      const baseContext = getContext();
++      const executionContext = reusableDefinition
++        ? Object.freeze({
++            ...baseContext,
++            inputs: createInputsApi(reusableDefinition, componentSelfProxy),
++          })
++        : baseContext;
++      return executeJavaScriptSource({
++        code: script.code,
++        ctx: executionContext,
++        self: reusableDefinition ? componentSelfProxy : publicProxy,
++        internal: getInternalApi(),
++        args,
++        globals: createTagGlobals(host, executionContext, environment),
++        sourceUrl: `scadatomic://${encodeURIComponent(projectId)}/methods/${encodeURIComponent(node.name)}.${encodeURIComponent(methodName)}.js`,
++      });
++    };
++
++    methodCache.set(cacheKey, callable);
++    return callable;
++  }
++
++  function setVariant(variantName: string) {
++    if (!variantSource.variants?.[variantName]) {
++      throw new Error(
++        `${node.name} (${reusableDefinition?.name ?? node.type}) has no variant “${variantName}”.`
++      );
++    }
++
++    localVariant = variantName;
++
++    if (!reusableDefinition) {
++      Object.assign(localProps, getComponentVariantProps(variantSource, variantName));
++      for (const [property, value] of localWrites) localProps[property] = value;
++    }
++
++    environment.collector.setShadow(
++      shadowKey.componentVariant(variantRuntimeNodeId),
++      variantName
++    );
++    environment.collector.push({
++      id: createIntentId(),
++      type: "set-variant",
++      source: environment.source,
++      target: {
++        kind: "component-variant",
++        componentId: variantRuntimeNodeId,
++        path: `${node.name}.variant`,
++      },
++      variantName,
++    });
++  }
++
++  const variantApi =
++    variantNames.length > 0
++      ? createVariantApi({
++          variantNames,
++          getCurrent: () => localVariant,
++          setVariant,
++        })
++      : undefined;
++
++  // Reusable components are strict facades: only explicitly declared inputs,
++  // public methods and variants are visible externally. Primitive nodes keep
++  // framework metadata/helpers for low-level component scripting.
++  const target = reusableDefinition
++    ? ({
++        ...(variantApi ? { variant: variantApi } : {}),
++      } as UiComponentScriptApi)
++    : ({
++        id: runtimeNodeId,
++        name: node.name,
++        type: node.type,
++        ...(variantApi ? { variant: variantApi } : {}),
++        setProp,
++        setColor(color: string) {
++          if (!colorProperty) {
++            throw new Error(
++              `${node.name} (${node.type}) has no color property.`
++            );
++          }
++          setProp(colorProperty, color);
++        },
++      } as UiComponentScriptApi);
++
++  function makeProxy(includePrivateMethods: boolean) {
++    return new Proxy(target, {
++      get(apiTarget, property, receiver) {
++        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
++          return Reflect.get(apiTarget, property, receiver);
++        }
++        if (allowedProps.has(property)) {
++          const input = reusableDefinition?.inputs?.[property];
++          const value = localProps[property];
++          if (input?.type === "tagRef" && isTagRef(value)) {
++            const tagRuntime = host.getTagRuntime();
++            const tag = tagRuntime?.listTags().find((candidate) => candidate.id === value.tagId);
++            if (!tagRuntime || !tag || tag.type.kind !== "udt" || tag.type.udtId !== input.udtId) {
++              return undefined;
++            }
++            return createUdtInstanceApi(tag.name, tagRuntime, {
++              ...createTagRuntimeContext(environment, getContext),
++            });
++          }
++          return value;
++        }
++        return getMethod(property, includePrivateMethods);
++      },
++      set(_apiTarget, property, value) {
++        if (typeof property !== "string") return false;
++        setProp(property, value);
++        return true;
++      },
++    }) as UiComponentScriptApi;
++  }
++
++  const publicProxy = makeProxy(false);
++  const componentSelfProxy = reusableDefinition ? makeProxy(true) : publicProxy;
++  return options.includePrivateMethods ? componentSelfProxy : publicProxy;
++}
++
++function createVariantApi({
++  variantNames,
++  getCurrent,
++  setVariant,
++}: {
++  variantNames: string[];
++  getCurrent: () => string | undefined;
++  setVariant: (variantName: string) => void;
++}): UiComponentVariantScriptApi {
++  const methods = new Map<string, () => void>();
++
++  const target = {
++    get current() {
++      return getCurrent();
++    },
++  } as UiComponentVariantScriptApi;
++
++  return new Proxy(target, {
++    get(apiTarget, property, receiver) {
++      if (typeof property !== "string" || hasOwn(apiTarget, property)) {
++        return Reflect.get(apiTarget, property, receiver);
++      }
++
++      if (!variantNames.includes(property)) return undefined;
++
++      const cached = methods.get(property);
++      if (cached) return cached;
++
++      const callable = () => {
++        setVariant(property);
++      };
++
++      methods.set(property, callable);
++      return callable;
++    },
++  });
++}
++
+diff --git a/src/mock/script-runtime/context-factory.ts b/src/mock/script-runtime/context-factory.ts
+new file mode 100644
+index 0000000..8d7cc7c
+--- /dev/null
++++ b/src/mock/script-runtime/context-factory.ts
+@@ -0,0 +1,123 @@
++import { createTagRuntimeProxy } from "../../uiframework/data/runtime/TagRuntimeProxy";
++import { createIntentId, shadowKey } from "../../execution";
++import { getMockSessionValue } from "../mock-session-state";
++import { createUiApi } from "./component-api";
++import { createNavigationApi } from "./navigation-api";
++import { createTagRuntimeContext } from "./tag-api";
++import type {
++  MockScriptContext,
++  MockScriptEvent,
++  MockScriptExecutionEnvironment,
++  MockScriptHost,
++  MockScriptInputsApi,
++} from "./types";
++
++export function createScriptContext(
++  event: MockScriptEvent,
++  host: MockScriptHost,
++  environment: MockScriptExecutionEnvironment,
++  getInputs?: () => MockScriptInputsApi | undefined
++): MockScriptContext {
++  const ui = createUiApi(host, event.projectId, () => ctx, environment);
++  const nav = createNavigationApi(host, environment);
++  const tagRuntime = host.getTagRuntime();
++  const contextRef: { current?: MockScriptContext } = {};
++  const stateWrites = new Map<string, { deleted: boolean; value?: unknown }>();
++  let stateCleared = false;
++  const tags = tagRuntime
++    ? createTagRuntimeProxy(tagRuntime, createTagRuntimeContext(environment, () => contextRef.current))
++    : undefined;
++
++  const ctx: MockScriptContext = Object.freeze({
++    projectId: event.projectId,
++    handlerId: event.handlerId,
++    sourceNodeId: event.sourceNodeId,
++    eventName: event.eventName,
++    payload: Object.freeze({ ...(event.payload ?? {}) }),
++    get inputs() {
++      return getInputs?.();
++    },
++    state: Object.freeze({
++      get<T>(key: string, fallback?: T) {
++        const local = stateWrites.get(key);
++        if (local) return local.deleted ? fallback : local.value;
++        if (stateCleared) return fallback;
++        return getMockSessionValue(event.projectId, key, fallback);
++      },
++      set(key: string, value: unknown) {
++        stateWrites.set(key, { deleted: false, value });
++        environment.collector.setShadow(shadowKey.state(event.projectId, key), value);
++        environment.collector.push({
++          id: createIntentId(),
++          type: "state-set",
++          source: environment.source,
++          key,
++          value,
++        });
++      },
++      delete(key: string) {
++        stateWrites.set(key, { deleted: true });
++        environment.collector.deleteShadow(shadowKey.state(event.projectId, key));
++        environment.collector.push({
++          id: createIntentId(),
++          type: "state-delete",
++          source: environment.source,
++          key,
++        });
++      },
++      clear() {
++        stateCleared = true;
++        stateWrites.clear();
++        environment.collector.clearShadow(`state:${event.projectId}:`);
++        environment.collector.push({
++          id: createIntentId(),
++          type: "state-clear",
++          source: environment.source,
++        });
++      },
++    }),
++    ui,
++    nav,
++    ...(tags ? { tags } : {}),
++    navigateTo(path: string) {
++      environment.collector.push({
++        id: createIntentId(),
++        type: "navigate",
++        source: environment.source,
++        path,
++      });
++    },
++    emit(eventName: string, payload?: Record<string, unknown>) {
++      environment.collector.push({
++        id: createIntentId(),
++        type: "emit-event",
++        source: environment.source,
++        event: {
++          kind: "event",
++          ownerId: event.sourceNodeId,
++          eventName,
++        },
++        ...(payload ? { payload } : {}),
++      });
++    },
++    random: Object.freeze({
++      color: randomColor,
++      number(min = 0, max = 1) {
++        const low = Math.min(min, max);
++        const high = Math.max(min, max);
++        return low + Math.random() * (high - low);
++      },
++    }),
++    log(...args: unknown[]) {
++      console.log(`[script:${event.handlerId}]`, ...args);
++    },
++  });
++  contextRef.current = ctx;
++
++  return ctx;
++}
++
++function randomColor() {
++  const value = Math.floor(Math.random() * 0x1000000);
++  return `#${value.toString(16).padStart(6, "0")}`;
++}
+diff --git a/src/mock/script-runtime/javascript-executor.ts b/src/mock/script-runtime/javascript-executor.ts
+new file mode 100644
+index 0000000..8a9bd1f
+--- /dev/null
++++ b/src/mock/script-runtime/javascript-executor.ts
+@@ -0,0 +1,52 @@
++import type {
++  MockScriptContext,
++  MockScriptInternalApi,
++  UiComponentScriptApi,
++} from "./types";
++
++/** Trusted prototype executor. Production must replace this with a sandbox. */
++export function executeJavaScriptSource({
++  code,
++  ctx,
++  self,
++  internal,
++  args,
++  globals = {},
++  sourceUrl,
++}: {
++  code: string;
++  ctx: MockScriptContext;
++  self: UiComponentScriptApi | undefined;
++  internal?: MockScriptInternalApi | undefined;
++  args: unknown[];
++  globals?: Record<string, unknown> | undefined;
++  sourceUrl: string;
++}) {
++  const reserved = new Set(["ctx", "self", "internal", "args"]);
++  const globalEntries = Object.entries(globals).filter(
++    ([name]) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !reserved.has(name)
++  );
++  const globalNames = globalEntries.map(([name]) => name);
++  const globalValues = globalEntries.map(([, value]) => value);
++
++  if (internal) {
++    const execute = new Function(
++      "ctx",
++      "self",
++      "internal",
++      "args",
++      ...globalNames,
++      `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
++    ) as (...values: unknown[]) => unknown;
++    return execute(ctx, self, internal, args, ...globalValues);
++  }
++
++  const execute = new Function(
++    "ctx",
++    "self",
++    "args",
++    ...globalNames,
++    `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
++  ) as (...values: unknown[]) => unknown;
++  return execute(ctx, self, args, ...globalValues);
++}
+diff --git a/src/mock/script-runtime/navigation-api.ts b/src/mock/script-runtime/navigation-api.ts
+new file mode 100644
+index 0000000..2657002
+--- /dev/null
++++ b/src/mock/script-runtime/navigation-api.ts
+@@ -0,0 +1,60 @@
++import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
++import { createIntentId } from "../../execution";
++import { hasOwn } from "./object-utils";
++import type {
++  MockScriptExecutionEnvironment,
++  MockScriptHost,
++  MockScriptNavigationApi,
++  MockScriptNavigationNodeApi,
++} from "./types";
++
++export function createNavigationApi(
++  host: MockScriptHost,
++  environment: MockScriptExecutionEnvironment
++): MockScriptNavigationApi {
++  const roots = host.getNavigationTree();
++  const rootByName = new Map(roots.map((node) => [node.name, node]));
++  const cache = new Map<string, MockScriptNavigationNodeApi>();
++
++  function createNodeApi(node: NavigationTreeNode): MockScriptNavigationNodeApi {
++    const cached = cache.get(node.pageId);
++    if (cached) return cached;
++
++    const childByName = new Map(node.children.map((child) => [child.name, child]));
++    const target = {
++      path: node.path,
++      pageId: node.pageId,
++      go() {
++        environment.collector.push({
++          id: createIntentId(),
++          type: "navigate",
++          source: environment.source,
++          path: node.path,
++        });
++      },
++    } as MockScriptNavigationNodeApi;
++
++    const proxy = new Proxy(target, {
++      get(apiTarget, property, receiver) {
++        if (typeof property !== "string" || hasOwn(apiTarget, property)) {
++          return Reflect.get(apiTarget, property, receiver);
++        }
++        const child = childByName.get(property);
++        return child ? createNodeApi(child) : undefined;
++      },
++    });
++
++    cache.set(node.pageId, proxy);
++    return proxy;
++  }
++
++  return new Proxy({} as MockScriptNavigationApi, {
++    get(_target, property) {
++      if (typeof property !== "string") return undefined;
++      const node = rootByName.get(property);
++      return node ? createNodeApi(node) : undefined;
++    },
++  });
++}
++
++/** Public scene facade. Reusable components expose public inputs/methods only. */
+diff --git a/src/mock/script-runtime/object-utils.ts b/src/mock/script-runtime/object-utils.ts
+new file mode 100644
+index 0000000..2636f8e
+--- /dev/null
++++ b/src/mock/script-runtime/object-utils.ts
+@@ -0,0 +1,3 @@
++export function hasOwn(target: object, property: string) {
++  return Object.prototype.hasOwnProperty.call(target, property);
++}
+diff --git a/src/mock/script-runtime/runtime-effects-adapter.ts b/src/mock/script-runtime/runtime-effects-adapter.ts
+new file mode 100644
+index 0000000..2c79bda
+--- /dev/null
++++ b/src/mock/script-runtime/runtime-effects-adapter.ts
+@@ -0,0 +1,70 @@
++import type { Intent, RuntimeEffects } from "../../execution";
++import { TypeRegistry } from "../../uiframework/data/types/TypeRegistry";
++import {
++  clearMockSessionState,
++  deleteMockSessionValue,
++  setMockSessionValue,
++} from "../mock-session-state";
++import type { MockScriptEvent, MockScriptHost } from "./types";
++
++/** Compatibility adapter: Executor is the only caller of these legacy effects. */
++export function createMockRuntimeEffects(
++  event: MockScriptEvent,
++  host: MockScriptHost
++): RuntimeEffects {
++  return {
++    setValue(target, value) {
++      const tagRuntime = host.getTagRuntime();
++      if (!tagRuntime) throw new Error(`Tag runtime is unavailable for ${target.path}.`);
++      const owner = tagRuntime.listTags().find((tag) => tag.id === target.id);
++      if (!owner) throw new Error(`Tag ${target.id} no longer exists (${target.path}).`);
++      const result = tagRuntime.write(target.path, value, { kind: "script" });
++      if (!result.ok) throw new TypeError(result.error);
++    },
++    setProperty(target, value) {
++      host.setNodeProp(target.componentId, target.property, value);
++    },
++    setVariant(target, variantName) {
++      host.setNodeVariant(target.componentId, variantName);
++    },
++    emitEvent(intentEvent, payload) {
++      host.emit(intentEvent.eventName, payload);
++    },
++    navigate(path) {
++      host.navigateTo(path);
++    },
++    setState(key, value) {
++      setMockSessionValue(event.projectId, key, value);
++    },
++    deleteState(key) {
++      deleteMockSessionValue(event.projectId, key);
++    },
++    clearState() {
++      clearMockSessionState(event.projectId);
++    },
++    callMethod(target) {
++      throw new Error(
++        `Deferred runtime method execution is not registered: ${target.path ?? target.ownerId}.${target.method}`
++      );
++    },
++  };
++}
++
++export function validateMockRuntimeIntent(intent: Intent, host: MockScriptHost): void {
++  if (intent.type !== "set-value") return;
++  const tagRuntime = host.getTagRuntime();
++  if (!tagRuntime) throw new TypeError(`Tag runtime is unavailable for ${intent.target.path}.`);
++  const resolved = tagRuntime.store.resolve(intent.target.path);
++  if (!resolved) throw new TypeError(`Unknown tag path: ${intent.target.path}`);
++  if (resolved.tag.id !== intent.target.id) {
++    throw new TypeError(`Tag reference changed before execution: ${intent.target.path}.`);
++  }
++  if (resolved.type.kind === "udt") {
++    throw new TypeError(`Cannot assign an entire UDT value: ${intent.target.path}`);
++  }
++  if (!TypeRegistry.validate(resolved.type, intent.value)) {
++    throw new TypeError(
++      `Invalid ${TypeRegistry.getDisplayName(resolved.type)} value for ${intent.target.path}.`
++    );
++  }
++}
+diff --git a/src/mock/script-runtime/tag-api.ts b/src/mock/script-runtime/tag-api.ts
+new file mode 100644
+index 0000000..13cfe5a
+--- /dev/null
++++ b/src/mock/script-runtime/tag-api.ts
+@@ -0,0 +1,65 @@
++import { createTagRuntimeGlobals } from "../../uiframework/data/runtime/TagRuntimeProxy";
++import { createIntentId, shadowKey } from "../../execution";
++import type {
++  MockScriptContext,
++  MockScriptExecutionEnvironment,
++  MockScriptHost,
++} from "./types";
++
++export function createTagGlobals(
++  host: MockScriptHost,
++  ctx: MockScriptContext,
++  environment: MockScriptExecutionEnvironment
++) {
++  const tagRuntime = host.getTagRuntime();
++  return tagRuntime
++    ? createTagRuntimeGlobals(
++        tagRuntime,
++        createTagRuntimeContext(environment, () => ctx)
++      )
++    : {};
++}
++
++export function createTagRuntimeContext(
++  environment: MockScriptExecutionEnvironment,
++  getContext: () => MockScriptContext | undefined
++) {
++  return {
++    writeSource: { kind: "script" } as const,
++    log: (...values: unknown[]) => getContext()?.log(...values),
++    emit: (eventName: string, payload?: Record<string, unknown>) =>
++      getContext()?.emit(eventName, payload),
++    readValue: (path: string, fallback: () => unknown) =>
++      environment.collector.readShadow(shadowKey.tag(path), fallback),
++    writeValue: (path: string, tagId: string, value: unknown) => {
++      environment.collector.setShadow(shadowKey.tag(path), value);
++      environment.collector.push({
++        id: createIntentId(),
++        type: "set-value",
++        source: environment.source,
++        target: {
++          kind: "tag",
++          id: tagId,
++          path,
++        },
++        value,
++      });
++    },
++    callMethod: (path: string, tagId: string, methodName: string, args: unknown[]) => {
++      environment.collector.push({
++        id: createIntentId(),
++        type: "call-method",
++        source: environment.source,
++        target: {
++          kind: "method",
++          ownerId: tagId,
++          method: methodName,
++          path,
++        },
++        args,
++        expanded: true,
++      });
++    },
++  };
++}
++
+diff --git a/src/mock/script-runtime/types.ts b/src/mock/script-runtime/types.ts
+new file mode 100644
+index 0000000..031e8ae
+--- /dev/null
++++ b/src/mock/script-runtime/types.ts
+@@ -0,0 +1,112 @@
++import type { TagRuntime } from "../../uiframework/data/runtime/TagRuntime";
++import type { TagRuntimeApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
++import type { UiComponentDefinition, UiNode } from "../../uiframework/core/document";
++import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
++import type { IntentCollector, IntentSource } from "../../execution";
++
++export type MockScriptEvent = {
++  projectId: string;
++  pageId?: string | undefined;
++  handlerId: string;
++  sourceNodeId: string;
++  eventName: string;
++  payload?: Record<string, unknown> | undefined;
++};
++
++/** A concrete reusable-component instance with a scoped runtime node. */
++export type MockRuntimeComponentScope = {
++  instance: UiNode;
++  definition: UiComponentDefinition;
++  runtimeInstanceId: string;
++};
++
++export type MockScriptHost = {
++  setNodeProp(nodeId: string, property: string, value: unknown): void;
++  getNodeProps(nodeId: string): Record<string, unknown>;
++  setNodeVariant(nodeId: string, variantName: string): void;
++  getNodeVariant(nodeId: string): string | undefined;
++  resolveUiNode(name: string): UiNode | undefined;
++  resolveComponentDefinition(
++    componentDefinitionId: string
++  ): UiComponentDefinition | undefined;
++  resolveComponentScopeForRuntimeNode(
++    runtimeNodeId: string
++  ): MockRuntimeComponentScope | undefined;
++  getTagRuntime(): TagRuntime | undefined;
++  getNavigationTree(): NavigationTreeNode[];
++  navigateTo(path: string): void;
++  emit(eventName: string, payload?: Record<string, unknown>): void;
++};
++
++export type UiComponentVariantScriptApi = {
++  readonly current: string | undefined;
++  [key: string]: unknown;
++};
++
++export type UiComponentScriptApi = {
++  readonly id?: string;
++  readonly name?: string;
++  readonly type?: string;
++  readonly variant?: UiComponentVariantScriptApi;
++  setProp?(property: string, value: unknown): void;
++  setColor?(color: string): void;
++  [key: string]: unknown;
++};
++
++export type MockScriptUiApi = {
++  get(name: string): UiComponentScriptApi;
++  [key: string]: unknown;
++};
++
++export type MockScriptInternalApi = {
++  get(name: string): UiComponentScriptApi;
++  [key: string]: unknown;
++};
++
++export type MockScriptNavigationNodeApi = {
++  readonly path: string;
++  readonly pageId: string;
++  go(): void;
++  [key: string]: unknown;
++};
++
++export type MockScriptNavigationApi = {
++  [key: string]: MockScriptNavigationNodeApi | unknown;
++};
++
++export type MockScriptInputsApi = Record<string, unknown>;
++
++export type MockScriptContext = {
++  projectId: string;
++  handlerId: string;
++  sourceNodeId: string;
++  eventName: string;
++  payload: Record<string, unknown>;
++  state: {
++    get<T>(key: string, fallback?: T): unknown | T;
++    set(key: string, value: unknown): void;
++    delete(key: string): void;
++    clear(): void;
++  };
++  ui: MockScriptUiApi;
++  nav: MockScriptNavigationApi;
++  inputs?: MockScriptInputsApi | undefined;
++  tags?: TagRuntimeApi | undefined;
++  navigateTo(path: string): void;
++  emit(eventName: string, payload?: Record<string, unknown>): void;
++  random: {
++    color(): string;
++    number(min?: number, max?: number): number;
++  };
++  log(...args: unknown[]): void;
++};
++
++export type MockScriptExecutionEnvironment = {
++  collector: IntentCollector;
++  source: IntentSource;
++};
++
++export type CreateComponentApiOptions = {
++  runtimeNodeId?: string;
++  includePrivateMethods?: boolean;
++};
+diff --git a/src/uiframework/editing/node-tree-editor.ts b/src/uiframework/editing/node-tree-editor.ts
+new file mode 100644
+index 0000000..424bb33
+--- /dev/null
++++ b/src/uiframework/editing/node-tree-editor.ts
+@@ -0,0 +1,193 @@
++import { applyDocumentCommand } from "../core/commands";
++import type { NodeId, UiDocument, UiNode } from "../core/document";
++import { buildDocumentIndex } from "../core/document-index";
++import { duplicateNodeSubtree } from "../core/duplicate-node";
++import { createUniqueNodeName } from "../core/node-name";
++import { wouldCreateComponentCycle } from "../component-repository";
++import { getComponentDefinition } from "../registry/component-definitions";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
++
++export type NodeInsertDraft = {
++  type: UiNode["type"];
++  props?: Record<string, unknown>;
++  componentDefinitionId?: string | undefined;
++};
++
++export type NodeTreeEditingContext = {
++  /** The document that physically contains the tree being edited. */
++  treeDocument: UiDocument;
++  rootId: NodeId;
++  /** Full project document, used to resolve reusable-component names/cycles. */
++  projectDocument?: UiDocument | undefined;
++  /** Set when editing a reusable-component definition. */
++  ownerComponentId?: string | undefined;
++};
++
++export type NodeInsertResult = {
++  document: UiDocument;
++  insertedNodeId: NodeId | null;
++};
++
++export type NodeDuplicateResult = {
++  document: UiDocument;
++  duplicatedNodeId: NodeId | null;
++};
++
++function projectDocumentOf(context: NodeTreeEditingContext) {
++  return context.projectDocument ?? context.treeDocument;
++}
++
++export function canInsertIntoTree(
++  context: NodeTreeEditingContext,
++  parentId: NodeId,
++  draft?: Pick<NodeInsertDraft, "componentDefinitionId">
++): boolean {
++  const parent = context.treeDocument.nodes[parentId];
++  const parentDefinition = parent ? getComponentDefinition(parent.type) : undefined;
++  if (!parent || !parentDefinition?.acceptsChildren || !canAcceptManualChildren(parent)) {
++    return false;
++  }
++
++  if (
++    context.ownerComponentId &&
++    draft?.componentDefinitionId &&
++    wouldCreateComponentCycle(
++      projectDocumentOf(context),
++      context.ownerComponentId,
++      draft.componentDefinitionId
++    )
++  ) {
++    return false;
++  }
++
++  return true;
++}
++
++export function insertNodeIntoTree(
++  context: NodeTreeEditingContext,
++  parentId: NodeId,
++  insertIndex: number,
++  draft: NodeInsertDraft
++): NodeInsertResult {
++  if (!canInsertIntoTree(context, parentId, draft)) {
++    return { document: context.treeDocument, insertedNodeId: null };
++  }
++
++  const projectDocument = projectDocumentOf(context);
++  const registeredDefinition = getComponentDefinition(draft.type);
++  const id = crypto.randomUUID();
++  const reusableName = draft.componentDefinitionId
++    ? projectDocument.components?.[draft.componentDefinitionId]?.name
++    : undefined;
++  const name = createUniqueNodeName(
++    context.treeDocument,
++    reusableName ?? draft.type,
++    context.rootId
++  );
++  const node: UiNode = {
++    id,
++    name,
++    type: draft.type,
++    componentDefinitionId: draft.componentDefinitionId,
++    props: { ...(draft.props ?? {}) },
++    children: registeredDefinition?.acceptsChildren ? [] : undefined,
++  };
++
++  const document = applyDocumentCommand(
++    context.treeDocument,
++    { type: "node.insert", parentId, insertIndex, node },
++    context.rootId
++  );
++
++  return {
++    document,
++    insertedNodeId: document.nodes[id] ? id : null,
++  };
++}
++
++export function deleteNodeFromTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId
++): UiDocument {
++  if (nodeId === context.rootId || !context.treeDocument.nodes[nodeId]) {
++    return context.treeDocument;
++  }
++  return applyDocumentCommand(
++    context.treeDocument,
++    { type: "node.delete", nodeId },
++    context.rootId
++  );
++}
++
++export function canDuplicateNodeInTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId
++): boolean {
++  if (nodeId === context.rootId || !context.treeDocument.nodes[nodeId]) return false;
++  const index = buildDocumentIndex(context.treeDocument, context.rootId);
++  const parentId = index.parentById.get(nodeId);
++  if (!parentId) return false;
++  return canInsertIntoTree(context, parentId);
++}
++
++export function duplicateNodeInTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId
++): NodeDuplicateResult {
++  if (!canDuplicateNodeInTree(context, nodeId)) {
++    return { document: context.treeDocument, duplicatedNodeId: null };
++  }
++  return duplicateNodeSubtree(context.treeDocument, nodeId, context.rootId);
++}
++
++export function moveNodeInTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId,
++  targetParentId: NodeId,
++  targetIndex: number
++): UiDocument {
++  if (
++    nodeId === context.rootId ||
++    !context.treeDocument.nodes[nodeId] ||
++    !canInsertIntoTree(context, targetParentId)
++  ) {
++    return context.treeDocument;
++  }
++
++  return applyDocumentCommand(
++    context.treeDocument,
++    { type: "node.move", nodeId, targetParentId, targetIndex },
++    context.rootId
++  );
++}
++
++export function moveNodeByInTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId,
++  offset: -1 | 1
++): UiDocument {
++  if (nodeId === context.rootId || !context.treeDocument.nodes[nodeId]) {
++    return context.treeDocument;
++  }
++  return applyDocumentCommand(
++    context.treeDocument,
++    { type: "node.moveBy", nodeId, offset },
++    context.rootId
++  );
++}
++
++export function updateNodeInTree(
++  context: NodeTreeEditingContext,
++  nodeId: NodeId,
++  updater: (node: UiNode) => UiNode
++): UiDocument {
++  const node = context.treeDocument.nodes[nodeId];
++  if (!node) return context.treeDocument;
++  return {
++    ...context.treeDocument,
++    nodes: {
++      ...context.treeDocument.nodes,
++      [nodeId]: updater(node),
++    },
++  };
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 703db22..ac37d1d 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -20,25 +20,26 @@ import {
+   type UiNode,
+   type PageKind,
+ } from "./core/document";
+-import { getComponentDefinition } from "./registry/component-definitions";
+ import { setOptionalRecordEntry } from "./core/optional-record";
+-import {
+-  createProjectComponentRepository,
+-  wouldCreateComponentCycle,
+-} from "./component-repository";
++import { createProjectComponentRepository } from "./component-repository";
+ import {
+   createReusableComponentFromNode,
+   createReusableComponentFromSelection,
+   createComponentDefinitionDocument,
+ } from "./reusable-components";
+-import {
+-  createUniqueNodeName,
+-  validateNodeName,
+-} from "./core/node-name";
++import { validateNodeName } from "./core/node-name";
+ import { createPageDeletionPlan, withStartPage } from "./core/pages";
+-import { duplicateNodeSubtree } from "./core/duplicate-node";
+ import { buildDocumentIndex } from "./core/document-index";
+-import { canAcceptManualChildren } from "./repeat/RepeatBehavior";
++import {
++  deleteNodeFromTree,
++  duplicateNodeInTree,
++  insertNodeIntoTree,
++  moveNodeByInTree,
++  moveNodeInTree,
++  updateNodeInTree,
++  type NodeInsertDraft,
++  type NodeTreeEditingContext,
++} from "./editing/node-tree-editor";
+ import type { ProjectData } from "./data/tags/TagDefinition";
+ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+ import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
+@@ -50,11 +51,7 @@ export type DragPreview = {
+   label?: string | undefined;
+ };
+ 
+-export type NewNode = {
+-  type: UiNode["type"];
+-  props?: Record<string, unknown>;
+-  componentDefinitionId?: string | undefined;
+-};
++export type NewNode = NodeInsertDraft;
+ 
+ export type RenameNodeResult =
+   | { ok: true }
+@@ -199,6 +196,37 @@ function applyActiveCommand(state: EditorState, command: DocumentCommand) {
+   return applyDocumentCommand(state.document, command, getActiveRootId(state));
+ }
+ 
++function createActiveTreeContext(state: EditorState): NodeTreeEditingContext {
++  return { treeDocument: state.document, rootId: getActiveRootId(state) };
++}
++
++function createComponentTreeContext(
++  state: EditorState,
++  componentId: string
++): NodeTreeEditingContext | null {
++  const definition = state.document.components?.[componentId];
++  if (!definition) return null;
++  return {
++    treeDocument: createComponentDefinitionDocument(state.document, definition),
++    projectDocument: state.document,
++    rootId: definition.rootId,
++    ownerComponentId: componentId,
++  };
++}
++
++function persistComponentTree(
++  state: EditorState,
++  componentId: string,
++  treeDocument: UiDocument
++): UiDocument {
++  const definition = state.document.components?.[componentId];
++  if (!definition) return state.document;
++  return createProjectComponentRepository(state.document).upsert({
++    ...definition,
++    nodes: treeDocument.nodes,
++  });
++}
++
+ function createUniquePageName(
+   document: UiDocument,
+   parentPageId?: PageId,
+@@ -573,19 +601,9 @@ export const useEditorStore = create<EditorState>((set) => ({
+   },
+ 
+   updateNode: (id, updater) => {
+-    set((state) => {
+-      const current = state.document.nodes[id];
+-      if (!current) {
+-        return state;
+-      }
+-
+-      return {
+-        document: applyActiveCommand(state, {
+-          type: "node.replace",
+-          node: updater(current),
+-        }),
+-      };
+-    });
++    set((state) => ({
++      document: updateNodeInTree(createActiveTreeContext(state), id, updater),
++    }));
+   },
+ 
+   setBinding: (nodeId, property, binding) => {
+@@ -690,22 +708,11 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   updateComponentDefinitionNode: (componentId, nodeId, updater) => {
+     set((state) => {
+-      const current = state.document.components?.[componentId];
+-      const node = current?.nodes[nodeId];
+-      if (!current || !node) return state;
+-
+-      const nextDefinition = {
+-        ...current,
+-        nodes: {
+-          ...current.nodes,
+-          [nodeId]: updater(node),
+-        },
+-      };
+-
++      const context = createComponentTreeContext(state, componentId);
++      if (!context) return state;
++      const treeDocument = updateNodeInTree(context, nodeId, updater);
+       return {
+-        document: createProjectComponentRepository(state.document).upsert(
+-          nextDefinition
+-        ),
++        document: persistComponentTree(state, componentId, treeDocument),
+       };
+     });
+   },
+@@ -730,139 +737,44 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   insertComponentDefinitionNode: (componentId, parentId, insertIndex, node) => {
+     let insertedId: NodeId | null = null;
+-
+     set((state) => {
+-      const definition = state.document.components?.[componentId];
+-      const parent = definition?.nodes[parentId];
+-      if (!definition || !parent) return state;
+-
+-      const parentDefinition = getComponentDefinition(parent.type);
+-      if (!parentDefinition?.acceptsChildren || !canAcceptManualChildren(parent)) {
+-        return state;
+-      }
+-
+-      if (
+-        node.componentDefinitionId &&
+-        wouldCreateComponentCycle(
+-          state.document,
+-          componentId,
+-          node.componentDefinitionId
+-        )
+-      ) {
+-        console.warn("Ignoring component insertion that would create a recursive component graph.");
+-        return state;
+-      }
+-
+-      const syntheticDocument = createComponentDefinitionDocument(
+-        state.document,
+-        definition
+-      );
+-      const registeredDefinition = getComponentDefinition(node.type);
+-      const id = crypto.randomUUID();
+-      const reusableName = node.componentDefinitionId
+-        ? state.document.components?.[node.componentDefinitionId]?.name
+-        : undefined;
+-      const name = createUniqueNodeName(
+-        syntheticDocument,
+-        reusableName ?? node.type,
+-        definition.rootId
+-      );
+-      const newNode: UiNode = {
+-        id,
+-        name,
+-        type: node.type,
+-        componentDefinitionId: node.componentDefinitionId,
+-        props: { ...(node.props ?? {}) },
+-        children: registeredDefinition?.acceptsChildren ? [] : undefined,
+-      };
+-      const updatedSynthetic = applyDocumentCommand(
+-        syntheticDocument,
+-        {
+-          type: "node.insert",
+-          parentId,
+-          insertIndex,
+-          node: newNode,
+-        },
+-        definition.rootId
+-      );
+-
+-      if (!updatedSynthetic.nodes[id]) return state;
+-      insertedId = id;
+-
++      const context = createComponentTreeContext(state, componentId);
++      if (!context) return state;
++      const result = insertNodeIntoTree(context, parentId, insertIndex, node);
++      if (!result.insertedNodeId) return state;
++      insertedId = result.insertedNodeId;
+       return {
+-        document: createProjectComponentRepository(state.document).upsert({
+-          ...definition,
+-          nodes: updatedSynthetic.nodes,
+-        }),
++        document: persistComponentTree(state, componentId, result.document),
+         dragPreview: null,
+         draggedNodeId: null,
+         nodeDragCandidate: null,
+       };
+     });
+-
+     return insertedId;
+   },
+ 
+   deleteComponentDefinitionNode: (componentId, nodeId) => {
+     set((state) => {
+-      const definition = state.document.components?.[componentId];
+-      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
+-        return state;
+-      }
+-
+-      const syntheticDocument = createComponentDefinitionDocument(
+-        state.document,
+-        definition
+-      );
+-      const updatedSynthetic = applyDocumentCommand(
+-        syntheticDocument,
+-        { type: "node.delete", nodeId },
+-        definition.rootId
+-      );
+-
+-      if (updatedSynthetic.nodes === syntheticDocument.nodes) return state;
+-
+-      return {
+-        document: createProjectComponentRepository(state.document).upsert({
+-          ...definition,
+-          nodes: updatedSynthetic.nodes,
+-        }),
+-      };
++      const context = createComponentTreeContext(state, componentId);
++      if (!context) return state;
++      const treeDocument = deleteNodeFromTree(context, nodeId);
++      if (treeDocument === context.treeDocument) return state;
++      return { document: persistComponentTree(state, componentId, treeDocument) };
+     });
+   },
+ 
+   duplicateComponentDefinitionNode: (componentId, nodeId) => {
+     let duplicatedNodeId: NodeId | null = null;
+-
+     set((state) => {
+-      const definition = state.document.components?.[componentId];
+-      if (!definition || nodeId === definition.rootId || !definition.nodes[nodeId]) {
+-        return state;
+-      }
+-
+-      const syntheticDocument = createComponentDefinitionDocument(
+-        state.document,
+-        definition
+-      );
+-      if (!canDuplicateIntoCurrentParent(syntheticDocument, definition.rootId, nodeId)) {
+-        return state;
+-      }
+-      const result = duplicateNodeSubtree(
+-        syntheticDocument,
+-        nodeId,
+-        definition.rootId
+-      );
++      const context = createComponentTreeContext(state, componentId);
++      if (!context) return state;
++      const result = duplicateNodeInTree(context, nodeId);
+       if (!result.duplicatedNodeId) return state;
+-
+       duplicatedNodeId = result.duplicatedNodeId;
+       return {
+-        document: createProjectComponentRepository(state.document).upsert({
+-          ...definition,
+-          nodes: result.document.nodes,
+-        }),
++        document: persistComponentTree(state, componentId, result.document),
+       };
+     });
+-
+     return duplicatedNodeId;
+   },
+ 
+@@ -873,41 +785,16 @@ export const useEditorStore = create<EditorState>((set) => ({
+     targetIndex
+   ) => {
+     set((state) => {
+-      const definition = state.document.components?.[componentId];
+-      if (!definition) return state;
+-
+-      const targetParent = definition.nodes[targetParentId];
+-      const targetDefinition = targetParent
+-        ? getComponentDefinition(targetParent.type)
+-        : undefined;
+-      if (
+-        !targetParent ||
+-        !targetDefinition?.acceptsChildren ||
+-        !canAcceptManualChildren(targetParent)
+-      ) {
+-        return state;
+-      }
+-
+-      const syntheticDocument = createComponentDefinitionDocument(
+-        state.document,
+-        definition
+-      );
+-      const updatedSynthetic = applyDocumentCommand(
+-        syntheticDocument,
+-        {
+-          type: "node.move",
+-          nodeId,
+-          targetParentId,
+-          targetIndex,
+-        },
+-        definition.rootId
++      const context = createComponentTreeContext(state, componentId);
++      if (!context) return state;
++      const treeDocument = moveNodeInTree(
++        context,
++        nodeId,
++        targetParentId,
++        targetIndex
+       );
+-
+       return {
+-        document: createProjectComponentRepository(state.document).upsert({
+-          ...definition,
+-          nodes: updatedSynthetic.nodes,
+-        }),
++        document: persistComponentTree(state, componentId, treeDocument),
+         draggedNodeId: null,
+         nodeDragCandidate: null,
+       };
+@@ -916,41 +803,17 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   insertNode: (parentId, insertIndex, node) => {
+     set((state) => {
+-      const parent = state.document.nodes[parentId];
+-      if (!parent || !canAcceptManualChildren(parent)) {
+-        return state;
+-      }
+-
+-      const definition = getComponentDefinition(node.type);
+-      const id = crypto.randomUUID();
+-      const reusableName = node.componentDefinitionId
+-        ? state.document.components?.[node.componentDefinitionId]?.name
+-        : undefined;
+-      const name = createUniqueNodeName(
+-        state.document,
+-        reusableName ?? node.type,
+-        getActiveRootId(state)
+-      );
+-      const newNode: UiNode = {
+-        id,
+-        name,
+-        type: node.type,
+-        componentDefinitionId: node.componentDefinitionId,
+-        props: { ...(node.props ?? {}) },
+-        children: definition?.acceptsChildren ? [] : undefined,
+-      };
+-
+-      const document = applyActiveCommand(state, {
+-        type: "node.insert",
++      const result = insertNodeIntoTree(
++        createActiveTreeContext(state),
+         parentId,
+         insertIndex,
+-        node: newNode,
+-      });
+-
++        node
++      );
++      const insertedId = result.insertedNodeId;
+       return {
+-        document,
+-        selectedNodeId: document.nodes[id] ? id : state.selectedNodeId,
+-        selectedNodeIds: document.nodes[id] ? [id] : state.selectedNodeIds,
++        document: result.document,
++        selectedNodeId: insertedId ?? state.selectedNodeId,
++        selectedNodeIds: insertedId ? [insertedId] : state.selectedNodeIds,
+         dragPreview: null,
+         draggedNodeId: null,
+         nodeDragCandidate: null,
+@@ -960,19 +823,15 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   deleteNode: (id) => {
+     set((state) => {
+-      const rootId = getActiveRootId(state);
+-      const parentId = buildDocumentIndex(state.document, rootId).parentById.get(id);
+-      const document = applyActiveCommand(state, {
+-        type: "node.delete",
+-        nodeId: id,
+-      });
++      const context = createActiveTreeContext(state);
++      const parentId = buildDocumentIndex(state.document, context.rootId).parentById.get(id);
++      const document = deleteNodeFromTree(context, id);
+       const selectedNodeIds = state.selectedNodeIds.filter(
+         (nodeId) => !!document.nodes[nodeId]
+       );
+       const fallbackSelection =
+         selectedNodeIds[0] ??
+         (parentId && document.nodes[parentId] ? parentId : null);
+-
+       return {
+         document,
+         selectedNodeIds: fallbackSelection ? [fallbackSelection] : [],
+@@ -986,19 +845,9 @@ export const useEditorStore = create<EditorState>((set) => ({
+ 
+   duplicateNode: (id) => {
+     let duplicatedNodeId: NodeId | null = null;
+-
+     set((state) => {
+-      const rootId = getActiveRootId(state);
+-      if (!canDuplicateIntoCurrentParent(state.document, rootId, id)) {
+-        return state;
+-      }
+-      const result = duplicateNodeSubtree(
+-        state.document,
+-        id,
+-        rootId
+-      );
++      const result = duplicateNodeInTree(createActiveTreeContext(state), id);
+       if (!result.duplicatedNodeId) return state;
+-
+       duplicatedNodeId = result.duplicatedNodeId;
+       return {
+         document: result.document,
+@@ -1008,27 +857,18 @@ export const useEditorStore = create<EditorState>((set) => ({
+         nodeDragCandidate: null,
+       };
+     });
+-
+     return duplicatedNodeId;
+   },
+ 
+   moveNodeUp: (nodeId) => {
+     set((state) => ({
+-      document: applyActiveCommand(state, {
+-        type: "node.moveBy",
+-        nodeId,
+-        offset: -1,
+-      }),
++      document: moveNodeByInTree(createActiveTreeContext(state), nodeId, -1),
+     }));
+   },
+ 
+   moveNodeDown: (nodeId) => {
+     set((state) => ({
+-      document: applyActiveCommand(state, {
+-        type: "node.moveBy",
+-        nodeId,
+-        offset: 1,
+-      }),
++      document: moveNodeByInTree(createActiveTreeContext(state), nodeId, 1),
+     }));
+   },
+ 
+@@ -1085,41 +925,17 @@ export const useEditorStore = create<EditorState>((set) => ({
+   },
+ 
+   moveNode: (nodeId, targetParentId, targetIndex) => {
+-    set((state) => {
+-      const targetParent = state.document.nodes[targetParentId];
+-      if (!targetParent || !canAcceptManualChildren(targetParent)) {
+-        return {
+-          ...state,
+-          draggedNodeId: null,
+-          nodeDragCandidate: null,
+-        };
+-      }
+-
+-      return {
+-        document: applyActiveCommand(state, {
+-          type: "node.move",
+-          nodeId,
+-          targetParentId,
+-          targetIndex,
+-        }),
+-        draggedNodeId: null,
+-        nodeDragCandidate: null,
+-        selectedNodeId: nodeId,
+-        selectedNodeIds: [nodeId],
+-      };
+-    });
++    set((state) => ({
++      document: moveNodeInTree(
++        createActiveTreeContext(state),
++        nodeId,
++        targetParentId,
++        targetIndex
++      ),
++      draggedNodeId: null,
++      nodeDragCandidate: null,
++      selectedNodeId: nodeId,
++      selectedNodeIds: [nodeId],
++    }));
+   },
+ }));
+-
+-function canDuplicateIntoCurrentParent(
+-  document: UiDocument,
+-  rootId: NodeId,
+-  nodeId: NodeId
+-): boolean {
+-  const index = buildDocumentIndex(document, rootId);
+-  const parentId = index.parentById.get(nodeId);
+-  if (!parentId) return false;
+-  const parent = document.nodes[parentId];
+-  return !!parent && canAcceptManualChildren(parent);
+-}
+-
+diff --git a/src/uiframework/gui/property-panel/PropInput.tsx b/src/uiframework/gui/property-panel/PropInput.tsx
+index b6c2386..6ad7f00 100644
+--- a/src/uiframework/gui/property-panel/PropInput.tsx
++++ b/src/uiframework/gui/property-panel/PropInput.tsx
+@@ -1,36 +1,7 @@
+ import type { Binding, ComponentInputDefinition } from "../../core/document";
+ import type { InspectorControl } from "../../registry/component-definitions";
+-import { useEditorStore } from "../../editor-store";
+-import { createTagRef, isTagRef } from "../../data/collections/TagRef";
+-import { isUdtTag } from "../../data/tags/TagDefinition";
+-import {
+-  CHART_TIME_RANGE_PRESETS,
+-  createRelativeChartTimeRange,
+-  getChartTimeRangeDurationMs,
+-} from "../../chart-time-range";
+ import type { UpdateNode } from "./property-panel-types";
+-import { ChartSeriesInput } from "./ChartSeriesInput";
+-import { ImageAssetPicker } from "../assets/ImageAssetPicker";
+-import {
+-  Checkbox,
+-  FormField,
+-  SectionHeader,
+-  SegmentedControl,
+-  SegmentedControlItem,
+-  Select,
+-  TextInput,
+-} from "../ui";
+-
+-const namedColors: Record<string, string> = {
+-  black: "#000000",
+-  white: "#ffffff",
+-  red: "#ef4444",
+-  green: "#22c55e",
+-  blue: "#3b82f6",
+-  yellow: "#eab308",
+-  gray: "#71717a",
+-  zinc: "#71717a",
+-};
++import { PropertyControlRenderer } from "./property-control-registry";
+ 
+ export function PropInput({
+   nodeId,
+@@ -61,381 +32,17 @@ export function PropInput({
+     }));
+   }
+ 
+-  if (control.kind === "tag-ref") {
+-    return (
+-      <TagRefInput
+-        udtId={control.udtId}
+-        value={value}
+-        onChange={updateProp}
+-      />
+-    );
+-  }
+-
+-  if (control.kind === "chart-series") {
+-    return (
+-      <div className="space-y-2">
+-        <SectionHeader
+-          title="Data points"
+-          description="Add multiple live tag series to the same chart."
+-        />
+-        <ChartSeriesInput
+-          nodeId={nodeId}
+-          value={value}
+-          values={values}
+-          bindings={bindings}
+-          componentInputs={componentInputs}
+-          updateNode={updateNode}
+-        />
+-      </div>
+-    );
+-  }
+-
+-  if (control.kind === "time-range") {
+-    const durationMs = getChartTimeRangeDurationMs(value);
+-
+-    return (
+-      <FormField label="time range">
+-        <Select
+-          value={String(durationMs)}
+-          onChange={(event) =>
+-            updateProp(createRelativeChartTimeRange(Number(event.target.value)))
+-          }
+-        >
+-          {CHART_TIME_RANGE_PRESETS.map((preset) => (
+-            <option key={preset.durationMs} value={preset.durationMs}>
+-              {preset.label}
+-            </option>
+-          ))}
+-        </Select>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "image-asset") {
+-    return (
+-      <FormField label="Source">
+-        <ImageAssetPicker
+-          assetId={typeof value === "string" && value ? value : undefined}
+-          onChange={(assetId) => updateProp(assetId)}
+-        />
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "text-format") {
+-    const bold = values.fontWeight === "bold";
+-    const italic = Boolean(values.italic);
+-    const underline = Boolean(values.underline);
+-
+-    function toggleTextStyle(
+-      property: "fontWeight" | "italic" | "underline",
+-      enabled: boolean,
+-    ) {
+-      updateNode(nodeId, (currentNode) => {
+-        const nextProps = { ...(currentNode.props ?? {}) };
+-
+-        if (enabled) {
+-          nextProps[property] = property === "fontWeight" ? "bold" : true;
+-        } else {
+-          delete nextProps[property];
+-        }
+-
+-        return {
+-          ...currentNode,
+-          props: nextProps,
+-        };
+-      });
+-    }
+-
+-    return (
+-      <FormField label="format">
+-        <SegmentedControl>
+-          <SegmentedControlItem
+-            aria-label="Bold"
+-            title="Bold"
+-            active={bold}
+-            className="font-bold"
+-            onClick={() => toggleTextStyle("fontWeight", !bold)}
+-          >
+-            B
+-          </SegmentedControlItem>
+-          <SegmentedControlItem
+-            aria-label="Italic"
+-            title="Italic"
+-            active={italic}
+-            className="italic"
+-            onClick={() => toggleTextStyle("italic", !italic)}
+-          >
+-            I
+-          </SegmentedControlItem>
+-          <SegmentedControlItem
+-            aria-label="Underline"
+-            title="Underline"
+-            active={underline}
+-            className="underline"
+-            onClick={() => toggleTextStyle("underline", !underline)}
+-          >
+-            U
+-          </SegmentedControlItem>
+-        </SegmentedControl>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "text-align") {
+-    const alignment =
+-      value === "center" || value === "right" ? value : "left";
+-
+-    return (
+-      <FormField label="alignment">
+-        <SegmentedControl>
+-          {(["left", "center", "right"] as const).map((nextAlignment) => (
+-            <SegmentedControlItem
+-              key={nextAlignment}
+-              active={alignment === nextAlignment}
+-              aria-label={`Align ${nextAlignment}`}
+-              title={`Align ${nextAlignment}`}
+-              onClick={() => updateProp(nextAlignment)}
+-            >
+-              <TextAlignIcon alignment={nextAlignment} />
+-            </SegmentedControlItem>
+-          ))}
+-        </SegmentedControl>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "border-size") {
+-    const borderSize =
+-      typeof value === "number" ? value : Number(value ?? control.min ?? 0);
+-
+-    return (
+-      <FormField label="border">
+-        <div
+-          data-editor-ignore
+-          className="flex h-9 w-full items-center overflow-hidden rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
+-        >
+-          <span
+-            title="Border size · all sides"
+-            className="flex h-full w-10 shrink-0 items-center justify-center border-r border-[var(--editor-border)] text-[var(--editor-text-muted)]"
+-          >
+-            <BorderAllIcon />
+-          </span>
+-          <input
+-            type="number"
+-            aria-label="Border size"
+-            value={Number.isFinite(borderSize) ? borderSize : 0}
+-            min={control.min}
+-            max={control.max}
+-            step={control.step}
+-            onChange={(event) => updateProp(Number(event.target.value))}
+-            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-[var(--editor-text)] outline-none"
+-          />
+-          <span className="pr-3 text-xs text-[var(--editor-text-muted)] opacity-70">px</span>
+-        </div>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "color") {
+-    const textColorValue =
+-      typeof value === "string" && value ? value : "#18181b";
+-
+-    return (
+-      <FormField label={propName}>
+-        <div className="flex items-center gap-2">
+-          <input
+-            data-editor-ignore
+-            type="color"
+-            value={normalizeColorForInput(textColorValue)}
+-            onChange={(event) => updateProp(event.target.value)}
+-            className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
+-          />
+-          <TextInput
+-            value={textColorValue}
+-            onChange={(event) => updateProp(event.target.value)}
+-          />
+-        </div>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "select") {
+-    return (
+-      <FormField label={propName}>
+-        <Select
+-          value={String(value ?? control.options[0] ?? "")}
+-          onChange={(event) => updateProp(event.target.value)}
+-        >
+-          {control.options.map((option) => (
+-            <option key={option} value={option}>
+-              {option}
+-            </option>
+-          ))}
+-        </Select>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "toggle") {
+-    const checked = Boolean(value);
+-
+-    return (
+-      <FormField label={propName}>
+-        <label className="flex items-center gap-3 h-9 px-3 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
+-          <Checkbox
+-            checked={checked}
+-            onChange={(event) => updateProp(event.target.checked)}
+-          />
+-          <span className="text-sm text-[var(--editor-text-muted)]">
+-            {checked ? "Enabled" : "Disabled"}
+-          </span>
+-        </label>
+-      </FormField>
+-    );
+-  }
+-
+-  if (control.kind === "number") {
+-    return (
+-      <FormField label={propName}>
+-        <TextInput
+-          type="number"
+-          value={typeof value === "number" ? value : Number(value ?? 0)}
+-          min={control.min}
+-          max={control.max}
+-          step={control.step}
+-          onChange={(event) => updateProp(Number(event.target.value))}
+-        />
+-      </FormField>
+-    );
+-  }
+-
+-  return (
+-    <FormField label={propName}>
+-      <TextInput
+-        value={String(value ?? "")}
+-        onChange={(event) => updateProp(event.target.value)}
+-      />
+-    </FormField>
+-  );
+-}
+-
+-function TextAlignIcon({
+-  alignment,
+-}: {
+-  alignment: "left" | "center" | "right";
+-}) {
+-  const lines = [14, 10, 14, 8];
+-
+-  return (
+-    <svg
+-      width="16"
+-      height="16"
+-      viewBox="0 0 16 16"
+-      fill="none"
+-      aria-hidden="true"
+-    >
+-      {lines.map((width, index) => {
+-        const x =
+-          alignment === "left"
+-            ? 1
+-            : alignment === "center"
+-              ? (16 - width) / 2
+-              : 15 - width;
+-        const y = 2 + index * 4;
+-
+-        return (
+-          <path
+-            key={`${width}-${index}`}
+-            d={`M${x} ${y}H${x + width}`}
+-            stroke="currentColor"
+-            strokeWidth="1.4"
+-            strokeLinecap="round"
+-          />
+-        );
+-      })}
+-    </svg>
+-  );
+-}
+-
+-function BorderAllIcon() {
+-  return (
+-    <svg
+-      width="16"
+-      height="16"
+-      viewBox="0 0 16 16"
+-      fill="none"
+-      aria-hidden="true"
+-    >
+-      <rect
+-        x="2.25"
+-        y="2.25"
+-        width="11.5"
+-        height="11.5"
+-        rx="1.25"
+-        stroke="currentColor"
+-        strokeWidth="1.5"
+-      />
+-      <rect
+-        x="5"
+-        y="5"
+-        width="6"
+-        height="6"
+-        rx="0.75"
+-        stroke="currentColor"
+-        strokeWidth="1"
+-        opacity="0.55"
+-      />
+-    </svg>
+-  );
+-}
+-
+-function normalizeColorForInput(value: string) {
+-  const normalized = namedColors[value.toLowerCase()] ?? value;
+-
+-  if (/^#[0-9a-fA-F]{6}$/.test(normalized)) {
+-    return normalized;
+-  }
+-
+-  if (/^#[0-9a-fA-F]{3}$/.test(normalized)) {
+-    const [r, g, b] = normalized.slice(1).split("");
+-    return `#${r}${r}${g}${g}${b}${b}`;
+-  }
+-
+-  return "#18181b";
+-}
+-
+-function TagRefInput({
+-  udtId,
+-  value,
+-  onChange,
+-}: {
+-  udtId: string;
+-  value: unknown;
+-  onChange: (value: unknown) => void;
+-}) {
+-  const projectData = useEditorStore((state) => state.document.data);
+-  const tags = Object.values(projectData?.tags ?? {}).filter(
+-    (tag) => isUdtTag(tag) && tag.type.udtId === udtId
+-  );
+-  const selectedId = isTagRef(value) ? value.tagId : "";
+-
+   return (
+-    <FormField label="tag">
+-      <Select
+-        value={selectedId}
+-        onChange={(event) => {
+-          const tag = tags.find((candidate) => candidate.id === event.target.value);
+-          onChange(tag ? createTagRef(tag) : undefined);
+-        }}
+-      >
+-        <option value="">Unassigned</option>
+-        {tags.map((tag) => (
+-          <option key={tag.id} value={tag.id}>
+-            {tag.name}
+-          </option>
+-        ))}
+-      </Select>
+-    </FormField>
++    <PropertyControlRenderer
++      nodeId={nodeId}
++      propName={propName}
++      value={value}
++      values={values}
++      bindings={bindings}
++      componentInputs={componentInputs}
++      control={control}
++      updateNode={updateNode}
++      updateProp={updateProp}
++    />
+   );
+ }
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+new file mode 100644
+index 0000000..b53f4b6
+--- /dev/null
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -0,0 +1,369 @@
++import type { ReactNode } from "react";
++import type { Binding, ComponentInputDefinition } from "../../core/document";
++import type { InspectorControl } from "../../registry/component-definitions";
++import { useEditorStore } from "../../editor-store";
++import { createTagRef, isTagRef } from "../../data/collections/TagRef";
++import { isUdtTag } from "../../data/tags/TagDefinition";
++import {
++  CHART_TIME_RANGE_PRESETS,
++  createRelativeChartTimeRange,
++  getChartTimeRangeDurationMs,
++} from "../../chart-time-range";
++import type { UpdateNode } from "./property-panel-types";
++import { ChartSeriesInput } from "./ChartSeriesInput";
++import { ImageAssetPicker } from "../assets/ImageAssetPicker";
++import {
++  Checkbox,
++  FormField,
++  SectionHeader,
++  SegmentedControl,
++  SegmentedControlItem,
++  Select,
++  TextInput,
++} from "../ui";
++
++export type PropertyControlRendererProps = {
++  nodeId: string;
++  propName: string;
++  value: unknown;
++  values: Record<string, unknown>;
++  bindings?: Record<string, Binding> | undefined;
++  componentInputs?: Record<string, ComponentInputDefinition> | undefined;
++  control: InspectorControl;
++  updateNode: UpdateNode;
++  updateProp: (value: unknown) => void;
++};
++
++type PropertyControlRenderer = (props: PropertyControlRendererProps) => ReactNode;
++
++const namedColors: Record<string, string> = {
++  black: "#000000",
++  white: "#ffffff",
++  red: "#ef4444",
++  green: "#22c55e",
++  blue: "#3b82f6",
++  yellow: "#eab308",
++  gray: "#71717a",
++  zinc: "#71717a",
++};
++
++const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRenderer>> = {
++  "tag-ref": (props) => <TagRefControl {...props} />,
++  "chart-series": (props) => <ChartSeriesControl {...props} />,
++  "time-range": (props) => <TimeRangeControl {...props} />,
++  "image-asset": (props) => <ImageAssetControl {...props} />,
++  "text-format": (props) => <TextFormatControl {...props} />,
++  "text-align": (props) => <TextAlignControl {...props} />,
++  "border-size": (props) => <BorderSizeControl {...props} />,
++  color: (props) => <ColorControl {...props} />,
++  select: (props) => <SelectControl {...props} />,
++  toggle: (props) => <ToggleControl {...props} />,
++  number: (props) => <NumberControl {...props} />,
++  text: (props) => <TextControl {...props} />,
++};
++
++export function PropertyControlRenderer(props: PropertyControlRendererProps) {
++  const Renderer = renderers[props.control.kind] ?? renderers.text;
++  return Renderer ? <Renderer {...props} /> : null;
++}
++
++function TagRefControl({ control, value, updateProp }: PropertyControlRendererProps) {
++  const projectData = useEditorStore((state) => state.document.data);
++  if (control.kind !== "tag-ref") return null;
++  const tags = Object.values(projectData?.tags ?? {}).filter(
++    (tag) => isUdtTag(tag) && tag.type.udtId === control.udtId
++  );
++  const selectedId = isTagRef(value) ? value.tagId : "";
++
++  return (
++    <FormField label="tag">
++      <Select
++        value={selectedId}
++        onChange={(event) => {
++          const tag = tags.find((candidate) => candidate.id === event.target.value);
++          updateProp(tag ? createTagRef(tag) : undefined);
++        }}
++      >
++        <option value="">Unassigned</option>
++        {tags.map((tag) => (
++          <option key={tag.id} value={tag.id}>
++            {tag.name}
++          </option>
++        ))}
++      </Select>
++    </FormField>
++  );
++}
++
++function ChartSeriesControl(props: PropertyControlRendererProps) {
++  if (props.control.kind !== "chart-series") return null;
++  return (
++    <div className="space-y-2">
++      <SectionHeader
++        title="Data points"
++        description="Add multiple live tag series to the same chart."
++      />
++      <ChartSeriesInput
++        nodeId={props.nodeId}
++        value={props.value}
++        values={props.values}
++        bindings={props.bindings}
++        componentInputs={props.componentInputs}
++        updateNode={props.updateNode}
++      />
++    </div>
++  );
++}
++
++function TimeRangeControl({ control, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "time-range") return null;
++  const durationMs = getChartTimeRangeDurationMs(value);
++  return (
++    <FormField label="time range">
++      <Select
++        value={String(durationMs)}
++        onChange={(event) =>
++          updateProp(createRelativeChartTimeRange(Number(event.target.value)))
++        }
++      >
++        {CHART_TIME_RANGE_PRESETS.map((preset) => (
++          <option key={preset.durationMs} value={preset.durationMs}>
++            {preset.label}
++          </option>
++        ))}
++      </Select>
++    </FormField>
++  );
++}
++
++function ImageAssetControl({ control, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "image-asset") return null;
++  return (
++    <FormField label="Source">
++      <ImageAssetPicker
++        assetId={typeof value === "string" && value ? value : undefined}
++        onChange={(assetId) => updateProp(assetId)}
++      />
++    </FormField>
++  );
++}
++
++function TextFormatControl({ control, nodeId, values, updateNode }: PropertyControlRendererProps) {
++  if (control.kind !== "text-format") return null;
++  const bold = values.fontWeight === "bold";
++  const italic = Boolean(values.italic);
++  const underline = Boolean(values.underline);
++
++  function toggleTextStyle(
++    property: "fontWeight" | "italic" | "underline",
++    enabled: boolean
++  ) {
++    updateNode(nodeId, (currentNode) => {
++      const nextProps = { ...(currentNode.props ?? {}) };
++      if (enabled) nextProps[property] = property === "fontWeight" ? "bold" : true;
++      else delete nextProps[property];
++      return { ...currentNode, props: nextProps };
++    });
++  }
++
++  return (
++    <FormField label="format">
++      <SegmentedControl>
++        <SegmentedControlItem
++          aria-label="Bold"
++          title="Bold"
++          active={bold}
++          className="font-bold"
++          onClick={() => toggleTextStyle("fontWeight", !bold)}
++        >
++          B
++        </SegmentedControlItem>
++        <SegmentedControlItem
++          aria-label="Italic"
++          title="Italic"
++          active={italic}
++          className="italic"
++          onClick={() => toggleTextStyle("italic", !italic)}
++        >
++          I
++        </SegmentedControlItem>
++        <SegmentedControlItem
++          aria-label="Underline"
++          title="Underline"
++          active={underline}
++          className="underline"
++          onClick={() => toggleTextStyle("underline", !underline)}
++        >
++          U
++        </SegmentedControlItem>
++      </SegmentedControl>
++    </FormField>
++  );
++}
++
++function TextAlignControl({ control, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "text-align") return null;
++  const alignment = value === "center" || value === "right" ? value : "left";
++  return (
++    <FormField label="alignment">
++      <SegmentedControl>
++        {(["left", "center", "right"] as const).map((nextAlignment) => (
++          <SegmentedControlItem
++            key={nextAlignment}
++            active={alignment === nextAlignment}
++            aria-label={`Align ${nextAlignment}`}
++            title={`Align ${nextAlignment}`}
++            onClick={() => updateProp(nextAlignment)}
++          >
++            <TextAlignIcon alignment={nextAlignment} />
++          </SegmentedControlItem>
++        ))}
++      </SegmentedControl>
++    </FormField>
++  );
++}
++
++function BorderSizeControl({ control, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "border-size") return null;
++  const borderSize = typeof value === "number" ? value : Number(value ?? control.min ?? 0);
++  return (
++    <FormField label="border">
++      <div
++        data-editor-ignore
++        className="flex h-9 w-full items-center overflow-hidden rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
++      >
++        <span
++          title="Border size · all sides"
++          className="flex h-full w-10 shrink-0 items-center justify-center border-r border-[var(--editor-border)] text-[var(--editor-text-muted)]"
++        >
++          <BorderAllIcon />
++        </span>
++        <input
++          type="number"
++          aria-label="Border size"
++          value={Number.isFinite(borderSize) ? borderSize : 0}
++          min={control.min}
++          max={control.max}
++          step={control.step}
++          onChange={(event) => updateProp(Number(event.target.value))}
++          className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-[var(--editor-text)] outline-none"
++        />
++        <span className="pr-3 text-xs text-[var(--editor-text-muted)] opacity-70">px</span>
++      </div>
++    </FormField>
++  );
++}
++
++function ColorControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "color") return null;
++  const textColorValue = typeof value === "string" && value ? value : "#18181b";
++  return (
++    <FormField label={propName}>
++      <div className="flex items-center gap-2">
++        <input
++          data-editor-ignore
++          type="color"
++          value={normalizeColorForInput(textColorValue)}
++          onChange={(event) => updateProp(event.target.value)}
++          className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
++        />
++        <TextInput value={textColorValue} onChange={(event) => updateProp(event.target.value)} />
++      </div>
++    </FormField>
++  );
++}
++
++function SelectControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "select") return null;
++  return (
++    <FormField label={propName}>
++      <Select
++        value={String(value ?? control.options[0] ?? "")}
++        onChange={(event) => updateProp(event.target.value)}
++      >
++        {control.options.map((option) => (
++          <option key={option} value={option}>{option}</option>
++        ))}
++      </Select>
++    </FormField>
++  );
++}
++
++function ToggleControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "toggle") return null;
++  const checked = Boolean(value);
++  return (
++    <FormField label={propName}>
++      <label className="flex items-center gap-3 h-9 px-3 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] cursor-pointer transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]">
++        <Checkbox checked={checked} onChange={(event) => updateProp(event.target.checked)} />
++        <span className="text-sm text-[var(--editor-text-muted)]">
++          {checked ? "Enabled" : "Disabled"}
++        </span>
++      </label>
++    </FormField>
++  );
++}
++
++function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "number") return null;
++  return (
++    <FormField label={propName}>
++      <TextInput
++        type="number"
++        value={typeof value === "number" ? value : Number(value ?? 0)}
++        min={control.min}
++        max={control.max}
++        step={control.step}
++        onChange={(event) => updateProp(Number(event.target.value))}
++      />
++    </FormField>
++  );
++}
++
++function TextControl({ propName, value, updateProp }: PropertyControlRendererProps) {
++  return (
++    <FormField label={propName}>
++      <TextInput value={String(value ?? "")} onChange={(event) => updateProp(event.target.value)} />
++    </FormField>
++  );
++}
++
++function TextAlignIcon({ alignment }: { alignment: "left" | "center" | "right" }) {
++  const lines = [14, 10, 14, 8];
++  return (
++    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
++      {lines.map((width, index) => {
++        const x = alignment === "left" ? 1 : alignment === "center" ? (16 - width) / 2 : 15 - width;
++        const y = 2 + index * 4;
++        return (
++          <path
++            key={`${width}-${index}`}
++            d={`M${x} ${y}H${x + width}`}
++            stroke="currentColor"
++            strokeWidth="1.4"
++            strokeLinecap="round"
++          />
++        );
++      })}
++    </svg>
++  );
++}
++
++function BorderAllIcon() {
++  return (
++    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
++      <rect x="2.25" y="2.25" width="11.5" height="11.5" rx="1.25" stroke="currentColor" strokeWidth="1.5" />
++      <rect x="5" y="5" width="6" height="6" rx="0.75" stroke="currentColor" strokeWidth="1" opacity="0.55" />
++    </svg>
++  );
++}
++
++function normalizeColorForInput(value: string) {
++  const normalized = namedColors[value.toLowerCase()] ?? value;
++  if (/^#[0-9a-fA-F]{6}$/.test(normalized)) return normalized;
++  if (/^#[0-9a-fA-F]{3}$/.test(normalized)) {
++    const [r, g, b] = normalized.slice(1).split("");
++    return `#${r}${r}${g}${g}${b}${b}`;
++  }
++  return "#18181b";
++}
+diff --git a/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx b/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
+index 626a92b..46fa8d7 100644
+--- a/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
++++ b/src/uiframework/gui/reusable-component/ComponentStructureTree.tsx
+@@ -1,5 +1,6 @@
+-import { ChevronRight, Layers3, Trash2 } from "lucide-react";
++import { Layers3 } from "lucide-react";
+ import type { UiComponentDefinition } from "../../core/document";
++import { NodeTree } from "../tree-view/NodeTree";
+ 
+ export function ComponentStructureTree({
+   definition,
+@@ -26,91 +27,15 @@ export function ComponentStructureTree({
+         </div>
+       </div>
+       <div className="p-2">
+-        <TreeNode
+-          definition={definition}
+-          nodeId={definition.rootId}
++        <NodeTree
++          rootId={definition.rootId}
++          nodes={definition.nodes}
+           selectedNodeId={selectedNodeId}
+-          onSelect={onSelect}
+-          onDelete={onDelete}
+-          depth={0}
++          selectNode={(nodeId) => onSelect(nodeId)}
++          deleteNode={onDelete}
++          canDeleteNode={(nodeId) => nodeId !== definition.rootId}
+         />
+       </div>
+     </div>
+   );
+ }
+-
+-function TreeNode({
+-  definition,
+-  nodeId,
+-  selectedNodeId,
+-  onSelect,
+-  onDelete,
+-  depth,
+-}: {
+-  definition: UiComponentDefinition;
+-  nodeId: string;
+-  selectedNodeId: string;
+-  onSelect: (nodeId: string) => void;
+-  onDelete: (nodeId: string) => void;
+-  depth: number;
+-}) {
+-  const node = definition.nodes[nodeId];
+-  if (!node) return null;
+-  const children = node.children ?? [];
+-  const canDelete = node.id !== definition.rootId;
+-
+-  return (
+-    <div>
+-      <div
+-        className={`group flex w-full items-center gap-1 rounded-md pr-1 transition ${
+-          selectedNodeId === node.id
+-            ? "bg-violet-50 text-violet-700"
+-            : "text-[var(--editor-text)] hover:bg-[var(--editor-surface-muted)]"
+-        }`}
+-        style={{ paddingLeft: 8 + depth * 12 }}
+-      >
+-        <button
+-          type="button"
+-          onClick={() => onSelect(node.id)}
+-          className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 text-left text-xs"
+-        >
+-          <ChevronRight
+-            size={11}
+-            className={children.length ? "text-zinc-400" : "opacity-0"}
+-          />
+-          <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
+-          <span className="text-[9px] uppercase tracking-wide text-[var(--editor-text-muted)]">
+-            {node.type}
+-          </span>
+-        </button>
+-
+-        {canDelete ? (
+-          <button
+-            type="button"
+-            aria-label={`Delete ${node.name}`}
+-            title="Delete"
+-            onClick={(event) => {
+-              event.stopPropagation();
+-              onDelete(node.id);
+-            }}
+-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--editor-text-soft)] opacity-0 transition hover:bg-red-50 hover:text-[var(--editor-danger)] group-hover:opacity-100 focus:opacity-100"
+-          >
+-            <Trash2 size={13} />
+-          </button>
+-        ) : null}
+-      </div>
+-
+-      {children.map((childId) => (
+-        <TreeNode
+-          key={childId}
+-          definition={definition}
+-          nodeId={childId}
+-          selectedNodeId={selectedNodeId}
+-          onSelect={onSelect}
+-          onDelete={onDelete}
+-          depth={depth + 1}
+-        />
+-      ))}
+-    </div>
+-  );
+-}
+diff --git a/src/uiframework/gui/tree-view/NodeTree.tsx b/src/uiframework/gui/tree-view/NodeTree.tsx
+new file mode 100644
+index 0000000..a368a52
+--- /dev/null
++++ b/src/uiframework/gui/tree-view/NodeTree.tsx
+@@ -0,0 +1,57 @@
++import { TreeNode } from "./TreeNode";
++import type { TreeNodes, TreeSelectionOptions } from "./tree-view-types";
++
++const noopMove = () => {};
++const noopDuplicate = () => null;
++const noopDelete = () => {};
++const never = () => false;
++
++export type NodeTreeProps = {
++  rootId: string;
++  nodes: TreeNodes;
++  selectedNodeId?: string | null | undefined;
++  selectedNodeIds?: readonly string[] | undefined;
++  selectNode: (nodeId: string, options?: TreeSelectionOptions) => void;
++  moveNodeUp?: ((nodeId: string) => void) | undefined;
++  moveNodeDown?: ((nodeId: string) => void) | undefined;
++  duplicateNode?: ((nodeId: string) => string | null) | undefined;
++  canDuplicateNode?: ((nodeId: string) => boolean) | undefined;
++  deleteNode?: ((nodeId: string) => void) | undefined;
++  canDeleteNode?: ((nodeId: string) => boolean) | undefined;
++};
++
++/**
++ * Shared tree renderer for both page trees and reusable-component definitions.
++ * Callers provide capabilities; rendering/collapse/selection stay identical.
++ */
++export function NodeTree({
++  rootId,
++  nodes,
++  selectedNodeId,
++  selectedNodeIds = selectedNodeId ? [selectedNodeId] : [],
++  selectNode,
++  moveNodeUp = noopMove,
++  moveNodeDown = noopMove,
++  duplicateNode = noopDuplicate,
++  canDuplicateNode = never,
++  deleteNode = noopDelete,
++  canDeleteNode = never,
++}: NodeTreeProps) {
++  if (!nodes[rootId]) return null;
++
++  return (
++    <TreeNode
++      nodeId={rootId}
++      nodes={nodes}
++      selectedNodeId={selectedNodeId}
++      selectedNodeIds={selectedNodeIds}
++      selectNode={selectNode}
++      moveNodeUp={moveNodeUp}
++      moveNodeDown={moveNodeDown}
++      duplicateNode={duplicateNode}
++      canDuplicateNode={canDuplicateNode}
++      deleteNode={deleteNode}
++      canDeleteNode={canDeleteNode}
++    />
++  );
++}
+diff --git a/src/uiframework/gui/tree-view/TreeView.tsx b/src/uiframework/gui/tree-view/TreeView.tsx
+index f2edf17..e524a01 100644
+--- a/src/uiframework/gui/tree-view/TreeView.tsx
++++ b/src/uiframework/gui/tree-view/TreeView.tsx
+@@ -2,7 +2,7 @@ import { getPage } from "../../core/document";
+ import { buildDocumentIndex } from "../../core/document-index";
+ import { canAcceptManualChildren } from "../../repeat/RepeatBehavior";
+ import { useEditorStore } from "../../editor-store";
+-import { TreeNode } from "./TreeNode";
++import { NodeTree } from "./NodeTree";
+ 
+ export function TreeView() {
+   const document = useEditorStore((state) => state.document);
+@@ -32,8 +32,8 @@ export function TreeView() {
+         ) : null}
+       </div>
+ 
+-      <TreeNode
+-        nodeId={page.rootId}
++      <NodeTree
++        rootId={page.rootId}
+         nodes={document.nodes}
+         selectedNodeId={selectedNodeId}
+         selectedNodeIds={selectedNodeIds}
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+new file mode 100644
+index 0000000..4b1b237
+--- /dev/null
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -0,0 +1,28 @@
++import type { ElementType } from "react";
++
++export type InspectorControl =
++  | { kind: "text" }
++  | { kind: "number"; min?: number; max?: number; step?: number }
++  | { kind: "color" }
++  | { kind: "toggle" }
++  | { kind: "image-asset" }
++  | { kind: "tag-ref"; udtId: string }
++  | { kind: "time-range" }
++  | { kind: "chart-series" }
++  | { kind: "text-format" }
++  | { kind: "text-align" }
++  | { kind: "border-size"; min?: number; max?: number; step?: number }
++  | { kind: "select"; options: readonly string[] };
++
++export type ComponentDefinition = {
++  type: string;
++  label: string;
++  description: string;
++  editor: ElementType;
++  runtime: ElementType;
++  defaults: Record<string, unknown>;
++  acceptsChildren?: boolean;
++  inspector: Record<string, InspectorControl>;
++  bindings?: Record<string, { label: string }>;
++  events?: Record<string, { label: string; defaultSuffix: string }>;
++};
+diff --git a/src/uiframework/registry/component-definitions.ts b/src/uiframework/registry/component-definitions.ts
+index 423bf91..50f6e0c 100644
+--- a/src/uiframework/registry/component-definitions.ts
++++ b/src/uiframework/registry/component-definitions.ts
+@@ -1,208 +1,24 @@
+-import type { ElementType } from "react";
+-import { Button } from "../components/Button";
+-import { Chart } from "../components/Chart";
+-import { Container } from "../components/Container";
+-import { Page } from "../components/Page";
+-import { EditorPageSlot, RuntimePageSlot } from "../components/PageSlot";
+-import { Navigation } from "../components/Navigation";
+-import { Image } from "../components/Image";
+-import { RuntimeButton } from "../components/RuntimeButton";
+-import { RuntimeChart } from "../components/RuntimeChart";
+-import { RuntimeText } from "../components/RuntimeText";
+-import { Text } from "../components/Text";
+-import {
+-  defaultButtonProps,
+-  defaultPageProps,
+-  defaultChartProps,
+-  defaultContainerProps,
+-  defaultTextProps,
+-  defaultNavigationProps,
+-  defaultImageProps,
+-} from "../component-props";
++import type { ComponentDefinition } from "./component-definition-types";
++import { buttonDefinition } from "./components/button";
++import { chartDefinition } from "./components/chart";
++import { containerDefinition } from "./components/container";
++import { imageDefinition } from "./components/image";
++import { navigationDefinition } from "./components/navigation";
++import { pageDefinition } from "./components/page";
++import { pageSlotDefinition } from "./components/page-slot";
++import { textDefinition } from "./components/text";
+ 
+-export type InspectorControl =
+-  | { kind: "text" }
+-  | { kind: "number"; min?: number; max?: number; step?: number }
+-  | { kind: "color" }
+-  | { kind: "toggle" }
+-  | { kind: "image-asset" }
+-  | { kind: "tag-ref"; udtId: string }
+-  | { kind: "time-range" }
+-  | { kind: "chart-series" }
+-  | { kind: "text-format" }
+-  | { kind: "text-align" }
+-  | { kind: "border-size"; min?: number; max?: number; step?: number }
+-  | { kind: "select"; options: readonly string[] };
+-
+-export type ComponentDefinition = {
+-  type: string;
+-  label: string;
+-  description: string;
+-  editor: ElementType;
+-  runtime: ElementType;
+-  defaults: Record<string, unknown>;
+-  acceptsChildren?: boolean;
+-  inspector: Record<string, InspectorControl>;
+-  bindings?: Record<string, { label: string }>;
+-  events?: Record<string, { label: string; defaultSuffix: string }>;
+-};
++export type { ComponentDefinition, InspectorControl } from "./component-definition-types";
+ 
+ export const componentDefinitions = {
+-  Page: {
+-    type: "Page",
+-    label: "Page",
+-    description: "Root viewport",
+-    editor: Page,
+-    runtime: Page,
+-    defaults: defaultPageProps,
+-    acceptsChildren: true,
+-    inspector: {
+-      backgroundColor: { kind: "color" },
+-      padding: { kind: "number", min: 0 },
+-      gap: { kind: "number", min: 0 },
+-      columns: { kind: "number", min: 1, max: 24 },
+-      display: { kind: "select", options: ["grid", "flex"] },
+-    },
+-  },
+-  PageSlot: {
+-    type: "PageSlot",
+-    label: "Page Slot",
+-    description: "Content outlet for a Page Layout",
+-    editor: EditorPageSlot,
+-    runtime: RuntimePageSlot,
+-    defaults: { slotName: "content" },
+-    inspector: {
+-      slotName: { kind: "select", options: ["content"] },
+-    },
+-  },
+-  Navigation: {
+-    type: "Navigation",
+-    label: "Navigation",
+-    description: "Top-level page navigation",
+-    editor: Navigation,
+-    runtime: Navigation,
+-    defaults: defaultNavigationProps,
+-    inspector: {
+-      backgroundColor: { kind: "color" },
+-      color: { kind: "color" },
+-      activeColor: { kind: "color" },
+-      gap: { kind: "number", min: 0, max: 48 },
+-      padding: { kind: "number", min: 0, max: 48 },
+-      borderRadius: { kind: "number", min: 0, max: 48 },
+-    },
+-  },
+-  Container: {
+-    type: "Container",
+-    label: "Container",
+-    description: "Layout container",
+-    editor: Container,
+-    runtime: Container,
+-    defaults: defaultContainerProps,
+-    acceptsChildren: true,
+-    inspector: {
+-      width: { kind: "text" },
+-      height: { kind: "text" },
+-      minWidth: { kind: "text" },
+-      minHeight: { kind: "text" },
+-      maxWidth: { kind: "text" },
+-      maxHeight: { kind: "text" },
+-      padding: { kind: "number", min: 0 },
+-      gap: { kind: "number", min: 0 },
+-      columns: { kind: "number", min: 1, max: 24 },
+-      gridMode: { kind: "select", options: ["fixed", "adaptive"] },
+-      minColumnWidth: { kind: "number", min: 96, max: 640 },
+-      minRowHeight: { kind: "number", min: 24, max: 480 },
+-      gridRowMode: { kind: "select", options: ["content", "minimum"] },
+-      gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
+-      borderSize: { kind: "border-size", min: 0 },
+-      display: { kind: "select", options: ["grid", "flex"] },
+-    },
+-  },
+-  Text: {
+-    type: "Text",
+-    label: "Text",
+-    description: "Static or bound text",
+-    editor: Text,
+-    runtime: RuntimeText,
+-    defaults: defaultTextProps,
+-    inspector: {
+-      value: { kind: "text" },
+-      color: { kind: "color" },
+-      fontSize: { kind: "number", min: 1 },
+-      lineHeight: { kind: "text" },
+-      formatting: { kind: "text-format" },
+-      align: { kind: "text-align" },
+-      variant: {
+-        kind: "select",
+-        options: ["body", "label", "title", "caption"],
+-      },
+-      uppercase: { kind: "toggle" },
+-      borderSize: { kind: "border-size", min: 0 },
+-      borderColor: { kind: "color" },
+-      borderRadius: { kind: "number", min: 0 },
+-    },
+-    bindings: {
+-      value: { label: "Runtime tag" },
+-    },
+-  },
+-  Button: {
+-    type: "Button",
+-    label: "Button",
+-    description: "User action",
+-    editor: Button,
+-    runtime: RuntimeButton,
+-    defaults: defaultButtonProps,
+-    inspector: {
+-      label: { kind: "text" },
+-      disabled: { kind: "toggle" },
+-      backgroundColor: { kind: "color" },
+-      paddingX: { kind: "number", min: 0, max: 64 },
+-      paddingY: { kind: "number", min: 0, max: 48 },
+-      marginX: { kind: "number", min: 0, max: 64 },
+-      marginY: { kind: "number", min: 0, max: 64 },
+-      borderRadius: { kind: "number", min: 0, max: 64 },
+-    },
+-    events: {
+-      click: { label: "Click", defaultSuffix: "Clicked" },
+-      doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },
+-    },
+-  },
+-  Image: {
+-    type: "Image",
+-    label: "Image",
+-    description: "Local image asset",
+-    editor: Image,
+-    runtime: Image,
+-    defaults: defaultImageProps,
+-    inspector: {
+-      assetId: { kind: "image-asset" },
+-      width: { kind: "text" },
+-      height: { kind: "text" },
+-      fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
+-      alt: { kind: "text" },
+-      borderRadius: { kind: "number", min: 0 },
+-      backgroundColor: { kind: "color" },
+-    },
+-  },
+-  Chart: {
+-    type: "Chart",
+-    label: "Chart",
+-    description: "Line or bar chart",
+-    editor: Chart,
+-    runtime: RuntimeChart,
+-    defaults: defaultChartProps,
+-    inspector: {
+-      title: { kind: "text" },
+-      kind: { kind: "select", options: ["line", "bar"] },
+-      width: { kind: "text" },
+-      height: { kind: "text" },
+-      minHeight: { kind: "text" },
+-      series: { kind: "chart-series" },
+-      showLegend: { kind: "toggle" },
+-      showGrid: { kind: "toggle" },
+-      timeRange: { kind: "time-range" },
+-    },
+-  },
++  Page: pageDefinition,
++  PageSlot: pageSlotDefinition,
++  Navigation: navigationDefinition,
++  Container: containerDefinition,
++  Text: textDefinition,
++  Button: buttonDefinition,
++  Image: imageDefinition,
++  Chart: chartDefinition,
+ } satisfies Record<string, ComponentDefinition>;
+ 
+ export type RegisteredComponentType = keyof typeof componentDefinitions;
+@@ -212,7 +28,5 @@ export function getComponentDefinition(type: string): ComponentDefinition | unde
+ }
+ 
+ export function getDefaultPropsForType(type: string): Record<string, unknown> {
+-  return {
+-    ...(getComponentDefinition(type)?.defaults ?? {}),
+-  };
++  return { ...(getComponentDefinition(type)?.defaults ?? {}) };
+ }
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+new file mode 100644
+index 0000000..bf8635c
+--- /dev/null
++++ b/src/uiframework/registry/components/button.ts
+@@ -0,0 +1,27 @@
++import { Button } from "../../components/Button";
++import { RuntimeButton } from "../../components/RuntimeButton";
++import { defaultButtonProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const buttonDefinition = {
++  type: "Button",
++  label: "Button",
++  description: "User action",
++  editor: Button,
++  runtime: RuntimeButton,
++  defaults: defaultButtonProps,
++  inspector: {
++    label: { kind: "text" },
++    disabled: { kind: "toggle" },
++    backgroundColor: { kind: "color" },
++    paddingX: { kind: "number", min: 0, max: 64 },
++    paddingY: { kind: "number", min: 0, max: 48 },
++    marginX: { kind: "number", min: 0, max: 64 },
++    marginY: { kind: "number", min: 0, max: 64 },
++    borderRadius: { kind: "number", min: 0, max: 64 },
++  },
++  events: {
++    click: { label: "Click", defaultSuffix: "Clicked" },
++    doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/chart.ts b/src/uiframework/registry/components/chart.ts
+new file mode 100644
+index 0000000..c5a3c08
+--- /dev/null
++++ b/src/uiframework/registry/components/chart.ts
+@@ -0,0 +1,24 @@
++import { Chart } from "../../components/Chart";
++import { RuntimeChart } from "../../components/RuntimeChart";
++import { defaultChartProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const chartDefinition = {
++  type: "Chart",
++  label: "Chart",
++  description: "Line or bar chart",
++  editor: Chart,
++  runtime: RuntimeChart,
++  defaults: defaultChartProps,
++  inspector: {
++    title: { kind: "text" },
++    kind: { kind: "select", options: ["line", "bar"] },
++    width: { kind: "text" },
++    height: { kind: "text" },
++    minHeight: { kind: "text" },
++    series: { kind: "chart-series" },
++    showLegend: { kind: "toggle" },
++    showGrid: { kind: "toggle" },
++    timeRange: { kind: "time-range" },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+new file mode 100644
+index 0000000..8cdc729
+--- /dev/null
++++ b/src/uiframework/registry/components/container.ts
+@@ -0,0 +1,31 @@
++import { Container } from "../../components/Container";
++import { defaultContainerProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const containerDefinition = {
++  type: "Container",
++  label: "Container",
++  description: "Layout container",
++  editor: Container,
++  runtime: Container,
++  defaults: defaultContainerProps,
++  acceptsChildren: true,
++  inspector: {
++    width: { kind: "text" },
++    height: { kind: "text" },
++    minWidth: { kind: "text" },
++    minHeight: { kind: "text" },
++    maxWidth: { kind: "text" },
++    maxHeight: { kind: "text" },
++    padding: { kind: "number", min: 0 },
++    gap: { kind: "number", min: 0 },
++    columns: { kind: "number", min: 1, max: 24 },
++    gridMode: { kind: "select", options: ["fixed", "adaptive"] },
++    minColumnWidth: { kind: "number", min: 96, max: 640 },
++    minRowHeight: { kind: "number", min: 24, max: 480 },
++    gridRowMode: { kind: "select", options: ["content", "minimum"] },
++    gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
++    borderSize: { kind: "border-size", min: 0 },
++    display: { kind: "select", options: ["grid", "flex"] },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/image.ts b/src/uiframework/registry/components/image.ts
+new file mode 100644
+index 0000000..30cd170
+--- /dev/null
++++ b/src/uiframework/registry/components/image.ts
+@@ -0,0 +1,21 @@
++import { Image } from "../../components/Image";
++import { defaultImageProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const imageDefinition = {
++  type: "Image",
++  label: "Image",
++  description: "Local image asset",
++  editor: Image,
++  runtime: Image,
++  defaults: defaultImageProps,
++  inspector: {
++    assetId: { kind: "image-asset" },
++    width: { kind: "text" },
++    height: { kind: "text" },
++    fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
++    alt: { kind: "text" },
++    borderRadius: { kind: "number", min: 0 },
++    backgroundColor: { kind: "color" },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+new file mode 100644
+index 0000000..1fff314
+--- /dev/null
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -0,0 +1,20 @@
++import { Navigation } from "../../components/Navigation";
++import { defaultNavigationProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const navigationDefinition = {
++  type: "Navigation",
++  label: "Navigation",
++  description: "Top-level page navigation",
++  editor: Navigation,
++  runtime: Navigation,
++  defaults: defaultNavigationProps,
++  inspector: {
++    backgroundColor: { kind: "color" },
++    color: { kind: "color" },
++    activeColor: { kind: "color" },
++    gap: { kind: "number", min: 0, max: 48 },
++    padding: { kind: "number", min: 0, max: 48 },
++    borderRadius: { kind: "number", min: 0, max: 48 },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/page-slot.ts b/src/uiframework/registry/components/page-slot.ts
+new file mode 100644
+index 0000000..f59e46e
+--- /dev/null
++++ b/src/uiframework/registry/components/page-slot.ts
+@@ -0,0 +1,14 @@
++import { EditorPageSlot, RuntimePageSlot } from "../../components/PageSlot";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const pageSlotDefinition = {
++  type: "PageSlot",
++  label: "Page Slot",
++  description: "Content outlet for a Page Layout",
++  editor: EditorPageSlot,
++  runtime: RuntimePageSlot,
++  defaults: { slotName: "content" },
++  inspector: {
++    slotName: { kind: "select", options: ["content"] },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/page.ts b/src/uiframework/registry/components/page.ts
+new file mode 100644
+index 0000000..371fe64
+--- /dev/null
++++ b/src/uiframework/registry/components/page.ts
+@@ -0,0 +1,20 @@
++import { Page } from "../../components/Page";
++import { defaultPageProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const pageDefinition = {
++  type: "Page",
++  label: "Page",
++  description: "Root viewport",
++  editor: Page,
++  runtime: Page,
++  defaults: defaultPageProps,
++  acceptsChildren: true,
++  inspector: {
++    backgroundColor: { kind: "color" },
++    padding: { kind: "number", min: 0 },
++    gap: { kind: "number", min: 0 },
++    columns: { kind: "number", min: 1, max: 24 },
++    display: { kind: "select", options: ["grid", "flex"] },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+new file mode 100644
+index 0000000..c07e3e8
+--- /dev/null
++++ b/src/uiframework/registry/components/text.ts
+@@ -0,0 +1,29 @@
++import { Text } from "../../components/Text";
++import { RuntimeText } from "../../components/RuntimeText";
++import { defaultTextProps } from "../../component-props";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const textDefinition = {
++  type: "Text",
++  label: "Text",
++  description: "Static or bound text",
++  editor: Text,
++  runtime: RuntimeText,
++  defaults: defaultTextProps,
++  inspector: {
++    value: { kind: "text" },
++    color: { kind: "color" },
++    fontSize: { kind: "number", min: 1 },
++    lineHeight: { kind: "text" },
++    formatting: { kind: "text-format" },
++    align: { kind: "text-align" },
++    variant: { kind: "select", options: ["body", "label", "title", "caption"] },
++    uppercase: { kind: "toggle" },
++    borderSize: { kind: "border-size", min: 0 },
++    borderColor: { kind: "color" },
++    borderRadius: { kind: "number", min: 0 },
++  },
++  bindings: {
++    value: { label: "Runtime tag" },
++  },
++} satisfies ComponentDefinition;
