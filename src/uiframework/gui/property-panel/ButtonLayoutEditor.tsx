@@ -4,6 +4,7 @@ import { defaultButtonProps } from "../../component-props";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
 import { TextInput } from "../ui";
+import { SpacingValueControl } from "./SpacingValueControl";
 
 export function ButtonLayoutEditor({
   node,
@@ -13,10 +14,10 @@ export function ButtonLayoutEditor({
   updateNode: UpdateNode;
 }) {
   const props = node.props ?? {};
-  const paddingX = readNumber(props.paddingX, defaultButtonProps.paddingX);
-  const paddingY = readNumber(props.paddingY, defaultButtonProps.paddingY);
-  const marginX = readNumber(props.marginX, defaultButtonProps.marginX);
-  const marginY = readNumber(props.marginY, defaultButtonProps.marginY);
+  const paddingX = props.paddingX ?? defaultButtonProps.paddingX;
+  const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
+  const marginX = props.marginX ?? defaultButtonProps.marginX;
+  const marginY = props.marginY ?? defaultButtonProps.marginY;
   const borderRadius = readNumber(
     props.borderRadius,
     defaultButtonProps.borderRadius
@@ -50,34 +51,42 @@ export function ButtonLayoutEditor({
 
       <div className="border-t border-[var(--editor-border)] p-3">
         <div className="grid grid-cols-2 gap-2">
-          <CompactNumber
+          <SpacingValueControl
+            compact
             icon={<MoveHorizontal size={12} />}
             label="Padding X"
             value={paddingX}
+            fallback={defaultButtonProps.paddingX}
             min={0}
             max={64}
             onChange={(value) => patch({ paddingX: value })}
           />
-          <CompactNumber
+          <SpacingValueControl
+            compact
             icon={<MoveVertical size={12} />}
             label="Padding Y"
             value={paddingY}
+            fallback={defaultButtonProps.paddingY}
             min={0}
             max={48}
             onChange={(value) => patch({ paddingY: value })}
           />
-          <CompactNumber
+          <SpacingValueControl
+            compact
             icon={<MoveHorizontal size={12} />}
             label="Margin X"
             value={marginX}
+            fallback={defaultButtonProps.marginX}
             min={0}
             max={64}
             onChange={(value) => patch({ marginX: value })}
           />
-          <CompactNumber
+          <SpacingValueControl
+            compact
             icon={<MoveVertical size={12} />}
             label="Margin Y"
             value={marginY}
+            fallback={defaultButtonProps.marginY}
             min={0}
             max={64}
             onChange={(value) => patch({ marginY: value })}

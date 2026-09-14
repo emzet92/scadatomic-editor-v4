@@ -1,0 +1,1127 @@
+diff --git a/DESIGN_SYSTEM_SPACING.md b/DESIGN_SYSTEM_SPACING.md
+new file mode 100644
+index 0000000..8841ef6
+--- /dev/null
++++ b/DESIGN_SYSTEM_SPACING.md
+@@ -0,0 +1,70 @@
++# SCADAtomic Design System — Spacing Tokens
++
++Spacing is the third project-local design-token family after Colors and Typography.
++
++## Model
++
++```ts
++{
++  designSystem: {
++    spacing: {
++      "<uuid>": {
++        id: "<uuid>",
++        name: "Spacing/MD",
++        value: 16
++      }
++    }
++  }
++}
++```
++
++A spacing-capable property stores either a literal number or a stable token reference:
++
++```ts
++padding: 16
++```
++
++or:
++
++```ts
++padding: {
++  kind: "spacing-token",
++  tokenId: "<uuid>"
++}
++```
++
++The renderer resolves references immediately before rendering, so primitive React components continue to receive ordinary numeric pixel values.
++
++## Initial supported properties
++
++- Page: `padding`, `gap`
++- Container: `padding`, `gap`
++- Modal: `padding`, `gap`
++- Navigation: `padding`, `gap`
++- Button: `paddingX`, `paddingY`, `marginX`, `marginY`
++
++`borderRadius` is deliberately not a spacing token. It will belong to a separate Radius token family.
++
++## Editor UX
++
++Design System → Spacing contains a project-local token library and a starter scale:
++
++- Spacing/2XS = 2px
++- Spacing/XS = 4px
++- Spacing/SM = 8px
++- Spacing/MD = 16px
++- Spacing/LG = 24px
++- Spacing/XL = 32px
++- Spacing/2XL = 48px
++
++Spacing-capable properties show a source selector. The property can remain a local numeric value or reference one token from the Design System list.
++
++## Rename and delete semantics
++
++References use token IDs, not names. Renaming a token is safe.
++
++Deleting a spacing token detaches all references to the token's current numeric value. This preserves the current layout and prevents broken references.
++
++## Rendering
++
++The generic `resolveDesignTokenReferences()` resolver handles color, typography and spacing references. Components do not import design-system token types and remain renderer-agnostic.
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index 9ccd9dd..9841c8f 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -47,6 +47,7 @@ import { DataWorkspace } from "./gui/data/DataWorkspace";
+ import { DesignSystemPanel, type DesignSystemSection } from "./gui/design-system/DesignSystemPanel";
+ import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
+ import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
++import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -601,8 +602,10 @@ export function EditorPage() {
+             <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+               {designSystemSection === "colors" ? (
+                 <ColorLibraryWorkspace />
+-              ) : (
++              ) : designSystemSection === "typography" ? (
+                 <TypographyLibraryWorkspace />
++              ) : (
++                <SpacingLibraryWorkspace />
+               )}
+             </div>
+           ) : (
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+index ad282ad..2496381 100644
+--- a/src/uiframework/design-system/colors.ts
++++ b/src/uiframework/design-system/colors.ts
+@@ -7,6 +7,7 @@ import {
+   type DesignTokenReference,
+ } from "./tokens";
+ import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
++import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
+ 
+ export type ColorTokenId = string;
+ 
+@@ -25,12 +26,13 @@ export type ColorValue = string | ColorTokenRef;
+ export type DesignSystem = {
+   colors: Record<ColorTokenId, ColorToken>;
+   typography?: Record<TypographyTokenId, TypographyToken> | undefined;
++  spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
+ };
+ 
+ export const DEFAULT_COLOR_LITERAL = "#18181b";
+ 
+ export function createEmptyDesignSystem(): DesignSystem {
+-  return { colors: {}, typography: {} };
++  return { colors: {}, typography: {}, spacing: {} };
+ }
+ 
+ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+@@ -57,9 +59,21 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
+   });
+   if (!colorsValid) return false;
+ 
+-  if (value.typography === undefined) return true;
+-  if (!isRecord(value.typography)) return false;
+-  return Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id));
++  if (value.typography !== undefined) {
++    if (!isRecord(value.typography)) return false;
++    if (!Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id))) {
++      return false;
++    }
++  }
++
++  if (value.spacing !== undefined) {
++    if (!isRecord(value.spacing)) return false;
++    if (!Object.entries(value.spacing).every(([id, token]) => isSpacingToken(token, id))) {
++      return false;
++    }
++  }
++
++  return true;
+ }
+ 
+ export function normalizeColorForNativeInput(value: string, fallback = "#18181b") {
+diff --git a/src/uiframework/design-system/document-spacing.ts b/src/uiframework/design-system/document-spacing.ts
+new file mode 100644
+index 0000000..05c0a14
+--- /dev/null
++++ b/src/uiframework/design-system/document-spacing.ts
+@@ -0,0 +1,100 @@
++import type { ComponentInputDefinition, UiDocument, UiNode } from "../core/document";
++import {
++  countSpacingTokenReferences,
++  detachSpacingTokenReference,
++  type SpacingTokenId,
++} from "./spacing";
++
++export function detachSpacingTokenFromDocument(
++  document: UiDocument,
++  tokenId: SpacingTokenId,
++  replacement: number
++): UiDocument {
++  return {
++    ...document,
++    nodes: mapNodes(document.nodes, tokenId, replacement),
++    components: document.components
++      ? Object.fromEntries(
++          Object.entries(document.components).map(([id, definition]) => [
++            id,
++            {
++              ...definition,
++              nodes: mapNodes(definition.nodes, tokenId, replacement),
++              inputs: definition.inputs
++                ? mapInputs(definition.inputs, tokenId, replacement)
++                : undefined,
++            },
++          ])
++        )
++      : document.components,
++  };
++}
++
++export function countSpacingTokenUsages(
++  document: UiDocument,
++  tokenId: SpacingTokenId
++): number {
++  let count = countSpacingTokenReferences(document.nodes, tokenId);
++  for (const definition of Object.values(document.components ?? {})) {
++    count += countSpacingTokenReferences(definition.nodes, tokenId);
++    count += countSpacingTokenReferences(definition.inputs, tokenId);
++  }
++  return count;
++}
++
++function mapNodes(
++  nodes: Record<string, UiNode>,
++  tokenId: SpacingTokenId,
++  replacement: number
++): Record<string, UiNode> {
++  return Object.fromEntries(
++    Object.entries(nodes).map(([id, node]) => [id, detachTokenFromNode(node, tokenId, replacement)])
++  );
++}
++
++function detachTokenFromNode(
++  node: UiNode,
++  tokenId: SpacingTokenId,
++  replacement: number
++): UiNode {
++  return {
++    ...node,
++    props: node.props
++      ? (detachSpacingTokenReference(node.props, tokenId, replacement) as Record<string, unknown>)
++      : node.props,
++    variants: node.variants
++      ? Object.fromEntries(
++          Object.entries(node.variants).map(([name, variant]) => [
++            name,
++            {
++              ...variant,
++              props: detachSpacingTokenReference(
++                variant.props,
++                tokenId,
++                replacement
++              ) as Record<string, unknown>,
++            },
++          ])
++        )
++      : node.variants,
++  };
++}
++
++function mapInputs(
++  inputs: Record<string, ComponentInputDefinition>,
++  tokenId: SpacingTokenId,
++  replacement: number
++): Record<string, ComponentInputDefinition> {
++  return Object.fromEntries(
++    Object.entries(inputs).map(([name, input]) => {
++      if (input.type === "tagRef" || input.defaultValue === undefined) return [name, input];
++      return [
++        name,
++        {
++          ...input,
++          defaultValue: detachSpacingTokenReference(input.defaultValue, tokenId, replacement),
++        },
++      ];
++    })
++  );
++}
+diff --git a/src/uiframework/design-system/resolver.ts b/src/uiframework/design-system/resolver.ts
+index f80ccea..e8888cf 100644
+--- a/src/uiframework/design-system/resolver.ts
++++ b/src/uiframework/design-system/resolver.ts
+@@ -1,5 +1,6 @@
+ import { isColorTokenRef, resolveColorValue, type DesignSystem } from "./colors";
+ import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
++import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
+ import { isRecord } from "./tokens";
+ 
+ /**
+@@ -12,6 +13,7 @@ export function resolveDesignTokenReferences(
+ ): unknown {
+   if (isColorTokenRef(value)) return resolveColorValue(value, designSystem);
+   if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
++  if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
+   if (Array.isArray(value)) {
+     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+   }
+diff --git a/src/uiframework/design-system/spacing.ts b/src/uiframework/design-system/spacing.ts
+new file mode 100644
+index 0000000..cf7d1dd
+--- /dev/null
++++ b/src/uiframework/design-system/spacing.ts
+@@ -0,0 +1,94 @@
++import type { DesignSystem } from "./colors";
++import {
++  countTokenReferences,
++  isDesignTokenReference,
++  isRecord,
++  replaceTokenReferences,
++  type DesignTokenBase,
++  type DesignTokenReference,
++} from "./tokens";
++
++export type SpacingTokenId = string;
++
++export type SpacingToken = DesignTokenBase & {
++  value: number;
++};
++
++export type SpacingTokenRef = DesignTokenReference<"spacing-token">;
++export type SpacingValue = number | SpacingTokenRef;
++
++export const DEFAULT_SPACING_LITERAL = 0;
++
++export function createSpacingTokenRef(tokenId: SpacingTokenId): SpacingTokenRef {
++  return { kind: "spacing-token", tokenId };
++}
++
++export function isSpacingTokenRef(value: unknown): value is SpacingTokenRef {
++  return isDesignTokenReference(value, "spacing-token");
++}
++
++export function isSpacingToken(value: unknown, id?: string): value is SpacingToken {
++  if (!isRecord(value)) return false;
++  return (
++    typeof value.id === "string" &&
++    (id === undefined || value.id === id) &&
++    typeof value.name === "string" &&
++    value.name.trim().length > 0 &&
++    typeof value.value === "number" &&
++    Number.isFinite(value.value) &&
++    value.value >= 0 &&
++    (value.description === undefined || typeof value.description === "string")
++  );
++}
++
++export function resolveSpacingValue(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback = DEFAULT_SPACING_LITERAL
++): number {
++  if (typeof value === "number" && Number.isFinite(value)) return value;
++  if (isSpacingTokenRef(value)) {
++    const token = designSystem?.spacing?.[value.tokenId];
++    return token?.value ?? fallback;
++  }
++  return fallback;
++}
++
++export function detachSpacingTokenReference(
++  value: unknown,
++  tokenId: SpacingTokenId,
++  replacement: number
++): unknown {
++  return replaceTokenReferences(
++    value,
++    (candidate) => isSpacingTokenRef(candidate) && candidate.tokenId === tokenId,
++    () => replacement
++  );
++}
++
++export function countSpacingTokenReferences(value: unknown, tokenId: SpacingTokenId): number {
++  return countTokenReferences(
++    value,
++    (candidate) => isSpacingTokenRef(candidate) && candidate.tokenId === tokenId
++  );
++}
++
++export function createStarterSpacingTokens(): SpacingToken[] {
++  return [
++    createToken("Spacing/2XS", 2),
++    createToken("Spacing/XS", 4),
++    createToken("Spacing/SM", 8),
++    createToken("Spacing/MD", 16),
++    createToken("Spacing/LG", 24),
++    createToken("Spacing/XL", 32),
++    createToken("Spacing/2XL", 48),
++  ];
++}
++
++function createToken(name: string, value: number): SpacingToken {
++  return {
++    id: crypto.randomUUID(),
++    name,
++    value,
++  };
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index bc56313..6696ecc 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -60,6 +60,12 @@ import {
+   type TypographyTokenId,
+ } from "./design-system/typography";
+ import { detachTypographyTokenFromDocument } from "./design-system/document-typography";
++import {
++  createStarterSpacingTokens,
++  type SpacingToken,
++  type SpacingTokenId,
++} from "./design-system/spacing";
++import { detachSpacingTokenFromDocument } from "./design-system/document-spacing";
+ import { createUniqueTokenName } from "./design-system/tokens";
+ 
+ export type DragPreview = {
+@@ -97,6 +103,10 @@ type EditorState = {
+   addStarterTypographyPalette: () => void;
+   updateTypographyToken: (tokenId: TypographyTokenId, patch: Partial<Omit<TypographyToken, "id">>) => void;
+   deleteTypographyToken: (tokenId: TypographyTokenId) => void;
++  addSpacingToken: (draft?: Partial<Omit<SpacingToken, "id">>) => SpacingTokenId;
++  addStarterSpacingScale: () => void;
++  updateSpacingToken: (tokenId: SpacingTokenId, patch: Partial<Omit<SpacingToken, "id">>) => void;
++  deleteSpacingToken: (tokenId: SpacingTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -494,6 +504,103 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addSpacingToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const spacing = designSystem.spacing ?? {};
++      const name = createUniqueTokenName(spacing, draft?.name?.trim() || "Spacing");
++      const token: SpacingToken = {
++        id: tokenId,
++        name,
++        value:
++          typeof draft?.value === "number" && Number.isFinite(draft.value)
++            ? Math.max(0, draft.value)
++            : 16,
++        ...(draft?.description !== undefined ? { description: draft.description } : {}),
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            spacing: { ...spacing, [tokenId]: token },
++          },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterSpacingScale: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextSpacing = { ...(designSystem.spacing ?? {}) };
++      for (const token of createStarterSpacingTokens()) {
++        const name = createUniqueTokenName(nextSpacing, token.name);
++        nextSpacing[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, spacing: nextSpacing },
++        },
++      };
++    });
++  },
++
++  updateSpacingToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const spacing = designSystem.spacing ?? {};
++      const current = spacing[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueTokenName(spacing, patch.name.trim() || current.name, tokenId);
++      const nextValue = patch.value === undefined
++        ? current.value
++        : Number.isFinite(patch.value)
++          ? Math.max(0, patch.value)
++          : current.value;
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            spacing: {
++              ...spacing,
++              [tokenId]: {
++                ...current,
++                ...patch,
++                name: nextName,
++                value: nextValue,
++              },
++            },
++          },
++        },
++      };
++    });
++  },
++
++  deleteSpacingToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const spacing = designSystem.spacing ?? {};
++      const token = spacing[tokenId];
++      if (!token) return state;
++      const detached = detachSpacingTokenFromDocument(state.document, tokenId, token.value);
++      const nextSpacing = { ...spacing };
++      delete nextSpacing[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, spacing: nextSpacing },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+index 6b048f6..e625c29 100644
+--- a/src/uiframework/gui/design-system/DesignSystemPanel.tsx
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -1,9 +1,9 @@
+ import type { ReactNode } from "react";
+-import { Palette, Type } from "lucide-react";
++import { MoveHorizontal, Palette, Type } from "lucide-react";
+ import { useEditorStore } from "../../editor-store";
+ import { SectionHeader } from "../ui";
+ 
+-export type DesignSystemSection = "colors" | "typography";
++export type DesignSystemSection = "colors" | "typography" | "spacing";
+ 
+ export function DesignSystemPanel({
+   activeSection,
+@@ -18,6 +18,9 @@ export function DesignSystemPanel({
+   const typographyCount = useEditorStore(
+     (state) => Object.keys(state.document.designSystem?.typography ?? {}).length
+   );
++  const spacingCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.spacing ?? {}).length
++  );
+ 
+   return (
+     <div className="space-y-3">
+@@ -39,8 +42,15 @@ export function DesignSystemPanel({
+         count={typographyCount}
+         onClick={() => onSelectSection("typography")}
+       />
++      <TokenSectionButton
++        active={activeSection === "spacing"}
++        icon={<MoveHorizontal size={15} />}
++        title="Spacing"
++        count={spacingCount}
++        onClick={() => onSelectSection("spacing")}
++      />
+       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
+-        Spacing, radii, shadows and motion can use the same token reference model next.
++        Radius, shadows, borders and motion can use the same token reference model next.
+       </div>
+     </div>
+   );
+diff --git a/src/uiframework/gui/design-system/SpacingLibraryWorkspace.tsx b/src/uiframework/gui/design-system/SpacingLibraryWorkspace.tsx
+new file mode 100644
+index 0000000..e874f25
+--- /dev/null
++++ b/src/uiframework/gui/design-system/SpacingLibraryWorkspace.tsx
+@@ -0,0 +1,120 @@
++import { MoveHorizontal, Plus, Trash2 } from "lucide-react";
++import { useMemo } from "react";
++import { countSpacingTokenUsages } from "../../design-system/document-spacing";
++import { useEditorStore } from "../../editor-store";
++import { Button, PanelCard, TextInput } from "../ui";
++
++export function SpacingLibraryWorkspace() {
++  const document = useEditorStore((state) => state.document);
++  const addSpacingToken = useEditorStore((state) => state.addSpacingToken);
++  const addStarterSpacingScale = useEditorStore((state) => state.addStarterSpacingScale);
++  const updateSpacingToken = useEditorStore((state) => state.updateSpacingToken);
++  const deleteSpacingToken = useEditorStore((state) => state.deleteSpacingToken);
++
++  const tokens = useMemo(
++    () => Object.values(document.designSystem?.spacing ?? {}).sort((a, b) => {
++      if (a.value !== b.value) return a.value - b.value;
++      return a.name.localeCompare(b.name);
++    }),
++    [document.designSystem?.spacing]
++  );
++
++  return (
++    <div className="mx-auto w-full max-w-6xl p-8">
++      <div className="mb-7 flex items-start justify-between gap-5">
++        <div>
++          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++            <MoveHorizontal size={14} /> Design System
++          </div>
++          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Spacing</h1>
++          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++            Define a shared spacing scale for padding, gaps and margins. Components reference stable token IDs, so renaming a spacing step is safe.
++          </p>
++        </div>
++        <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
++          <Plus size={14} /> Add spacing
++        </Button>
++      </div>
++
++      {tokens.length === 0 ? (
++        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
++          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++            <MoveHorizontal size={20} />
++          </div>
++          <div className="text-sm font-semibold text-[var(--editor-text)]">No spacing tokens yet</div>
++          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
++            Create individual values or seed a practical 2 / 4 / 8 / 16 / 24 / 32 / 48 px scale.
++          </div>
++          <div className="mt-4 flex items-center gap-2">
++            <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
++              <Plus size={14} /> Add spacing
++            </Button>
++            <Button size="sm" variant="secondary" onClick={addStarterSpacingScale}>
++              Create starter scale
++            </Button>
++          </div>
++        </PanelCard>
++      ) : (
++        <div className="space-y-3">
++          {tokens.map((token) => {
++            const usageCount = countSpacingTokenUsages(document, token.id);
++            return (
++              <div
++                key={token.id}
++                className="grid grid-cols-[minmax(210px,1fr)_minmax(240px,1.3fr)_130px_48px] items-center gap-4 rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm"
++              >
++                <div className="space-y-2">
++                  <TextInput
++                    aria-label="Spacing token name"
++                    value={token.name}
++                    onChange={(event) => updateSpacingToken(token.id, { name: event.target.value })}
++                  />
++                  <div className="text-[10px] text-[var(--editor-text-soft)]">
++                    {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
++                  </div>
++                </div>
++
++                <div className="flex min-h-12 items-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4">
++                  <div
++                    className="h-3 rounded-full bg-[var(--editor-accent)] transition-[width]"
++                    style={{ width: `${Math.max(2, Math.min(240, token.value * 4))}px` }}
++                  />
++                  <span className="ml-3 text-xs text-[var(--editor-text-muted)]">
++                    {token.value}px
++                  </span>
++                </div>
++
++                <div className="flex items-center gap-2">
++                  <TextInput
++                    aria-label="Spacing value"
++                    type="number"
++                    min={0}
++                    step={1}
++                    value={token.value}
++                    onChange={(event) =>
++                      updateSpacingToken(token.id, { value: Math.max(0, Number(event.target.value)) })
++                    }
++                  />
++                  <span className="text-xs text-[var(--editor-text-muted)]">px</span>
++                </div>
++
++                <button
++                  type="button"
++                  title="Delete spacing token and detach usages"
++                  onClick={() => deleteSpacingToken(token.id)}
++                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
++                >
++                  <Trash2 size={14} />
++                </button>
++              </div>
++            );
++          })}
++        </div>
++      )}
++
++      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Deleting a spacing token detaches every reference to its current numeric value, preserving the layout instead of leaving broken references.
++      </div>
++    </div>
++  );
++}
+diff --git a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+index 5282e75..bb4b5a0 100644
+--- a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+@@ -4,6 +4,7 @@ import { defaultButtonProps } from "../../component-props";
+ import type { UiNode } from "../../core/document";
+ import type { UpdateNode } from "./property-panel-types";
+ import { TextInput } from "../ui";
++import { SpacingValueControl } from "./SpacingValueControl";
+ 
+ export function ButtonLayoutEditor({
+   node,
+@@ -13,10 +14,10 @@ export function ButtonLayoutEditor({
+   updateNode: UpdateNode;
+ }) {
+   const props = node.props ?? {};
+-  const paddingX = readNumber(props.paddingX, defaultButtonProps.paddingX);
+-  const paddingY = readNumber(props.paddingY, defaultButtonProps.paddingY);
+-  const marginX = readNumber(props.marginX, defaultButtonProps.marginX);
+-  const marginY = readNumber(props.marginY, defaultButtonProps.marginY);
++  const paddingX = props.paddingX ?? defaultButtonProps.paddingX;
++  const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
++  const marginX = props.marginX ?? defaultButtonProps.marginX;
++  const marginY = props.marginY ?? defaultButtonProps.marginY;
+   const borderRadius = readNumber(
+     props.borderRadius,
+     defaultButtonProps.borderRadius
+@@ -50,34 +51,42 @@ export function ButtonLayoutEditor({
+ 
+       <div className="border-t border-[var(--editor-border)] p-3">
+         <div className="grid grid-cols-2 gap-2">
+-          <CompactNumber
++          <SpacingValueControl
++            compact
+             icon={<MoveHorizontal size={12} />}
+             label="Padding X"
+             value={paddingX}
++            fallback={defaultButtonProps.paddingX}
+             min={0}
+             max={64}
+             onChange={(value) => patch({ paddingX: value })}
+           />
+-          <CompactNumber
++          <SpacingValueControl
++            compact
+             icon={<MoveVertical size={12} />}
+             label="Padding Y"
+             value={paddingY}
++            fallback={defaultButtonProps.paddingY}
+             min={0}
+             max={48}
+             onChange={(value) => patch({ paddingY: value })}
+           />
+-          <CompactNumber
++          <SpacingValueControl
++            compact
+             icon={<MoveHorizontal size={12} />}
+             label="Margin X"
+             value={marginX}
++            fallback={defaultButtonProps.marginX}
+             min={0}
+             max={64}
+             onChange={(value) => patch({ marginX: value })}
+           />
+-          <CompactNumber
++          <SpacingValueControl
++            compact
+             icon={<MoveVertical size={12} />}
+             label="Margin Y"
+             value={marginY}
++            fallback={defaultButtonProps.marginY}
+             min={0}
+             max={64}
+             onChange={(value) => patch({ marginY: value })}
+diff --git a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+index b6e15ec..f04edd8 100644
+--- a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+@@ -6,8 +6,10 @@ import {
+   type ContainerGridRowMode,
+ } from "../../component-props";
+ import type { UiNode } from "../../core/document";
++import { resolveSpacingValue } from "../../design-system/spacing";
++import { useEditorStore } from "../../editor-store";
+ import type { UpdateNode } from "./property-panel-types";
+-import { TextInput } from "../ui";
++import { SpacingValueControl } from "./SpacingValueControl";
+ 
+ type GridPreset = {
+   id: string;
+@@ -83,12 +85,25 @@ export function ContainerLayoutEditor({
+   updateNode: UpdateNode;
+ }) {
+   const rawProps = node.props ?? {};
++  const designSystem = useEditorStore((state) => state.document.designSystem);
+   const display = rawProps.display === "flex" ? "flex" : "grid";
+   const gridMode: ContainerGridMode =
+     rawProps.gridMode === "adaptive" ? "adaptive" : "fixed";
+   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
+-  const gap = clampInt(rawProps.gap, 0, 64, defaultContainerProps.gap);
+-  const padding = clampInt(rawProps.padding, 0, 64, defaultContainerProps.padding);
++  const gapValue = rawProps.gap ?? defaultContainerProps.gap;
++  const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
++  const gap = clampInt(
++    resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
++    0,
++    64,
++    defaultContainerProps.gap
++  );
++  const padding = clampInt(
++    resolveSpacingValue(paddingValue, designSystem, defaultContainerProps.padding),
++    0,
++    64,
++    defaultContainerProps.padding
++  );
+   const minColumnWidth = clampInt(
+     rawProps.minColumnWidth,
+     96,
+@@ -339,14 +354,22 @@ export function ContainerLayoutEditor({
+           ))}
+         </div>
+         <div className="mt-3 grid grid-cols-2 gap-2">
+-          <CompactValue
++          <SpacingValueControl
++            compact
+             label="Gap"
+-            value={gap}
++            value={gapValue}
++            fallback={defaultContainerProps.gap}
++            min={0}
++            max={64}
+             onChange={(value) => patch({ gap: value })}
+           />
+-          <CompactValue
++          <SpacingValueControl
++            compact
+             label="Padding"
+-            value={padding}
++            value={paddingValue}
++            fallback={defaultContainerProps.padding}
++            min={0}
++            max={64}
+             onChange={(value) => patch({ padding: value })}
+           />
+         </div>
+@@ -482,38 +505,6 @@ function IconButton({
+   );
+ }
+ 
+-function CompactValue({
+-  label,
+-  value,
+-  onChange,
+-}: {
+-  label: string;
+-  value: number;
+-  onChange: (value: number) => void;
+-}) {
+-  return (
+-    <label className="rounded-[14px] border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2">
+-      <span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--editor-text-soft)]">
+-        {label}
+-      </span>
+-      <div className="mt-1 flex items-center gap-1">
+-        <TextInput
+-          controlSize="sm"
+-          type="number"
+-          min={0}
+-          max={64}
+-          value={value}
+-          onChange={(event) =>
+-            onChange(Math.max(0, Math.min(64, Number(event.target.value) || 0)))
+-          }
+-          className="h-7 min-w-0 flex-1 px-2 text-xs font-semibold"
+-        />
+-        <span className="text-[10px] text-[var(--editor-text-soft)]">px</span>
+-      </div>
+-    </label>
+-  );
+-}
+-
+ function clampInt(
+   value: unknown,
+   min: number,
+diff --git a/src/uiframework/gui/property-panel/SpacingValueControl.tsx b/src/uiframework/gui/property-panel/SpacingValueControl.tsx
+new file mode 100644
+index 0000000..0d854ff
+--- /dev/null
++++ b/src/uiframework/gui/property-panel/SpacingValueControl.tsx
+@@ -0,0 +1,127 @@
++import type { ReactNode } from "react";
++import {
++  createSpacingTokenRef,
++  isSpacingTokenRef,
++  resolveSpacingValue,
++  type SpacingValue,
++} from "../../design-system/spacing";
++import { useEditorStore } from "../../editor-store";
++import { Select, TextInput } from "../ui";
++
++const LOCAL_OPTION = "__local__";
++
++export function SpacingValueControl({
++  label,
++  icon,
++  value,
++  fallback = 0,
++  min = 0,
++  max,
++  step = 1,
++  onChange,
++  compact = false,
++}: {
++  label: string;
++  icon?: ReactNode;
++  value: unknown;
++  fallback?: number;
++  min?: number;
++  max?: number | undefined;
++  step?: number;
++  onChange: (value: SpacingValue) => void;
++  compact?: boolean;
++}) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
++  const tokens = Object.values(designSystem?.spacing ?? {}).sort((a, b) => {
++    if (a.value !== b.value) return a.value - b.value;
++    return a.name.localeCompare(b.name);
++  });
++  const tokenRef = isSpacingTokenRef(value) ? value : undefined;
++  const selectedToken = tokenRef ? designSystem?.spacing?.[tokenRef.tokenId] : undefined;
++  const resolvedValue = clamp(resolveSpacingValue(value, designSystem, fallback), min, max);
++  const selection = tokenRef ? tokenRef.tokenId : LOCAL_OPTION;
++
++  function selectMode(next: string) {
++    if (next === LOCAL_OPTION) {
++      onChange(resolvedValue);
++      return;
++    }
++    onChange(createSpacingTokenRef(next));
++  }
++
++  const content = (
++    <div className={compact ? "space-y-1.5" : "space-y-2"}>
++      <Select
++        aria-label={`${label} source`}
++        value={selection}
++        onChange={(event) => selectMode(event.target.value)}
++        controlSize={compact ? "sm" : "md"}
++      >
++        <option value={LOCAL_OPTION}>Local value</option>
++        {tokens.length > 0 ? <optgroup label="Design System">{tokens.map((token) => (
++          <option key={token.id} value={token.id}>
++            {token.name} — {token.value}px
++          </option>
++        ))}</optgroup> : null}
++      </Select>
++
++      {tokenRef ? (
++        selectedToken ? (
++          <div className="flex min-h-8 items-center justify-between gap-2 rounded-[10px] border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2.5 text-[10px] text-[var(--editor-text-muted)]">
++            <span className="truncate">{selectedToken.name}</span>
++            <span className="shrink-0 font-mono text-[var(--editor-text)]">{selectedToken.value}px</span>
++          </div>
++        ) : (
++          <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
++            Missing spacing token. Choose another token or switch to Local value.
++          </div>
++        )
++      ) : (
++        <div className="flex items-center gap-1.5">
++          <TextInput
++            aria-label={`${label} value`}
++            controlSize={compact ? "sm" : "md"}
++            type="number"
++            min={min}
++            max={max}
++            step={step}
++            value={resolvedValue}
++            onChange={(event) => onChange(clamp(Number(event.target.value), min, max))}
++            className="min-w-0 flex-1"
++          />
++          <span className="shrink-0 text-[10px] text-[var(--editor-text-soft)]">px</span>
++        </div>
++      )}
++
++      {tokens.length === 0 && !compact ? (
++        <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
++          Add values in Design System → Spacing to enable token references.
++        </div>
++      ) : null}
++    </div>
++  );
++
++  if (!compact) {
++    return (
++      <div>
++        <div className="mb-1.5 text-xs font-medium text-[var(--editor-text-muted)]">{label}</div>
++        {content}
++      </div>
++    );
++  }
++
++  return (
++    <div className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
++      <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
++        {icon}
++        {label}
++      </div>
++      {content}
++    </div>
++  );
++}
++
++function clamp(value: number, min: number, max: number | undefined) {
++  if (!Number.isFinite(value)) return min;
++  return Math.max(min, max === undefined ? value : Math.min(max, value));
++}
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index 0775292..4283f58 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -25,6 +25,7 @@ import {
+ } from "../../chart-time-range";
+ import type { UpdateNode } from "./property-panel-types";
+ import { ChartSeriesInput } from "./ChartSeriesInput";
++import { SpacingValueControl } from "./SpacingValueControl";
+ import { ImageAssetPicker } from "../assets/ImageAssetPicker";
+ import {
+   Checkbox,
+@@ -65,6 +66,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
+   color: (props) => <ColorControl {...props} />,
+   select: (props) => <SelectControl {...props} />,
+   toggle: (props) => <ToggleControl {...props} />,
++  spacing: (props) => <SpacingControl {...props} />,
+   number: (props) => <NumberControl {...props} />,
+   text: (props) => <TextControl {...props} />,
+ };
+@@ -580,6 +582,20 @@ function ToggleControl({ control, propName, value, updateProp }: PropertyControl
+   );
+ }
+ 
++function SpacingControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "spacing") return null;
++  return (
++    <SpacingValueControl
++      label={propName}
++      value={value}
++      min={control.min ?? 0}
++      max={control.max}
++      step={control.step ?? 1}
++      onChange={updateProp}
++    />
++  );
++}
++
+ function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+   if (control.kind !== "number") return null;
+   return (
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index 6d07cd9..9021921 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -3,6 +3,7 @@ import type { ElementType } from "react";
+ export type InspectorControl =
+   | { kind: "text" }
+   | { kind: "number"; min?: number; max?: number; step?: number }
++  | { kind: "spacing"; min?: number; max?: number; step?: number }
+   | { kind: "color" }
+   | { kind: "toggle" }
+   | { kind: "image-asset" }
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+index c89e2d1..7257013 100644
+--- a/src/uiframework/registry/components/button.ts
++++ b/src/uiframework/registry/components/button.ts
+@@ -14,10 +14,10 @@ export const buttonDefinition = {
+     label: { kind: "text" },
+     disabled: { kind: "toggle" },
+     backgroundColor: { kind: "color" },
+-    paddingX: { kind: "number", min: 0, max: 64 },
+-    paddingY: { kind: "number", min: 0, max: 48 },
+-    marginX: { kind: "number", min: 0, max: 64 },
+-    marginY: { kind: "number", min: 0, max: 64 },
++    paddingX: { kind: "spacing", min: 0, max: 64 },
++    paddingY: { kind: "spacing", min: 0, max: 48 },
++    marginX: { kind: "spacing", min: 0, max: 64 },
++    marginY: { kind: "spacing", min: 0, max: 64 },
+     borderRadius: { kind: "number", min: 0, max: 64 },
+   },
+ 
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+index 7ec4936..cc69695 100644
+--- a/src/uiframework/registry/components/container.ts
++++ b/src/uiframework/registry/components/container.ts
+@@ -17,8 +17,8 @@ export const containerDefinition = {
+     minHeight: { kind: "text" },
+     maxWidth: { kind: "text" },
+     maxHeight: { kind: "text" },
+-    padding: { kind: "number", min: 0 },
+-    gap: { kind: "number", min: 0 },
++    padding: { kind: "spacing", min: 0 },
++    gap: { kind: "spacing", min: 0 },
+     columns: { kind: "number", min: 1, max: 24 },
+     gridMode: { kind: "select", options: ["fixed", "adaptive"] },
+     minColumnWidth: { kind: "number", min: 96, max: 640 },
+diff --git a/src/uiframework/registry/components/modal.ts b/src/uiframework/registry/components/modal.ts
+index bab6d64..690cb15 100644
+--- a/src/uiframework/registry/components/modal.ts
++++ b/src/uiframework/registry/components/modal.ts
+@@ -24,8 +24,8 @@ export const modalDefinition = {
+     width: { kind: "number", min: 240 },
+     minHeight: { kind: "number", min: 120 },
+     backgroundColor: { kind: "color" },
+-    padding: { kind: "number", min: 0 },
+-    gap: { kind: "number", min: 0 },
++    padding: { kind: "spacing", min: 0 },
++    gap: { kind: "spacing", min: 0 },
+     columns: { kind: "number", min: 1, max: 24 },
+     display: { kind: "select", options: ["grid", "flex"] },
+     borderRadius: { kind: "number", min: 0, max: 64 },
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+index 3b59b8b..851031a 100644
+--- a/src/uiframework/registry/components/navigation.ts
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -13,8 +13,8 @@ export const navigationDefinition = {
+     backgroundColor: { kind: "color" },
+     color: { kind: "color" },
+     activeColor: { kind: "color" },
+-    gap: { kind: "number", min: 0, max: 48 },
+-    padding: { kind: "number", min: 0, max: 48 },
++    gap: { kind: "spacing", min: 0, max: 48 },
++    padding: { kind: "spacing", min: 0, max: 48 },
+     borderRadius: { kind: "number", min: 0, max: 48 },
+   },
+   bindings: {
+diff --git a/src/uiframework/registry/components/page.ts b/src/uiframework/registry/components/page.ts
+index 371fe64..694c3fa 100644
+--- a/src/uiframework/registry/components/page.ts
++++ b/src/uiframework/registry/components/page.ts
+@@ -12,8 +12,8 @@ export const pageDefinition = {
+   acceptsChildren: true,
+   inspector: {
+     backgroundColor: { kind: "color" },
+-    padding: { kind: "number", min: 0 },
+-    gap: { kind: "number", min: 0 },
++    padding: { kind: "spacing", min: 0 },
++    gap: { kind: "spacing", min: 0 },
+     columns: { kind: "number", min: 1, max: 24 },
+     display: { kind: "select", options: ["grid", "flex"] },
+   },

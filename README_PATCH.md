@@ -1,20 +1,33 @@
-# SCADAtomic — Design System Typography patch
+# SCADAtomic Design System — Spacing Tokens patch
 
-Base: `scadatomic-editor-design-system-colors-picker-source.zip`
+Base: `scadatomic-editor-design-system-typography-source.zip`
 
-Adds the second Design System token family: **Typography**.
+## Adds
 
-Highlights:
-- generic `DesignTokenBase` / `DesignTokenReference<TKind>` foundation,
-- project Typography library with stable UUID references,
-- starter typography scale,
-- `Text.textStyle` local style or `typography-token` reference,
-- Property Panel `Local style / Design System` selector,
-- renderer-level token resolution,
-- safe token deletion by detaching usages to an equivalent local style,
-- legacy Text props remain compatible until the user opts into the new typography control.
+- Design System → Spacing workspace
+- stable `SpacingToken` IDs and `{ kind: "spacing-token", tokenId }` references
+- starter scale: 2 / 4 / 8 / 16 / 24 / 32 / 48 px
+- generic design-token resolver support
+- safe detach to the current numeric px value when a token is deleted
+- reusable spacing property control with Local / Design System selection
+- Page: `padding`, `gap`
+- Container: `padding`, `gap`
+- Modal: `padding`, `gap`
+- Navigation: `padding`, `gap`
+- Button: `paddingX`, `paddingY`, `marginX`, `marginY`
 
-Validation performed:
-- TypeScript 6 project typecheck: passed,
-- ESLint for all changed TypeScript/TSX files: passed,
-- `git apply --check PATCH_DESIGN_SYSTEM_TYPOGRAPHY.diff`: passed.
+`borderRadius` is intentionally excluded; it belongs to the future Radius token family.
+
+## Apply
+
+```bash
+git apply PATCH_DESIGN_SYSTEM_SPACING.diff
+```
+
+## Validation
+
+- TypeScript 6 project typecheck: PASS
+- ESLint changed files: PASS
+- spacing resolve/count/detach smoke test: PASS
+- generic DesignSystem resolver smoke test: PASS
+- `git apply --check`: PASS

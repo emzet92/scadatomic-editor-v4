@@ -12,8 +12,8 @@ export const pageDefinition = {
   acceptsChildren: true,
   inspector: {
     backgroundColor: { kind: "color" },
-    padding: { kind: "number", min: 0 },
-    gap: { kind: "number", min: 0 },
+    padding: { kind: "spacing", min: 0 },
+    gap: { kind: "spacing", min: 0 },
     columns: { kind: "number", min: 1, max: 24 },
     display: { kind: "select", options: ["grid", "flex"] },
   },

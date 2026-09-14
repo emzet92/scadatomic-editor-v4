@@ -7,6 +7,7 @@ import {
   type DesignTokenReference,
 } from "./tokens";
 import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
+import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
 
 export type ColorTokenId = string;
 
@@ -25,12 +26,13 @@ export type ColorValue = string | ColorTokenRef;
 export type DesignSystem = {
   colors: Record<ColorTokenId, ColorToken>;
   typography?: Record<TypographyTokenId, TypographyToken> | undefined;
+  spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
 };
 
 export const DEFAULT_COLOR_LITERAL = "#18181b";
 
 export function createEmptyDesignSystem(): DesignSystem {
-  return { colors: {}, typography: {} };
+  return { colors: {}, typography: {}, spacing: {} };
 }
 
 export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
@@ -57,9 +59,21 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
   });
   if (!colorsValid) return false;
 
-  if (value.typography === undefined) return true;
-  if (!isRecord(value.typography)) return false;
-  return Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id));
+  if (value.typography !== undefined) {
+    if (!isRecord(value.typography)) return false;
+    if (!Object.entries(value.typography).every(([id, token]) => isTypographyToken(token, id))) {
+      return false;
+    }
+  }
+
+  if (value.spacing !== undefined) {
+    if (!isRecord(value.spacing)) return false;
+    if (!Object.entries(value.spacing).every(([id, token]) => isSpacingToken(token, id))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function normalizeColorForNativeInput(value: string, fallback = "#18181b") {

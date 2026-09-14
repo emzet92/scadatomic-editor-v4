@@ -6,8 +6,10 @@ import {
   type ContainerGridRowMode,
 } from "../../component-props";
 import type { UiNode } from "../../core/document";
+import { resolveSpacingValue } from "../../design-system/spacing";
+import { useEditorStore } from "../../editor-store";
 import type { UpdateNode } from "./property-panel-types";
-import { TextInput } from "../ui";
+import { SpacingValueControl } from "./SpacingValueControl";
 
 type GridPreset = {
   id: string;
@@ -83,12 +85,25 @@ export function ContainerLayoutEditor({
   updateNode: UpdateNode;
 }) {
   const rawProps = node.props ?? {};
+  const designSystem = useEditorStore((state) => state.document.designSystem);
   const display = rawProps.display === "flex" ? "flex" : "grid";
   const gridMode: ContainerGridMode =
     rawProps.gridMode === "adaptive" ? "adaptive" : "fixed";
   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
-  const gap = clampInt(rawProps.gap, 0, 64, defaultContainerProps.gap);
-  const padding = clampInt(rawProps.padding, 0, 64, defaultContainerProps.padding);
+  const gapValue = rawProps.gap ?? defaultContainerProps.gap;
+  const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
+  const gap = clampInt(
+    resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
+    0,
+    64,
+    defaultContainerProps.gap
+  );
+  const padding = clampInt(
+    resolveSpacingValue(paddingValue, designSystem, defaultContainerProps.padding),
+    0,
+    64,
+    defaultContainerProps.padding
+  );
   const minColumnWidth = clampInt(
     rawProps.minColumnWidth,
     96,
@@ -339,14 +354,22 @@ export function ContainerLayoutEditor({
           ))}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <CompactValue
+          <SpacingValueControl
+            compact
             label="Gap"
-            value={gap}
+            value={gapValue}
+            fallback={defaultContainerProps.gap}
+            min={0}
+            max={64}
             onChange={(value) => patch({ gap: value })}
           />
-          <CompactValue
+          <SpacingValueControl
+            compact
             label="Padding"
-            value={padding}
+            value={paddingValue}
+            fallback={defaultContainerProps.padding}
+            min={0}
+            max={64}
             onChange={(value) => patch({ padding: value })}
           />
         </div>
@@ -479,38 +502,6 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-function CompactValue({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="rounded-[14px] border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2">
-      <span className="block text-[9px] font-semibold uppercase tracking-wide text-[var(--editor-text-soft)]">
-        {label}
-      </span>
-      <div className="mt-1 flex items-center gap-1">
-        <TextInput
-          controlSize="sm"
-          type="number"
-          min={0}
-          max={64}
-          value={value}
-          onChange={(event) =>
-            onChange(Math.max(0, Math.min(64, Number(event.target.value) || 0)))
-          }
-          className="h-7 min-w-0 flex-1 px-2 text-xs font-semibold"
-        />
-        <span className="text-[10px] text-[var(--editor-text-soft)]">px</span>
-      </div>
-    </label>
   );
 }
 

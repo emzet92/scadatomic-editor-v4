@@ -3,6 +3,7 @@ import type { ElementType } from "react";
 export type InspectorControl =
   | { kind: "text" }
   | { kind: "number"; min?: number; max?: number; step?: number }
+  | { kind: "spacing"; min?: number; max?: number; step?: number }
   | { kind: "color" }
   | { kind: "toggle" }
   | { kind: "image-asset" }

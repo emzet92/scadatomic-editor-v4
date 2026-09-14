@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Palette, Type } from "lucide-react";
+import { MoveHorizontal, Palette, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { SectionHeader } from "../ui";
 
-export type DesignSystemSection = "colors" | "typography";
+export type DesignSystemSection = "colors" | "typography" | "spacing";
 
 export function DesignSystemPanel({
   activeSection,
@@ -17,6 +17,9 @@ export function DesignSystemPanel({
   );
   const typographyCount = useEditorStore(
     (state) => Object.keys(state.document.designSystem?.typography ?? {}).length
+  );
+  const spacingCount = useEditorStore(
+    (state) => Object.keys(state.document.designSystem?.spacing ?? {}).length
   );
 
   return (
@@ -39,8 +42,15 @@ export function DesignSystemPanel({
         count={typographyCount}
         onClick={() => onSelectSection("typography")}
       />
+      <TokenSectionButton
+        active={activeSection === "spacing"}
+        icon={<MoveHorizontal size={15} />}
+        title="Spacing"
+        count={spacingCount}
+        onClick={() => onSelectSection("spacing")}
+      />
       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
-        Spacing, radii, shadows and motion can use the same token reference model next.
+        Radius, shadows, borders and motion can use the same token reference model next.
       </div>
     </div>
   );

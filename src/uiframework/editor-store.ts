@@ -60,6 +60,12 @@ import {
   type TypographyTokenId,
 } from "./design-system/typography";
 import { detachTypographyTokenFromDocument } from "./design-system/document-typography";
+import {
+  createStarterSpacingTokens,
+  type SpacingToken,
+  type SpacingTokenId,
+} from "./design-system/spacing";
+import { detachSpacingTokenFromDocument } from "./design-system/document-spacing";
 import { createUniqueTokenName } from "./design-system/tokens";
 
 export type DragPreview = {
@@ -97,6 +103,10 @@ type EditorState = {
   addStarterTypographyPalette: () => void;
   updateTypographyToken: (tokenId: TypographyTokenId, patch: Partial<Omit<TypographyToken, "id">>) => void;
   deleteTypographyToken: (tokenId: TypographyTokenId) => void;
+  addSpacingToken: (draft?: Partial<Omit<SpacingToken, "id">>) => SpacingTokenId;
+  addStarterSpacingScale: () => void;
+  updateSpacingToken: (tokenId: SpacingTokenId, patch: Partial<Omit<SpacingToken, "id">>) => void;
+  deleteSpacingToken: (tokenId: SpacingTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -489,6 +499,103 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: {
           ...detached,
           designSystem: { ...designSystem, typography: nextTypography },
+        },
+      };
+    });
+  },
+
+  addSpacingToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const spacing = designSystem.spacing ?? {};
+      const name = createUniqueTokenName(spacing, draft?.name?.trim() || "Spacing");
+      const token: SpacingToken = {
+        id: tokenId,
+        name,
+        value:
+          typeof draft?.value === "number" && Number.isFinite(draft.value)
+            ? Math.max(0, draft.value)
+            : 16,
+        ...(draft?.description !== undefined ? { description: draft.description } : {}),
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            spacing: { ...spacing, [tokenId]: token },
+          },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterSpacingScale: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextSpacing = { ...(designSystem.spacing ?? {}) };
+      for (const token of createStarterSpacingTokens()) {
+        const name = createUniqueTokenName(nextSpacing, token.name);
+        nextSpacing[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, spacing: nextSpacing },
+        },
+      };
+    });
+  },
+
+  updateSpacingToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const spacing = designSystem.spacing ?? {};
+      const current = spacing[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueTokenName(spacing, patch.name.trim() || current.name, tokenId);
+      const nextValue = patch.value === undefined
+        ? current.value
+        : Number.isFinite(patch.value)
+          ? Math.max(0, patch.value)
+          : current.value;
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            spacing: {
+              ...spacing,
+              [tokenId]: {
+                ...current,
+                ...patch,
+                name: nextName,
+                value: nextValue,
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+
+  deleteSpacingToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const spacing = designSystem.spacing ?? {};
+      const token = spacing[tokenId];
+      if (!token) return state;
+      const detached = detachSpacingTokenFromDocument(state.document, tokenId, token.value);
+      const nextSpacing = { ...spacing };
+      delete nextSpacing[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, spacing: nextSpacing },
         },
       };
     });

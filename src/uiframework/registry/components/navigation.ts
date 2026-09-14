@@ -13,8 +13,8 @@ export const navigationDefinition = {
     backgroundColor: { kind: "color" },
     color: { kind: "color" },
     activeColor: { kind: "color" },
-    gap: { kind: "number", min: 0, max: 48 },
-    padding: { kind: "number", min: 0, max: 48 },
+    gap: { kind: "spacing", min: 0, max: 48 },
+    padding: { kind: "spacing", min: 0, max: 48 },
     borderRadius: { kind: "number", min: 0, max: 48 },
   },
   bindings: {

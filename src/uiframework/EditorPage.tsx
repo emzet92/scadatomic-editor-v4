@@ -47,6 +47,7 @@ import { DataWorkspace } from "./gui/data/DataWorkspace";
 import { DesignSystemPanel, type DesignSystemSection } from "./gui/design-system/DesignSystemPanel";
 import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
 import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
+import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
@@ -601,8 +602,10 @@ export function EditorPage() {
             <div className="min-h-full bg-[var(--editor-canvas-bg)]">
               {designSystemSection === "colors" ? (
                 <ColorLibraryWorkspace />
-              ) : (
+              ) : designSystemSection === "typography" ? (
                 <TypographyLibraryWorkspace />
+              ) : (
+                <SpacingLibraryWorkspace />
               )}
             </div>
           ) : (
