@@ -1,10 +1,9 @@
 import { Maximize2, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
-import type { ReactNode } from "react";
 import { defaultButtonProps } from "../../component-props";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
-import { TextInput } from "../ui";
 import { SpacingValueControl } from "./SpacingValueControl";
+import { RadiusValueControl } from "./RadiusValueControl";
 
 export function ButtonLayoutEditor({
   node,
@@ -18,10 +17,7 @@ export function ButtonLayoutEditor({
   const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
   const marginX = props.marginX ?? defaultButtonProps.marginX;
   const marginY = props.marginY ?? defaultButtonProps.marginY;
-  const borderRadius = readNumber(
-    props.borderRadius,
-    defaultButtonProps.borderRadius
-  );
+  const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
 
   function patch(next: Record<string, unknown>) {
     updateNode(node.id, (current) => ({
@@ -94,64 +90,18 @@ export function ButtonLayoutEditor({
         </div>
 
         <div className="mt-2">
-          <CompactNumber
+          <RadiusValueControl
+            compact
             icon={<Radius size={12} />}
             label="Corner radius"
             value={borderRadius}
+            fallback={defaultButtonProps.borderRadius}
             min={0}
-            max={64}
+            max={999}
             onChange={(value) => patch({ borderRadius: value })}
           />
         </div>
       </div>
     </section>
   );
-}
-
-function CompactNumber({
-  icon,
-  label,
-  value,
-  min,
-  max,
-  onChange,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
-      <span className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
-        {icon}
-        {label}
-      </span>
-      <div className="mt-1.5 flex items-center gap-1.5">
-        <TextInput
-          controlSize="sm"
-          type="number"
-          min={min}
-          max={max}
-          value={value}
-          onChange={(event) =>
-            onChange(clamp(Number(event.target.value), min, max))
-          }
-          className="h-7 min-w-0 flex-1 px-2 text-xs"
-        />
-        <span className="text-[9px] text-[var(--editor-text-soft)]">px</span>
-      </div>
-    </label>
-  );
-}
-
-function readNumber(value: unknown, fallback: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function clamp(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min;
-  return Math.max(min, Math.min(max, value));
 }

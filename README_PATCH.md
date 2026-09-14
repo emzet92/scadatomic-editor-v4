@@ -1,33 +1,22 @@
-# SCADAtomic Design System — Spacing Tokens patch
+# SCADAtomic — Design System Radius Tokens patch
 
-Base: `scadatomic-editor-design-system-typography-source.zip`
+Base: `scadatomic-editor-design-system-spacing-source.zip`
 
-## Adds
+Adds the fourth Design System token family: Radius.
 
-- Design System → Spacing workspace
-- stable `SpacingToken` IDs and `{ kind: "spacing-token", tokenId }` references
-- starter scale: 2 / 4 / 8 / 16 / 24 / 32 / 48 px
-- generic design-token resolver support
-- safe detach to the current numeric px value when a token is deleted
-- reusable spacing property control with Local / Design System selection
-- Page: `padding`, `gap`
-- Container: `padding`, `gap`
-- Modal: `padding`, `gap`
-- Navigation: `padding`, `gap`
-- Button: `paddingX`, `paddingY`, `marginX`, `marginY`
+Highlights:
+- stable UUID-backed `radius-token` references,
+- starter scale: None / XS / SM / MD / LG / XL / 2XL / Pill,
+- Design System → Radius library workspace,
+- shared Local value / Design System selector in property controls,
+- radius token resolution before component render,
+- safe detach to the current numeric value on token deletion,
+- support for Button, Container, Modal, Text, Image and Navigation,
+- Container border radius is now a real editable property instead of a hardcoded 8px,
+- Radius/Pill keeps the full 999px value instead of being clamped to the old 64px editor limit.
 
-`borderRadius` is intentionally excluded; it belongs to the future Radius token family.
-
-## Apply
-
-```bash
-git apply PATCH_DESIGN_SYSTEM_SPACING.diff
-```
-
-## Validation
-
-- TypeScript 6 project typecheck: PASS
-- ESLint changed files: PASS
-- spacing resolve/count/detach smoke test: PASS
-- generic DesignSystem resolver smoke test: PASS
-- `git apply --check`: PASS
+Validation performed:
+- TypeScript 6.0.3 project typecheck: pass
+- ESLint on changed TypeScript/TSX files: pass
+- radius resolver / validation / usage count / detach smoke test: pass
+- `git apply --check PATCH_DESIGN_SYSTEM_RADIUS.diff`: pass

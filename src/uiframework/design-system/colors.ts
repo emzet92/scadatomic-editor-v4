@@ -8,6 +8,7 @@ import {
 } from "./tokens";
 import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
 import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
+import { isRadiusToken, type RadiusToken, type RadiusTokenId } from "./radius";
 
 export type ColorTokenId = string;
 
@@ -27,12 +28,13 @@ export type DesignSystem = {
   colors: Record<ColorTokenId, ColorToken>;
   typography?: Record<TypographyTokenId, TypographyToken> | undefined;
   spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
+  radius?: Record<RadiusTokenId, RadiusToken> | undefined;
 };
 
 export const DEFAULT_COLOR_LITERAL = "#18181b";
 
 export function createEmptyDesignSystem(): DesignSystem {
-  return { colors: {}, typography: {}, spacing: {} };
+  return { colors: {}, typography: {}, spacing: {}, radius: {} };
 }
 
 export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
@@ -69,6 +71,13 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
   if (value.spacing !== undefined) {
     if (!isRecord(value.spacing)) return false;
     if (!Object.entries(value.spacing).every(([id, token]) => isSpacingToken(token, id))) {
+      return false;
+    }
+  }
+
+  if (value.radius !== undefined) {
+    if (!isRecord(value.radius)) return false;
+    if (!Object.entries(value.radius).every(([id, token]) => isRadiusToken(token, id))) {
       return false;
     }
   }

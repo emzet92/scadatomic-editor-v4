@@ -20,7 +20,7 @@ export const textDefinition = {
     uppercase: { kind: "toggle" },
     borderSize: { kind: "border-size", min: 0 },
     borderColor: { kind: "color" },
-    borderRadius: { kind: "number", min: 0 },
+    borderRadius: { kind: "radius", min: 0, max: 999 },
   },
   bindings: {
     value: { label: "Value", valueType: "string" },

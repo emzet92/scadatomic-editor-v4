@@ -15,7 +15,7 @@ export const navigationDefinition = {
     activeColor: { kind: "color" },
     gap: { kind: "spacing", min: 0, max: 48 },
     padding: { kind: "spacing", min: 0, max: 48 },
-    borderRadius: { kind: "number", min: 0, max: 48 },
+    borderRadius: { kind: "radius", min: 0, max: 999 },
   },
   bindings: {
     visible: { label: "Visible", valueType: "boolean" },

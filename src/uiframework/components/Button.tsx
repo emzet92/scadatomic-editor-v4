@@ -24,7 +24,7 @@ export function Button({
   const safePaddingY = clampSpacing(paddingY, 0, 48);
   const safeMarginX = clampSpacing(marginX, 0, 64);
   const safeMarginY = clampSpacing(marginY, 0, 64);
-  const safeRadius = clampSpacing(borderRadius, 0, 64);
+  const safeRadius = clampSpacing(borderRadius, 0, 999);
 
   return (
     <button

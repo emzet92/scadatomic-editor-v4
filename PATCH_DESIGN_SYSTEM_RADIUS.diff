@@ -1,0 +1,598 @@
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index 9841c8f..84ec66a 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -48,6 +48,7 @@ import { DesignSystemPanel, type DesignSystemSection } from "./gui/design-system
+ import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
+ import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibraryWorkspace";
+ import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
++import { RadiusLibraryWorkspace } from "./gui/design-system/RadiusLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -604,8 +605,10 @@ export function EditorPage() {
+                 <ColorLibraryWorkspace />
+               ) : designSystemSection === "typography" ? (
+                 <TypographyLibraryWorkspace />
+-              ) : (
++              ) : designSystemSection === "spacing" ? (
+                 <SpacingLibraryWorkspace />
++              ) : (
++                <RadiusLibraryWorkspace />
+               )}
+             </div>
+           ) : (
+diff --git a/src/uiframework/component-props.ts b/src/uiframework/component-props.ts
+index 6777ae1..dab049e 100644
+--- a/src/uiframework/component-props.ts
++++ b/src/uiframework/component-props.ts
+@@ -53,6 +53,7 @@ export type ContainerNodeProps = {
+   gridRowMode?: ContainerGridRowMode;
+   gridItemAlignment?: ContainerGridItemAlignment;
+   borderSize?: number;
++  borderRadius?: number;
+   display?: "grid" | "flex";
+ };
+ 
+@@ -68,6 +69,7 @@ export const defaultContainerProps = {
+   gridRowMode: "content",
+   gridItemAlignment: "start",
+   borderSize: 1,
++  borderRadius: 8,
+   display: "grid",
+ } satisfies ContainerNodeProps;
+ 
+diff --git a/src/uiframework/components/Button.tsx b/src/uiframework/components/Button.tsx
+index e30ba89..2d18413 100644
+--- a/src/uiframework/components/Button.tsx
++++ b/src/uiframework/components/Button.tsx
+@@ -24,7 +24,7 @@ export function Button({
+   const safePaddingY = clampSpacing(paddingY, 0, 48);
+   const safeMarginX = clampSpacing(marginX, 0, 64);
+   const safeMarginY = clampSpacing(marginY, 0, 64);
+-  const safeRadius = clampSpacing(borderRadius, 0, 64);
++  const safeRadius = clampSpacing(borderRadius, 0, 999);
+ 
+   return (
+     <button
+diff --git a/src/uiframework/components/Container.tsx b/src/uiframework/components/Container.tsx
+index 0428340..ab27f9d 100644
+--- a/src/uiframework/components/Container.tsx
++++ b/src/uiframework/components/Container.tsx
+@@ -17,6 +17,7 @@ export function Container({
+   maxWidth,
+   maxHeight,
+   borderSize = defaultContainerProps.borderSize,
++  borderRadius = defaultContainerProps.borderRadius,
+   padding = defaultContainerProps.padding,
+   gap = defaultContainerProps.gap,
+   columns = defaultContainerProps.columns,
+@@ -44,7 +45,7 @@ export function Container({
+     maxWidth: toCssSize(maxWidth),
+     maxHeight: toCssSize(maxHeight),
+     border: borderSize > 0 ? `${borderSize}px solid #d4d4d8` : undefined,
+-    borderRadius: 8,
++    borderRadius,
+     padding,
+     display,
+     gap,
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+index 2496381..a1bb69f 100644
+--- a/src/uiframework/design-system/colors.ts
++++ b/src/uiframework/design-system/colors.ts
+@@ -8,6 +8,7 @@ import {
+ } from "./tokens";
+ import { isTypographyToken, type TypographyToken, type TypographyTokenId } from "./typography";
+ import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
++import { isRadiusToken, type RadiusToken, type RadiusTokenId } from "./radius";
+ 
+ export type ColorTokenId = string;
+ 
+@@ -27,12 +28,13 @@ export type DesignSystem = {
+   colors: Record<ColorTokenId, ColorToken>;
+   typography?: Record<TypographyTokenId, TypographyToken> | undefined;
+   spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
++  radius?: Record<RadiusTokenId, RadiusToken> | undefined;
+ };
+ 
+ export const DEFAULT_COLOR_LITERAL = "#18181b";
+ 
+ export function createEmptyDesignSystem(): DesignSystem {
+-  return { colors: {}, typography: {}, spacing: {} };
++  return { colors: {}, typography: {}, spacing: {}, radius: {} };
+ }
+ 
+ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+@@ -73,6 +75,13 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
+     }
+   }
+ 
++  if (value.radius !== undefined) {
++    if (!isRecord(value.radius)) return false;
++    if (!Object.entries(value.radius).every(([id, token]) => isRadiusToken(token, id))) {
++      return false;
++    }
++  }
++
+   return true;
+ }
+ 
+diff --git a/src/uiframework/design-system/resolver.ts b/src/uiframework/design-system/resolver.ts
+index e8888cf..650d293 100644
+--- a/src/uiframework/design-system/resolver.ts
++++ b/src/uiframework/design-system/resolver.ts
+@@ -1,6 +1,7 @@
+ import { isColorTokenRef, resolveColorValue, type DesignSystem } from "./colors";
+ import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
+ import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
++import { isRadiusTokenRef, resolveRadiusValue } from "./radius";
+ import { isRecord } from "./tokens";
+ 
+ /**
+@@ -14,6 +15,7 @@ export function resolveDesignTokenReferences(
+   if (isColorTokenRef(value)) return resolveColorValue(value, designSystem);
+   if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
+   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
++  if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
+   if (Array.isArray(value)) {
+     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+   }
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 6696ecc..144cd37 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -66,6 +66,12 @@ import {
+   type SpacingTokenId,
+ } from "./design-system/spacing";
+ import { detachSpacingTokenFromDocument } from "./design-system/document-spacing";
++import {
++  createStarterRadiusTokens,
++  type RadiusToken,
++  type RadiusTokenId,
++} from "./design-system/radius";
++import { detachRadiusTokenFromDocument } from "./design-system/document-radius";
+ import { createUniqueTokenName } from "./design-system/tokens";
+ 
+ export type DragPreview = {
+@@ -107,6 +113,10 @@ type EditorState = {
+   addStarterSpacingScale: () => void;
+   updateSpacingToken: (tokenId: SpacingTokenId, patch: Partial<Omit<SpacingToken, "id">>) => void;
+   deleteSpacingToken: (tokenId: SpacingTokenId) => void;
++  addRadiusToken: (draft?: Partial<Omit<RadiusToken, "id">>) => RadiusTokenId;
++  addStarterRadiusScale: () => void;
++  updateRadiusToken: (tokenId: RadiusTokenId, patch: Partial<Omit<RadiusToken, "id">>) => void;
++  deleteRadiusToken: (tokenId: RadiusTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -601,6 +611,103 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addRadiusToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const radius = designSystem.radius ?? {};
++      const name = createUniqueTokenName(radius, draft?.name?.trim() || "Radius");
++      const token: RadiusToken = {
++        id: tokenId,
++        name,
++        value:
++          typeof draft?.value === "number" && Number.isFinite(draft.value)
++            ? Math.max(0, draft.value)
++            : 8,
++        ...(draft?.description !== undefined ? { description: draft.description } : {}),
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            radius: { ...radius, [tokenId]: token },
++          },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterRadiusScale: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextRadius = { ...(designSystem.radius ?? {}) };
++      for (const token of createStarterRadiusTokens()) {
++        const name = createUniqueTokenName(nextRadius, token.name);
++        nextRadius[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, radius: nextRadius },
++        },
++      };
++    });
++  },
++
++  updateRadiusToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const radius = designSystem.radius ?? {};
++      const current = radius[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueTokenName(radius, patch.name.trim() || current.name, tokenId);
++      const nextValue = patch.value === undefined
++        ? current.value
++        : Number.isFinite(patch.value)
++          ? Math.max(0, patch.value)
++          : current.value;
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            radius: {
++              ...radius,
++              [tokenId]: {
++                ...current,
++                ...patch,
++                name: nextName,
++                value: nextValue,
++              },
++            },
++          },
++        },
++      };
++    });
++  },
++
++  deleteRadiusToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const radius = designSystem.radius ?? {};
++      const token = radius[tokenId];
++      if (!token) return state;
++      const detached = detachRadiusTokenFromDocument(state.document, tokenId, token.value);
++      const nextRadius = { ...radius };
++      delete nextRadius[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, radius: nextRadius },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+index e625c29..56a8b32 100644
+--- a/src/uiframework/gui/design-system/DesignSystemPanel.tsx
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -1,9 +1,9 @@
+ import type { ReactNode } from "react";
+-import { MoveHorizontal, Palette, Type } from "lucide-react";
++import { MoveHorizontal, Palette, Radius, Type } from "lucide-react";
+ import { useEditorStore } from "../../editor-store";
+ import { SectionHeader } from "../ui";
+ 
+-export type DesignSystemSection = "colors" | "typography" | "spacing";
++export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius";
+ 
+ export function DesignSystemPanel({
+   activeSection,
+@@ -21,6 +21,9 @@ export function DesignSystemPanel({
+   const spacingCount = useEditorStore(
+     (state) => Object.keys(state.document.designSystem?.spacing ?? {}).length
+   );
++  const radiusCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.radius ?? {}).length
++  );
+ 
+   return (
+     <div className="space-y-3">
+@@ -49,8 +52,15 @@ export function DesignSystemPanel({
+         count={spacingCount}
+         onClick={() => onSelectSection("spacing")}
+       />
++      <TokenSectionButton
++        active={activeSection === "radius"}
++        icon={<Radius size={15} />}
++        title="Radius"
++        count={radiusCount}
++        onClick={() => onSelectSection("radius")}
++      />
+       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
+-        Radius, shadows, borders and motion can use the same token reference model next.
++        Shadows, borders and motion can use the same token reference model next.
+       </div>
+     </div>
+   );
+diff --git a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+index bb4b5a0..639b608 100644
+--- a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+@@ -1,10 +1,9 @@
+ import { Maximize2, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
+-import type { ReactNode } from "react";
+ import { defaultButtonProps } from "../../component-props";
+ import type { UiNode } from "../../core/document";
+ import type { UpdateNode } from "./property-panel-types";
+-import { TextInput } from "../ui";
+ import { SpacingValueControl } from "./SpacingValueControl";
++import { RadiusValueControl } from "./RadiusValueControl";
+ 
+ export function ButtonLayoutEditor({
+   node,
+@@ -18,10 +17,7 @@ export function ButtonLayoutEditor({
+   const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
+   const marginX = props.marginX ?? defaultButtonProps.marginX;
+   const marginY = props.marginY ?? defaultButtonProps.marginY;
+-  const borderRadius = readNumber(
+-    props.borderRadius,
+-    defaultButtonProps.borderRadius
+-  );
++  const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
+ 
+   function patch(next: Record<string, unknown>) {
+     updateNode(node.id, (current) => ({
+@@ -94,12 +90,14 @@ export function ButtonLayoutEditor({
+         </div>
+ 
+         <div className="mt-2">
+-          <CompactNumber
++          <RadiusValueControl
++            compact
+             icon={<Radius size={12} />}
+             label="Corner radius"
+             value={borderRadius}
++            fallback={defaultButtonProps.borderRadius}
+             min={0}
+-            max={64}
++            max={999}
+             onChange={(value) => patch({ borderRadius: value })}
+           />
+         </div>
+@@ -107,51 +105,3 @@ export function ButtonLayoutEditor({
+     </section>
+   );
+ }
+-
+-function CompactNumber({
+-  icon,
+-  label,
+-  value,
+-  min,
+-  max,
+-  onChange,
+-}: {
+-  icon: ReactNode;
+-  label: string;
+-  value: number;
+-  min: number;
+-  max: number;
+-  onChange: (value: number) => void;
+-}) {
+-  return (
+-    <label className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
+-      <span className="flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
+-        {icon}
+-        {label}
+-      </span>
+-      <div className="mt-1.5 flex items-center gap-1.5">
+-        <TextInput
+-          controlSize="sm"
+-          type="number"
+-          min={min}
+-          max={max}
+-          value={value}
+-          onChange={(event) =>
+-            onChange(clamp(Number(event.target.value), min, max))
+-          }
+-          className="h-7 min-w-0 flex-1 px-2 text-xs"
+-        />
+-        <span className="text-[9px] text-[var(--editor-text-soft)]">px</span>
+-      </div>
+-    </label>
+-  );
+-}
+-
+-function readNumber(value: unknown, fallback: number) {
+-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+-}
+-
+-function clamp(value: number, min: number, max: number) {
+-  if (!Number.isFinite(value)) return min;
+-  return Math.max(min, Math.min(max, value));
+-}
+diff --git a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+index f04edd8..fb0bb00 100644
+--- a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+@@ -1,4 +1,4 @@
+-import { LayoutGrid, Minus, Plus, Rows3 } from "lucide-react";
++import { LayoutGrid, Minus, Plus, Radius, Rows3 } from "lucide-react";
+ import {
+   defaultContainerProps,
+   type ContainerGridItemAlignment,
+@@ -10,6 +10,7 @@ import { resolveSpacingValue } from "../../design-system/spacing";
+ import { useEditorStore } from "../../editor-store";
+ import type { UpdateNode } from "./property-panel-types";
+ import { SpacingValueControl } from "./SpacingValueControl";
++import { RadiusValueControl } from "./RadiusValueControl";
+ 
+ type GridPreset = {
+   id: string;
+@@ -92,6 +93,7 @@ export function ContainerLayoutEditor({
+   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
+   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
+   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
++  const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
+   const gap = clampInt(
+     resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
+     0,
+@@ -373,6 +375,18 @@ export function ContainerLayoutEditor({
+             onChange={(value) => patch({ padding: value })}
+           />
+         </div>
++        <div className="mt-2">
++          <RadiusValueControl
++            compact
++            icon={<Radius size={12} />}
++            label="Corner radius"
++            value={borderRadiusValue}
++            fallback={defaultContainerProps.borderRadius}
++            min={0}
++            max={999}
++            onChange={(value) => patch({ borderRadius: value })}
++          />
++        </div>
+       </div>
+     </section>
+   );
+diff --git a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+index 42f1c48..2237ea2 100644
+--- a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
++++ b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+@@ -31,6 +31,7 @@ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
+   "minRowHeight",
+   "gridRowMode",
+   "gridItemAlignment",
++  "borderRadius",
+ ]);
+ 
+ /**
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index 4283f58..f65848f 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -26,6 +26,7 @@ import {
+ import type { UpdateNode } from "./property-panel-types";
+ import { ChartSeriesInput } from "./ChartSeriesInput";
+ import { SpacingValueControl } from "./SpacingValueControl";
++import { RadiusValueControl } from "./RadiusValueControl";
+ import { ImageAssetPicker } from "../assets/ImageAssetPicker";
+ import {
+   Checkbox,
+@@ -67,6 +68,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
+   select: (props) => <SelectControl {...props} />,
+   toggle: (props) => <ToggleControl {...props} />,
+   spacing: (props) => <SpacingControl {...props} />,
++  radius: (props) => <RadiusControl {...props} />,
+   number: (props) => <NumberControl {...props} />,
+   text: (props) => <TextControl {...props} />,
+ };
+@@ -596,6 +598,20 @@ function SpacingControl({ control, propName, value, updateProp }: PropertyContro
+   );
+ }
+ 
++function RadiusControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  if (control.kind !== "radius") return null;
++  return (
++    <RadiusValueControl
++      label={propName}
++      value={value}
++      min={control.min ?? 0}
++      max={control.max}
++      step={control.step ?? 1}
++      onChange={updateProp}
++    />
++  );
++}
++
+ function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+   if (control.kind !== "number") return null;
+   return (
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index 9021921..25150a0 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -4,6 +4,7 @@ export type InspectorControl =
+   | { kind: "text" }
+   | { kind: "number"; min?: number; max?: number; step?: number }
+   | { kind: "spacing"; min?: number; max?: number; step?: number }
++  | { kind: "radius"; min?: number; max?: number; step?: number }
+   | { kind: "color" }
+   | { kind: "toggle" }
+   | { kind: "image-asset" }
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+index 7257013..0661103 100644
+--- a/src/uiframework/registry/components/button.ts
++++ b/src/uiframework/registry/components/button.ts
+@@ -18,7 +18,7 @@ export const buttonDefinition = {
+     paddingY: { kind: "spacing", min: 0, max: 48 },
+     marginX: { kind: "spacing", min: 0, max: 64 },
+     marginY: { kind: "spacing", min: 0, max: 64 },
+-    borderRadius: { kind: "number", min: 0, max: 64 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+   },
+ 
+   bindings: {
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+index cc69695..d084611 100644
+--- a/src/uiframework/registry/components/container.ts
++++ b/src/uiframework/registry/components/container.ts
+@@ -26,6 +26,7 @@ export const containerDefinition = {
+     gridRowMode: { kind: "select", options: ["content", "minimum"] },
+     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
+     borderSize: { kind: "border-size", min: 0 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+     display: { kind: "select", options: ["grid", "flex"] },
+   },
+   bindings: {
+diff --git a/src/uiframework/registry/components/image.ts b/src/uiframework/registry/components/image.ts
+index 727afce..d30b76f 100644
+--- a/src/uiframework/registry/components/image.ts
++++ b/src/uiframework/registry/components/image.ts
+@@ -15,7 +15,7 @@ export const imageDefinition = {
+     height: { kind: "text" },
+     fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
+     alt: { kind: "text" },
+-    borderRadius: { kind: "number", min: 0 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+     backgroundColor: { kind: "color" },
+   },
+   bindings: {
+diff --git a/src/uiframework/registry/components/modal.ts b/src/uiframework/registry/components/modal.ts
+index 690cb15..3680350 100644
+--- a/src/uiframework/registry/components/modal.ts
++++ b/src/uiframework/registry/components/modal.ts
+@@ -28,7 +28,7 @@ export const modalDefinition = {
+     gap: { kind: "spacing", min: 0 },
+     columns: { kind: "number", min: 1, max: 24 },
+     display: { kind: "select", options: ["grid", "flex"] },
+-    borderRadius: { kind: "number", min: 0, max: 64 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+     closeOnBackdrop: { kind: "toggle" },
+     closeOnEscape: { kind: "toggle" },
+   },
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+index 851031a..e203e22 100644
+--- a/src/uiframework/registry/components/navigation.ts
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -15,7 +15,7 @@ export const navigationDefinition = {
+     activeColor: { kind: "color" },
+     gap: { kind: "spacing", min: 0, max: 48 },
+     padding: { kind: "spacing", min: 0, max: 48 },
+-    borderRadius: { kind: "number", min: 0, max: 48 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+   },
+   bindings: {
+     visible: { label: "Visible", valueType: "boolean" },
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+index 9dafea1..b2e347a 100644
+--- a/src/uiframework/registry/components/text.ts
++++ b/src/uiframework/registry/components/text.ts
+@@ -20,7 +20,7 @@ export const textDefinition = {
+     uppercase: { kind: "toggle" },
+     borderSize: { kind: "border-size", min: 0 },
+     borderColor: { kind: "color" },
+-    borderRadius: { kind: "number", min: 0 },
++    borderRadius: { kind: "radius", min: 0, max: 999 },
+   },
+   bindings: {
+     value: { label: "Value", valueType: "string" },

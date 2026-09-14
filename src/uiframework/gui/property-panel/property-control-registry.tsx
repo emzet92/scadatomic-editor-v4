@@ -26,6 +26,7 @@ import {
 import type { UpdateNode } from "./property-panel-types";
 import { ChartSeriesInput } from "./ChartSeriesInput";
 import { SpacingValueControl } from "./SpacingValueControl";
+import { RadiusValueControl } from "./RadiusValueControl";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
@@ -67,6 +68,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
   select: (props) => <SelectControl {...props} />,
   toggle: (props) => <ToggleControl {...props} />,
   spacing: (props) => <SpacingControl {...props} />,
+  radius: (props) => <RadiusControl {...props} />,
   number: (props) => <NumberControl {...props} />,
   text: (props) => <TextControl {...props} />,
 };
@@ -586,6 +588,20 @@ function SpacingControl({ control, propName, value, updateProp }: PropertyContro
   if (control.kind !== "spacing") return null;
   return (
     <SpacingValueControl
+      label={propName}
+      value={value}
+      min={control.min ?? 0}
+      max={control.max}
+      step={control.step ?? 1}
+      onChange={updateProp}
+    />
+  );
+}
+
+function RadiusControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+  if (control.kind !== "radius") return null;
+  return (
+    <RadiusValueControl
       label={propName}
       value={value}
       min={control.min ?? 0}

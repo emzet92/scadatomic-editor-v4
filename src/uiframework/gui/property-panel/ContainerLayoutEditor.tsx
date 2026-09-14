@@ -1,4 +1,4 @@
-import { LayoutGrid, Minus, Plus, Rows3 } from "lucide-react";
+import { LayoutGrid, Minus, Plus, Radius, Rows3 } from "lucide-react";
 import {
   defaultContainerProps,
   type ContainerGridItemAlignment,
@@ -10,6 +10,7 @@ import { resolveSpacingValue } from "../../design-system/spacing";
 import { useEditorStore } from "../../editor-store";
 import type { UpdateNode } from "./property-panel-types";
 import { SpacingValueControl } from "./SpacingValueControl";
+import { RadiusValueControl } from "./RadiusValueControl";
 
 type GridPreset = {
   id: string;
@@ -92,6 +93,7 @@ export function ContainerLayoutEditor({
   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
+  const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
   const gap = clampInt(
     resolveSpacingValue(gapValue, designSystem, defaultContainerProps.gap),
     0,
@@ -371,6 +373,18 @@ export function ContainerLayoutEditor({
             min={0}
             max={64}
             onChange={(value) => patch({ padding: value })}
+          />
+        </div>
+        <div className="mt-2">
+          <RadiusValueControl
+            compact
+            icon={<Radius size={12} />}
+            label="Corner radius"
+            value={borderRadiusValue}
+            fallback={defaultContainerProps.borderRadius}
+            min={0}
+            max={999}
+            onChange={(value) => patch({ borderRadius: value })}
           />
         </div>
       </div>

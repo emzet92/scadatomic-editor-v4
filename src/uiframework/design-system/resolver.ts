@@ -1,6 +1,7 @@
 import { isColorTokenRef, resolveColorValue, type DesignSystem } from "./colors";
 import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
 import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
+import { isRadiusTokenRef, resolveRadiusValue } from "./radius";
 import { isRecord } from "./tokens";
 
 /**
@@ -14,6 +15,7 @@ export function resolveDesignTokenReferences(
   if (isColorTokenRef(value)) return resolveColorValue(value, designSystem);
   if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
+  if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
   if (Array.isArray(value)) {
     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
   }

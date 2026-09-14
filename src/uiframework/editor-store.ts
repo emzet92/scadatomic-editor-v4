@@ -66,6 +66,12 @@ import {
   type SpacingTokenId,
 } from "./design-system/spacing";
 import { detachSpacingTokenFromDocument } from "./design-system/document-spacing";
+import {
+  createStarterRadiusTokens,
+  type RadiusToken,
+  type RadiusTokenId,
+} from "./design-system/radius";
+import { detachRadiusTokenFromDocument } from "./design-system/document-radius";
 import { createUniqueTokenName } from "./design-system/tokens";
 
 export type DragPreview = {
@@ -107,6 +113,10 @@ type EditorState = {
   addStarterSpacingScale: () => void;
   updateSpacingToken: (tokenId: SpacingTokenId, patch: Partial<Omit<SpacingToken, "id">>) => void;
   deleteSpacingToken: (tokenId: SpacingTokenId) => void;
+  addRadiusToken: (draft?: Partial<Omit<RadiusToken, "id">>) => RadiusTokenId;
+  addStarterRadiusScale: () => void;
+  updateRadiusToken: (tokenId: RadiusTokenId, patch: Partial<Omit<RadiusToken, "id">>) => void;
+  deleteRadiusToken: (tokenId: RadiusTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -596,6 +606,103 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: {
           ...detached,
           designSystem: { ...designSystem, spacing: nextSpacing },
+        },
+      };
+    });
+  },
+
+  addRadiusToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const radius = designSystem.radius ?? {};
+      const name = createUniqueTokenName(radius, draft?.name?.trim() || "Radius");
+      const token: RadiusToken = {
+        id: tokenId,
+        name,
+        value:
+          typeof draft?.value === "number" && Number.isFinite(draft.value)
+            ? Math.max(0, draft.value)
+            : 8,
+        ...(draft?.description !== undefined ? { description: draft.description } : {}),
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            radius: { ...radius, [tokenId]: token },
+          },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterRadiusScale: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextRadius = { ...(designSystem.radius ?? {}) };
+      for (const token of createStarterRadiusTokens()) {
+        const name = createUniqueTokenName(nextRadius, token.name);
+        nextRadius[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, radius: nextRadius },
+        },
+      };
+    });
+  },
+
+  updateRadiusToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const radius = designSystem.radius ?? {};
+      const current = radius[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueTokenName(radius, patch.name.trim() || current.name, tokenId);
+      const nextValue = patch.value === undefined
+        ? current.value
+        : Number.isFinite(patch.value)
+          ? Math.max(0, patch.value)
+          : current.value;
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            radius: {
+              ...radius,
+              [tokenId]: {
+                ...current,
+                ...patch,
+                name: nextName,
+                value: nextValue,
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+
+  deleteRadiusToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const radius = designSystem.radius ?? {};
+      const token = radius[tokenId];
+      if (!token) return state;
+      const detached = detachRadiusTokenFromDocument(state.document, tokenId, token.value);
+      const nextRadius = { ...radius };
+      delete nextRadius[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, radius: nextRadius },
         },
       };
     });

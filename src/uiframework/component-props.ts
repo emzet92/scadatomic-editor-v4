@@ -53,6 +53,7 @@ export type ContainerNodeProps = {
   gridRowMode?: ContainerGridRowMode;
   gridItemAlignment?: ContainerGridItemAlignment;
   borderSize?: number;
+  borderRadius?: number;
   display?: "grid" | "flex";
 };
 
@@ -68,6 +69,7 @@ export const defaultContainerProps = {
   gridRowMode: "content",
   gridItemAlignment: "start",
   borderSize: 1,
+  borderRadius: 8,
   display: "grid",
 } satisfies ContainerNodeProps;
 

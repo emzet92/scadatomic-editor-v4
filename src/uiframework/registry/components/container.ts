@@ -26,6 +26,7 @@ export const containerDefinition = {
     gridRowMode: { kind: "select", options: ["content", "minimum"] },
     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
     borderSize: { kind: "border-size", min: 0 },
+    borderRadius: { kind: "radius", min: 0, max: 999 },
     display: { kind: "select", options: ["grid", "flex"] },
   },
   bindings: {

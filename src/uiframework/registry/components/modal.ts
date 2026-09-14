@@ -28,7 +28,7 @@ export const modalDefinition = {
     gap: { kind: "spacing", min: 0 },
     columns: { kind: "number", min: 1, max: 24 },
     display: { kind: "select", options: ["grid", "flex"] },
-    borderRadius: { kind: "number", min: 0, max: 64 },
+    borderRadius: { kind: "radius", min: 0, max: 999 },
     closeOnBackdrop: { kind: "toggle" },
     closeOnEscape: { kind: "toggle" },
   },

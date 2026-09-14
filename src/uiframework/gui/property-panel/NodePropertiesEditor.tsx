@@ -31,6 +31,7 @@ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
   "minRowHeight",
   "gridRowMode",
   "gridItemAlignment",
+  "borderRadius",
 ]);
 
 /**
