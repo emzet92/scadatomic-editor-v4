@@ -46,6 +46,13 @@ import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
 import type { ReactiveEventHandlerBinding } from "../reactivity";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
+import {
+  createEmptyDesignSystem,
+  createStarterColorTokens,
+  type ColorToken,
+  type ColorTokenId,
+} from "./design-system/colors";
+import { detachColorTokenFromDocument } from "./design-system/document-colors";
 
 export type DragPreview = {
   type: string;
@@ -74,6 +81,10 @@ type EditorState = {
   document: UiDocument;
 
   updateProjectData: (updater: (data: ProjectData) => ProjectData) => void;
+  addColorToken: (draft?: { name?: string; value?: string }) => ColorTokenId;
+  addStarterColorPalette: () => void;
+  updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
+  deleteColorToken: (tokenId: ColorTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -195,6 +206,23 @@ type EditorState = {
   ) => void;
 };
 
+function createUniqueColorTokenName(
+  colors: Record<string, ColorToken>,
+  requestedName: string,
+  exceptId?: string
+) {
+  const occupied = new Set(
+    Object.values(colors)
+      .filter((token) => token.id !== exceptId)
+      .map((token) => token.name.toLocaleLowerCase())
+  );
+  if (!occupied.has(requestedName.toLocaleLowerCase())) return requestedName;
+
+  let index = 2;
+  while (occupied.has(`${requestedName} ${index}`.toLocaleLowerCase())) index += 1;
+  return `${requestedName} ${index}`;
+}
+
 const NODE_DRAG_THRESHOLD_PX = 4;
 
 const initialEditorDocument = createEmptyUiDocument();
@@ -278,6 +306,99 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (next === current) return state;
       replaceDesignerTagData(next);
       return { document: { ...state.document, data: next } };
+    });
+  },
+
+  addColorToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const name = createUniqueColorTokenName(
+        designSystem.colors,
+        draft?.name?.trim() || "Color"
+      );
+      const token: ColorToken = {
+        id: tokenId,
+        name,
+        value: draft?.value?.trim() || "#7c3aed",
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            colors: { ...designSystem.colors, [tokenId]: token },
+          },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterColorPalette: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextColors = { ...designSystem.colors };
+      for (const token of createStarterColorTokens()) {
+        const name = createUniqueColorTokenName(nextColors, token.name);
+        nextColors[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, colors: nextColors },
+        },
+      };
+    });
+  },
+
+  updateColorToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const current = designSystem.colors[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueColorTokenName(
+            designSystem.colors,
+            patch.name.trim() || current.name,
+            tokenId
+          );
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            colors: {
+              ...designSystem.colors,
+              [tokenId]: {
+                ...current,
+                ...patch,
+                name: nextName,
+                value: patch.value?.trim() || current.value,
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+
+  deleteColorToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const token = designSystem.colors[tokenId];
+      if (!token) return state;
+
+      const detached = detachColorTokenFromDocument(state.document, tokenId, token.value);
+      const nextColors = { ...designSystem.colors };
+      delete nextColors[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, colors: nextColors },
+        },
+      };
     });
   },
 

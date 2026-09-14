@@ -2,6 +2,12 @@ import type { ReactNode } from "react";
 import type { Binding, ComponentInputDefinition } from "../../core/document";
 import type { InspectorControl } from "../../registry/component-definitions";
 import { useEditorStore } from "../../editor-store";
+import {
+  createColorTokenRef,
+  isColorTokenRef,
+  normalizeColorForNativeInput,
+  resolveColorValue,
+} from "../../design-system/colors";
 import { createTagRef, isTagRef } from "../../data/collections/TagRef";
 import { isUdtTag } from "../../data/tags/TagDefinition";
 import {
@@ -255,19 +261,97 @@ function BorderSizeControl({ control, value, updateProp }: PropertyControlRender
 }
 
 function ColorControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+  const designSystem = useEditorStore((state) => state.document.designSystem);
   if (control.kind !== "color") return null;
-  const textColorValue = typeof value === "string" && value ? value : "#18181b";
+
+  const colors = Object.values(designSystem?.colors ?? {}).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  const tokenRef = isColorTokenRef(value) ? value : undefined;
+  const selectedToken = tokenRef ? designSystem?.colors[tokenRef.tokenId] : undefined;
+  const resolved = resolveColorValue(value, designSystem);
+  const literalValue = typeof value === "string" && value ? value : resolved;
+  const mode = tokenRef ? "token" : "local";
+
+  function switchMode(nextMode: "local" | "token") {
+    if (nextMode === mode) return;
+    if (nextMode === "local") {
+      updateProp(resolved);
+      return;
+    }
+    const firstToken = colors[0];
+    if (firstToken) updateProp(createColorTokenRef(firstToken.id));
+  }
+
   return (
     <FormField label={propName}>
-      <div className="flex items-center gap-2">
-        <input
-          data-editor-ignore
-          type="color"
-          value={normalizeColorForInput(textColorValue)}
-          onChange={(event) => updateProp(event.target.value)}
-          className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
-        />
-        <TextInput value={textColorValue} onChange={(event) => updateProp(event.target.value)} />
+      <div className="space-y-2">
+        <SegmentedControl className="w-full">
+          <SegmentedControlItem
+            active={mode === "local"}
+            className="flex-1 text-xs"
+            onClick={() => switchMode("local")}
+          >
+            Local
+          </SegmentedControlItem>
+          <SegmentedControlItem
+            active={mode === "token"}
+            disabled={colors.length === 0}
+            className="flex-1 text-xs"
+            onClick={() => switchMode("token")}
+          >
+            Token
+          </SegmentedControlItem>
+        </SegmentedControl>
+
+        {mode === "token" ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-9 w-9 shrink-0 rounded-[12px] border border-[var(--editor-border)] shadow-sm"
+                style={{ background: selectedToken?.value ?? resolved }}
+              />
+              <Select
+                value={tokenRef?.tokenId ?? ""}
+                onChange={(event) => updateProp(createColorTokenRef(event.target.value))}
+                className="min-w-0 flex-1"
+              >
+                {colors.map((token) => (
+                  <option key={token.id} value={token.id}>
+                    {token.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {selectedToken ? (
+              <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-[var(--editor-text-soft)]">
+                <span className="truncate">{selectedToken.name}</span>
+                <span className="font-mono">{selectedToken.value}</span>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+                Missing color token. Choose another token or switch to Local.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              data-editor-ignore
+              type="color"
+              value={normalizeColorForNativeInput(namedColors[literalValue.toLowerCase()] ?? literalValue)}
+              onChange={(event) => updateProp(event.target.value)}
+              className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
+            />
+            <TextInput value={literalValue} onChange={(event) => updateProp(event.target.value)} />
+          </div>
+        )}
+
+        {colors.length === 0 ? (
+          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+            Add project colors in Design System → Colors to enable token references.
+          </div>
+        ) : null}
       </div>
     </FormField>
   );
@@ -356,14 +440,4 @@ function BorderAllIcon() {
       <rect x="5" y="5" width="6" height="6" rx="0.75" stroke="currentColor" strokeWidth="1" opacity="0.55" />
     </svg>
   );
-}
-
-function normalizeColorForInput(value: string) {
-  const normalized = namedColors[value.toLowerCase()] ?? value;
-  if (/^#[0-9a-fA-F]{6}$/.test(normalized)) return normalized;
-  if (/^#[0-9a-fA-F]{3}$/.test(normalized)) {
-    const [r, g, b] = normalized.slice(1).split("");
-    return `#${r}${r}${g}${g}${b}${b}`;
-  }
-  return "#18181b";
 }

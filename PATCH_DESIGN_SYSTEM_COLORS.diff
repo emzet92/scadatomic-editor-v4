@@ -1,0 +1,978 @@
+diff --git a/DESIGN_SYSTEM_COLORS.md b/DESIGN_SYSTEM_COLORS.md
+new file mode 100644
+index 0000000..7e592a4
+--- /dev/null
++++ b/DESIGN_SYSTEM_COLORS.md
+@@ -0,0 +1,60 @@
++# SCADAtomic Design System — Color Tokens
++
++This iteration introduces the first project-local design-token family: **Colors**.
++
++## Document model
++
++`UiDocument.designSystem.colors` stores stable color definitions:
++
++```ts
++{
++  id: "...",
++  name: "Brand/Primary",
++  value: "#7c3aed"
++}
++```
++
++A color-capable component property can keep either a literal CSS color or a stable token reference:
++
++```ts
++"#7c3aed"
++```
++
++or:
++
++```ts
++{ kind: "color-token", tokenId: "..." }
++```
++
++Names are presentation metadata; references use token IDs, therefore renaming `Brand/Primary` does not break component references.
++
++## Rendering
++
++Components remain unaware of design tokens. `RenderNode` resolves token references immediately before passing props to the editor/runtime component. This keeps the document renderer-independent and avoids coupling Button/Text/Modal implementations to the token system.
++
++Resolution also works for reusable-component internals, variants and nested prop structures.
++
++## Designer
++
++The editor now has three project areas:
++
++- Design
++- Data
++- System
++
++`System -> Colors` contains the project color library. Users can create colors, rename them, edit values, see usage counts and seed a starter palette.
++
++Every inspector control with `kind: "color"` supports:
++
++- **Local** — a literal CSS color;
++- **Token** — a reference to a project color token.
++
++This applies to normal nodes, variant props and exposed reusable-component color inputs.
++
++## Deleting colors
++
++Deleting a token does not leave broken references. All usages are detached to the token's current literal value before the token is removed, preserving the visual appearance of the project.
++
++## Future token families
++
++The `DesignSystem` root intentionally leaves room for additional token families such as typography, spacing, radii, shadows and motion. They should follow the same stable-ID reference pattern rather than storing raw CSS expressions as the project-domain model.
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index ad0e313..46126c6 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -44,6 +44,8 @@ import {
+ import { initialDocument } from "./registry/initial-values";
+ import { DataPanel } from "./gui/data/DataPanel";
+ import { DataWorkspace } from "./gui/data/DataWorkspace";
++import { DesignSystemPanel } from "./gui/design-system/DesignSystemPanel";
++import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -198,7 +200,7 @@ export function EditorPage() {
+   const [saveStatus, setSaveStatus] = useState<
+     "idle" | "saving" | "saved" | "error"
+   >("idle");
+-  const [editorArea, setEditorArea] = useState<"design" | "data">("design");
++  const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
+   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
+ 
+   const loadedRef = useRef(false);
+@@ -490,8 +492,8 @@ export function EditorPage() {
+   const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
+   const projectData = document.data ?? { udts: {}, tags: {} };
+ 
+-  function switchEditorArea(area: "design" | "data") {
+-    if (area === "data") exitComponentMode();
++  function switchEditorArea(area: "design" | "data" | "designSystem") {
++    if (area !== "design") exitComponentMode();
+     setEditorArea(area);
+   }
+ 
+@@ -516,6 +518,13 @@ export function EditorPage() {
+             >
+               <Database size={13} /> Data
+             </SegmentedControlItem>
++            <SegmentedControlItem
++              active={editorArea === "designSystem"}
++              className="flex-1 gap-1.5 text-xs"
++              onClick={() => switchEditorArea("designSystem")}
++            >
++              <Palette size={13} /> System
++            </SegmentedControlItem>
+           </SegmentedControl>
+ 
+           {editorArea === "data" ? (
+@@ -525,6 +534,8 @@ export function EditorPage() {
+               onSelect={setDataSelection}
+               projectId={projectId}
+             />
++          ) : editorArea === "designSystem" ? (
++            <DesignSystemPanel />
+           ) : componentDefinitionMode && focusedDefinition ? (
+             <>
+               <ComponentStructureTree
+@@ -581,6 +592,10 @@ export function EditorPage() {
+                 projectId={projectId}
+               />
+             </div>
++          ) : editorArea === "designSystem" ? (
++            <div className="min-h-full bg-[var(--editor-canvas-bg)]">
++              <ColorLibraryWorkspace />
++            </div>
+           ) : (
+             <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
+               <div className="mb-3 flex items-center justify-between gap-3">
+diff --git a/src/uiframework/Renderer.tsx b/src/uiframework/Renderer.tsx
+index 45f380a..62d54bc 100644
+--- a/src/uiframework/Renderer.tsx
++++ b/src/uiframework/Renderer.tsx
+@@ -5,6 +5,7 @@ import { getDefaultComponentVariantProps } from "./component-variants";
+ import { resolveTagCollection } from "./data/collections/TagCollectionSource";
+ import { createTagRef } from "./data/collections/TagRef";
+ import { createRepeatInstanceId } from "./repeat/RepeatRuntime";
++import { resolveDesignTokenReferences } from "./design-system/colors";
+ import {
+   applyComponentInstanceInputs,
+   getComponentDefinitionForInstance,
+@@ -82,7 +83,10 @@ export function RenderNode({
+         : {}),
+     });
+ 
+-    const instanceEnvironmentProps = decorateProps?.(node, context) ?? {};
++    const instanceEnvironmentProps = resolveDesignTokenReferences(
++      decorateProps?.(node, context) ?? {},
++      document.designSystem
++    ) as Record<string, unknown>;
+ 
+     return (
+       <div {...instanceEnvironmentProps}>
+@@ -105,7 +109,14 @@ export function RenderNode({
+ 
+   const nextVisited = new Set(visited);
+   nextVisited.add(id);
+-  const environmentProps = decorateProps?.(node, context) ?? {};
++  const resolvedNodeProps = resolveDesignTokenReferences(
++    node.props ?? {},
++    document.designSystem
++  ) as Record<string, unknown>;
++  const environmentProps = resolveDesignTokenReferences(
++    decorateProps?.(node, context) ?? {},
++    document.designSystem
++  ) as Record<string, unknown>;
+ 
+   const repeatedChildren =
+     node.type === "Container" && node.contentBehavior?.kind === "repeat"
+@@ -121,7 +132,7 @@ export function RenderNode({
+       : undefined;
+ 
+   return (
+-    <Component {...node.props} {...environmentProps}>
++    <Component {...resolvedNodeProps} {...environmentProps}>
+       {repeatedChildren ?? node.children?.map((childId) => (
+         <RenderNode
+           key={childId}
+diff --git a/src/uiframework/core/document.ts b/src/uiframework/core/document.ts
+index 5b3389c..c986e0c 100644
+--- a/src/uiframework/core/document.ts
++++ b/src/uiframework/core/document.ts
+@@ -4,6 +4,7 @@ import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
+ import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
+ import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../../reactivity";
+ import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
++import { createEmptyDesignSystem, isDesignSystem, type DesignSystem } from "../design-system/colors";
+ export type NodeId = string;
+ export type PageId = string;
+ export type ModalId = string;
+@@ -126,6 +127,8 @@ export type UiDocument = {
+   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
+   /** Project-local data definitions and persisted designer values. */
+   data?: ProjectData | undefined;
++  /** Project-local design tokens. Colors are the first token family. */
++  designSystem?: DesignSystem | undefined;
+   /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
+   reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
+ };
+@@ -151,6 +154,7 @@ export function createUiDocument(
+     },
+     nodes,
+     data: createEmptyProjectData(),
++    designSystem: createEmptyDesignSystem(),
+   };
+ }
+ 
+@@ -327,6 +331,10 @@ export function isUiDocument(value: unknown): value is UiDocument {
+     return false;
+   }
+ 
++  if (candidate.designSystem !== undefined && !isDesignSystem(candidate.designSystem)) {
++    return false;
++  }
++
+   if (candidate.reactiveEvents !== undefined) {
+     if (
+       !isRecord(candidate.reactiveEvents) ||
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+new file mode 100644
+index 0000000..3ce91ec
+--- /dev/null
++++ b/src/uiframework/design-system/colors.ts
+@@ -0,0 +1,160 @@
++export type ColorTokenId = string;
++
++export type ColorToken = {
++  id: ColorTokenId;
++  name: string;
++  value: string;
++  description?: string | undefined;
++};
++
++export type ColorTokenRef = {
++  kind: "color-token";
++  tokenId: ColorTokenId;
++};
++
++export type ColorValue = string | ColorTokenRef;
++
++export type DesignSystem = {
++  colors: Record<ColorTokenId, ColorToken>;
++};
++
++export const DEFAULT_COLOR_LITERAL = "#18181b";
++
++export function createEmptyDesignSystem(): DesignSystem {
++  return { colors: {} };
++}
++
++export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
++  return { kind: "color-token", tokenId };
++}
++
++export function isColorTokenRef(value: unknown): value is ColorTokenRef {
++  return (
++    isRecord(value) &&
++    value.kind === "color-token" &&
++    typeof value.tokenId === "string"
++  );
++}
++
++export function isDesignSystem(value: unknown): value is DesignSystem {
++  if (!isRecord(value) || !isRecord(value.colors)) return false;
++  return Object.entries(value.colors).every(([id, token]) => {
++    if (!isRecord(token)) return false;
++    return (
++      token.id === id &&
++      typeof token.name === "string" &&
++      token.name.trim().length > 0 &&
++      typeof token.value === "string" &&
++      token.value.trim().length > 0 &&
++      (token.description === undefined || typeof token.description === "string")
++    );
++  });
++}
++
++export function normalizeColorForNativeInput(value: string, fallback = "#18181b") {
++  const normalized = value.trim();
++  if (/^#[0-9a-fA-F]{6}$/.test(normalized)) return normalized;
++  if (/^#[0-9a-fA-F]{3}$/.test(normalized)) {
++    const [, r, g, b] = normalized;
++    return `#${r}${r}${g}${g}${b}${b}`;
++  }
++  return fallback;
++}
++
++export function resolveColorValue(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback = DEFAULT_COLOR_LITERAL
++): string {
++  if (typeof value === "string" && value.trim()) return value;
++  if (isColorTokenRef(value)) {
++    return designSystem?.colors[value.tokenId]?.value ?? fallback;
++  }
++  return fallback;
++}
++
++/**
++ * Resolve design-token references immediately before rendering.
++ *
++ * Documents keep stable references while React components continue receiving
++ * plain values. The resolver is deliberately independent from React so future
++ * renderers (native, PDF, server-side, etc.) can use the same contract.
++ */
++export function resolveDesignTokenReferences(
++  value: unknown,
++  designSystem: DesignSystem | undefined
++): unknown {
++  if (isColorTokenRef(value)) {
++    return resolveColorValue(value, designSystem);
++  }
++  if (Array.isArray(value)) {
++    return value.map((item) => resolveDesignTokenReferences(item, designSystem));
++  }
++  if (!isRecord(value)) return value;
++
++  return Object.fromEntries(
++    Object.entries(value).map(([key, nested]) => [
++      key,
++      resolveDesignTokenReferences(nested, designSystem),
++    ])
++  );
++}
++
++export function detachColorTokenReference(
++  value: unknown,
++  tokenId: ColorTokenId,
++  replacement: string
++): unknown {
++  if (isColorTokenRef(value)) {
++    return value.tokenId === tokenId ? replacement : value;
++  }
++  if (Array.isArray(value)) {
++    return value.map((item) => detachColorTokenReference(item, tokenId, replacement));
++  }
++  if (!isRecord(value)) return value;
++
++  return Object.fromEntries(
++    Object.entries(value).map(([key, nested]) => [
++      key,
++      detachColorTokenReference(nested, tokenId, replacement),
++    ])
++  );
++}
++
++export function countColorTokenReferences(value: unknown, tokenId: ColorTokenId): number {
++  if (isColorTokenRef(value)) return value.tokenId === tokenId ? 1 : 0;
++  if (Array.isArray(value)) {
++    return value.reduce((sum, item) => sum + countColorTokenReferences(item, tokenId), 0);
++  }
++  if (!isRecord(value)) return 0;
++  return Object.values(value).reduce<number>(
++    (sum, nested) => sum + countColorTokenReferences(nested, tokenId),
++    0
++  );
++}
++
++export function createStarterColorTokens(): ColorToken[] {
++  return [
++    createToken("Brand/Primary", "#7c3aed"),
++    createToken("Brand/Primary Hover", "#6d28d9"),
++    createToken("Surface/Default", "#ffffff"),
++    createToken("Surface/Muted", "#f4f4f5"),
++    createToken("Text/Primary", "#18181b"),
++    createToken("Text/Muted", "#71717a"),
++    createToken("Status/Success", "#16a34a"),
++    createToken("Status/Warning", "#d97706"),
++    createToken("Status/Danger", "#dc2626"),
++  ];
++}
++
++function createToken(name: string, value: string): ColorToken {
++  return {
++    id: crypto.randomUUID(),
++    name,
++    value,
++  };
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/uiframework/design-system/document-colors.ts b/src/uiframework/design-system/document-colors.ts
+new file mode 100644
+index 0000000..99fed4d
+--- /dev/null
++++ b/src/uiframework/design-system/document-colors.ts
+@@ -0,0 +1,95 @@
++import type { ComponentInputDefinition, UiDocument, UiNode } from "../core/document";
++import {
++  countColorTokenReferences,
++  detachColorTokenReference,
++  type ColorTokenId,
++} from "./colors";
++
++export function detachColorTokenFromDocument(
++  document: UiDocument,
++  tokenId: ColorTokenId,
++  replacement: string
++): UiDocument {
++  return {
++    ...document,
++    nodes: mapNodes(document.nodes, tokenId, replacement),
++    components: document.components
++      ? Object.fromEntries(
++          Object.entries(document.components).map(([id, definition]) => [
++            id,
++            {
++              ...definition,
++              nodes: mapNodes(definition.nodes, tokenId, replacement),
++              inputs: definition.inputs
++                ? mapInputs(definition.inputs, tokenId, replacement)
++                : undefined,
++            },
++          ])
++        )
++      : document.components,
++  };
++}
++
++export function countColorTokenUsages(document: UiDocument, tokenId: ColorTokenId): number {
++  let count = countColorTokenReferences(document.nodes, tokenId);
++  for (const definition of Object.values(document.components ?? {})) {
++    count += countColorTokenReferences(definition.nodes, tokenId);
++    count += countColorTokenReferences(definition.inputs, tokenId);
++  }
++  return count;
++}
++
++function mapNodes(
++  nodes: Record<string, UiNode>,
++  tokenId: ColorTokenId,
++  replacement: string
++): Record<string, UiNode> {
++  return Object.fromEntries(
++    Object.entries(nodes).map(([id, node]) => [id, detachTokenFromNode(node, tokenId, replacement)])
++  );
++}
++
++function detachTokenFromNode(node: UiNode, tokenId: ColorTokenId, replacement: string): UiNode {
++  return {
++    ...node,
++    props: node.props
++      ? (detachColorTokenReference(node.props, tokenId, replacement) as Record<string, unknown>)
++      : node.props,
++    variants: node.variants
++      ? Object.fromEntries(
++          Object.entries(node.variants).map(([name, variant]) => [
++            name,
++            {
++              ...variant,
++              props: detachColorTokenReference(
++                variant.props,
++                tokenId,
++                replacement
++              ) as Record<string, unknown>,
++            },
++          ])
++        )
++      : node.variants,
++  };
++}
++
++function mapInputs(
++  inputs: Record<string, ComponentInputDefinition>,
++  tokenId: ColorTokenId,
++  replacement: string
++): Record<string, ComponentInputDefinition> {
++  return Object.fromEntries(
++    Object.entries(inputs).map(([name, input]) => {
++      if (input.type === "tagRef" || input.defaultValue === undefined) {
++        return [name, input];
++      }
++      return [
++        name,
++        {
++          ...input,
++          defaultValue: detachColorTokenReference(input.defaultValue, tokenId, replacement),
++        },
++      ];
++    })
++  );
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index ed8cf46..87ef807 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -46,6 +46,13 @@ import type { ProjectData } from "./data/tags/TagDefinition";
+ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+ import type { ReactiveEventHandlerBinding } from "../reactivity";
+ import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
++import {
++  createEmptyDesignSystem,
++  createStarterColorTokens,
++  type ColorToken,
++  type ColorTokenId,
++} from "./design-system/colors";
++import { detachColorTokenFromDocument } from "./design-system/document-colors";
+ 
+ export type DragPreview = {
+   type: string;
+@@ -74,6 +81,10 @@ type EditorState = {
+   document: UiDocument;
+ 
+   updateProjectData: (updater: (data: ProjectData) => ProjectData) => void;
++  addColorToken: (draft?: { name?: string; value?: string }) => ColorTokenId;
++  addStarterColorPalette: () => void;
++  updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
++  deleteColorToken: (tokenId: ColorTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -195,6 +206,23 @@ type EditorState = {
+   ) => void;
+ };
+ 
++function createUniqueColorTokenName(
++  colors: Record<string, ColorToken>,
++  requestedName: string,
++  exceptId?: string
++) {
++  const occupied = new Set(
++    Object.values(colors)
++      .filter((token) => token.id !== exceptId)
++      .map((token) => token.name.toLocaleLowerCase())
++  );
++  if (!occupied.has(requestedName.toLocaleLowerCase())) return requestedName;
++
++  let index = 2;
++  while (occupied.has(`${requestedName} ${index}`.toLocaleLowerCase())) index += 1;
++  return `${requestedName} ${index}`;
++}
++
+ const NODE_DRAG_THRESHOLD_PX = 4;
+ 
+ const initialEditorDocument = createEmptyUiDocument();
+@@ -281,6 +309,99 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addColorToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const name = createUniqueColorTokenName(
++        designSystem.colors,
++        draft?.name?.trim() || "Color"
++      );
++      const token: ColorToken = {
++        id: tokenId,
++        name,
++        value: draft?.value?.trim() || "#7c3aed",
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            colors: { ...designSystem.colors, [tokenId]: token },
++          },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterColorPalette: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextColors = { ...designSystem.colors };
++      for (const token of createStarterColorTokens()) {
++        const name = createUniqueColorTokenName(nextColors, token.name);
++        nextColors[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, colors: nextColors },
++        },
++      };
++    });
++  },
++
++  updateColorToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const current = designSystem.colors[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueColorTokenName(
++            designSystem.colors,
++            patch.name.trim() || current.name,
++            tokenId
++          );
++      return {
++        document: {
++          ...state.document,
++          designSystem: {
++            ...designSystem,
++            colors: {
++              ...designSystem.colors,
++              [tokenId]: {
++                ...current,
++                ...patch,
++                name: nextName,
++                value: patch.value?.trim() || current.value,
++              },
++            },
++          },
++        },
++      };
++    });
++  },
++
++  deleteColorToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const token = designSystem.colors[tokenId];
++      if (!token) return state;
++
++      const detached = detachColorTokenFromDocument(state.document, tokenId, token.value);
++      const nextColors = { ...designSystem.colors };
++      delete nextColors[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, colors: nextColors },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+diff --git a/src/uiframework/gui/design-system/ColorLibraryWorkspace.tsx b/src/uiframework/gui/design-system/ColorLibraryWorkspace.tsx
+new file mode 100644
+index 0000000..4a82a67
+--- /dev/null
++++ b/src/uiframework/gui/design-system/ColorLibraryWorkspace.tsx
+@@ -0,0 +1,144 @@
++import { Copy, Palette, Plus, Trash2 } from "lucide-react";
++import { useMemo, useState } from "react";
++import { normalizeColorForNativeInput, type ColorToken } from "../../design-system/colors";
++import { countColorTokenUsages } from "../../design-system/document-colors";
++import { useEditorStore } from "../../editor-store";
++import { Button, PanelCard, TextInput } from "../ui";
++
++export function ColorLibraryWorkspace() {
++  const document = useEditorStore((state) => state.document);
++  const addColorToken = useEditorStore((state) => state.addColorToken);
++  const addStarterColorPalette = useEditorStore((state) => state.addStarterColorPalette);
++  const updateColorToken = useEditorStore((state) => state.updateColorToken);
++  const deleteColorToken = useEditorStore((state) => state.deleteColorToken);
++  const [copiedId, setCopiedId] = useState<string | null>(null);
++
++  const colors = useMemo(
++    () => Object.values(document.designSystem?.colors ?? {}).sort((a, b) => a.name.localeCompare(b.name)),
++    [document.designSystem?.colors]
++  );
++
++  async function copyToken(token: ColorToken) {
++    try {
++      await navigator.clipboard.writeText(token.value);
++      setCopiedId(token.id);
++      window.setTimeout(() => setCopiedId((current) => (current === token.id ? null : current)), 1000);
++    } catch {
++      // Clipboard access can be unavailable in sandboxed designer frames.
++    }
++  }
++
++  return (
++    <div className="mx-auto w-full max-w-6xl p-8">
++      <div className="mb-7 flex items-start justify-between gap-5">
++        <div>
++          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++            <Palette size={14} /> Design System
++          </div>
++          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Color library</h1>
++          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++            Define named project colors once and reference them from component properties and variants. Rename safely; references use stable IDs.
++          </p>
++        </div>
++        <Button
++          size="sm"
++          variant="primary"
++          onClick={() => addColorToken({ name: "Color", value: "#7c3aed" })}
++        >
++          <Plus size={14} /> Add color
++        </Button>
++      </div>
++
++      {colors.length === 0 ? (
++        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
++          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++            <Palette size={20} />
++          </div>
++          <div className="text-sm font-semibold text-[var(--editor-text)]">No color tokens yet</div>
++          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
++            Create a color or seed a starter palette for brand, surfaces, text and status colors.
++          </div>
++          <div className="mt-4 flex items-center gap-2">
++            <Button size="sm" variant="primary" onClick={() => addColorToken()}>
++              <Plus size={14} /> Add color
++            </Button>
++            <Button size="sm" variant="secondary" onClick={addStarterColorPalette}>
++              Create starter palette
++            </Button>
++          </div>
++        </PanelCard>
++      ) : (
++        <div className="overflow-hidden rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-sm">
++          <div className="grid grid-cols-[56px_minmax(180px,1.3fr)_minmax(160px,.8fr)_100px_84px] items-center gap-3 border-b border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
++            <span>Color</span>
++            <span>Name</span>
++            <span>Value</span>
++            <span>Usage</span>
++            <span className="text-right">Actions</span>
++          </div>
++          {colors.map((token) => {
++            const usageCount = countColorTokenUsages(document, token.id);
++            return (
++              <div
++                key={token.id}
++                className="grid grid-cols-[56px_minmax(180px,1.3fr)_minmax(160px,.8fr)_100px_84px] items-center gap-3 border-b border-[var(--editor-border)] px-4 py-3 last:border-b-0"
++              >
++                <label className="relative block h-9 w-9 cursor-pointer overflow-hidden rounded-xl border border-[var(--editor-border)] shadow-sm">
++                  <span className="absolute inset-0" style={{ background: token.value }} />
++                  <input
++                    type="color"
++                    aria-label={`Choose ${token.name}`}
++                    value={normalizeColorForNativeInput(token.value)}
++                    onChange={(event) => updateColorToken(token.id, { value: event.target.value })}
++                    className="absolute inset-0 cursor-pointer opacity-0"
++                  />
++                </label>
++
++                <TextInput
++                  aria-label="Color token name"
++                  value={token.name}
++                  onChange={(event) => updateColorToken(token.id, { name: event.target.value })}
++                />
++
++                <div className="flex items-center gap-2">
++                  <TextInput
++                    aria-label="Color value"
++                    value={token.value}
++                    onChange={(event) => updateColorToken(token.id, { value: event.target.value })}
++                  />
++                </div>
++
++                <div className="text-xs text-[var(--editor-text-muted)]">
++                  {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
++                </div>
++
++                <div className="flex items-center justify-end gap-1">
++                  <button
++                    type="button"
++                    title={copiedId === token.id ? "Copied" : "Copy value"}
++                    onClick={() => void copyToken(token)}
++                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-surface-muted)] hover:text-[var(--editor-text)]"
++                  >
++                    <Copy size={14} />
++                  </button>
++                  <button
++                    type="button"
++                    title="Delete token and detach usages"
++                    onClick={() => deleteColorToken(token.id)}
++                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
++                  >
++                    <Trash2 size={14} />
++                  </button>
++                </div>
++              </div>
++            );
++          })}
++        </div>
++      )}
++
++      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Deleting a token detaches every reference to its current literal value. The UI keeps the same appearance instead of leaving broken references.
++      </div>
++    </div>
++  );
++}
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+new file mode 100644
+index 0000000..6b63e0c
+--- /dev/null
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -0,0 +1,29 @@
++import { Palette } from "lucide-react";
++import { useEditorStore } from "../../editor-store";
++import { SectionHeader } from "../ui";
++
++export function DesignSystemPanel() {
++  const colorCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.colors ?? {}).length
++  );
++
++  return (
++    <div className="space-y-3">
++      <SectionHeader
++        title="Design System"
++        description="Project-local tokens shared by every page and reusable component."
++      />
++      <div className="rounded-xl border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-3">
++        <div className="flex items-center gap-2 text-sm font-medium text-[var(--editor-accent)]">
++          <Palette size={15} /> Colors
++        </div>
++        <div className="mt-1 text-xs text-[var(--editor-text-muted)]">
++          {colorCount} {colorCount === 1 ? "token" : "tokens"}
++        </div>
++      </div>
++      <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Typography, spacing, radii and shadows can be added here later using the same token model.
++      </div>
++    </div>
++  );
++}
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index b53f4b6..5537aac 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -2,6 +2,12 @@ import type { ReactNode } from "react";
+ import type { Binding, ComponentInputDefinition } from "../../core/document";
+ import type { InspectorControl } from "../../registry/component-definitions";
+ import { useEditorStore } from "../../editor-store";
++import {
++  createColorTokenRef,
++  isColorTokenRef,
++  normalizeColorForNativeInput,
++  resolveColorValue,
++} from "../../design-system/colors";
+ import { createTagRef, isTagRef } from "../../data/collections/TagRef";
+ import { isUdtTag } from "../../data/tags/TagDefinition";
+ import {
+@@ -255,19 +261,97 @@ function BorderSizeControl({ control, value, updateProp }: PropertyControlRender
+ }
+ 
+ function ColorControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
+   if (control.kind !== "color") return null;
+-  const textColorValue = typeof value === "string" && value ? value : "#18181b";
++
++  const colors = Object.values(designSystem?.colors ?? {}).sort((a, b) =>
++    a.name.localeCompare(b.name)
++  );
++  const tokenRef = isColorTokenRef(value) ? value : undefined;
++  const selectedToken = tokenRef ? designSystem?.colors[tokenRef.tokenId] : undefined;
++  const resolved = resolveColorValue(value, designSystem);
++  const literalValue = typeof value === "string" && value ? value : resolved;
++  const mode = tokenRef ? "token" : "local";
++
++  function switchMode(nextMode: "local" | "token") {
++    if (nextMode === mode) return;
++    if (nextMode === "local") {
++      updateProp(resolved);
++      return;
++    }
++    const firstToken = colors[0];
++    if (firstToken) updateProp(createColorTokenRef(firstToken.id));
++  }
++
+   return (
+     <FormField label={propName}>
+-      <div className="flex items-center gap-2">
+-        <input
+-          data-editor-ignore
+-          type="color"
+-          value={normalizeColorForInput(textColorValue)}
+-          onChange={(event) => updateProp(event.target.value)}
+-          className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
+-        />
+-        <TextInput value={textColorValue} onChange={(event) => updateProp(event.target.value)} />
++      <div className="space-y-2">
++        <SegmentedControl className="w-full">
++          <SegmentedControlItem
++            active={mode === "local"}
++            className="flex-1 text-xs"
++            onClick={() => switchMode("local")}
++          >
++            Local
++          </SegmentedControlItem>
++          <SegmentedControlItem
++            active={mode === "token"}
++            disabled={colors.length === 0}
++            className="flex-1 text-xs"
++            onClick={() => switchMode("token")}
++          >
++            Token
++          </SegmentedControlItem>
++        </SegmentedControl>
++
++        {mode === "token" ? (
++          <div className="space-y-2">
++            <div className="flex items-center gap-2">
++              <span
++                className="h-9 w-9 shrink-0 rounded-[12px] border border-[var(--editor-border)] shadow-sm"
++                style={{ background: selectedToken?.value ?? resolved }}
++              />
++              <Select
++                value={tokenRef?.tokenId ?? ""}
++                onChange={(event) => updateProp(createColorTokenRef(event.target.value))}
++                className="min-w-0 flex-1"
++              >
++                {colors.map((token) => (
++                  <option key={token.id} value={token.id}>
++                    {token.name}
++                  </option>
++                ))}
++              </Select>
++            </div>
++            {selectedToken ? (
++              <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-[var(--editor-text-soft)]">
++                <span className="truncate">{selectedToken.name}</span>
++                <span className="font-mono">{selectedToken.value}</span>
++              </div>
++            ) : (
++              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
++                Missing color token. Choose another token or switch to Local.
++              </div>
++            )}
++          </div>
++        ) : (
++          <div className="flex items-center gap-2">
++            <input
++              data-editor-ignore
++              type="color"
++              value={normalizeColorForNativeInput(namedColors[literalValue.toLowerCase()] ?? literalValue)}
++              onChange={(event) => updateProp(event.target.value)}
++              className="h-9 w-12 rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 cursor-pointer transition hover:border-[var(--editor-accent-border)]"
++            />
++            <TextInput value={literalValue} onChange={(event) => updateProp(event.target.value)} />
++          </div>
++        )}
++
++        {colors.length === 0 ? (
++          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
++            Add project colors in Design System → Colors to enable token references.
++          </div>
++        ) : null}
+       </div>
+     </FormField>
+   );
+@@ -357,13 +441,3 @@ function BorderAllIcon() {
+     </svg>
+   );
+ }
+-
+-function normalizeColorForInput(value: string) {
+-  const normalized = namedColors[value.toLowerCase()] ?? value;
+-  if (/^#[0-9a-fA-F]{6}$/.test(normalized)) return normalized;
+-  if (/^#[0-9a-fA-F]{3}$/.test(normalized)) {
+-    const [r, g, b] = normalized.slice(1).split("");
+-    return `#${r}${r}${g}${g}${b}${b}`;
+-  }
+-  return "#18181b";
+-}
+diff --git a/src/uiframework/reusable-components/instance-runtime.ts b/src/uiframework/reusable-components/instance-runtime.ts
+index 679c121..0b8cf47 100644
+--- a/src/uiframework/reusable-components/instance-runtime.ts
++++ b/src/uiframework/reusable-components/instance-runtime.ts
+@@ -34,6 +34,7 @@ export function createComponentDefinitionDocument(
+     nodes: definition.nodes,
+     components: document.components,
+     data: document.data,
++    designSystem: document.designSystem,
+   };
+ }
+ 

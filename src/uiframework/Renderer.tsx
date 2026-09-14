@@ -5,6 +5,7 @@ import { getDefaultComponentVariantProps } from "./component-variants";
 import { resolveTagCollection } from "./data/collections/TagCollectionSource";
 import { createTagRef } from "./data/collections/TagRef";
 import { createRepeatInstanceId } from "./repeat/RepeatRuntime";
+import { resolveDesignTokenReferences } from "./design-system/colors";
 import {
   applyComponentInstanceInputs,
   getComponentDefinitionForInstance,
@@ -82,7 +83,10 @@ export function RenderNode({
         : {}),
     });
 
-    const instanceEnvironmentProps = decorateProps?.(node, context) ?? {};
+    const instanceEnvironmentProps = resolveDesignTokenReferences(
+      decorateProps?.(node, context) ?? {},
+      document.designSystem
+    ) as Record<string, unknown>;
 
     return (
       <div {...instanceEnvironmentProps}>
@@ -105,7 +109,14 @@ export function RenderNode({
 
   const nextVisited = new Set(visited);
   nextVisited.add(id);
-  const environmentProps = decorateProps?.(node, context) ?? {};
+  const resolvedNodeProps = resolveDesignTokenReferences(
+    node.props ?? {},
+    document.designSystem
+  ) as Record<string, unknown>;
+  const environmentProps = resolveDesignTokenReferences(
+    decorateProps?.(node, context) ?? {},
+    document.designSystem
+  ) as Record<string, unknown>;
 
   const repeatedChildren =
     node.type === "Container" && node.contentBehavior?.kind === "repeat"
@@ -121,7 +132,7 @@ export function RenderNode({
       : undefined;
 
   return (
-    <Component {...node.props} {...environmentProps}>
+    <Component {...resolvedNodeProps} {...environmentProps}>
       {repeatedChildren ?? node.children?.map((childId) => (
         <RenderNode
           key={childId}

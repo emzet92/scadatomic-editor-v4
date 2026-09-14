@@ -4,6 +4,7 @@ import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
 import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
 import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../../reactivity";
 import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
+import { createEmptyDesignSystem, isDesignSystem, type DesignSystem } from "../design-system/colors";
 export type NodeId = string;
 export type PageId = string;
 export type ModalId = string;
@@ -126,6 +127,8 @@ export type UiDocument = {
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
   /** Project-local data definitions and persisted designer values. */
   data?: ProjectData | undefined;
+  /** Project-local design tokens. Colors are the first token family. */
+  designSystem?: DesignSystem | undefined;
   /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
   reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
 };
@@ -151,6 +154,7 @@ export function createUiDocument(
     },
     nodes,
     data: createEmptyProjectData(),
+    designSystem: createEmptyDesignSystem(),
   };
 }
 
@@ -324,6 +328,10 @@ export function isUiDocument(value: unknown): value is UiDocument {
   }
 
   if (candidate.data !== undefined && !isProjectData(candidate.data)) {
+    return false;
+  }
+
+  if (candidate.designSystem !== undefined && !isDesignSystem(candidate.designSystem)) {
     return false;
   }
 

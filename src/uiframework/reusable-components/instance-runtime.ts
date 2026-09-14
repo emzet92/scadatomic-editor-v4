@@ -34,6 +34,7 @@ export function createComponentDefinitionDocument(
     nodes: definition.nodes,
     components: document.components,
     data: document.data,
+    designSystem: document.designSystem,
   };
 }
 

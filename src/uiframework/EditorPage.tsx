@@ -44,6 +44,8 @@ import {
 import { initialDocument } from "./registry/initial-values";
 import { DataPanel } from "./gui/data/DataPanel";
 import { DataWorkspace } from "./gui/data/DataWorkspace";
+import { DesignSystemPanel } from "./gui/design-system/DesignSystemPanel";
+import { ColorLibraryWorkspace } from "./gui/design-system/ColorLibraryWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
@@ -198,7 +200,7 @@ export function EditorPage() {
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
-  const [editorArea, setEditorArea] = useState<"design" | "data">("design");
+  const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
 
   const loadedRef = useRef(false);
@@ -490,8 +492,8 @@ export function EditorPage() {
   const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
   const projectData = document.data ?? { udts: {}, tags: {} };
 
-  function switchEditorArea(area: "design" | "data") {
-    if (area === "data") exitComponentMode();
+  function switchEditorArea(area: "design" | "data" | "designSystem") {
+    if (area !== "design") exitComponentMode();
     setEditorArea(area);
   }
 
@@ -516,6 +518,13 @@ export function EditorPage() {
             >
               <Database size={13} /> Data
             </SegmentedControlItem>
+            <SegmentedControlItem
+              active={editorArea === "designSystem"}
+              className="flex-1 gap-1.5 text-xs"
+              onClick={() => switchEditorArea("designSystem")}
+            >
+              <Palette size={13} /> System
+            </SegmentedControlItem>
           </SegmentedControl>
 
           {editorArea === "data" ? (
@@ -525,6 +534,8 @@ export function EditorPage() {
               onSelect={setDataSelection}
               projectId={projectId}
             />
+          ) : editorArea === "designSystem" ? (
+            <DesignSystemPanel />
           ) : componentDefinitionMode && focusedDefinition ? (
             <>
               <ComponentStructureTree
@@ -580,6 +591,10 @@ export function EditorPage() {
                 onSelect={setDataSelection}
                 projectId={projectId}
               />
+            </div>
+          ) : editorArea === "designSystem" ? (
+            <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+              <ColorLibraryWorkspace />
             </div>
           ) : (
             <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
