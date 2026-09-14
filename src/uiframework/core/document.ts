@@ -2,6 +2,8 @@ import { createEmptyProjectData, type ProjectData } from "../data/tags/TagDefini
 import { isProjectData } from "../data/serialization/project-data";
 import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
 import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
+import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../../reactivity";
+import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
 export type NodeId = string;
 export type PageId = string;
 export type PageKind = "page" | "layout";
@@ -18,7 +20,7 @@ export type TagRefBinding = {
   path: string;
 };
 
-export type Binding = TagBinding | TagRefBinding;
+export type Binding = TagBinding | TagRefBinding | ReactivePropertyBinding;
 
 export type HandlerRef = {
   handlerId: string;
@@ -113,6 +115,8 @@ export type UiDocument = {
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
   /** Project-local data definitions and persisted designer values. */
   data?: ProjectData | undefined;
+  /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
+  reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
 };
 
 export function createUiDocument(
@@ -266,6 +270,18 @@ export function isUiDocument(value: unknown): value is UiDocument {
 
   if (candidate.data !== undefined && !isProjectData(candidate.data)) {
     return false;
+  }
+
+  if (candidate.reactiveEvents !== undefined) {
+    if (
+      !isRecord(candidate.reactiveEvents) ||
+      !Object.entries(candidate.reactiveEvents).every(
+        ([id, binding]) =>
+          isReactiveEventHandlerBinding(binding) && binding.id === id
+      )
+    ) {
+      return false;
+    }
   }
 
   return true;
@@ -501,6 +517,7 @@ function isComponentInput(value: unknown): value is ComponentInputDefinition {
 
 function isBinding(value: unknown): value is Binding {
   if (!isRecord(value)) return false;
+  if (value.kind === "reactive") return isReactivePropertyBinding(value);
   if (value.kind === "tag") return typeof value.path === "string";
   return (
     value.kind === "tagRef" &&

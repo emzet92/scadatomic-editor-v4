@@ -42,6 +42,7 @@ import {
 } from "./editing/node-tree-editor";
 import type { ProjectData } from "./data/tags/TagDefinition";
 import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
+import type { ReactiveEventHandlerBinding } from "../reactivity";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
 
 export type DragPreview = {
@@ -108,6 +109,11 @@ type EditorState = {
     nodeId: NodeId,
     event: string,
     handler: HandlerRef | null
+  ) => void;
+
+  setReactiveEventHandler: (
+    id: string,
+    binding: ReactiveEventHandlerBinding | null
   ) => void;
 
   setMethod: (
@@ -626,6 +632,22 @@ export const useEditorStore = create<EditorState>((set) => ({
         handler,
       }),
     }));
+  },
+
+  setReactiveEventHandler: (id, binding) => {
+    set((state) => {
+      const reactiveEvents = { ...(state.document.reactiveEvents ?? {}) };
+      if (binding) reactiveEvents[id] = binding;
+      else delete reactiveEvents[id];
+      return {
+        document: {
+          ...state.document,
+          reactiveEvents: Object.keys(reactiveEvents).length > 0
+            ? reactiveEvents
+            : undefined,
+        },
+      };
+    });
   },
 
   setMethod: (nodeId, method, script) => {

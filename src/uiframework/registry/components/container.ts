@@ -28,4 +28,7 @@ export const containerDefinition = {
     borderSize: { kind: "border-size", min: 0 },
     display: { kind: "select", options: ["grid", "flex"] },
   },
+  bindings: {
+    visible: { label: "Visible", valueType: "boolean" },
+  },
 } satisfies ComponentDefinition;

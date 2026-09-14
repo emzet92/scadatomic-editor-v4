@@ -20,6 +20,13 @@ export const buttonDefinition = {
     marginY: { kind: "number", min: 0, max: 64 },
     borderRadius: { kind: "number", min: 0, max: 64 },
   },
+
+  bindings: {
+    "$variant": { label: "Variant", valueType: "variant", description: "Drive the visual variant from runtime state." },
+    enabled: { label: "Enabled", valueType: "boolean" },
+    visible: { label: "Visible", valueType: "boolean" },
+    label: { label: "Label", valueType: "string" },
+  },
   events: {
     click: { label: "Click", defaultSuffix: "Clicked" },
     doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },

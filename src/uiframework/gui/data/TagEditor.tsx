@@ -12,8 +12,9 @@ import type { DataSelection } from "./data-selection";
 import type { PrimitiveDataType } from "../../data/types/DataType";
 import type { TagFieldRef } from "../../data/tags/TagFieldRef";
 import { TagSourceEditor } from "./simulation/TagSourceEditor";
+import { ReactiveTagEventsEditor } from "./ReactiveTagEventsEditor";
 
-export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void }) {
+export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
   const tag = data.tags[tagId];
   const updateProjectData = useEditorStore((state) => state.updateProjectData);
   const setTagValue = useEditorStore((state) => state.setTagValue);
@@ -38,16 +39,17 @@ export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId:
       <FormField label="Name" error={error}><div className="flex gap-2"><TextInput value={name} onChange={(event) => setName(event.target.value)} mono /><Button onClick={saveName}>Rename</Button></div></FormField>
       <FormField label="Type"><DataTypeSelect data={data} value={stableTag.type} onChange={() => undefined} disabled /></FormField>
     </PanelCard>
-    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit is routed to the mapped driver; driver readback updates TagStore and emits tag.changed.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} data={data} target={{ tagId: stableTag.id, fieldIds: [field.id] }} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue data={data} target={{ tagId: stableTag.id, fieldIds: [] }} path={stableTag.name} label="Value" type={stableTag.type} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
+    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit is routed to the mapped driver; driver readback updates TagStore and emits tag.changed.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} data={data} target={{ tagId: stableTag.id, fieldIds: [field.id] }} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} projectId={projectId} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue data={data} target={{ tagId: stableTag.id, fieldIds: [] }} path={stableTag.name} label="Value" type={stableTag.type} projectId={projectId} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
     <ConfirmDialog open={deleteOpen} title={`Delete ${stableTag.name}?`} description="The tag and its persisted runtime value will be removed from this project." confirmLabel="Delete tag" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { updateProjectData((current) => deleteTag(current, stableTag.id)); setDeleteOpen(false); onSelect(null); }} />
   </div>;
 }
 
-function TagFieldValue({ data, target, path, label, type, onChange }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void }) {
+function TagFieldValue({ data, target, path, label, type, onChange, projectId }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void; projectId?: string | undefined }) {
   const value = useDesignerTagValue(path);
   return <div className="space-y-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3">
     <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>
     <TagSourceEditor data={data} target={target} />
+    <ReactiveTagEventsEditor target={target} path={path} projectId={projectId} />
   </div>;
 }
 

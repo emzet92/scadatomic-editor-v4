@@ -3,6 +3,7 @@ import type { TagDriverRegistry } from "../drivers/DriverRegistry";
 import type { ProjectData } from "../tags/TagDefinition";
 import { TagStore } from "../tags/TagStore";
 import { TagRuntime } from "./TagRuntime";
+import type { ReactiveStore } from "../../../reactivity/runtime/reactive-store";
 
 /**
  * Runtime ownership boundary for one running project.
@@ -16,6 +17,8 @@ export class ProjectRuntimeSession {
   readonly tagStore: TagStore;
   readonly drivers: DriverRuntime;
   readonly tags: TagRuntime;
+  /** Generic reactive hub backed by the same process image as tags. */
+  readonly reactive: ReactiveStore;
 
   private projectData: ProjectData;
 
@@ -28,6 +31,7 @@ export class ProjectRuntimeSession {
       getProjectData: () => this.projectData,
     });
     this.tags = new TagRuntime(this.tagStore, this.drivers);
+    this.reactive = this.tags.reactive;
   }
 
   getProjectData() {
@@ -47,6 +51,7 @@ export class ProjectRuntimeSession {
   }
 
   dispose() {
+    this.tags.dispose();
     this.drivers.dispose();
   }
 }

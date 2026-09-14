@@ -21,6 +21,12 @@ import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
 import { getComponentVariantProps } from "../component-variants";
 import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
+import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
+import {
+  getReactiveNodeProps,
+  getReactiveNodeVariant,
+  useProjectReactiveUiRevision,
+} from "../reactive-ui-state";
 
 export function RenderPage() {
   const { projectId, "*": routePath = "" } = useParams();
@@ -31,6 +37,10 @@ export function RenderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateToastVisible, setUpdateToastVisible] = useState(false);
+
+  // Derived UI changes live outside the persisted document. This subscription
+  // repaints the renderer without mutating document props.
+  useProjectReactiveUiRevision(projectId);
 
   const showUpdateToast = useCallback(() => {
     setUpdateToastVisible(true);
@@ -74,6 +84,12 @@ export function RenderPage() {
       cancelled = true;
     };
   }, [projectId]);
+
+
+  useEffect(() => {
+    if (!projectId || loading || error) return undefined;
+    return configureProjectReactiveRuntime(projectId, document);
+  }, [document, error, loading, projectId]);
 
   const navigateTo = useCallback(
     (path: string) => {
@@ -158,18 +174,26 @@ export function RenderPage() {
                 ? `${context.componentInstanceId}::${node.id}`
                 : node.id;
               const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
+              const reactiveProps = getReactiveNodeProps(projectId, runtimeNodeId);
+              const reactiveVariantName = getReactiveNodeVariant(projectId, runtimeNodeId);
               const runtimeVariantName = getMockRuntimeNodeVariant(
                 projectId,
                 runtimeNodeId
               );
+              const requestedVariant = reactiveVariantName ?? runtimeVariantName;
               const variantName =
-                runtimeVariantName && node.variants?.[runtimeVariantName]
-                  ? runtimeVariantName
+                requestedVariant && node.variants?.[requestedVariant]
+                  ? requestedVariant
                   : node.defaultVariant;
               const variantProps = getComponentVariantProps(node, variantName);
+              const effectiveReactiveProps = normalizeReactiveProps(
+                { ...(node.props ?? {}), ...variantProps, ...runtimeProps },
+                reactiveProps
+              );
 
               if (
                 Object.keys(runtimeProps).length === 0 &&
+                Object.keys(reactiveProps).length === 0 &&
                 Object.keys(variantProps).length === 0
               ) {
                 return node;
@@ -181,6 +205,7 @@ export function RenderPage() {
                   ...(node.props ?? {}),
                   ...variantProps,
                   ...runtimeProps,
+                  ...effectiveReactiveProps,
                 },
               };
             }}
@@ -222,6 +247,36 @@ export function RenderPage() {
       )}
     </div>
   );
+}
+
+function normalizeReactiveProps(
+  baseProps: Record<string, unknown>,
+  reactiveProps: Record<string, unknown>
+) {
+  const next = { ...reactiveProps };
+
+  if (Object.prototype.hasOwnProperty.call(next, "enabled")) {
+    next.disabled = !next.enabled;
+    delete next.enabled;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(next, "visible")) {
+    const visible = Boolean(next.visible);
+    const baseStyle = isRecord(baseProps.style) ? baseProps.style : {};
+    const reactiveStyle = isRecord(next.style) ? next.style : {};
+    next.style = {
+      ...baseStyle,
+      ...reactiveStyle,
+      ...(visible ? {} : { display: "none" }),
+    };
+    delete next.visible;
+  }
+
+  return next;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 export default RenderPage;

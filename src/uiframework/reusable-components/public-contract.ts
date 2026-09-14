@@ -1,5 +1,6 @@
 import {
   isJsIdentifier,
+  type Binding,
   type ComponentInputDefinition,
   type ComponentInputType,
   type UiComponentDefinition,
@@ -102,7 +103,7 @@ export function createComponentInput(
       : requestedType ?? inferInputType(property, resolvedProps[property]);
   const defaultValue =
     inferredType === "tag"
-      ? internalNode.bindings?.[property]?.path ?? ""
+      ? getBindingSourcePath(internalNode.bindings?.[property])
       : resolvedProps[property];
 
   return {
@@ -114,6 +115,17 @@ export function createComponentInput(
       kind: inferredType === "tag" ? "binding" : "prop",
     },
   };
+}
+
+
+function getBindingSourcePath(binding: Binding | undefined): string {
+  if (!binding) return "";
+  if (binding.kind === "tag") return binding.path;
+  if (binding.kind === "tagRef") {
+    return binding.path ? `${binding.input}.${binding.path}` : binding.input;
+  }
+  const tagDependency = binding.dependencies.find((ref) => ref.kind === "tag");
+  return tagDependency?.kind === "tag" ? tagDependency.path ?? "" : "";
 }
 
 

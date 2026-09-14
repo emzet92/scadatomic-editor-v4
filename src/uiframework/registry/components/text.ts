@@ -24,6 +24,7 @@ export const textDefinition = {
     borderRadius: { kind: "number", min: 0 },
   },
   bindings: {
-    value: { label: "Runtime tag" },
+    value: { label: "Value", valueType: "string" },
+    visible: { label: "Visible", valueType: "boolean" },
   },
 } satisfies ComponentDefinition;

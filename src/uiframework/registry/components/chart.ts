@@ -21,4 +21,7 @@ export const chartDefinition = {
     showGrid: { kind: "toggle" },
     timeRange: { kind: "time-range" },
   },
+  bindings: {
+    visible: { label: "Visible", valueType: "boolean" },
+  },
 } satisfies ComponentDefinition;

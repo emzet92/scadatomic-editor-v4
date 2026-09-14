@@ -75,7 +75,7 @@ export function ComponentProperties({
 
       {bindingDefinitions && setBinding ? (
         <BindingsEditor
-          nodeId={node.id}
+          node={node}
           definitions={bindingDefinitions}
           bindings={node.bindings}
           setBinding={setBinding}

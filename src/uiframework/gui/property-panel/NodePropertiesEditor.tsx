@@ -78,6 +78,19 @@ export function NodePropertiesEditor({
         ? omitControls(controls, BUTTON_LAYOUT_CONTROL_KEYS)
         : controls;
 
+  const resolvedBindingDefinitions = {
+    ...(bindingDefinitions ?? {}),
+    ...(Object.keys(node.variants ?? {}).length > 0
+      ? {
+          "$variant": {
+            label: "Variant",
+            valueType: "variant" as const,
+            description: "Drive the visual variant from runtime state.",
+          },
+        }
+      : {}),
+  };
+
   return (
     <div className="space-y-5">
       {node.type === "Container" ? (
@@ -93,7 +106,9 @@ export function NodePropertiesEditor({
         values={values}
         controls={resolvedControls}
         updateNode={updateNode}
-        {...(bindingDefinitions ? { bindingDefinitions } : {})}
+        {...(Object.keys(resolvedBindingDefinitions).length > 0
+          ? { bindingDefinitions: resolvedBindingDefinitions }
+          : {})}
         {...(setBinding ? { setBinding } : {})}
         {...(eventDefinitions ? { eventDefinitions } : {})}
         {...(setEvent ? { setEvent } : {})}

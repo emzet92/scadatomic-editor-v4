@@ -181,6 +181,8 @@ export function PropertyPanel({
         updateNode={updateNode}
         onEditDefinition={onEditComponentDefinition}
         renameNode={renameNode}
+        setBinding={setBinding}
+        onEditVariant={onEditVariant}
       />
     );
   }

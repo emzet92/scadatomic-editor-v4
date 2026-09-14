@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { applyDocumentCommand } from "./core/commands";
 import { parseUiDocument, type UiDocument } from "./core/document";
-import { runtimeSignals } from "./runtime-signals";
 import { getWs } from "./websocket";
 import {
   applyMockRuntimeUiState,
@@ -170,23 +169,6 @@ export function RuntimeProvider({
           return;
         }
 
-        if (payload.type === "tag.snapshot" && Array.isArray(payload.values)) {
-          for (const item of payload.values) {
-            if (!item || typeof item !== "object" || Array.isArray(item)) continue;
-            const entry = item as Record<string, unknown>;
-            if (typeof entry.path === "string") {
-              runtimeSignals.set(entry.path, entry.value);
-            }
-          }
-          return;
-        }
-
-        if (
-          payload.type === "tag.changed" &&
-          typeof payload.path === "string"
-        ) {
-          runtimeSignals.set(payload.path, payload.newValue);
-        }
       } catch (error) {
         console.error(
           "Failed to parse runtime message",

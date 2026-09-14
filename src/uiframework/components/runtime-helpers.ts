@@ -6,12 +6,14 @@ export function sendRuntimeEvent({
   nodeId,
   projectId,
   pageId,
+  payload,
 }: {
   handlerId: string;
   eventName: string;
   nodeId: string;
   projectId?: string | undefined;
   pageId?: string | undefined;
+  payload?: Record<string, unknown> | undefined;
 }) {
   sendWsMessage({
     type: "runtime.event",
@@ -20,5 +22,6 @@ export function sendRuntimeEvent({
     nodeId,
     projectId,
     pageId,
+    payload,
   });
 }

@@ -1,11 +1,13 @@
 import { Box, Braces, ExternalLink } from "lucide-react";
-import type { UiDocument, UiNode } from "../../core/document";
+import type { Binding, UiDocument, UiNode } from "../../core/document";
 import type { RenameNodeResult } from "../../editor-store";
 import {
   getComponentDefinitionForInstance,
   getResolvedComponentInstanceProps,
 } from "../../reusable-components";
 import { ComponentProperties } from "../property-panel/ComponentProperties";
+import { BindingsEditor } from "../property-panel/BindingsEditor";
+import { VariantsEditor } from "../property-panel/VariantsEditor";
 import { PropertyPanelHeader } from "../property-panel/PropertyPanelHeader";
 import type { UpdateNode } from "../property-panel/property-panel-types";
 import { Button } from "../ui";
@@ -17,12 +19,16 @@ export function ComponentInstancePanel({
   updateNode,
   onEditDefinition,
   renameNode,
+  setBinding,
+  onEditVariant,
 }: {
   document: UiDocument;
   node: UiNode;
   updateNode: UpdateNode;
   onEditDefinition: (componentId: string) => void;
   renameNode: (nodeId: string, name: string) => RenameNodeResult;
+  setBinding: (nodeId: string, property: string, binding: Binding | null) => void;
+  onEditVariant: (nodeId: string, variantName: string) => void;
 }) {
   const definition = getComponentDefinitionForInstance(document, node);
   if (!definition) {
@@ -72,6 +78,22 @@ export function ComponentInstancePanel({
             updateNode={updateNode}
             emptyMessage="This component exposes no input properties."
           />
+
+          <BindingsEditor
+            node={node}
+            definitions={{
+              visible: { label: "Visible", valueType: "boolean" },
+              ...(Object.keys(node.variants ?? {}).length > 0
+                ? { "$variant": { label: "Variant", valueType: "variant" as const } }
+                : {}),
+            }}
+            bindings={node.bindings}
+            setBinding={setBinding}
+          />
+
+          {Object.keys(node.variants ?? {}).length > 0 ? (
+            <VariantsEditor node={node} updateNode={updateNode} onEditVariant={onEditVariant} />
+          ) : null}
         </section>
 
         <section className="border-t border-[var(--editor-border)] pt-4">

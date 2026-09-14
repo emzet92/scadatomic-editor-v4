@@ -1,0 +1,2704 @@
+diff --git a/src/mock/mock-runtime-socket.ts b/src/mock/mock-runtime-socket.ts
+index 1d6c987..f207210 100644
+--- a/src/mock/mock-runtime-socket.ts
++++ b/src/mock/mock-runtime-socket.ts
+@@ -187,6 +187,9 @@ class MockRuntimeSocket extends EventTarget {
+     const sourceNodeId = payload.nodeId;
+     const eventName = payload.eventName;
+     const pageId = typeof payload.pageId === "string" ? payload.pageId : undefined;
++    const eventPayload = payload.payload && typeof payload.payload === "object" && !Array.isArray(payload.payload)
++      ? (payload.payload as Record<string, unknown>)
++      : undefined;
+ 
+     if (
+       typeof projectId !== "string" ||
+@@ -207,6 +210,7 @@ class MockRuntimeSocket extends EventTarget {
+         sourceNodeId,
+         eventName,
+         pageId,
++        ...(eventPayload ? { payload: eventPayload } : {}),
+       },
+       {
+         setNodeProp: (nodeId, property, value) => {
+diff --git a/src/reactivity/debug/binding-trace.ts b/src/reactivity/debug/binding-trace.ts
+new file mode 100644
+index 0000000..9a3e9ba
+--- /dev/null
++++ b/src/reactivity/debug/binding-trace.ts
+@@ -0,0 +1,29 @@
++import type { RuntimePropertyBinding } from "../model/property-binding";
++
++export type BindingTraceEntry = {
++  bindingId: string;
++  target: RuntimePropertyBinding["target"];
++  status: "success" | "error";
++  value?: unknown;
++  message?: string;
++  timestamp: number;
++};
++
++const MAX_TRACE = 200;
++const traces: BindingTraceEntry[] = [];
++const listeners = new Set<() => void>();
++
++export function publishBindingTrace(entry: BindingTraceEntry) {
++  traces.push(entry);
++  while (traces.length > MAX_TRACE) traces.shift();
++  for (const listener of listeners) listener();
++}
++
++export function getBindingTrace() {
++  return [...traces];
++}
++
++export function subscribeBindingTrace(listener: () => void) {
++  listeners.add(listener);
++  return () => listeners.delete(listener);
++}
+diff --git a/src/reactivity/index.ts b/src/reactivity/index.ts
+new file mode 100644
+index 0000000..77c945e
+--- /dev/null
++++ b/src/reactivity/index.ts
+@@ -0,0 +1,11 @@
++export * from "./model/reactive-ref";
++export * from "./model/binding-expression";
++export * from "./model/property-binding";
++export * from "./model/reactive-event";
++export * from "./runtime/reactive-store";
++export * from "./runtime/dependency-registry";
++export * from "./runtime/binding-evaluator";
++export * from "./runtime/binding-runtime";
++export * from "./sources/tag-reactive-source";
++export * from "./debug/binding-trace";
++export * from "./sources/reactive-tag-runtime";
+diff --git a/src/reactivity/model/binding-expression.ts b/src/reactivity/model/binding-expression.ts
+new file mode 100644
+index 0000000..bc90abc
+--- /dev/null
++++ b/src/reactivity/model/binding-expression.ts
+@@ -0,0 +1,53 @@
++import type { ReactiveRef } from "./reactive-ref";
++import { isReactiveRef } from "./reactive-ref";
++
++export type BindingExpression =
++  | { type: "constant"; value: unknown }
++  | { type: "ref"; ref: ReactiveRef }
++  | { type: "not"; operand: BindingExpression }
++  | { type: "equals"; left: BindingExpression; right: BindingExpression }
++  | { type: "not-equals"; left: BindingExpression; right: BindingExpression }
++  | { type: "greater-than"; left: BindingExpression; right: BindingExpression }
++  | { type: "less-than"; left: BindingExpression; right: BindingExpression }
++  | { type: "and"; operands: BindingExpression[] }
++  | { type: "or"; operands: BindingExpression[] }
++  | {
++      type: "conditional";
++      condition: BindingExpression;
++      whenTrue: BindingExpression;
++      whenFalse: BindingExpression;
++    }
++  | { type: "format"; template: string; value: BindingExpression };
++
++export function isBindingExpression(value: unknown): value is BindingExpression {
++  if (!isRecord(value) || typeof value.type !== "string") return false;
++
++  switch (value.type) {
++    case "constant":
++      return Object.prototype.hasOwnProperty.call(value, "value");
++    case "ref":
++      return isReactiveRef(value.ref);
++    case "not":
++      return isBindingExpression(value.operand);
++    case "equals":
++    case "not-equals":
++    case "greater-than":
++    case "less-than":
++      return isBindingExpression(value.left) && isBindingExpression(value.right);
++    case "and":
++    case "or":
++      return Array.isArray(value.operands) && value.operands.every(isBindingExpression);
++    case "conditional":
++      return isBindingExpression(value.condition) &&
++        isBindingExpression(value.whenTrue) &&
++        isBindingExpression(value.whenFalse);
++    case "format":
++      return typeof value.template === "string" && isBindingExpression(value.value);
++    default:
++      return false;
++  }
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/reactivity/model/property-binding.ts b/src/reactivity/model/property-binding.ts
+new file mode 100644
+index 0000000..143e9e2
+--- /dev/null
++++ b/src/reactivity/model/property-binding.ts
+@@ -0,0 +1,47 @@
++import type { BindingExpression } from "./binding-expression";
++import { isBindingExpression } from "./binding-expression";
++import type { ReactiveRef } from "./reactive-ref";
++import { isReactiveRef } from "./reactive-ref";
++
++export type ReactivePropertyBinding = {
++  kind: "reactive";
++  id: string;
++  dependencies: ReactiveRef[];
++  expression: BindingExpression;
++  enabled?: boolean | undefined;
++};
++
++export type RuntimePropertyBinding = ReactivePropertyBinding & {
++  target: {
++    componentId: string;
++    property: string;
++  };
++};
++
++export function createReactivePropertyBinding(
++  expression: BindingExpression,
++  dependencies: ReactiveRef[]
++): ReactivePropertyBinding {
++  return {
++    kind: "reactive",
++    id: crypto.randomUUID(),
++    dependencies,
++    expression,
++    enabled: true,
++  };
++}
++
++export function isReactivePropertyBinding(
++  value: unknown
++): value is ReactivePropertyBinding {
++  if (!isRecord(value) || value.kind !== "reactive") return false;
++  return typeof value.id === "string" &&
++    Array.isArray(value.dependencies) &&
++    value.dependencies.every(isReactiveRef) &&
++    isBindingExpression(value.expression) &&
++    (value.enabled === undefined || typeof value.enabled === "boolean");
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/reactivity/model/reactive-event.ts b/src/reactivity/model/reactive-event.ts
+new file mode 100644
+index 0000000..fddcad4
+--- /dev/null
++++ b/src/reactivity/model/reactive-event.ts
+@@ -0,0 +1,29 @@
++import type { ReactiveRef } from "./reactive-ref";
++import { isReactiveRef } from "./reactive-ref";
++
++export type ReactiveEventType = "value-changed" | "rising-edge" | "falling-edge";
++
++export type ReactiveEventHandlerBinding = {
++  id: string;
++  ref: ReactiveRef;
++  event: ReactiveEventType;
++  handlerId: string;
++  enabled?: boolean | undefined;
++};
++
++export function isReactiveEventHandlerBinding(
++  value: unknown
++): value is ReactiveEventHandlerBinding {
++  if (!isRecord(value)) return false;
++  return typeof value.id === "string" &&
++    isReactiveRef(value.ref) &&
++    (value.event === "value-changed" ||
++      value.event === "rising-edge" ||
++      value.event === "falling-edge") &&
++    typeof value.handlerId === "string" &&
++    (value.enabled === undefined || typeof value.enabled === "boolean");
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/reactivity/model/reactive-ref.ts b/src/reactivity/model/reactive-ref.ts
+new file mode 100644
+index 0000000..c40678c
+--- /dev/null
++++ b/src/reactivity/model/reactive-ref.ts
+@@ -0,0 +1,73 @@
++import type { TagFieldRef } from "../../uiframework/data/tags/TagFieldRef";
++import { tagFieldRefKey } from "../../uiframework/data/tags/TagFieldRef";
++
++export type TagReactiveRef = {
++  kind: "tag";
++  ref: TagFieldRef;
++  /** Human-readable diagnostic path. Stable ids in ref remain authoritative. */
++  path?: string | undefined;
++};
++
++export type PageStateReactiveRef = {
++  kind: "page-state";
++  pageId: string;
++  key: string;
++};
++
++export type ComponentStateReactiveRef = {
++  kind: "component-state";
++  componentId: string;
++  key: string;
++};
++
++export type MemoryReactiveRef = {
++  kind: "memory";
++  key: string;
++};
++
++export type ReactiveRef =
++  | TagReactiveRef
++  | PageStateReactiveRef
++  | ComponentStateReactiveRef
++  | MemoryReactiveRef;
++
++export type ReactiveKey = string;
++
++export function toReactiveKey(ref: ReactiveRef): ReactiveKey {
++  switch (ref.kind) {
++    case "tag":
++      return `tag:${tagFieldRefKey(ref.ref)}`;
++    case "page-state":
++      return `page-state:${ref.pageId}:${ref.key}`;
++    case "component-state":
++      return `component-state:${ref.componentId}:${ref.key}`;
++    case "memory":
++      return `memory:${ref.key}`;
++  }
++}
++
++export function isReactiveRef(value: unknown): value is ReactiveRef {
++  if (!isRecord(value) || typeof value.kind !== "string") return false;
++
++  if (value.kind === "tag") {
++    return isRecord(value.ref) &&
++      typeof value.ref.tagId === "string" &&
++      Array.isArray(value.ref.fieldIds) &&
++      value.ref.fieldIds.every((fieldId) => typeof fieldId === "string") &&
++      (value.path === undefined || typeof value.path === "string");
++  }
++
++  if (value.kind === "page-state") {
++    return typeof value.pageId === "string" && typeof value.key === "string";
++  }
++
++  if (value.kind === "component-state") {
++    return typeof value.componentId === "string" && typeof value.key === "string";
++  }
++
++  return value.kind === "memory" && typeof value.key === "string";
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
+diff --git a/src/reactivity/runtime/binding-evaluator.ts b/src/reactivity/runtime/binding-evaluator.ts
+new file mode 100644
+index 0000000..757117b
+--- /dev/null
++++ b/src/reactivity/runtime/binding-evaluator.ts
+@@ -0,0 +1,58 @@
++import type { BindingExpression } from "../model/binding-expression";
++import type { ReactiveRef } from "../model/reactive-ref";
++
++export type ReactiveValueReader = (ref: ReactiveRef) => unknown;
++
++export function evaluateBindingExpression(
++  expression: BindingExpression,
++  read: ReactiveValueReader
++): unknown {
++  switch (expression.type) {
++    case "constant":
++      return expression.value;
++    case "ref":
++      return read(expression.ref);
++    case "not":
++      return !evaluateBindingExpression(expression.operand, read);
++    case "equals":
++      return Object.is(
++        evaluateBindingExpression(expression.left, read),
++        evaluateBindingExpression(expression.right, read)
++      );
++    case "not-equals":
++      return !Object.is(
++        evaluateBindingExpression(expression.left, read),
++        evaluateBindingExpression(expression.right, read)
++      );
++    case "greater-than":
++      return toComparableNumber(evaluateBindingExpression(expression.left, read)) >
++        toComparableNumber(evaluateBindingExpression(expression.right, read));
++    case "less-than":
++      return toComparableNumber(evaluateBindingExpression(expression.left, read)) <
++        toComparableNumber(evaluateBindingExpression(expression.right, read));
++    case "and":
++      return expression.operands.every((operand) =>
++        Boolean(evaluateBindingExpression(operand, read))
++      );
++    case "or":
++      return expression.operands.some((operand) =>
++        Boolean(evaluateBindingExpression(operand, read))
++      );
++    case "conditional":
++      return evaluateBindingExpression(expression.condition, read)
++        ? evaluateBindingExpression(expression.whenTrue, read)
++        : evaluateBindingExpression(expression.whenFalse, read);
++    case "format": {
++      const value = evaluateBindingExpression(expression.value, read);
++      return expression.template.replaceAll("{value}", String(value ?? ""));
++    }
++  }
++}
++
++function toComparableNumber(value: unknown) {
++  const number = typeof value === "number" ? value : Number(value);
++  if (!Number.isFinite(number)) {
++    throw new TypeError(`Binding comparison requires a numeric value, got ${String(value)}.`);
++  }
++  return number;
++}
+diff --git a/src/reactivity/runtime/binding-runtime.ts b/src/reactivity/runtime/binding-runtime.ts
+new file mode 100644
+index 0000000..9320b5a
+--- /dev/null
++++ b/src/reactivity/runtime/binding-runtime.ts
+@@ -0,0 +1,90 @@
++import { publishBindingTrace } from "../debug/binding-trace";
++import type { RuntimePropertyBinding } from "../model/property-binding";
++import { toReactiveKey, type ReactiveRef } from "../model/reactive-ref";
++import { evaluateBindingExpression } from "./binding-evaluator";
++import { DependencyRegistry } from "./dependency-registry";
++import type { ReactiveStore } from "./reactive-store";
++
++export type BindingTargetRuntime = {
++  apply(binding: RuntimePropertyBinding, value: unknown): void;
++  clear(binding: RuntimePropertyBinding): void;
++  validate?(binding: RuntimePropertyBinding, value: unknown): void;
++};
++
++export class BindingRuntime {
++  private readonly store: ReactiveStore;
++  private readonly target: BindingTargetRuntime;
++  private readonly dependencies = new DependencyRegistry();
++  private readonly lastValues = new Map<string, unknown>();
++  private readonly unsubscribe: () => void;
++
++  constructor(store: ReactiveStore, target: BindingTargetRuntime) {
++    this.store = store;
++    this.target = target;
++    this.unsubscribe = store.subscribeAll((change) => {
++      const affected = this.dependencies.listAffected(toReactiveKey(change.ref));
++      for (const binding of affected) this.evaluate(binding.id);
++    });
++  }
++
++  register(binding: RuntimePropertyBinding) {
++    this.dependencies.register(binding);
++    if (binding.enabled !== false) this.evaluate(binding.id);
++  }
++
++  unregister(bindingId: string) {
++    const binding = this.dependencies.get(bindingId);
++    if (binding) this.target.clear(binding);
++    this.dependencies.unregister(bindingId);
++    this.lastValues.delete(bindingId);
++  }
++
++  evaluate(bindingId: string) {
++    const binding = this.dependencies.get(bindingId);
++    if (!binding || binding.enabled === false) return;
++
++    try {
++      const value = evaluateBindingExpression(
++        binding.expression,
++        (ref: ReactiveRef) => this.store.read(ref)
++      );
++      this.target.validate?.(binding, value);
++      if (this.lastValues.has(binding.id) && Object.is(this.lastValues.get(binding.id), value)) {
++        return;
++      }
++      this.lastValues.set(binding.id, value);
++      this.target.apply(binding, value);
++      publishBindingTrace({
++        bindingId: binding.id,
++        target: binding.target,
++        status: "success",
++        value,
++        timestamp: Date.now(),
++      });
++    } catch (error) {
++      this.lastValues.delete(binding.id);
++      this.target.clear(binding);
++      publishBindingTrace({
++        bindingId: binding.id,
++        target: binding.target,
++        status: "error",
++        message: error instanceof Error ? error.message : String(error),
++        timestamp: Date.now(),
++      });
++      console.warn(`[reactivity] Binding ${binding.id} failed`, error);
++    }
++  }
++
++  evaluateAll() {
++    for (const binding of this.dependencies.list()) {
++      if (binding.enabled !== false) this.evaluate(binding.id);
++    }
++  }
++
++  dispose() {
++    this.unsubscribe();
++    for (const binding of this.dependencies.list()) this.target.clear(binding);
++    this.dependencies.clear();
++    this.lastValues.clear();
++  }
++}
+diff --git a/src/reactivity/runtime/dependency-registry.ts b/src/reactivity/runtime/dependency-registry.ts
+new file mode 100644
+index 0000000..4b75c9a
+--- /dev/null
++++ b/src/reactivity/runtime/dependency-registry.ts
+@@ -0,0 +1,51 @@
++import type { RuntimePropertyBinding } from "../model/property-binding";
++import type { ReactiveKey } from "../model/reactive-ref";
++import { toReactiveKey } from "../model/reactive-ref";
++
++export class DependencyRegistry {
++  private readonly bindings = new Map<string, RuntimePropertyBinding>();
++  private readonly byDependency = new Map<ReactiveKey, Set<string>>();
++
++  register(binding: RuntimePropertyBinding) {
++    this.unregister(binding.id);
++    this.bindings.set(binding.id, binding);
++    for (const dependency of binding.dependencies) {
++      const key = toReactiveKey(dependency);
++      const ids = this.byDependency.get(key) ?? new Set<string>();
++      ids.add(binding.id);
++      this.byDependency.set(key, ids);
++    }
++  }
++
++  unregister(bindingId: string) {
++    const previous = this.bindings.get(bindingId);
++    if (!previous) return;
++    this.bindings.delete(bindingId);
++    for (const dependency of previous.dependencies) {
++      const key = toReactiveKey(dependency);
++      const ids = this.byDependency.get(key);
++      if (!ids) continue;
++      ids.delete(bindingId);
++      if (ids.size === 0) this.byDependency.delete(key);
++    }
++  }
++
++  get(bindingId: string) {
++    return this.bindings.get(bindingId);
++  }
++
++  listAffected(key: ReactiveKey) {
++    return [...(this.byDependency.get(key) ?? [])]
++      .map((id) => this.bindings.get(id))
++      .filter((binding): binding is RuntimePropertyBinding => Boolean(binding));
++  }
++
++  list() {
++    return [...this.bindings.values()];
++  }
++
++  clear() {
++    this.bindings.clear();
++    this.byDependency.clear();
++  }
++}
+diff --git a/src/reactivity/runtime/reactive-store.ts b/src/reactivity/runtime/reactive-store.ts
+new file mode 100644
+index 0000000..c1a387a
+--- /dev/null
++++ b/src/reactivity/runtime/reactive-store.ts
+@@ -0,0 +1,79 @@
++import type { ReactiveKey, ReactiveRef } from "../model/reactive-ref";
++import { toReactiveKey } from "../model/reactive-ref";
++
++export type ReactiveChangeSource = {
++  kind: string;
++  id?: string | undefined;
++};
++
++export type ReactiveChange = {
++  ref: ReactiveRef;
++  previousValue: unknown;
++  value: unknown;
++  timestamp: number;
++  source?: ReactiveChangeSource | undefined;
++};
++
++export type ReactiveSourceAdapter<TRef extends ReactiveRef = ReactiveRef> = {
++  kind: TRef["kind"];
++  read(ref: TRef): unknown;
++  describe?(ref: TRef): string;
++};
++
++export type ReactiveChangeListener = (change: ReactiveChange) => void;
++
++/**
++ * Dependency/event hub only. Values remain owned by their source adapters
++ * (TagStore today, memory/page/component state later), so the reactive layer
++ * never becomes a second process-image cache.
++ */
++export class ReactiveStore {
++  private readonly adapters = new Map<ReactiveRef["kind"], ReactiveSourceAdapter>();
++  private readonly listeners = new Map<ReactiveKey, Set<ReactiveChangeListener>>();
++  private readonly allListeners = new Set<ReactiveChangeListener>();
++
++  registerSource<TRef extends ReactiveRef>(adapter: ReactiveSourceAdapter<TRef>) {
++    this.adapters.set(adapter.kind, adapter as ReactiveSourceAdapter);
++    return () => {
++      if (this.adapters.get(adapter.kind) === adapter) {
++        this.adapters.delete(adapter.kind);
++      }
++    };
++  }
++
++  read(ref: ReactiveRef): unknown {
++    const adapter = this.adapters.get(ref.kind);
++    if (!adapter) {
++      throw new Error(`No reactive source adapter registered for ${ref.kind}.`);
++    }
++    return adapter.read(ref);
++  }
++
++  describe(ref: ReactiveRef): string {
++    const adapter = this.adapters.get(ref.kind);
++    return adapter?.describe?.(ref) ?? toReactiveKey(ref);
++  }
++
++  publish(change: ReactiveChange) {
++    if (Object.is(change.previousValue, change.value)) return;
++    const key = toReactiveKey(change.ref);
++    for (const listener of this.listeners.get(key) ?? []) listener(change);
++    for (const listener of this.allListeners) listener(change);
++  }
++
++  subscribe(ref: ReactiveRef, listener: ReactiveChangeListener) {
++    const key = toReactiveKey(ref);
++    const current = this.listeners.get(key) ?? new Set<ReactiveChangeListener>();
++    current.add(listener);
++    this.listeners.set(key, current);
++    return () => {
++      current.delete(listener);
++      if (current.size === 0) this.listeners.delete(key);
++    };
++  }
++
++  subscribeAll(listener: ReactiveChangeListener) {
++    this.allListeners.add(listener);
++    return () => this.allListeners.delete(listener);
++  }
++}
+diff --git a/src/reactivity/sources/reactive-tag-runtime.ts b/src/reactivity/sources/reactive-tag-runtime.ts
+new file mode 100644
+index 0000000..e73487f
+--- /dev/null
++++ b/src/reactivity/sources/reactive-tag-runtime.ts
+@@ -0,0 +1,113 @@
++import type { TagWriteSource } from "../../uiframework/data/tags/TagEvents";
++import type { TagFieldRef } from "../../uiframework/data/tags/TagFieldRef";
++import type { TagStore } from "../../uiframework/data/tags/TagStore";
++import type { TagReactiveRef } from "../model/reactive-ref";
++import { ReactiveStore } from "../runtime/reactive-store";
++import { TagReactiveSource } from "./tag-reactive-source";
++
++export type TagRuntimeWriteResult =
++  | { ok: true }
++  | { ok: false; error: string };
++
++/**
++ * Write boundary for reactive tags. The local/edge implementation is
++ * DriverRuntime; a browser client may provide a remote router that forwards to
++ * the authoritative driver host.
++ */
++export interface TagWriteRouter {
++  writePath(
++    path: string,
++    value: unknown,
++    requestedBy: TagWriteSource
++  ): TagRuntimeWriteResult;
++}
++
++/**
++ * Canonical application-facing tag runtime.
++ *
++ * There is intentionally no second value cache here:
++ * - TagStore is the live process image,
++ * - DriverRuntime remains the only write/source-ownership boundary,
++ * - ReactiveStore is only the dependency/change bus,
++ * - TagReactiveSource adapts TagStore changes into stable ReactiveRefs.
++ *
++ * This class is the migration target for the old TagRuntime facade. Existing
++ * imports keep working through data/runtime/TagRuntime.ts, which now only
++ * re-exports this implementation.
++ */
++export class ReactiveTagRuntime {
++  readonly store: TagStore;
++  readonly reactive: ReactiveStore;
++  readonly source: TagReactiveSource;
++
++  private readonly writer: TagWriteRouter;
++  private readonly disconnectReactiveSource: () => void;
++
++  constructor(
++    store: TagStore,
++    writer: TagWriteRouter,
++    reactive = new ReactiveStore()
++  ) {
++    this.store = store;
++    this.writer = writer;
++    this.reactive = reactive;
++    this.source = new TagReactiveSource(store);
++    this.disconnectReactiveSource = this.source.connect(reactive);
++  }
++
++  get(path: string) {
++    return this.store.get(path);
++  }
++
++  toReactiveRef(path: string): TagReactiveRef | undefined {
++    return this.source.resolvePath(path);
++  }
++
++  fromTagFieldRef(ref: TagFieldRef): TagReactiveRef | undefined {
++    return this.source.resolveRef(ref);
++  }
++
++  readReactive(ref: TagReactiveRef) {
++    return this.reactive.read(ref);
++  }
++
++  subscribeReactive(
++    ref: TagReactiveRef,
++    listener: Parameters<ReactiveStore["subscribe"]>[1]
++  ) {
++    return this.reactive.subscribe(ref, listener);
++  }
++
++  /**
++   * A write is a command, not a reactive-state mutation. It always routes to
++   * the owning driver; the source driver publishes readback into TagStore and
++   * only that readback becomes a reactive change.
++   */
++  write(
++    path: string,
++    value: unknown,
++    source: TagWriteSource = { kind: "script" }
++  ): TagRuntimeWriteResult {
++    return this.writer.writePath(path, value, source);
++  }
++
++  children(path: string) {
++    return this.store.children(path);
++  }
++
++  getTagByName(name: string) {
++    return this.store.getTagByName(name);
++  }
++
++  getUdtDefinitionById(udtId: string) {
++    return this.store.getUdtDefinitionById(udtId);
++  }
++
++  listTags() {
++    return this.store.listTags();
++  }
++
++  dispose() {
++    this.disconnectReactiveSource();
++  }
++}
+diff --git a/src/reactivity/sources/tag-reactive-source.ts b/src/reactivity/sources/tag-reactive-source.ts
+new file mode 100644
+index 0000000..22ff4e7
+--- /dev/null
++++ b/src/reactivity/sources/tag-reactive-source.ts
+@@ -0,0 +1,68 @@
++import type { TagWriteSource } from "../../uiframework/data/tags/TagEvents";
++import {
++  findTagFieldRefByPath,
++  resolveTagFieldRef,
++  type TagFieldRef,
++} from "../../uiframework/data/tags/TagFieldRef";
++import type { TagStore } from "../../uiframework/data/tags/TagStore";
++import type { TagReactiveRef } from "../model/reactive-ref";
++import type { ReactiveStore, ReactiveSourceAdapter } from "../runtime/reactive-store";
++
++export class TagReactiveSource implements ReactiveSourceAdapter<TagReactiveRef> {
++  readonly kind = "tag" as const;
++  private readonly tagStore: TagStore;
++
++  constructor(tagStore: TagStore) {
++    this.tagStore = tagStore;
++  }
++
++  read(ref: TagReactiveRef): unknown {
++    const resolved = resolveTagFieldRef(this.tagStore.snapshot(), ref.ref);
++    if (!resolved) {
++      throw new Error(`Reactive tag source is missing: ${ref.path ?? ref.ref.tagId}.`);
++    }
++    return this.tagStore.get(resolved.path);
++  }
++
++  describe(ref: TagReactiveRef) {
++    return resolveTagFieldRef(this.tagStore.snapshot(), ref.ref)?.path ?? ref.path ?? ref.ref.tagId;
++  }
++
++  resolvePath(path: string): TagReactiveRef | undefined {
++    const resolved = findTagFieldRefByPath(this.tagStore.snapshot(), path);
++    return resolved
++      ? { kind: "tag", ref: resolved.ref, path: resolved.path }
++      : undefined;
++  }
++
++  resolveRef(ref: TagFieldRef): TagReactiveRef | undefined {
++    const resolved = resolveTagFieldRef(this.tagStore.snapshot(), ref);
++    return resolved
++      ? { kind: "tag", ref: resolved.ref, path: resolved.path }
++      : undefined;
++  }
++
++  connect(store: ReactiveStore) {
++    const unregisterSource = store.registerSource(this);
++    const unsubscribe = this.tagStore.subscribe("*", (event) => {
++      const ref = this.resolvePath(event.path);
++      if (!ref) return;
++      store.publish({
++        ref,
++        previousValue: event.oldValue,
++        value: event.newValue,
++        timestamp: Date.now(),
++        ...(event.source ? { source: toReactiveSource(event.source) } : {}),
++      });
++    });
++
++    return () => {
++      unsubscribe();
++      unregisterSource();
++    };
++  }
++}
++
++function toReactiveSource(source: TagWriteSource) {
++  return source.id ? { kind: source.kind, id: source.id } : { kind: source.kind };
++}
+diff --git a/src/uiframework/components/runtime-helpers.ts b/src/uiframework/components/runtime-helpers.ts
+index 5dd402c..fa71047 100644
+--- a/src/uiframework/components/runtime-helpers.ts
++++ b/src/uiframework/components/runtime-helpers.ts
+@@ -6,12 +6,14 @@ export function sendRuntimeEvent({
+   nodeId,
+   projectId,
+   pageId,
++  payload,
+ }: {
+   handlerId: string;
+   eventName: string;
+   nodeId: string;
+   projectId?: string | undefined;
+   pageId?: string | undefined;
++  payload?: Record<string, unknown> | undefined;
+ }) {
+   sendWsMessage({
+     type: "runtime.event",
+@@ -20,5 +22,6 @@ export function sendRuntimeEvent({
+     nodeId,
+     projectId,
+     pageId,
++    payload,
+   });
+ }
+diff --git a/src/uiframework/core/document.ts b/src/uiframework/core/document.ts
+index a8f866e..4e24a98 100644
+--- a/src/uiframework/core/document.ts
++++ b/src/uiframework/core/document.ts
+@@ -2,6 +2,8 @@ import { createEmptyProjectData, type ProjectData } from "../data/tags/TagDefini
+ import { isProjectData } from "../data/serialization/project-data";
+ import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
+ import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
++import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../../reactivity";
++import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
+ export type NodeId = string;
+ export type PageId = string;
+ export type PageKind = "page" | "layout";
+@@ -18,7 +20,7 @@ export type TagRefBinding = {
+   path: string;
+ };
+ 
+-export type Binding = TagBinding | TagRefBinding;
++export type Binding = TagBinding | TagRefBinding | ReactivePropertyBinding;
+ 
+ export type HandlerRef = {
+   handlerId: string;
+@@ -113,6 +115,8 @@ export type UiDocument = {
+   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
+   /** Project-local data definitions and persisted designer values. */
+   data?: ProjectData | undefined;
++  /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
++  reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
+ };
+ 
+ export function createUiDocument(
+@@ -268,6 +272,18 @@ export function isUiDocument(value: unknown): value is UiDocument {
+     return false;
+   }
+ 
++  if (candidate.reactiveEvents !== undefined) {
++    if (
++      !isRecord(candidate.reactiveEvents) ||
++      !Object.entries(candidate.reactiveEvents).every(
++        ([id, binding]) =>
++          isReactiveEventHandlerBinding(binding) && binding.id === id
++      )
++    ) {
++      return false;
++    }
++  }
++
+   return true;
+ }
+ 
+@@ -501,6 +517,7 @@ function isComponentInput(value: unknown): value is ComponentInputDefinition {
+ 
+ function isBinding(value: unknown): value is Binding {
+   if (!isRecord(value)) return false;
++  if (value.kind === "reactive") return isReactivePropertyBinding(value);
+   if (value.kind === "tag") return typeof value.path === "string";
+   return (
+     value.kind === "tagRef" &&
+diff --git a/src/uiframework/data/runtime/ProjectRuntimeSession.ts b/src/uiframework/data/runtime/ProjectRuntimeSession.ts
+index ec2f46f..d4e031f 100644
+--- a/src/uiframework/data/runtime/ProjectRuntimeSession.ts
++++ b/src/uiframework/data/runtime/ProjectRuntimeSession.ts
+@@ -3,6 +3,7 @@ import type { TagDriverRegistry } from "../drivers/DriverRegistry";
+ import type { ProjectData } from "../tags/TagDefinition";
+ import { TagStore } from "../tags/TagStore";
+ import { TagRuntime } from "./TagRuntime";
++import type { ReactiveStore } from "../../../reactivity/runtime/reactive-store";
+ 
+ /**
+  * Runtime ownership boundary for one running project.
+@@ -16,6 +17,8 @@ export class ProjectRuntimeSession {
+   readonly tagStore: TagStore;
+   readonly drivers: DriverRuntime;
+   readonly tags: TagRuntime;
++  /** Generic reactive hub backed by the same process image as tags. */
++  readonly reactive: ReactiveStore;
+ 
+   private projectData: ProjectData;
+ 
+@@ -28,6 +31,7 @@ export class ProjectRuntimeSession {
+       getProjectData: () => this.projectData,
+     });
+     this.tags = new TagRuntime(this.tagStore, this.drivers);
++    this.reactive = this.tags.reactive;
+   }
+ 
+   getProjectData() {
+@@ -47,6 +51,7 @@ export class ProjectRuntimeSession {
+   }
+ 
+   dispose() {
++    this.tags.dispose();
+     this.drivers.dispose();
+   }
+ }
+diff --git a/src/uiframework/data/runtime/TagRuntime.ts b/src/uiframework/data/runtime/TagRuntime.ts
+index 207360a..af30e1b 100644
+--- a/src/uiframework/data/runtime/TagRuntime.ts
++++ b/src/uiframework/data/runtime/TagRuntime.ts
+@@ -1,63 +1,11 @@
+-import type { TagWriteSource } from "../tags/TagEvents";
+-import type { TagStore } from "../tags/TagStore";
+-
+-export type TagRuntimeWriteResult =
+-  | { ok: true }
+-  | { ok: false; error: string };
+-
+ /**
+- * Write boundary used by TagRuntime. The production/local host implementation
+- * is DriverRuntime. Browser runtime clients can supply a remote write router
+- * that forwards the request to the authoritative driver host.
++ * Compatibility import path.
++ *
++ * The implementation now lives in the reactive runtime. Keep this module until
++ * callers have migrated; no tag state or write logic is implemented here.
+  */
+-export interface TagWriteRouter {
+-  writePath(
+-    path: string,
+-    value: unknown,
+-    requestedBy: TagWriteSource
+-  ): TagRuntimeWriteResult;
+-}
+-
+-/**
+- * Application-facing tag API. Reads always come from a local process-image
+- * cache. Writes never mutate that cache directly: they are routed to the
+- * current source owner (local DriverRuntime or a remote authoritative host),
+- * and only driver readback updates TagStore.
+- */
+-export class TagRuntime {
+-  readonly store: TagStore;
+-  private readonly writer: TagWriteRouter;
+-
+-  constructor(store: TagStore, writer: TagWriteRouter) {
+-    this.store = store;
+-    this.writer = writer;
+-  }
+-
+-  get(path: string) {
+-    return this.store.get(path);
+-  }
+-
+-  write(
+-    path: string,
+-    value: unknown,
+-    source: TagWriteSource = { kind: "script" }
+-  ): TagRuntimeWriteResult {
+-    return this.writer.writePath(path, value, source);
+-  }
+-
+-  children(path: string) {
+-    return this.store.children(path);
+-  }
+-
+-  getTagByName(name: string) {
+-    return this.store.getTagByName(name);
+-  }
+-
+-  getUdtDefinitionById(udtId: string) {
+-    return this.store.getUdtDefinitionById(udtId);
+-  }
+-
+-  listTags() {
+-    return this.store.listTags();
+-  }
+-}
++export {
++  ReactiveTagRuntime as TagRuntime,
++  type TagRuntimeWriteResult,
++  type TagWriteRouter,
++} from "../../../reactivity/sources/reactive-tag-runtime";
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index ac37d1d..7a0cd0b 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -42,6 +42,7 @@ import {
+ } from "./editing/node-tree-editor";
+ import type { ProjectData } from "./data/tags/TagDefinition";
+ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
++import type { ReactiveEventHandlerBinding } from "../reactivity";
+ import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
+ 
+ export type DragPreview = {
+@@ -110,6 +111,11 @@ type EditorState = {
+     handler: HandlerRef | null
+   ) => void;
+ 
++  setReactiveEventHandler: (
++    id: string,
++    binding: ReactiveEventHandlerBinding | null
++  ) => void;
++
+   setMethod: (
+     nodeId: NodeId,
+     method: string,
+@@ -628,6 +634,22 @@ export const useEditorStore = create<EditorState>((set) => ({
+     }));
+   },
+ 
++  setReactiveEventHandler: (id, binding) => {
++    set((state) => {
++      const reactiveEvents = { ...(state.document.reactiveEvents ?? {}) };
++      if (binding) reactiveEvents[id] = binding;
++      else delete reactiveEvents[id];
++      return {
++        document: {
++          ...state.document,
++          reactiveEvents: Object.keys(reactiveEvents).length > 0
++            ? reactiveEvents
++            : undefined,
++        },
++      };
++    });
++  },
++
+   setMethod: (nodeId, method, script) => {
+     set((state) => ({
+       document: applyActiveCommand(state, {
+diff --git a/src/uiframework/gui/data/DataWorkspace.tsx b/src/uiframework/gui/data/DataWorkspace.tsx
+index bb5e967..7fc140d 100644
+--- a/src/uiframework/gui/data/DataWorkspace.tsx
++++ b/src/uiframework/gui/data/DataWorkspace.tsx
+@@ -12,7 +12,7 @@ import type { DataSelection } from "./data-selection";
+ export function DataWorkspace({ data, selection, onSelect, projectId }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
+   if (selection?.kind === "new-tag") return <CreateTagEditor data={data} onSelect={onSelect} />;
+   if (selection?.kind === "new-udt") return <CreateUdtEditor data={data} onSelect={onSelect} />;
+-  if (selection?.kind === "tag") return <TagEditor key={selection.tagId} data={data} tagId={selection.tagId} onSelect={onSelect} />;
++  if (selection?.kind === "tag") return <TagEditor key={selection.tagId} data={data} tagId={selection.tagId} onSelect={onSelect} projectId={projectId} />;
+   if (selection?.kind === "udt") return <UdtEditor key={selection.udtId} data={data} udtId={selection.udtId} onSelect={onSelect} />;
+   if (selection?.kind === "udt-method") return <UdtMethodEditor key={selection.methodId} data={data} udtId={selection.udtId} methodId={selection.methodId} />;
+   if (selection?.kind === "driver") return <DriverEditor key={selection.driverKind} data={data} driverKind={selection.driverKind} projectId={projectId} />;
+diff --git a/src/uiframework/gui/data/ReactiveTagEventsEditor.tsx b/src/uiframework/gui/data/ReactiveTagEventsEditor.tsx
+new file mode 100644
+index 0000000..22a1fef
+--- /dev/null
++++ b/src/uiframework/gui/data/ReactiveTagEventsEditor.tsx
+@@ -0,0 +1,113 @@
++import { Link2, Radio } from "lucide-react";
++import type { ReactiveEventType } from "../../../reactivity";
++import { tagFieldRefKey, type TagFieldRef } from "../../data/tags/TagFieldRef";
++import { useEditorStore } from "../../editor-store";
++import { Button, Checkbox, FormField, PanelCard, TextInput } from "../ui";
++
++const EVENTS: Array<{ type: ReactiveEventType; label: string; suffix: string }> = [
++  { type: "value-changed", label: "Value changed", suffix: "Changed" },
++  { type: "rising-edge", label: "Rising edge", suffix: "RisingEdge" },
++  { type: "falling-edge", label: "Falling edge", suffix: "FallingEdge" },
++];
++
++export function ReactiveTagEventsEditor({
++  target,
++  path,
++  projectId,
++}: {
++  target: TagFieldRef;
++  path: string;
++  projectId?: string | undefined;
++}) {
++  const reactiveEvents = useEditorStore((state) => state.document.reactiveEvents);
++  const setReactiveEventHandler = useEditorStore((state) => state.setReactiveEventHandler);
++
++  return (
++    <PanelCard className="space-y-3">
++      <div>
++        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--editor-text)]">
++          <Radio size={14} /> Reactive events
++        </div>
++        <p className="mt-1 text-xs text-[var(--editor-text-muted)]">
++          Bindings synchronize UI without scripts. Use these listeners only when a tag change should execute logic.
++        </p>
++      </div>
++
++      <div className="space-y-2">
++        {EVENTS.map((event) => {
++          const id = reactiveEventId(target, event.type);
++          const current = reactiveEvents?.[id];
++          const handlerId = current?.handlerId ?? defaultHandlerId(path, event.suffix);
++          const enabled = Boolean(current);
++          const href = projectId
++            ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(handlerId)}`
++            : undefined;
++
++          return (
++            <div
++              key={event.type}
++              className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3"
++            >
++              <div className="flex items-center gap-3">
++                <Checkbox
++                  checked={enabled}
++                  onChange={(input) => {
++                    if (!input.target.checked) {
++                      setReactiveEventHandler(id, null);
++                      return;
++                    }
++                    setReactiveEventHandler(id, {
++                      id,
++                      ref: { kind: "tag", ref: target, path },
++                      event: event.type,
++                      handlerId,
++                      enabled: true,
++                    });
++                  }}
++                />
++                <div className="min-w-0 flex-1">
++                  <div className="text-xs font-semibold text-[var(--editor-text)]">{event.label}</div>
++                  <div className="text-[10px] text-[var(--editor-text-muted)]">{path}</div>
++                </div>
++                {enabled && href ? (
++                  <Button
++                    size="xs"
++                    variant="text"
++                    onClick={() => window.location.assign(href)}
++                    title="Open handler"
++                  >
++                    <Link2 size={11} /> Edit
++                  </Button>
++                ) : null}
++              </div>
++
++              {enabled ? (
++                <FormField label="Handler" compact className="mt-3">
++                  <TextInput
++                    mono
++                    value={handlerId}
++                    onChange={(input) => {
++                      setReactiveEventHandler(id, {
++                        ...current!,
++                        handlerId: input.target.value,
++                      });
++                    }}
++                  />
++                </FormField>
++              ) : null}
++            </div>
++          );
++        })}
++      </div>
++    </PanelCard>
++  );
++}
++
++function reactiveEventId(ref: TagFieldRef, event: ReactiveEventType) {
++  return `tag-event:${tagFieldRefKey(ref)}:${event}`;
++}
++
++function defaultHandlerId(path: string, suffix: string) {
++  const safePath = path.replace(/[^A-Za-z0-9_.-]/g, "_");
++  return `tag.${safePath}.${suffix}`;
++}
+diff --git a/src/uiframework/gui/data/TagEditor.tsx b/src/uiframework/gui/data/TagEditor.tsx
+index ea5469f..6b2529c 100644
+--- a/src/uiframework/gui/data/TagEditor.tsx
++++ b/src/uiframework/gui/data/TagEditor.tsx
+@@ -12,8 +12,9 @@ import type { DataSelection } from "./data-selection";
+ import type { PrimitiveDataType } from "../../data/types/DataType";
+ import type { TagFieldRef } from "../../data/tags/TagFieldRef";
+ import { TagSourceEditor } from "./simulation/TagSourceEditor";
++import { ReactiveTagEventsEditor } from "./ReactiveTagEventsEditor";
+ 
+-export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void }) {
++export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
+   const tag = data.tags[tagId];
+   const updateProjectData = useEditorStore((state) => state.updateProjectData);
+   const setTagValue = useEditorStore((state) => state.setTagValue);
+@@ -38,16 +39,17 @@ export function TagEditor({ data, tagId, onSelect }: { data: ProjectData; tagId:
+       <FormField label="Name" error={error}><div className="flex gap-2"><TextInput value={name} onChange={(event) => setName(event.target.value)} mono /><Button onClick={saveName}>Rename</Button></div></FormField>
+       <FormField label="Type"><DataTypeSelect data={data} value={stableTag.type} onChange={() => undefined} disabled /></FormField>
+     </PanelCard>
+-    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit is routed to the mapped driver; driver readback updates TagStore and emits tag.changed.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} data={data} target={{ tagId: stableTag.id, fieldIds: [field.id] }} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue data={data} target={{ tagId: stableTag.id, fieldIds: [] }} path={stableTag.name} label="Value" type={stableTag.type} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
++    {isUdtTag(stableTag) && definition ? <PanelCard className="space-y-4"><div><h2 className="text-sm font-semibold text-[var(--editor-text)]">Values</h2><p className="text-xs text-[var(--editor-text-muted)]">Every edit is routed to the mapped driver; driver readback updates TagStore and emits tag.changed.</p></div><div className="grid gap-3 md:grid-cols-2">{definition.fields.map((field) => field.type.kind === "udt" ? null : <TagFieldValue key={field.id} data={data} target={{ tagId: stableTag.id, fieldIds: [field.id] }} path={`${stableTag.name}.${field.name}`} label={field.name} type={field.type} projectId={projectId} onChange={(value) => { const result = setTagValue(`${stableTag.name}.${field.name}`, value); if (!result.ok) setError(result.error); }} />)}</div></PanelCard> : !isUdtTag(stableTag) ? <PanelCard className="max-w-xl"><TagFieldValue data={data} target={{ tagId: stableTag.id, fieldIds: [] }} path={stableTag.name} label="Value" type={stableTag.type} projectId={projectId} onChange={(value) => { const result = setTagValue(stableTag.name, value); if (!result.ok) setError(result.error); }} /></PanelCard> : null}
+     <ConfirmDialog open={deleteOpen} title={`Delete ${stableTag.name}?`} description="The tag and its persisted runtime value will be removed from this project." confirmLabel="Delete tag" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { updateProjectData((current) => deleteTag(current, stableTag.id)); setDeleteOpen(false); onSelect(null); }} />
+   </div>;
+ }
+ 
+-function TagFieldValue({ data, target, path, label, type, onChange }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void }) {
++function TagFieldValue({ data, target, path, label, type, onChange, projectId }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void; projectId?: string | undefined }) {
+   const value = useDesignerTagValue(path);
+   return <div className="space-y-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-3">
+     <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>
+     <TagSourceEditor data={data} target={target} />
++    <ReactiveTagEventsEditor target={target} path={path} projectId={projectId} />
+   </div>;
+ }
+ 
+diff --git a/src/uiframework/gui/property-panel/BindingsEditor.tsx b/src/uiframework/gui/property-panel/BindingsEditor.tsx
+index d663493..1e57036 100644
+--- a/src/uiframework/gui/property-panel/BindingsEditor.tsx
++++ b/src/uiframework/gui/property-panel/BindingsEditor.tsx
+@@ -1,21 +1,39 @@
+-import type { Binding, ComponentInputDefinition } from "../../core/document";
++import { Link2, Unlink } from "lucide-react";
++import {
++  createReactivePropertyBinding,
++  type BindingExpression,
++  type ReactivePropertyBinding,
++  type TagReactiveRef,
++} from "../../../reactivity";
++import type {
++  Binding,
++  ComponentInputDefinition,
++  UiNode,
++} from "../../core/document";
++import {
++  findTagFieldRefByPath,
++  resolveTagFieldRef,
++} from "../../data/tags/TagFieldRef";
+ import { useEditorStore } from "../../editor-store";
+-import { FormField, SectionHeader, TextInput } from "../ui";
++import type { BindingDefinition } from "../../registry/component-definition-types";
++import { Button, FormField, SectionHeader, Select, TextInput } from "../ui";
+ import {
+   formatBindingPath,
+   getKnownBindingPaths,
+   parseBindingPath,
+ } from "./binding-paths";
+ 
++type TransformKind = "direct" | "not" | "equals" | "conditional";
++
+ export function BindingsEditor({
+-  nodeId,
++  node,
+   definitions,
+   bindings,
+   setBinding,
+   componentInputs,
+ }: {
+-  nodeId: string;
+-  definitions: Record<string, { label: string }>;
++  node: UiNode;
++  definitions: Record<string, BindingDefinition>;
+   bindings: Record<string, Binding> | undefined;
+   setBinding: (
+     nodeId: string,
+@@ -25,43 +43,365 @@ export function BindingsEditor({
+   componentInputs?: Record<string, ComponentInputDefinition> | undefined;
+ }) {
+   const projectData = useEditorStore((state) => state.document.data);
+-  const { all: knownTagPaths, relativePaths } = getKnownBindingPaths(
++  const { absolutePaths, relativePaths } = getKnownBindingPaths(
+     projectData,
+     componentInputs,
+   );
+-  const dataListId = `tag-paths-${nodeId}`;
+ 
+   return (
+     <div className="pt-4 border-t border-[var(--editor-border)] space-y-3">
+-      <datalist id={dataListId}>
+-        {knownTagPaths.map((path) => <option key={path} value={path} />)}
+-      </datalist>
+       <SectionHeader
+-        title="Bindings"
+-        description={relativePaths.length > 0
+-          ? "Bind to project tags or a public TagRef input, e.g. pump.rpm."
+-          : "Bind component properties to runtime tags."}
++        title="Reactive bindings"
++        description="Derive UI state from runtime values. Bindings are pure and never execute commands."
+       />
+ 
+-      {Object.entries(definitions).map(([property, definition]) => {
+-        const current = bindings?.[property];
+-        const value = formatBindingPath(current);
+-
+-        return (
+-          <FormField key={property} label={`${definition.label} · ${property}`}>
+-            <TextInput
+-              type="text"
+-              list={dataListId}
+-              value={value}
+-              placeholder={relativePaths[0] ?? "Pump1.speed"}
+-              onChange={(event) => {
+-                const path = event.target.value.trim();
+-                setBinding(nodeId, property, parseBindingPath(path, componentInputs));
+-              }}
+-            />
++      {Object.entries(definitions).map(([property, definition]) => (
++        <BindingCard
++          key={property}
++          node={node}
++          property={property}
++          definition={definition}
++          binding={bindings?.[property]}
++          absolutePaths={absolutePaths}
++          relativePaths={relativePaths}
++          componentInputs={componentInputs}
++          onChange={(binding) => setBinding(node.id, property, binding)}
++        />
++      ))}
++    </div>
++  );
++}
++
++function BindingCard({
++  node,
++  property,
++  definition,
++  binding,
++  absolutePaths,
++  relativePaths,
++  componentInputs,
++  onChange,
++}: {
++  node: UiNode;
++  property: string;
++  definition: BindingDefinition;
++  binding: Binding | undefined;
++  absolutePaths: string[];
++  relativePaths: string[];
++  componentInputs?: Record<string, ComponentInputDefinition> | undefined;
++  onChange(binding: Binding | null): void;
++}) {
++  const projectData = useEditorStore((state) => state.document.data);
++  const sourcePath = resolveCurrentBindingPath(binding, projectData);
++  const transform = detectTransform(binding);
++  const isBound = Boolean(binding);
++
++  function bindSource(path: string) {
++    if (!path) {
++      onChange(null);
++      return;
++    }
++
++    if (relativePaths.includes(path)) {
++      onChange(parseBindingPath(path, componentInputs));
++      return;
++    }
++
++    const resolved = projectData ? findTagFieldRefByPath(projectData, path) : undefined;
++    if (!resolved) {
++      // Keep legacy path support for an unresolved value so the designer can
++      // preserve references while a source is temporarily missing.
++      onChange({ kind: "tag", path });
++      return;
++    }
++
++    const ref: TagReactiveRef = {
++      kind: "tag",
++      ref: resolved.ref,
++      path: resolved.path,
++    };
++    onChange(buildReactiveBinding(ref, transform, binding, definition, node));
++  }
++
++  function setTransform(nextTransform: TransformKind) {
++    const ref = getAbsoluteReactiveRef(binding, projectData);
++    if (!ref) return;
++    onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
++  }
++
++  function updateConditionalBranch(branch: "true" | "false", rawValue: string) {
++    const reactive = binding?.kind === "reactive" ? binding : undefined;
++    const ref = getAbsoluteReactiveRef(binding, projectData);
++    if (!reactive || !ref) return;
++    const current = readConditionalValues(reactive);
++    const value = coerceEditorValue(rawValue, definition.valueType);
++    onChange(createReactivePropertyBinding(
++      {
++        type: "conditional",
++        condition: { type: "ref", ref },
++        whenTrue: { type: "constant", value: branch === "true" ? value : current.whenTrue },
++        whenFalse: { type: "constant", value: branch === "false" ? value : current.whenFalse },
++      },
++      [ref]
++    ));
++  }
++
++  function updateEqualsValue(rawValue: string) {
++    const ref = getAbsoluteReactiveRef(binding, projectData);
++    if (!ref) return;
++    onChange(createReactivePropertyBinding(
++      {
++        type: "equals",
++        left: { type: "ref", ref },
++        right: { type: "constant", value: parseLooseValue(rawValue) },
++      },
++      [ref]
++    ));
++  }
++
++  const conditionValues = binding?.kind === "reactive"
++    ? readConditionalValues(binding)
++    : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
++
++  return (
++    <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3 space-y-3">
++      <div className="flex items-start justify-between gap-3">
++        <div className="min-w-0">
++          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--editor-text)]">
++            <Link2 size={12} /> {definition.label}
++          </div>
++          <div className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
++            {definition.description ?? property}
++          </div>
++        </div>
++        {isBound ? (
++          <Button
++            size="xs"
++            variant="text"
++            onClick={() => onChange(null)}
++            title="Remove binding"
++          >
++            <Unlink size={11} /> Remove
++          </Button>
++        ) : null}
++      </div>
++
++      <FormField label="Source" compact>
++        <Select value={sourcePath} onChange={(event) => bindSource(event.target.value)}>
++          <option value="">Static value</option>
++          {absolutePaths.length > 0 ? (
++            <optgroup label="Project tags">
++              {absolutePaths.map((path) => <option key={path} value={path}>{path}</option>)}
++            </optgroup>
++          ) : null}
++          {relativePaths.length > 0 ? (
++            <optgroup label="Component TagRef">
++              {relativePaths.map((path) => <option key={path} value={path}>{path}</option>)}
++            </optgroup>
++          ) : null}
++        </Select>
++      </FormField>
++
++      {binding?.kind === "reactive" ? (
++        <>
++          <FormField label="Transform" compact>
++            <Select value={transform} onChange={(event) => setTransform(event.target.value as TransformKind)}>
++              <option value="direct">Direct</option>
++              {definition.valueType === "boolean" ? <option value="not">NOT</option> : null}
++              <option value="equals">Equals</option>
++              <option value="conditional">Condition</option>
++            </Select>
+           </FormField>
+-        );
+-      })}
++
++          {transform === "equals" ? (
++            <FormField label="Equals value" compact>
++              <TextInput
++                value={String(readEqualsValue(binding) ?? "")}
++                onChange={(event) => updateEqualsValue(event.target.value)}
++              />
++            </FormField>
++          ) : null}
++
++          {transform === "conditional" ? (
++            <div className="grid grid-cols-2 gap-2">
++              <BindingResultField
++                label="When true"
++                value={conditionValues.whenTrue}
++                definition={definition}
++                node={node}
++                onChange={(value) => updateConditionalBranch("true", value)}
++              />
++              <BindingResultField
++                label="When false"
++                value={conditionValues.whenFalse}
++                definition={definition}
++                node={node}
++                onChange={(value) => updateConditionalBranch("false", value)}
++              />
++            </div>
++          ) : null}
++        </>
++      ) : binding ? (
++        <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">
++          Legacy/relative binding. It remains compatible and will be resolved at runtime.
++        </div>
++      ) : null}
+     </div>
+   );
+ }
++
++function BindingResultField({
++  label,
++  value,
++  definition,
++  node,
++  onChange,
++}: {
++  label: string;
++  value: unknown;
++  definition: BindingDefinition;
++  node: UiNode;
++  onChange(value: string): void;
++}) {
++  if (definition.valueType === "variant") {
++    const variants = Object.keys(node.variants ?? {});
++    return (
++      <FormField label={label} compact>
++        <Select value={String(value ?? "")} onChange={(event) => onChange(event.target.value)}>
++          <option value="">Select variant</option>
++          {variants.map((variant) => <option key={variant} value={variant}>{variant}</option>)}
++        </Select>
++      </FormField>
++    );
++  }
++
++  if (definition.valueType === "boolean") {
++    return (
++      <FormField label={label} compact>
++        <Select value={String(Boolean(value))} onChange={(event) => onChange(event.target.value)}>
++          <option value="true">true</option>
++          <option value="false">false</option>
++        </Select>
++      </FormField>
++    );
++  }
++
++  return (
++    <FormField label={label} compact>
++      <TextInput value={String(value ?? "")} onChange={(event) => onChange(event.target.value)} />
++    </FormField>
++  );
++}
++
++
++function resolveCurrentBindingPath(
++  binding: Binding | undefined,
++  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
++) {
++  if (binding?.kind === "reactive" && projectData) {
++    const tagRef = binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
++    if (tagRef) {
++      return resolveTagFieldRef(projectData, tagRef.ref)?.path ?? tagRef.path ?? "";
++    }
++  }
++  return formatBindingPath(binding);
++}
++
++function buildReactiveBinding(
++  ref: TagReactiveRef,
++  transform: TransformKind,
++  current: Binding | undefined,
++  definition: BindingDefinition,
++  node: UiNode
++): ReactivePropertyBinding {
++  let expression: BindingExpression;
++  if (transform === "not") {
++    expression = { type: "not", operand: { type: "ref", ref } };
++  } else if (transform === "equals") {
++    expression = {
++      type: "equals",
++      left: { type: "ref", ref },
++      right: { type: "constant", value: current?.kind === "reactive" ? readEqualsValue(current) : true },
++    };
++  } else if (transform === "conditional") {
++    const previous = current?.kind === "reactive"
++      ? readConditionalValues(current)
++      : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
++    expression = {
++      type: "conditional",
++      condition: { type: "ref", ref },
++      whenTrue: { type: "constant", value: previous.whenTrue },
++      whenFalse: { type: "constant", value: previous.whenFalse },
++    };
++  } else {
++    expression = { type: "ref", ref };
++  }
++
++  return createReactivePropertyBinding(expression, [ref]);
++}
++
++function getAbsoluteReactiveRef(
++  binding: Binding | undefined,
++  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
++): TagReactiveRef | undefined {
++  if (!binding) return undefined;
++  if (binding.kind === "reactive") {
++    return binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
++  }
++  if (binding.kind === "tag" && projectData) {
++    const resolved = findTagFieldRefByPath(projectData, binding.path);
++    return resolved ? { kind: "tag", ref: resolved.ref, path: resolved.path } : undefined;
++  }
++  return undefined;
++}
++
++function detectTransform(binding: Binding | undefined): TransformKind {
++  if (binding?.kind !== "reactive") return "direct";
++  if (binding.expression.type === "not") return "not";
++  if (binding.expression.type === "equals") return "equals";
++  if (binding.expression.type === "conditional") return "conditional";
++  return "direct";
++}
++
++function readEqualsValue(binding: ReactivePropertyBinding) {
++  const expression = binding.expression;
++  return expression.type === "equals" && expression.right.type === "constant"
++    ? expression.right.value
++    : true;
++}
++
++function readConditionalValues(binding: ReactivePropertyBinding) {
++  const expression = binding.expression;
++  if (expression.type !== "conditional") {
++    return { whenTrue: true, whenFalse: false };
++  }
++  return {
++    whenTrue: expression.whenTrue.type === "constant" ? expression.whenTrue.value : true,
++    whenFalse: expression.whenFalse.type === "constant" ? expression.whenFalse.value : false,
++  };
++}
++
++function defaultTrueValue(definition: BindingDefinition, node: UiNode) {
++  if (definition.valueType === "variant") return Object.keys(node.variants ?? {})[0] ?? "";
++  if (definition.valueType === "boolean") return true;
++  return "";
++}
++
++function defaultFalseValue(definition: BindingDefinition, node: UiNode) {
++  if (definition.valueType === "variant") return Object.keys(node.variants ?? {})[1] ?? Object.keys(node.variants ?? {})[0] ?? "";
++  if (definition.valueType === "boolean") return false;
++  return "";
++}
++
++function coerceEditorValue(value: string, type: BindingDefinition["valueType"]) {
++  if (type === "boolean") return value === "true";
++  if (type === "number") return Number(value);
++  return value;
++}
++
++function parseLooseValue(value: string): unknown {
++  if (value === "true") return true;
++  if (value === "false") return false;
++  const number = Number(value);
++  return value.trim() !== "" && Number.isFinite(number) ? number : value;
++}
+diff --git a/src/uiframework/gui/property-panel/ComponentProperties.tsx b/src/uiframework/gui/property-panel/ComponentProperties.tsx
+index ec7ebbe..0bbca81 100644
+--- a/src/uiframework/gui/property-panel/ComponentProperties.tsx
++++ b/src/uiframework/gui/property-panel/ComponentProperties.tsx
+@@ -75,7 +75,7 @@ export function ComponentProperties({
+ 
+       {bindingDefinitions && setBinding ? (
+         <BindingsEditor
+-          nodeId={node.id}
++          node={node}
+           definitions={bindingDefinitions}
+           bindings={node.bindings}
+           setBinding={setBinding}
+diff --git a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+index 03856e9..42f1c48 100644
+--- a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
++++ b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+@@ -78,6 +78,19 @@ export function NodePropertiesEditor({
+         ? omitControls(controls, BUTTON_LAYOUT_CONTROL_KEYS)
+         : controls;
+ 
++  const resolvedBindingDefinitions = {
++    ...(bindingDefinitions ?? {}),
++    ...(Object.keys(node.variants ?? {}).length > 0
++      ? {
++          "$variant": {
++            label: "Variant",
++            valueType: "variant" as const,
++            description: "Drive the visual variant from runtime state.",
++          },
++        }
++      : {}),
++  };
++
+   return (
+     <div className="space-y-5">
+       {node.type === "Container" ? (
+@@ -93,7 +106,9 @@ export function NodePropertiesEditor({
+         values={values}
+         controls={resolvedControls}
+         updateNode={updateNode}
+-        {...(bindingDefinitions ? { bindingDefinitions } : {})}
++        {...(Object.keys(resolvedBindingDefinitions).length > 0
++          ? { bindingDefinitions: resolvedBindingDefinitions }
++          : {})}
+         {...(setBinding ? { setBinding } : {})}
+         {...(eventDefinitions ? { eventDefinitions } : {})}
+         {...(setEvent ? { setEvent } : {})}
+diff --git a/src/uiframework/gui/property-panel/PropertyPanel.tsx b/src/uiframework/gui/property-panel/PropertyPanel.tsx
+index e0c14e7..7164597 100644
+--- a/src/uiframework/gui/property-panel/PropertyPanel.tsx
++++ b/src/uiframework/gui/property-panel/PropertyPanel.tsx
+@@ -181,6 +181,8 @@ export function PropertyPanel({
+         updateNode={updateNode}
+         onEditDefinition={onEditComponentDefinition}
+         renameNode={renameNode}
++        setBinding={setBinding}
++        onEditVariant={onEditVariant}
+       />
+     );
+   }
+diff --git a/src/uiframework/gui/property-panel/binding-paths.ts b/src/uiframework/gui/property-panel/binding-paths.ts
+index 8477860..3099a67 100644
+--- a/src/uiframework/gui/property-panel/binding-paths.ts
++++ b/src/uiframework/gui/property-panel/binding-paths.ts
+@@ -40,6 +40,10 @@ export function parseBindingPath(
+ 
+ export function formatBindingPath(binding: Binding | undefined) {
+   if (!binding) return "";
++  if (binding.kind === "reactive") {
++    const dependency = binding.dependencies.find((ref) => ref.kind === "tag");
++    return dependency?.kind === "tag" ? dependency.path ?? "" : "";
++  }
+   return binding.kind === "tag"
+     ? binding.path
+     : `${binding.input}${binding.path ? `.${binding.path}` : ""}`;
+diff --git a/src/uiframework/gui/reusable-component/ComponentInstancePanel.tsx b/src/uiframework/gui/reusable-component/ComponentInstancePanel.tsx
+index 4eadf95..d06850f 100644
+--- a/src/uiframework/gui/reusable-component/ComponentInstancePanel.tsx
++++ b/src/uiframework/gui/reusable-component/ComponentInstancePanel.tsx
+@@ -1,11 +1,13 @@
+ import { Box, Braces, ExternalLink } from "lucide-react";
+-import type { UiDocument, UiNode } from "../../core/document";
++import type { Binding, UiDocument, UiNode } from "../../core/document";
+ import type { RenameNodeResult } from "../../editor-store";
+ import {
+   getComponentDefinitionForInstance,
+   getResolvedComponentInstanceProps,
+ } from "../../reusable-components";
+ import { ComponentProperties } from "../property-panel/ComponentProperties";
++import { BindingsEditor } from "../property-panel/BindingsEditor";
++import { VariantsEditor } from "../property-panel/VariantsEditor";
+ import { PropertyPanelHeader } from "../property-panel/PropertyPanelHeader";
+ import type { UpdateNode } from "../property-panel/property-panel-types";
+ import { Button } from "../ui";
+@@ -17,12 +19,16 @@ export function ComponentInstancePanel({
+   updateNode,
+   onEditDefinition,
+   renameNode,
++  setBinding,
++  onEditVariant,
+ }: {
+   document: UiDocument;
+   node: UiNode;
+   updateNode: UpdateNode;
+   onEditDefinition: (componentId: string) => void;
+   renameNode: (nodeId: string, name: string) => RenameNodeResult;
++  setBinding: (nodeId: string, property: string, binding: Binding | null) => void;
++  onEditVariant: (nodeId: string, variantName: string) => void;
+ }) {
+   const definition = getComponentDefinitionForInstance(document, node);
+   if (!definition) {
+@@ -72,6 +78,22 @@ export function ComponentInstancePanel({
+             updateNode={updateNode}
+             emptyMessage="This component exposes no input properties."
+           />
++
++          <BindingsEditor
++            node={node}
++            definitions={{
++              visible: { label: "Visible", valueType: "boolean" },
++              ...(Object.keys(node.variants ?? {}).length > 0
++                ? { "$variant": { label: "Variant", valueType: "variant" as const } }
++                : {}),
++            }}
++            bindings={node.bindings}
++            setBinding={setBinding}
++          />
++
++          {Object.keys(node.variants ?? {}).length > 0 ? (
++            <VariantsEditor node={node} updateNode={updateNode} onEditVariant={onEditVariant} />
++          ) : null}
+         </section>
+ 
+         <section className="border-t border-[var(--editor-border)] pt-4">
+diff --git a/src/uiframework/reactive-runtime-session.ts b/src/uiframework/reactive-runtime-session.ts
+new file mode 100644
+index 0000000..c5ab495
+--- /dev/null
++++ b/src/uiframework/reactive-runtime-session.ts
+@@ -0,0 +1,400 @@
++import {
++  BindingRuntime,
++  type BindingTargetRuntime,
++  type RuntimePropertyBinding,
++  type ReactiveEventHandlerBinding,
++  type ReactiveChange,
++  type ReactivePropertyBinding,
++  type TagReactiveRef,
++  toReactiveKey,
++} from "../reactivity";
++import { getMockRuntimeSession } from "../mock/mock-tag-runtime";
++import type { Binding, UiComponentDefinition, UiDocument, UiNode } from "./core/document";
++import {
++  applyComponentInstanceInputs,
++  getComponentDefinitionForInstance,
++} from "./reusable-components";
++import { sendRuntimeEvent } from "./components/runtime-helpers";
++import { resolveTagCollection } from "./data/collections/TagCollectionSource";
++import { createTagRef } from "./data/collections/TagRef";
++import { createRepeatInstanceId, parseRepeatInstanceId } from "./repeat/RepeatRuntime";
++import {
++  clearProjectReactiveUiState,
++  clearReactiveNodeProperty,
++  clearReactiveNodeVariant,
++  setReactiveNodeProperty,
++  setReactiveNodeVariant,
++} from "./reactive-ui-state";
++
++class ProjectReactiveUiSession {
++  private readonly projectId: string;
++  private bindingRuntime: BindingRuntime | undefined;
++  private unsubscribeEvents: (() => void) | undefined;
++
++  constructor(projectId: string) {
++    this.projectId = projectId;
++  }
++
++  configure(document: UiDocument) {
++    this.disposeRuntimeOnly();
++
++    const projectRuntime = getMockRuntimeSession(this.projectId, document.data);
++    const target = createBindingTarget(this.projectId, document);
++    const bindingRuntime = new BindingRuntime(projectRuntime.reactive, target);
++    this.bindingRuntime = bindingRuntime;
++
++    for (const runtimeBinding of collectRuntimeBindings(
++      document,
++      projectRuntime.tags.toReactiveRef.bind(projectRuntime.tags)
++    )) {
++      bindingRuntime.register(runtimeBinding);
++    }
++
++    // Initial evaluation happens during register(). No tag change is required.
++    this.unsubscribeEvents = projectRuntime.reactive.subscribeAll((change) => {
++      this.dispatchReactiveHandlers(change, document.reactiveEvents ?? {});
++    });
++  }
++
++  dispose() {
++    this.disposeRuntimeOnly();
++    clearProjectReactiveUiState(this.projectId);
++  }
++
++  private disposeRuntimeOnly() {
++    this.bindingRuntime?.dispose();
++    this.bindingRuntime = undefined;
++    this.unsubscribeEvents?.();
++    this.unsubscribeEvents = undefined;
++  }
++
++  private dispatchReactiveHandlers(
++    change: ReactiveChange,
++    handlers: Record<string, ReactiveEventHandlerBinding>
++  ) {
++    const changedKey = toReactiveKey(change.ref);
++    for (const handler of Object.values(handlers)) {
++      if (handler.enabled === false || toReactiveKey(handler.ref) !== changedKey) continue;
++      if (!matchesEvent(handler.event, change.previousValue, change.value)) continue;
++
++      sendRuntimeEvent({
++        handlerId: handler.handlerId,
++        eventName: `reactive.${handler.event}`,
++        nodeId: `reactive:${handler.id}`,
++        projectId: this.projectId,
++        payload: {
++          previousValue: change.previousValue,
++          value: change.value,
++          reactiveKey: changedKey,
++          path: change.ref.kind === "tag" ? change.ref.path : undefined,
++        },
++      });
++    }
++  }
++}
++
++const sessions = new Map<string, ProjectReactiveUiSession>();
++
++export function configureProjectReactiveRuntime(
++  projectId: string,
++  document: UiDocument
++) {
++  let session = sessions.get(projectId);
++  if (!session) {
++    session = new ProjectReactiveUiSession(projectId);
++    sessions.set(projectId, session);
++  }
++  session.configure(document);
++  return () => {
++    if (sessions.get(projectId) !== session) return;
++    session?.dispose();
++    sessions.delete(projectId);
++  };
++}
++
++function collectRuntimeBindings(
++  document: UiDocument,
++  resolveLegacyTag: (path: string) => TagReactiveRef | undefined
++): RuntimePropertyBinding[] {
++  const output: RuntimePropertyBinding[] = [];
++
++  for (const node of Object.values(document.nodes)) {
++    collectNodeBindings(node, node.id, resolveLegacyTag, output);
++    if (node.type === "ComponentInstance") {
++      collectComponentInstanceBindings(
++        document,
++        node,
++        node.id,
++        resolveLegacyTag,
++        output,
++        new Set<string>()
++      );
++    }
++    collectRepeatContainerBindings(
++      document,
++      node,
++      undefined,
++      resolveLegacyTag,
++      output,
++      new Set<string>()
++    );
++  }
++
++  return output;
++}
++
++function collectNodeBindings(
++  node: UiNode,
++  runtimeNodeId: string,
++  resolveLegacyTag: (path: string) => TagReactiveRef | undefined,
++  output: RuntimePropertyBinding[]
++) {
++  for (const [property, persisted] of Object.entries(node.bindings ?? {})) {
++    const reactiveBinding = normalizeBinding(persisted, resolveLegacyTag);
++    if (!reactiveBinding) continue;
++    output.push({
++      ...reactiveBinding,
++      // The persisted id identifies the binding definition. Runtime scoped
++      // instances need a distinct id so two Pump instances do not share cache.
++      id: `${runtimeNodeId}:${property}:${reactiveBinding.id}`,
++      target: { componentId: runtimeNodeId, property },
++    });
++  }
++}
++
++function collectComponentInstanceBindings(
++  document: UiDocument,
++  instance: UiNode,
++  runtimeInstanceId: string,
++  resolveLegacyTag: (path: string) => TagReactiveRef | undefined,
++  output: RuntimePropertyBinding[],
++  definitionStack: Set<string>
++) {
++  const definition = getComponentDefinitionForInstance(document, instance);
++  if (!definition || definitionStack.has(definition.id)) return;
++
++  const nextStack = new Set(definitionStack);
++  nextStack.add(definition.id);
++  const componentDocument = applyComponentInstanceInputs(document, definition, instance);
++
++  for (const internalNode of Object.values(componentDocument.nodes)) {
++    const runtimeNodeId = `${runtimeInstanceId}::${internalNode.id}`;
++    collectNodeBindings(internalNode, runtimeNodeId, resolveLegacyTag, output);
++
++    if (internalNode.type === "ComponentInstance") {
++      collectComponentInstanceBindings(
++        componentDocument,
++        internalNode,
++        runtimeNodeId,
++        resolveLegacyTag,
++        output,
++        nextStack
++      );
++    }
++    collectRepeatContainerBindings(
++      componentDocument,
++      internalNode,
++      runtimeInstanceId,
++      resolveLegacyTag,
++      output,
++      nextStack
++    );
++  }
++}
++
++function collectRepeatContainerBindings(
++  document: UiDocument,
++  container: UiNode,
++  runtimeScopePrefix: string | undefined,
++  resolveLegacyTag: (path: string) => TagReactiveRef | undefined,
++  output: RuntimePropertyBinding[],
++  definitionStack: Set<string>
++) {
++  const behavior = container.contentBehavior;
++  if (container.type !== "Container" || behavior?.kind !== "repeat") return;
++
++  const definition = document.components?.[behavior.template.componentDefinitionId];
++  if (!definition || definitionStack.has(definition.id)) return;
++  const input = definition.inputs?.[behavior.template.inputName];
++  if (!input || input.type !== "tagRef" || input.udtId !== behavior.source.udtId) return;
++
++  for (const ref of resolveTagCollection(document.data, behavior.source)) {
++    const tag = document.data?.tags[ref.tagId];
++    if (!tag) continue;
++    const tagRef = createTagRef(tag);
++    if (!tagRef) continue;
++
++    // Keep this id algorithm identical to Renderer.renderRepeatedChildren().
++    const syntheticId = createRepeatInstanceId(container.id, ref.tagId, definition.id);
++    const runtimeInstanceId = runtimeScopePrefix
++      ? `${runtimeScopePrefix}::${syntheticId}`
++      : syntheticId;
++    const syntheticNode: UiNode = {
++      id: syntheticId,
++      name: `${definition.name}_${tag.name}`,
++      type: "ComponentInstance",
++      componentDefinitionId: definition.id,
++      props: { [behavior.template.inputName]: tagRef },
++    };
++    const syntheticDocument: UiDocument = {
++      ...document,
++      nodes: { ...document.nodes, [syntheticId]: syntheticNode },
++    };
++
++    collectComponentInstanceBindings(
++      syntheticDocument,
++      syntheticNode,
++      runtimeInstanceId,
++      resolveLegacyTag,
++      output,
++      definitionStack
++    );
++  }
++}
++
++function normalizeBinding(
++  binding: Binding,
++  resolveLegacyTag: (path: string) => TagReactiveRef | undefined
++): ReactivePropertyBinding | undefined {
++  if (binding.kind === "reactive") return binding;
++  if (binding.kind === "tag") {
++    const ref = resolveLegacyTag(binding.path);
++    if (!ref) return undefined;
++    return {
++      kind: "reactive",
++      id: `legacy:${toReactiveKey(ref)}`,
++      dependencies: [ref],
++      expression: { type: "ref", ref },
++      enabled: true,
++    };
++  }
++  // Relative TagRef bindings are resolved into absolute tag bindings while a
++  // reusable component instance is materialized. They remain a compatibility
++  // path until reactive bindings are made instance-scope aware.
++  return undefined;
++}
++
++function createBindingTarget(
++  projectId: string,
++  document: UiDocument
++): BindingTargetRuntime {
++  return {
++    apply(binding, value) {
++      validateTarget(document, binding, value);
++      if (binding.target.property === "$variant") {
++        setReactiveNodeVariant(projectId, binding.target.componentId, String(value));
++        return;
++      }
++      setReactiveNodeProperty(
++        projectId,
++        binding.target.componentId,
++        binding.target.property,
++        value
++      );
++    },
++    clear(binding) {
++      if (binding.target.property === "$variant") {
++        clearReactiveNodeVariant(projectId, binding.target.componentId);
++      } else {
++        clearReactiveNodeProperty(
++          projectId,
++          binding.target.componentId,
++          binding.target.property
++        );
++      }
++    },
++    validate(binding, value) {
++      validateTarget(document, binding, value);
++    },
++  };
++}
++
++function validateTarget(
++  document: UiDocument,
++  binding: RuntimePropertyBinding,
++  value: unknown
++) {
++  const node = findRuntimeTargetNode(document, binding.target.componentId);
++  if (!node) throw new Error(`Binding target ${binding.target.componentId} no longer exists.`);
++
++  if (binding.target.property === "$variant") {
++    if (typeof value !== "string" || !node.variants?.[value]) {
++      throw new TypeError(`Unknown variant ${String(value)} for ${node.name}.`);
++    }
++    return;
++  }
++
++  if (binding.target.property === "visible" || binding.target.property === "enabled") {
++    if (typeof value !== "boolean") {
++      throw new TypeError(`${binding.target.property} binding must evaluate to boolean.`);
++    }
++  }
++}
++
++function findRuntimeTargetNode(document: UiDocument, nodeId: string): UiNode | undefined {
++  const direct = document.nodes[nodeId];
++  if (direct) return direct;
++
++  const parts = nodeId.split("::").filter(Boolean);
++  if (parts.length < 2) return undefined;
++
++  let definition = resolveRuntimeScopeDefinition(document, parts[0]!);
++  if (!definition) return undefined;
++
++  for (let index = 1; index < parts.length; index += 1) {
++    const segment = parts[index]!;
++    const isLast = index === parts.length - 1;
++
++    const repeatedDefinition = resolveRepeatDefinition(document, segment);
++    if (repeatedDefinition) {
++      if (isLast) return undefined;
++      definition = repeatedDefinition;
++      continue;
++    }
++
++    const nested: UiNode | undefined = definition.nodes[segment];
++    if (!nested) return undefined;
++    if (isLast) return nested;
++    if (nested.type !== "ComponentInstance" || !nested.componentDefinitionId) {
++      return undefined;
++    }
++    const nestedDefinition: UiComponentDefinition | undefined =
++      document.components?.[nested.componentDefinitionId];
++    if (!nestedDefinition) return undefined;
++    definition = nestedDefinition;
++  }
++
++  return undefined;
++}
++
++function resolveRuntimeScopeDefinition(
++  document: UiDocument,
++  segment: string
++): UiComponentDefinition | undefined {
++  const repeated = resolveRepeatDefinition(document, segment);
++  if (repeated) return repeated;
++
++  const instance = document.nodes[segment];
++  if (instance?.type !== "ComponentInstance" || !instance.componentDefinitionId) {
++    return undefined;
++  }
++  return document.components?.[instance.componentDefinitionId];
++}
++
++function resolveRepeatDefinition(
++  document: UiDocument,
++  segment: string
++): UiComponentDefinition | undefined {
++  const repeat = parseRepeatInstanceId(segment);
++  return repeat ? document.components?.[repeat.componentDefinitionId] : undefined;
++}
++
++function matchesEvent(
++  event: ReactiveEventHandlerBinding["event"],
++  previousValue: unknown,
++  value: unknown
++) {
++  if (event === "value-changed") return !Object.is(previousValue, value);
++  if (event === "rising-edge") return previousValue === false && value === true;
++  return previousValue === true && value === false;
++}
+diff --git a/src/uiframework/reactive-ui-state.ts b/src/uiframework/reactive-ui-state.ts
+new file mode 100644
+index 0000000..15cacd5
+--- /dev/null
++++ b/src/uiframework/reactive-ui-state.ts
+@@ -0,0 +1,126 @@
++import { useSyncExternalStore } from "react";
++
++type DerivedNodeState = {
++  props: Record<string, unknown>;
++  variant?: string | undefined;
++};
++
++type ProjectDerivedState = {
++  nodes: Map<string, DerivedNodeState>;
++  listeners: Set<() => void>;
++  revision: number;
++};
++
++const projects = new Map<string, ProjectDerivedState>();
++
++function getProject(projectId: string): ProjectDerivedState {
++  let project = projects.get(projectId);
++  if (!project) {
++    project = { nodes: new Map(), listeners: new Set(), revision: 0 };
++    projects.set(projectId, project);
++  }
++  return project;
++}
++
++export function setReactiveNodeProperty(
++  projectId: string,
++  nodeId: string,
++  property: string,
++  value: unknown
++) {
++  const project = getProject(projectId);
++  const current = project.nodes.get(nodeId) ?? { props: {} };
++  if (Object.is(current.props[property], value)) return;
++
++  project.nodes.set(nodeId, {
++    ...current,
++    props: { ...current.props, [property]: value },
++  });
++  notify(project);
++}
++
++export function clearReactiveNodeProperty(
++  projectId: string,
++  nodeId: string,
++  property: string
++) {
++  const project = getProject(projectId);
++  const current = project.nodes.get(nodeId);
++  if (!current || !Object.prototype.hasOwnProperty.call(current.props, property)) return;
++
++  const props = { ...current.props };
++  delete props[property];
++  if (Object.keys(props).length === 0 && current.variant === undefined) {
++    project.nodes.delete(nodeId);
++  } else {
++    project.nodes.set(nodeId, { ...current, props });
++  }
++  notify(project);
++}
++
++export function setReactiveNodeVariant(
++  projectId: string,
++  nodeId: string,
++  variant: string
++) {
++  const project = getProject(projectId);
++  const current = project.nodes.get(nodeId) ?? { props: {} };
++  if (current.variant === variant) return;
++  project.nodes.set(nodeId, { ...current, variant });
++  notify(project);
++}
++
++export function clearReactiveNodeVariant(projectId: string, nodeId: string) {
++  const project = getProject(projectId);
++  const current = project.nodes.get(nodeId);
++  if (!current || current.variant === undefined) return;
++  if (Object.keys(current.props).length === 0) {
++    project.nodes.delete(nodeId);
++  } else {
++    project.nodes.set(nodeId, { props: current.props });
++  }
++  notify(project);
++}
++
++export function getReactiveNodeProps(projectId: string, nodeId: string) {
++  return { ...(getProject(projectId).nodes.get(nodeId)?.props ?? {}) };
++}
++
++export function getReactiveNodeVariant(projectId: string, nodeId: string) {
++  return getProject(projectId).nodes.get(nodeId)?.variant;
++}
++
++export function clearProjectReactiveUiState(projectId: string) {
++  const project = getProject(projectId);
++  if (project.nodes.size === 0) return;
++  project.nodes.clear();
++  notify(project);
++}
++
++export function subscribeProjectReactiveUiState(
++  projectId: string,
++  listener: () => void
++) {
++  const project = getProject(projectId);
++  project.listeners.add(listener);
++  return () => project.listeners.delete(listener);
++}
++
++export function getProjectReactiveUiRevision(projectId: string) {
++  return getProject(projectId).revision;
++}
++
++export function useProjectReactiveUiRevision(projectId: string | undefined) {
++  return useSyncExternalStore(
++    (listener) => projectId
++      ? subscribeProjectReactiveUiState(projectId, listener)
++      : () => undefined,
++    () => projectId ? getProjectReactiveUiRevision(projectId) : 0,
++    () => 0
++  );
++}
++
++function notify(project: ProjectDerivedState) {
++  project.revision += 1;
++  for (const listener of project.listeners) listener();
++}
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index 4b1b237..0371b01 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -14,6 +14,15 @@ export type InspectorControl =
+   | { kind: "border-size"; min?: number; max?: number; step?: number }
+   | { kind: "select"; options: readonly string[] };
+ 
++export type BindingValueType = "boolean" | "string" | "number" | "variant" | "unknown";
++
++export type BindingDefinition = {
++  label: string;
++  valueType?: BindingValueType;
++  /** Optional hint shown by the binding editor. */
++  description?: string;
++};
++
+ export type ComponentDefinition = {
+   type: string;
+   label: string;
+@@ -23,6 +32,6 @@ export type ComponentDefinition = {
+   defaults: Record<string, unknown>;
+   acceptsChildren?: boolean;
+   inspector: Record<string, InspectorControl>;
+-  bindings?: Record<string, { label: string }>;
++  bindings?: Record<string, BindingDefinition>;
+   events?: Record<string, { label: string; defaultSuffix: string }>;
+ };
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+index bf8635c..c89e2d1 100644
+--- a/src/uiframework/registry/components/button.ts
++++ b/src/uiframework/registry/components/button.ts
+@@ -20,6 +20,13 @@ export const buttonDefinition = {
+     marginY: { kind: "number", min: 0, max: 64 },
+     borderRadius: { kind: "number", min: 0, max: 64 },
+   },
++
++  bindings: {
++    "$variant": { label: "Variant", valueType: "variant", description: "Drive the visual variant from runtime state." },
++    enabled: { label: "Enabled", valueType: "boolean" },
++    visible: { label: "Visible", valueType: "boolean" },
++    label: { label: "Label", valueType: "string" },
++  },
+   events: {
+     click: { label: "Click", defaultSuffix: "Clicked" },
+     doubleClick: { label: "Double click", defaultSuffix: "DoubleClicked" },
+diff --git a/src/uiframework/registry/components/chart.ts b/src/uiframework/registry/components/chart.ts
+index c5a3c08..4607df5 100644
+--- a/src/uiframework/registry/components/chart.ts
++++ b/src/uiframework/registry/components/chart.ts
+@@ -21,4 +21,7 @@ export const chartDefinition = {
+     showGrid: { kind: "toggle" },
+     timeRange: { kind: "time-range" },
+   },
++  bindings: {
++    visible: { label: "Visible", valueType: "boolean" },
++  },
+ } satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+index 8cdc729..7ec4936 100644
+--- a/src/uiframework/registry/components/container.ts
++++ b/src/uiframework/registry/components/container.ts
+@@ -28,4 +28,7 @@ export const containerDefinition = {
+     borderSize: { kind: "border-size", min: 0 },
+     display: { kind: "select", options: ["grid", "flex"] },
+   },
++  bindings: {
++    visible: { label: "Visible", valueType: "boolean" },
++  },
+ } satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/image.ts b/src/uiframework/registry/components/image.ts
+index 30cd170..727afce 100644
+--- a/src/uiframework/registry/components/image.ts
++++ b/src/uiframework/registry/components/image.ts
+@@ -18,4 +18,7 @@ export const imageDefinition = {
+     borderRadius: { kind: "number", min: 0 },
+     backgroundColor: { kind: "color" },
+   },
++  bindings: {
++    visible: { label: "Visible", valueType: "boolean" },
++  },
+ } satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+index 1fff314..3b59b8b 100644
+--- a/src/uiframework/registry/components/navigation.ts
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -17,4 +17,7 @@ export const navigationDefinition = {
+     padding: { kind: "number", min: 0, max: 48 },
+     borderRadius: { kind: "number", min: 0, max: 48 },
+   },
++  bindings: {
++    visible: { label: "Visible", valueType: "boolean" },
++  },
+ } satisfies ComponentDefinition;
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+index c07e3e8..4a82aed 100644
+--- a/src/uiframework/registry/components/text.ts
++++ b/src/uiframework/registry/components/text.ts
+@@ -24,6 +24,7 @@ export const textDefinition = {
+     borderRadius: { kind: "number", min: 0 },
+   },
+   bindings: {
+-    value: { label: "Runtime tag" },
++    value: { label: "Value", valueType: "string" },
++    visible: { label: "Visible", valueType: "boolean" },
+   },
+ } satisfies ComponentDefinition;
+diff --git a/src/uiframework/reusable-components/public-contract.ts b/src/uiframework/reusable-components/public-contract.ts
+index 49786aa..eed1246 100644
+--- a/src/uiframework/reusable-components/public-contract.ts
++++ b/src/uiframework/reusable-components/public-contract.ts
+@@ -1,5 +1,6 @@
+ import {
+   isJsIdentifier,
++  type Binding,
+   type ComponentInputDefinition,
+   type ComponentInputType,
+   type UiComponentDefinition,
+@@ -102,7 +103,7 @@ export function createComponentInput(
+       : requestedType ?? inferInputType(property, resolvedProps[property]);
+   const defaultValue =
+     inferredType === "tag"
+-      ? internalNode.bindings?.[property]?.path ?? ""
++      ? getBindingSourcePath(internalNode.bindings?.[property])
+       : resolvedProps[property];
+ 
+   return {
+@@ -117,6 +118,17 @@ export function createComponentInput(
+ }
+ 
+ 
++function getBindingSourcePath(binding: Binding | undefined): string {
++  if (!binding) return "";
++  if (binding.kind === "tag") return binding.path;
++  if (binding.kind === "tagRef") {
++    return binding.path ? `${binding.input}.${binding.path}` : binding.input;
++  }
++  const tagDependency = binding.dependencies.find((ref) => ref.kind === "tag");
++  return tagDependency?.kind === "tag" ? tagDependency.path ?? "" : "";
++}
++
++
+ export function createTagRefComponentInput(
+   definition: UiComponentDefinition,
+   requestedName: string,
+diff --git a/src/uiframework/runtime-provider.ts b/src/uiframework/runtime-provider.ts
+index 322bc0a..fa913c6 100644
+--- a/src/uiframework/runtime-provider.ts
++++ b/src/uiframework/runtime-provider.ts
+@@ -1,7 +1,6 @@
+ import { useEffect, useRef } from "react";
+ import { applyDocumentCommand } from "./core/commands";
+ import { parseUiDocument, type UiDocument } from "./core/document";
+-import { runtimeSignals } from "./runtime-signals";
+ import { getWs } from "./websocket";
+ import {
+   applyMockRuntimeUiState,
+@@ -170,23 +169,6 @@ export function RuntimeProvider({
+           return;
+         }
+ 
+-        if (payload.type === "tag.snapshot" && Array.isArray(payload.values)) {
+-          for (const item of payload.values) {
+-            if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+-            const entry = item as Record<string, unknown>;
+-            if (typeof entry.path === "string") {
+-              runtimeSignals.set(entry.path, entry.value);
+-            }
+-          }
+-          return;
+-        }
+-
+-        if (
+-          payload.type === "tag.changed" &&
+-          typeof payload.path === "string"
+-        ) {
+-          runtimeSignals.set(payload.path, payload.newValue);
+-        }
+       } catch (error) {
+         console.error(
+           "Failed to parse runtime message",
+diff --git a/src/uiframework/runtime-tag-bridge.ts b/src/uiframework/runtime-tag-bridge.ts
+index 1a71793..2e2a6f9 100644
+--- a/src/uiframework/runtime-tag-bridge.ts
++++ b/src/uiframework/runtime-tag-bridge.ts
+@@ -1,32 +1,33 @@
+ import {
+   configureMockRuntimeProjectData,
+-  getMockTagStore,
++  getMockRuntimeSession,
+   hasMockRuntimeSession,
+   replaceMockTagStoreData,
+ } from "../mock/mock-tag-runtime";
+ import type { ProjectData } from "./data/tags/TagDefinition";
+-import { flattenTagValues } from "./data/runtime/UdtRuntime";
+ import { runtimeSignals } from "./runtime-signals";
++import type { TagRuntime } from "./data/runtime/TagRuntime";
+ 
+ const EMPTY_PROJECT_DATA: ProjectData = { udts: {}, tags: {} };
++const signalBridges = new Map<string, { runtime: TagRuntime; unsubscribe: () => void }>();
+ 
+ /**
+  * Synchronizes runtime tag schema at an explicit project boundary.
+  *
+- * The first load initializes live values from project/session data. Further
+- * publish/config updates preserve the live process image and only reconfigure
+- * definitions/mappings. This prevents a normal publish or UI update from
+- * resetting values that were written through the driver runtime.
++ * TagStore remains the canonical process image. RuntimeSignalStore is now only
++ * a trend/history projection fed from TagRuntime.reactive; it is no longer an
++ * independent source of live tag truth.
+  */
+ export function hydrateRuntimeTagState(
+   projectId: string,
+   data: ProjectData | undefined
+ ) {
+   const resolvedData = data ?? EMPTY_PROJECT_DATA;
+-  const store = hasMockRuntimeSession(projectId)
+-    ? configureMockRuntimeProjectData(projectId, resolvedData).tagStore
+-    : replaceMockTagStoreData(projectId, resolvedData);
+-  syncRuntimeSignals(store.snapshot());
++  const session = hasMockRuntimeSession(projectId)
++    ? configureMockRuntimeProjectData(projectId, resolvedData)
++    : getMockRuntimeSession(projectId, resolvedData);
++  attachRuntimeSignalBridge(projectId, session.tags);
++  syncRuntimeSignals(session.tags);
+ }
+ 
+ /** Explicit full reset reserved for a real runtime restart/new session. */
+@@ -34,16 +35,33 @@ export function resetRuntimeTagState(
+   projectId: string,
+   data: ProjectData | undefined
+ ) {
+-  const store = replaceMockTagStoreData(projectId, data ?? EMPTY_PROJECT_DATA);
+-  syncRuntimeSignals(store.snapshot());
++  replaceMockTagStoreData(projectId, data ?? EMPTY_PROJECT_DATA);
++  const session = getMockRuntimeSession(projectId);
++  attachRuntimeSignalBridge(projectId, session.tags);
++  syncRuntimeSignals(session.tags);
+ }
+ 
+ export function refreshRuntimeTagSignals(projectId: string) {
+-  syncRuntimeSignals(getMockTagStore(projectId).snapshot());
++  const session = getMockRuntimeSession(projectId);
++  attachRuntimeSignalBridge(projectId, session.tags);
++  syncRuntimeSignals(session.tags);
+ }
+ 
+-function syncRuntimeSignals(data: ProjectData) {
+-  for (const [path, value] of flattenTagValues(data)) {
+-    runtimeSignals.set(path, value);
++function attachRuntimeSignalBridge(projectId: string, runtime: TagRuntime) {
++  const existing = signalBridges.get(projectId);
++  if (existing?.runtime === runtime) return;
++  existing?.unsubscribe();
++
++  const unsubscribe = runtime.reactive.subscribeAll((change) => {
++    if (change.ref.kind !== "tag") return;
++    const path = runtime.source.describe(change.ref);
++    runtimeSignals.set(path, change.value);
++  });
++  signalBridges.set(projectId, { runtime, unsubscribe });
++}
++
++function syncRuntimeSignals(runtime: TagRuntime) {
++  for (const entry of runtime.store.listPrimitivePaths()) {
++    runtimeSignals.set(entry.path, entry.value);
+   }
+ }
+diff --git a/src/uiframework/runtime/RenderPage.tsx b/src/uiframework/runtime/RenderPage.tsx
+index 7d4cda5..b04de31 100644
+--- a/src/uiframework/runtime/RenderPage.tsx
++++ b/src/uiframework/runtime/RenderPage.tsx
+@@ -21,6 +21,12 @@ import { runtimeRegistry } from "../registry/runtime-registry";
+ import { RuntimeProvider } from "../runtime-provider";
+ import { getComponentVariantProps } from "../component-variants";
+ import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
++import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
++import {
++  getReactiveNodeProps,
++  getReactiveNodeVariant,
++  useProjectReactiveUiRevision,
++} from "../reactive-ui-state";
+ 
+ export function RenderPage() {
+   const { projectId, "*": routePath = "" } = useParams();
+@@ -32,6 +38,10 @@ export function RenderPage() {
+   const [error, setError] = useState<string | null>(null);
+   const [updateToastVisible, setUpdateToastVisible] = useState(false);
+ 
++  // Derived UI changes live outside the persisted document. This subscription
++  // repaints the renderer without mutating document props.
++  useProjectReactiveUiRevision(projectId);
++
+   const showUpdateToast = useCallback(() => {
+     setUpdateToastVisible(true);
+     window.setTimeout(() => setUpdateToastVisible(false), 1800);
+@@ -75,6 +85,12 @@ export function RenderPage() {
+     };
+   }, [projectId]);
+ 
++
++  useEffect(() => {
++    if (!projectId || loading || error) return undefined;
++    return configureProjectReactiveRuntime(projectId, document);
++  }, [document, error, loading, projectId]);
++
+   const navigateTo = useCallback(
+     (path: string) => {
+       if (!projectId) return;
+@@ -158,18 +174,26 @@ export function RenderPage() {
+                 ? `${context.componentInstanceId}::${node.id}`
+                 : node.id;
+               const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
++              const reactiveProps = getReactiveNodeProps(projectId, runtimeNodeId);
++              const reactiveVariantName = getReactiveNodeVariant(projectId, runtimeNodeId);
+               const runtimeVariantName = getMockRuntimeNodeVariant(
+                 projectId,
+                 runtimeNodeId
+               );
++              const requestedVariant = reactiveVariantName ?? runtimeVariantName;
+               const variantName =
+-                runtimeVariantName && node.variants?.[runtimeVariantName]
+-                  ? runtimeVariantName
++                requestedVariant && node.variants?.[requestedVariant]
++                  ? requestedVariant
+                   : node.defaultVariant;
+               const variantProps = getComponentVariantProps(node, variantName);
++              const effectiveReactiveProps = normalizeReactiveProps(
++                { ...(node.props ?? {}), ...variantProps, ...runtimeProps },
++                reactiveProps
++              );
+ 
+               if (
+                 Object.keys(runtimeProps).length === 0 &&
++                Object.keys(reactiveProps).length === 0 &&
+                 Object.keys(variantProps).length === 0
+               ) {
+                 return node;
+@@ -181,6 +205,7 @@ export function RenderPage() {
+                   ...(node.props ?? {}),
+                   ...variantProps,
+                   ...runtimeProps,
++                  ...effectiveReactiveProps,
+                 },
+               };
+             }}
+@@ -224,4 +249,34 @@ export function RenderPage() {
+   );
+ }
+ 
++function normalizeReactiveProps(
++  baseProps: Record<string, unknown>,
++  reactiveProps: Record<string, unknown>
++) {
++  const next = { ...reactiveProps };
++
++  if (Object.prototype.hasOwnProperty.call(next, "enabled")) {
++    next.disabled = !next.enabled;
++    delete next.enabled;
++  }
++
++  if (Object.prototype.hasOwnProperty.call(next, "visible")) {
++    const visible = Boolean(next.visible);
++    const baseStyle = isRecord(baseProps.style) ? baseProps.style : {};
++    const reactiveStyle = isRecord(next.style) ? next.style : {};
++    next.style = {
++      ...baseStyle,
++      ...reactiveStyle,
++      ...(visible ? {} : { display: "none" }),
++    };
++    delete next.visible;
++  }
++
++  return next;
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}
++
+ export default RenderPage;

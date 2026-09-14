@@ -12,7 +12,7 @@ import type { DataSelection } from "./data-selection";
 export function DataWorkspace({ data, selection, onSelect, projectId }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
   if (selection?.kind === "new-tag") return <CreateTagEditor data={data} onSelect={onSelect} />;
   if (selection?.kind === "new-udt") return <CreateUdtEditor data={data} onSelect={onSelect} />;
-  if (selection?.kind === "tag") return <TagEditor key={selection.tagId} data={data} tagId={selection.tagId} onSelect={onSelect} />;
+  if (selection?.kind === "tag") return <TagEditor key={selection.tagId} data={data} tagId={selection.tagId} onSelect={onSelect} projectId={projectId} />;
   if (selection?.kind === "udt") return <UdtEditor key={selection.udtId} data={data} udtId={selection.udtId} onSelect={onSelect} />;
   if (selection?.kind === "udt-method") return <UdtMethodEditor key={selection.methodId} data={data} udtId={selection.udtId} methodId={selection.methodId} />;
   if (selection?.kind === "driver") return <DriverEditor key={selection.driverKind} data={data} driverKind={selection.driverKind} projectId={projectId} />;

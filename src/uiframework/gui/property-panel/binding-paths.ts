@@ -40,6 +40,10 @@ export function parseBindingPath(
 
 export function formatBindingPath(binding: Binding | undefined) {
   if (!binding) return "";
+  if (binding.kind === "reactive") {
+    const dependency = binding.dependencies.find((ref) => ref.kind === "tag");
+    return dependency?.kind === "tag" ? dependency.path ?? "" : "";
+  }
   return binding.kind === "tag"
     ? binding.path
     : `${binding.input}${binding.path ? `.${binding.path}` : ""}`;

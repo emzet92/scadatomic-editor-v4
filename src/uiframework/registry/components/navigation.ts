@@ -17,4 +17,7 @@ export const navigationDefinition = {
     padding: { kind: "number", min: 0, max: 48 },
     borderRadius: { kind: "number", min: 0, max: 48 },
   },
+  bindings: {
+    visible: { label: "Visible", valueType: "boolean" },
+  },
 } satisfies ComponentDefinition;

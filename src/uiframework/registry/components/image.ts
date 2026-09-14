@@ -18,4 +18,7 @@ export const imageDefinition = {
     borderRadius: { kind: "number", min: 0 },
     backgroundColor: { kind: "color" },
   },
+  bindings: {
+    visible: { label: "Visible", valueType: "boolean" },
+  },
 } satisfies ComponentDefinition;

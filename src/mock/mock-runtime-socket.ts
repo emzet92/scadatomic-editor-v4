@@ -187,6 +187,9 @@ class MockRuntimeSocket extends EventTarget {
     const sourceNodeId = payload.nodeId;
     const eventName = payload.eventName;
     const pageId = typeof payload.pageId === "string" ? payload.pageId : undefined;
+    const eventPayload = payload.payload && typeof payload.payload === "object" && !Array.isArray(payload.payload)
+      ? (payload.payload as Record<string, unknown>)
+      : undefined;
 
     if (
       typeof projectId !== "string" ||
@@ -207,6 +210,7 @@ class MockRuntimeSocket extends EventTarget {
         sourceNodeId,
         eventName,
         pageId,
+        ...(eventPayload ? { payload: eventPayload } : {}),
       },
       {
         setNodeProp: (nodeId, property, value) => {
