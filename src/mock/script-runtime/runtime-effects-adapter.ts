@@ -6,6 +6,7 @@ import {
   setMockSessionValue,
 } from "../mock-session-state";
 import type { MockScriptEvent, MockScriptHost } from "./types";
+import { closeProjectModal, openProjectModal } from "../../uiframework/modal-runtime-state";
 
 /** Compatibility adapter: Executor is the only caller of these legacy effects. */
 export function createMockRuntimeEffects(
@@ -29,6 +30,12 @@ export function createMockRuntimeEffects(
     },
     emitEvent(intentEvent, payload) {
       host.emit(intentEvent.eventName, payload);
+    },
+    openModal(target, payload) {
+      openProjectModal(event.projectId, target.modalId, payload);
+    },
+    closeModal(target, payload) {
+      closeProjectModal(event.projectId, target.modalId, payload);
     },
     navigate(path) {
       host.navigateTo(path);

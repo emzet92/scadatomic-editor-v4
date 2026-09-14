@@ -86,6 +86,12 @@ function validateIntents(intents: readonly Intent[]): void {
           throw new ExecutionPlanningError("emit-event requires owner id and event name.");
         }
         break;
+      case "modal-open":
+      case "modal-close":
+        if (!intent.target.modalId || !intent.target.name) {
+          throw new ExecutionPlanningError(`${intent.type} requires a resolved modal reference.`);
+        }
+        break;
       case "navigate":
         if (!intent.path) throw new ExecutionPlanningError("navigate requires a path.");
         break;

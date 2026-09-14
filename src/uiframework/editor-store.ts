@@ -7,6 +7,7 @@ import {
   createEmptyUiDocument,
   createPageLayoutNodes,
   createPageRootNode,
+  createModalRootNode,
   getPage,
   getPageKind,
   type Binding,
@@ -15,6 +16,7 @@ import {
   type ScopedMethodRef,
   type UiComponentDefinition,
   type PageId,
+  type ModalId,
   type NodeId,
   type UiDocument,
   type UiNode,
@@ -66,6 +68,7 @@ type NodeDragCandidate = {
 
 type EditorState = {
   activePageId: PageId;
+  activeModalId: ModalId | null;
   selectedNodeId: NodeId | null;
   selectedNodeIds: NodeId[];
   document: UiDocument;
@@ -80,6 +83,9 @@ type EditorState = {
   nodeDragCandidate: NodeDragCandidate | null;
 
   setActivePageId: (pageId: PageId) => void;
+  setActiveModalId: (modalId: ModalId | null) => void;
+  addModal: () => ModalId | null;
+  deleteModal: (modalId: ModalId) => boolean;
   setStartPage: (pageId: PageId) => void;
   setPageLayout: (pageId: PageId, layoutId: PageId | null) => void;
   addPage: (parentPageId?: PageId | undefined) => PageId | null;
@@ -194,7 +200,11 @@ const NODE_DRAG_THRESHOLD_PX = 4;
 const initialEditorDocument = createEmptyUiDocument();
 replaceDesignerTagData(initialEditorDocument.data);
 
-function getActiveRootId(state: Pick<EditorState, "document" | "activePageId">) {
+function getActiveRootId(state: Pick<EditorState, "document" | "activePageId" | "activeModalId">) {
+  if (state.activeModalId) {
+    const modal = state.document.modals?.[state.activeModalId];
+    if (modal) return modal.rootId;
+  }
   return getPage(state.document, state.activePageId).rootId;
 }
 
@@ -256,6 +266,7 @@ function createUniquePageName(
 
 export const useEditorStore = create<EditorState>((set) => ({
   activePageId: initialEditorDocument.startPageId,
+  activeModalId: null,
   selectedNodeId: null,
   selectedNodeIds: [],
   document: initialEditorDocument,
@@ -286,6 +297,7 @@ export const useEditorStore = create<EditorState>((set) => ({
       if (!page) return state;
       return {
         activePageId: pageId,
+        activeModalId: null,
         selectedNodeId: page.rootId,
         selectedNodeIds: [page.rootId],
         draggedNodeId: null,
@@ -293,6 +305,102 @@ export const useEditorStore = create<EditorState>((set) => ({
         dragPreview: null,
       };
     });
+  },
+
+  setActiveModalId: (modalId) => {
+    set((state) => {
+      if (!modalId) {
+        const page = getPage(state.document, state.activePageId);
+        return {
+          activeModalId: null,
+          selectedNodeId: page.rootId,
+          selectedNodeIds: [page.rootId],
+          draggedNodeId: null,
+          nodeDragCandidate: null,
+          dragPreview: null,
+        };
+      }
+      const modal = state.document.modals?.[modalId];
+      if (!modal) return state;
+      return {
+        activeModalId: modalId,
+        selectedNodeId: modal.rootId,
+        selectedNodeIds: [modal.rootId],
+        draggedNodeId: null,
+        nodeDragCandidate: null,
+        dragPreview: null,
+      };
+    });
+  },
+
+  addModal: () => {
+    let createdId: ModalId | null = null;
+    set((state) => {
+      const existingNames = new Set(Object.values(state.document.modals ?? {}).map((modal) => modal.name));
+      let index = 1;
+      while (existingNames.has(`Modal${index}`)) index += 1;
+      const name = `Modal${index}`;
+      const root = createModalRootNode(name);
+      const modalId = crypto.randomUUID();
+      createdId = modalId;
+      return {
+        document: {
+          ...state.document,
+          modals: {
+            ...(state.document.modals ?? {}),
+            [modalId]: {
+              id: modalId,
+              name,
+              rootId: root.id,
+              closeOnBackdrop: true,
+              closeOnEscape: true,
+            },
+          },
+          nodes: { ...state.document.nodes, [root.id]: root },
+        },
+        activeModalId: modalId,
+        selectedNodeId: root.id,
+        selectedNodeIds: [root.id],
+      };
+    });
+    return createdId;
+  },
+
+  deleteModal: (modalId) => {
+    let deleted = false;
+    set((state) => {
+      const modal = state.document.modals?.[modalId];
+      if (!modal) return state;
+      const ids: string[] = [];
+      const stack = [modal.rootId];
+      const visited = new Set<string>();
+      while (stack.length > 0) {
+        const id = stack.pop();
+        if (!id || visited.has(id)) continue;
+        visited.add(id);
+        const node = state.document.nodes[id];
+        if (!node) continue;
+        ids.push(id);
+        for (const child of node.children ?? []) stack.push(child);
+      }
+      const modals = { ...(state.document.modals ?? {}) };
+      delete modals[modalId];
+      const nodes = { ...state.document.nodes };
+      for (const id of ids) delete nodes[id];
+      const page = getPage(state.document, state.activePageId);
+      deleted = true;
+      return {
+        document: {
+          ...state.document,
+          modals: Object.keys(modals).length > 0 ? modals : undefined,
+          nodes,
+        },
+        activeModalId: state.activeModalId === modalId ? null : state.activeModalId,
+        selectedNodeId: state.activeModalId === modalId ? page.rootId : state.selectedNodeId,
+        selectedNodeIds: state.activeModalId === modalId ? [page.rootId] : state.selectedNodeIds.filter((id) => !!nodes[id]),
+      };
+    });
+    return deleted;
   },
 
   setStartPage: (pageId) => {
@@ -358,6 +466,7 @@ export const useEditorStore = create<EditorState>((set) => ({
           },
         },
         activePageId: pageId,
+        activeModalId: null,
         selectedNodeId: root.id,
         selectedNodeIds: [root.id],
       };
@@ -394,6 +503,7 @@ export const useEditorStore = create<EditorState>((set) => ({
           },
         },
         activePageId: pageId,
+        activeModalId: null,
         selectedNodeId: root.id,
         selectedNodeIds: [root.id],
       };
@@ -510,6 +620,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     set({
       document,
       activePageId: startPage.id,
+      activeModalId: null,
       selectedNodeIds: [startPage.rootId],
       selectedNodeId: startPage.rootId,
       draggedNodeId: null,
@@ -548,6 +659,9 @@ export const useEditorStore = create<EditorState>((set) => ({
       const pageEntry = Object.values(state.document.pages).find(
         (page) => page.rootId === nodeId
       );
+      const modalEntry = Object.values(state.document.modals ?? {}).find(
+        (modal) => modal.rootId === nodeId
+      );
       const validation = validateNodeName(
         state.document,
         nodeId,
@@ -576,6 +690,19 @@ export const useEditorStore = create<EditorState>((set) => ({
         return state;
       }
 
+      if (
+        modalEntry &&
+        Object.values(state.document.modals ?? {}).some(
+          (modal) => modal.id !== modalEntry.id && modal.name === validation.name
+        )
+      ) {
+        result = {
+          ok: false,
+          error: `“${validation.name}” is already used by another modal.`,
+        };
+        return state;
+      }
+
       result = { ok: true };
 
       const renamedDocument = applyActiveCommand(state, {
@@ -585,6 +712,17 @@ export const useEditorStore = create<EditorState>((set) => ({
           name: validation.name,
         },
       });
+      if (modalEntry) {
+        return {
+          document: {
+            ...renamedDocument,
+            modals: {
+              ...(renamedDocument.modals ?? {}),
+              [modalEntry.id]: { ...modalEntry, name: validation.name },
+            },
+          },
+        };
+      }
       if (!pageEntry) {
         return { document: renamedDocument };
       }

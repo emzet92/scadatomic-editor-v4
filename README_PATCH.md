@@ -1,30 +1,28 @@
-# SCADAtomic Storybook UI Framework patch
+# SCADAtomic Modal System patch
 
-Base: `scadatomic-editor-cloud-fleet-source.zip`
+Base: `scadatomic-editor-storybook-ui-source.zip`
 
-Adds Storybook 10.6 for the shared SCADAtomic application UI framework only.
+Adds project-global modals as first-class document entities with a reused visual designer surface, modal lifecycle events, a script API and runtime overlay/stack.
 
-## Included stories
+## Script API
 
-- Foundations / design tokens
-- Button + IconButton
-- Form controls
-- Panels
-- Segmented control
-- Dialog + ConfirmDialog
-- WorkspaceHeader pattern
-
-Runtime, tags, execution graph, canvas widgets and domain feature screens are intentionally excluded.
-
-## Install and run
-
-After applying the patch, run once:
-
-```bash
-npm install
-npm run storybook
+```js
+ctx.modals.ConfirmDelete.open({ deviceId: "edge-01" });
+ctx.modals.ConfirmDelete.close({ accepted: true });
 ```
 
-Then open `http://localhost:6006`.
+Modal root events:
+- `On open`
+- `On close`
 
-`package.json` contains Storybook 10.6 dependencies. The supplied base lockfile is intentionally left untouched because npm registry access was unavailable in the build environment; the first local `npm install` will regenerate the Storybook entries in `package-lock.json`. Commit that regenerated lockfile before returning to `npm ci`.
+`On close` receives payloads passed by `close()`. Escape/backdrop closure emits `{ reason: "escape" }` / `{ reason: "backdrop" }`.
+
+## Execution model
+
+`open()` and `close()` collect typed `modal-open` / `modal-close` intents. The Executor routes them to the client modal runtime. This keeps the contract reusable for the future Python script frontend.
+
+## Validation
+
+- TypeScript `tsc -b`: pass
+- ESLint on changed source files: pass
+- `git apply --check PATCH_MODAL_SYSTEM.diff`: pass

@@ -25,6 +25,7 @@ import {
 
 const icons = {
   Page: LayoutTemplate,
+  Modal: LayoutTemplate,
   PageSlot: PanelTop,
   Container: Box,
   Text: Type,
@@ -45,8 +46,9 @@ export function ComponentPalette({
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
   const document = useEditorStore((s) => s.document);
   const activePageId = useEditorStore((s) => s.activePageId);
+  const activeModalId = useEditorStore((s) => s.activeModalId);
   const activePage = document.pages[activePageId];
-  const editingLayout = !!activePage && getPageKind(activePage) === "layout";
+  const editingLayout = !activeModalId && !!activePage && getPageKind(activePage) === "layout";
   const reusableComponents = useMemo(
     () => createProjectComponentRepository(document).list(),
     [document]
@@ -56,6 +58,7 @@ export function ComponentPalette({
   const items = Object.values(componentDefinitions).filter(
     (item) =>
       item.type !== "Page" &&
+      item.type !== "Modal" &&
       (item.type !== "PageSlot" || (editingLayout && !ownerComponentId)) &&
       item.label.toLowerCase().includes(normalizedSearch)
   );

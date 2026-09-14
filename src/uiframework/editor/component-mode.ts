@@ -32,11 +32,11 @@ export function resolveComponentEditorMode(
 ): ComponentEditorMode | null {
   if (!scoped || scoped.pageId !== activePageId) return null;
 
-  const page = document.pages[activePageId];
+  const surfaceRootId = document.pages[activePageId]?.rootId ?? document.modals?.[activePageId]?.rootId;
   const node = document.nodes[scoped.mode.nodeId];
-  if (!page || !node?.variants?.[scoped.mode.variantName]) return null;
+  if (!surfaceRootId || !node?.variants?.[scoped.mode.variantName]) return null;
 
-  const pageIndex = buildDocumentIndex(document, page.rootId);
+  const pageIndex = buildDocumentIndex(document, surfaceRootId);
   return pageIndex.depthById.has(node.id) ? scoped.mode : null;
 }
 

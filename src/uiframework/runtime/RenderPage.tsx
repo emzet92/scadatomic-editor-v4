@@ -19,6 +19,7 @@ import {
 import { NavigationRuntimeProvider } from "../navigation/NavigationRuntimeProvider";
 import { runtimeRegistry } from "../registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
+import { RuntimeModalLayer } from "./RuntimeModalLayer";
 import { getComponentVariantProps } from "../component-variants";
 import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
 import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
@@ -239,6 +240,14 @@ export function RenderPage() {
           />
         </div>
       </NavigationRuntimeProvider>
+
+      {projectId ? (
+        <RuntimeModalLayer
+          projectId={projectId}
+          document={document}
+          pageId={currentPage.id}
+        />
+      ) : null}
 
       {updateToastVisible && (
         <div className="fixed right-5 bottom-5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">

@@ -33,6 +33,12 @@ export type EventReference = {
   eventName: string;
 };
 
+export type ModalReference = {
+  kind: "modal";
+  modalId: string;
+  name: string;
+};
+
 export type MethodReference = {
   kind: "method";
   ownerId: string;
@@ -66,6 +72,18 @@ export type SetVariantIntent = BaseIntent & {
 export type EmitEventIntent = BaseIntent & {
   type: "emit-event";
   event: EventReference;
+  payload?: Record<string, unknown> | undefined;
+};
+
+export type ModalOpenIntent = BaseIntent & {
+  type: "modal-open";
+  target: ModalReference;
+  payload?: Record<string, unknown> | undefined;
+};
+
+export type ModalCloseIntent = BaseIntent & {
+  type: "modal-close";
+  target: ModalReference;
   payload?: Record<string, unknown> | undefined;
 };
 
@@ -112,6 +130,8 @@ export type Intent =
   | SetPropertyIntent
   | SetVariantIntent
   | EmitEventIntent
+  | ModalOpenIntent
+  | ModalCloseIntent
   | NavigateIntent
   | StateSetIntent
   | StateDeleteIntent

@@ -6,6 +6,7 @@ import {
 } from "../uiframework/core/document";
 import { buildNavigationTree } from "../uiframework/navigation/navigation";
 import { getPageLayout } from "../uiframework/core/page-layouts";
+import { collectModalNodeIds } from "../uiframework/core/modals";
 import { getMockProjectSnapshot } from "./mock-project-store";
 import {
   applyMockRuntimeUiState,
@@ -239,6 +240,14 @@ class MockRuntimeSocket extends EventTarget {
           const document = this.getProjectDocument(projectId);
           if (!document) return undefined;
 
+          const owningModal = Object.values(document.modals ?? {}).find((modal) =>
+            collectModalNodeIds(document, modal.id).includes(sourceNodeId)
+          );
+          if (owningModal) {
+            const modalNode = findNodeByNameInSubtree(document, owningModal.rootId, name);
+            if (modalNode) return modalNode;
+          }
+
           const page = pageId ? document.pages[pageId] : undefined;
           if (!page) {
             return Object.values(document.nodes).find((node) => node.name === name);
@@ -266,6 +275,10 @@ class MockRuntimeSocket extends EventTarget {
         getNavigationTree: () => {
           const document = this.getProjectDocument(projectId);
           return document ? buildNavigationTree(document) : [];
+        },
+        getModals: () => {
+          const document = this.getProjectDocument(projectId);
+          return Object.values(document?.modals ?? {});
         },
         navigateTo: (path) => {
           this.emitMockResponse({

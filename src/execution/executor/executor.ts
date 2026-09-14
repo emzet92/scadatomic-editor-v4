@@ -105,6 +105,10 @@ async function executeNode(node: ExecutionNode, effects: RuntimeEffects) {
       return effects.setVariant(intent.target, intent.variantName);
     case "emit-event":
       return effects.emitEvent(intent.event, intent.payload);
+    case "modal-open":
+      return effects.openModal(intent.target, intent.payload);
+    case "modal-close":
+      return effects.closeModal(intent.target, intent.payload);
     case "navigate":
       return effects.navigate(intent.path);
     case "state-set":

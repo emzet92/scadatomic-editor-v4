@@ -95,6 +95,16 @@ export function HandlerTree({
               onAddMethod={onAddMethod}
               onRemoveMethod={onRemoveMethod}
             />
+
+            {Object.keys(document.modals ?? {}).length > 0 ? (
+              <ModalsApiSection
+                document={document}
+                currentScriptId={currentScriptId}
+                onSelect={onSelect}
+                onAddMethod={onAddMethod}
+                onRemoveMethod={onRemoveMethod}
+              />
+            ) : null}
           </>
         )}
       </div>
@@ -189,6 +199,56 @@ function PageApiRow({
             onRemoveMethod={onRemoveMethod}
             depth={depth + 1}
           />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function ModalsApiSection({
+  document,
+  currentScriptId,
+  onSelect,
+  onAddMethod,
+  onRemoveMethod,
+}: {
+  document: UiDocument;
+  currentScriptId: string;
+  onSelect: (scriptId: string) => void;
+  onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
+  onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
+}) {
+  const modals = Object.values(document.modals ?? {}).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+
+  return (
+    <details open className="mt-2 rounded-lg border border-sky-100 bg-sky-50/30">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
+        <ChevronRight size={12} className="text-sky-400" />
+        <span className="flex-1">Modals</span>
+        <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-sky-500">
+          {modals.length}
+        </span>
+      </summary>
+      <div className="pb-1">
+        {modals.map((modal) => (
+          <details key={modal.id} open className="border-t border-sky-100/70 first:border-t-0">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-sky-50/70">
+              <ChevronRight size={12} className="text-zinc-400" />
+              <span className="min-w-0 flex-1 truncate font-medium">{modal.name}</span>
+              <span className="font-mono text-[9px] text-sky-500">ctx.modals.{modal.name}</span>
+            </summary>
+            <HandlerNode
+              document={document}
+              nodeId={modal.rootId}
+              currentScriptId={currentScriptId}
+              onSelect={onSelect}
+              onAddMethod={onAddMethod}
+              onRemoveMethod={onRemoveMethod}
+              depth={1}
+            />
+          </details>
         ))}
       </div>
     </details>

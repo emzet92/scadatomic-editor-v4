@@ -6,6 +6,7 @@ import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../..
 import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
 export type NodeId = string;
 export type PageId = string;
+export type ModalId = string;
 export type PageKind = "page" | "layout";
 export type ComponentDefinitionId = string;
 
@@ -93,6 +94,14 @@ export type UiNode = {
  * Page metadata is project-global while the actual page tree lives in the
  * project-global node table. Node ids stay globally unique inside a project.
  */
+export type UiModal = {
+  id: ModalId;
+  name: string;
+  rootId: NodeId;
+  closeOnBackdrop?: boolean | undefined;
+  closeOnEscape?: boolean | undefined;
+};
+
 export type UiPage = {
   id: PageId;
   name: string;
@@ -110,6 +119,8 @@ export type UiDocument = {
   rootId: NodeId;
   startPageId: PageId;
   pages: Record<PageId, UiPage>;
+  /** Project-global modal definitions. Modal node trees share the global node table. */
+  modals?: Record<ModalId, UiModal> | undefined;
   /** All page nodes. Components remain global per project below. */
   nodes: Record<NodeId, UiNode>;
   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
@@ -182,6 +193,39 @@ export function getPageByRootId(
   rootId: NodeId
 ): UiPage | undefined {
   return Object.values(document.pages).find((page) => page.rootId === rootId);
+}
+
+
+export function getModal(document: UiDocument, modalId: ModalId): UiModal | undefined {
+  return document.modals?.[modalId];
+}
+
+export function getModalByRootId(
+  document: UiDocument,
+  rootId: NodeId
+): UiModal | undefined {
+  return Object.values(document.modals ?? {}).find((modal) => modal.rootId === rootId);
+}
+
+export function createModalRootNode(name: string): UiNode {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    type: "Modal",
+    props: {
+      width: 560,
+      minHeight: 240,
+      backgroundColor: "#ffffff",
+      padding: 24,
+      gap: 12,
+      columns: 1,
+      display: "grid",
+      borderRadius: 18,
+      closeOnBackdrop: true,
+      closeOnEscape: true,
+    },
+    children: [],
+  };
 }
 
 export function createPageRootNode(name: string): UiNode {
@@ -262,6 +306,17 @@ export function isUiDocument(value: unknown): value is UiDocument {
       !isRecord(candidate.components) ||
       !Object.entries(candidate.components).every(([id, definition]) =>
         isComponentDefinition(definition, id)
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (candidate.modals !== undefined) {
+    if (
+      !isRecord(candidate.modals) ||
+      !Object.entries(candidate.modals).every(([id, modal]) =>
+        isUiModal(modal, id, nodes)
       )
     ) {
       return false;
@@ -353,6 +408,26 @@ function isUiPage(
   }
 
   return nodes[value.rootId]?.type === "Page";
+}
+
+
+function isUiModal(
+  value: unknown,
+  expectedId: string,
+  nodes: Record<string, UiNode>
+): value is UiModal {
+  if (!isRecord(value)) return false;
+  if (
+    value.id !== expectedId ||
+    typeof value.name !== "string" ||
+    !isJsIdentifier(value.name) ||
+    typeof value.rootId !== "string" ||
+    (value.closeOnBackdrop !== undefined && typeof value.closeOnBackdrop !== "boolean") ||
+    (value.closeOnEscape !== undefined && typeof value.closeOnEscape !== "boolean")
+  ) {
+    return false;
+  }
+  return nodes[value.rootId]?.type === "Modal";
 }
 
 function isUiNode(value: unknown, expectedId: string): value is UiNode {

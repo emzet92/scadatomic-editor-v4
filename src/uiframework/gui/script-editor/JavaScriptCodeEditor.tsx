@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ComponentApiDescription } from "../../component-api";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import type { NavigationTreeNode } from "../../navigation/navigation";
+import type { UiModal } from "../../core/document";
 import {
   createTagAutocompleteRoots,
   getTagNamespaceAutocompleteRoot,
@@ -20,6 +21,7 @@ type JavaScriptCodeEditorProps = {
   selfComponent?: ComponentApiDescription | undefined;
   internalComponents?: ComponentApiDescription[] | undefined;
   navigation?: NavigationTreeNode[] | undefined;
+  modals?: UiModal[] | undefined;
   projectData?: ProjectData | undefined;
   extraAutocompleteRoots?: AutocompleteApiNode[] | undefined;
   autocompleteHint?: string | undefined;
@@ -33,6 +35,7 @@ export function JavaScriptCodeEditor({
   selfComponent,
   internalComponents = [],
   navigation = [],
+  modals = [],
   projectData,
   extraAutocompleteRoots = [],
   autocompleteHint = "ctx · self · internal · tags autocomplete",
@@ -54,13 +57,32 @@ export function JavaScriptCodeEditor({
         internalComponents,
         navigation,
         mergeAutocompleteRoots(extraAutocompleteRoots, tagRoots),
-        ctxTagRoot ? [ctxTagRoot] : []
+        [
+          ...(ctxTagRoot ? [ctxTagRoot] : []),
+          ...(modals.length > 0
+            ? [{
+                label: "modals",
+                completionType: "namespace",
+                detail: "modal runtime API",
+                children: modals.map((modal) => ({
+                  label: modal.name,
+                  completionType: "class",
+                  detail: "modal",
+                  children: [
+                    { label: "open", completionType: "method", detail: "(payload?)" },
+                    { label: "close", completionType: "method", detail: "(result?)" },
+                  ],
+                })),
+              }]
+            : []),
+        ]
       ),
     [
       components,
       selfComponent,
       internalComponents,
       navigation,
+      modals,
       extraAutocompleteRoots,
       tagRoots,
       ctxTagRoot,

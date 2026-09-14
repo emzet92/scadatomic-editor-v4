@@ -24,6 +24,10 @@ export function PageTree() {
   const addPage = useEditorStore((state) => state.addPage);
   const addPageLayout = useEditorStore((state) => state.addPageLayout);
   const deletePage = useEditorStore((state) => state.deletePage);
+  const activeModalId = useEditorStore((state) => state.activeModalId);
+  const setActiveModalId = useEditorStore((state) => state.setActiveModalId);
+  const addModal = useEditorStore((state) => state.addModal);
+  const deleteModal = useEditorStore((state) => state.deleteModal);
   const [pendingDeletePageId, setPendingDeletePageId] = useState<string | null>(null);
 
   const tree = useMemo(() => buildNavigationTree(document), [document]);
@@ -72,7 +76,7 @@ export function PageTree() {
               key={node.pageId}
               node={node}
               depth={0}
-              activePageId={activePageId}
+              activePageId={activeModalId ? "" : activePageId}
               startPageId={document.startPageId}
               runtimePageCount={runtimePageCount}
               onOpen={setActivePageId}
@@ -106,7 +110,7 @@ export function PageTree() {
               <LayoutRow
                 key={layout.id}
                 name={layout.name}
-                active={layout.id === activePageId}
+                active={!activeModalId && layout.id === activePageId}
                 onOpen={() => setActivePageId(layout.id)}
                 onDelete={() => setPendingDeletePageId(layout.id)}
               />
@@ -114,6 +118,40 @@ export function PageTree() {
           ) : (
             <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
               Add a layout to share navigation, headers, sidebars and other chrome between pages.
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-2 border-t border-[var(--editor-border)] pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+            Modals
+          </div>
+          <IconButton
+            aria-label="Add modal"
+            title="Add modal"
+            variant="secondary"
+            onClick={() => addModal()}
+          >
+            <Plus size={14} />
+          </IconButton>
+        </div>
+
+        <div className="space-y-0.5">
+          {Object.values(document.modals ?? {}).length > 0 ? (
+            Object.values(document.modals ?? {}).map((modal) => (
+              <ModalRow
+                key={modal.id}
+                name={modal.name}
+                active={modal.id === activeModalId}
+                onOpen={() => setActiveModalId(modal.id)}
+                onDelete={() => deleteModal(modal.id)}
+              />
+            ))
+          ) : (
+            <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+              Add a reusable modal surface with its own lifecycle events and script API.
             </div>
           )}
         </div>
@@ -169,6 +207,51 @@ function LayoutRow({
       >
         <LayoutTemplate size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
+      </button>
+      <div className="hidden shrink-0 group-hover:block">
+        <IconButton
+          aria-label={`Delete ${name}`}
+          title={`Delete ${name}`}
+          variant="danger"
+          size="icon-xs"
+          onClick={onDelete}
+        >
+          <Trash2 size={12} />
+        </IconButton>
+      </div>
+    </div>
+  );
+}
+
+function ModalRow({
+  name,
+  active,
+  onOpen,
+  onDelete,
+}: {
+  name: string;
+  active: boolean;
+  onOpen(): void;
+  onDelete(): void;
+}) {
+  return (
+    <div
+      className={`group flex h-8 items-center rounded-md px-1 text-xs transition ${
+        active
+          ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+          : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
+      >
+        <FileText size={12} className="shrink-0 opacity-70" />
+        <span className="truncate font-medium">{name}</span>
+        <span className="ml-auto rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)] group-hover:hidden">
+          modal
+        </span>
       </button>
       <div className="hidden shrink-0 group-hover:block">
         <IconButton

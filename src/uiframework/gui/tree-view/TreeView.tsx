@@ -7,6 +7,7 @@ import { NodeTree } from "./NodeTree";
 export function TreeView() {
   const document = useEditorStore((state) => state.document);
   const activePageId = useEditorStore((state) => state.activePageId);
+  const activeModalId = useEditorStore((state) => state.activeModalId);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
   const selectNode = useEditorStore((state) => state.selectNode);
@@ -15,9 +16,11 @@ export function TreeView() {
   const duplicateNode = useEditorStore((state) => state.duplicateNode);
   const deleteNode = useEditorStore((state) => state.deleteNode);
   const page = getPage(document, activePageId);
-  const index = buildDocumentIndex(document, page.rootId);
+  const modal = activeModalId ? document.modals?.[activeModalId] : undefined;
+  const rootId = modal?.rootId ?? page.rootId;
+  const index = buildDocumentIndex(document, rootId);
 
-  if (!document.nodes[page.rootId]) return null;
+  if (!document.nodes[rootId]) return null;
 
   return (
     <div className="space-y-1">
@@ -33,7 +36,7 @@ export function TreeView() {
       </div>
 
       <NodeTree
-        rootId={page.rootId}
+        rootId={rootId}
         nodes={document.nodes}
         selectedNodeId={selectedNodeId}
         selectedNodeIds={selectedNodeIds}
@@ -42,13 +45,13 @@ export function TreeView() {
         moveNodeDown={moveNodeDown}
         duplicateNode={duplicateNode}
         canDuplicateNode={(nodeId) => {
-          if (nodeId === page.rootId) return false;
+          if (nodeId === rootId) return false;
           const parentId = index.parentById.get(nodeId);
           const parent = parentId ? document.nodes[parentId] : undefined;
           return !!parent && canAcceptManualChildren(parent);
         }}
         deleteNode={deleteNode}
-        canDeleteNode={(nodeId) => nodeId !== page.rootId}
+        canDeleteNode={(nodeId) => nodeId !== rootId}
       />
     </div>
   );

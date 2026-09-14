@@ -6,6 +6,7 @@ import { getPage, type UiDocument } from "./core/document";
 import { createPageRenderDocument } from "./core/page-layouts";
 import { createComponentDefinitionDocument } from "./reusable-components";
 import { PageDesignerSurface } from "./designer/PageDesignerSurface";
+import { ModalDesignerSurface } from "./designer/ModalDesignerSurface";
 import {
   Canvas,
   LeftSidebar,
@@ -182,6 +183,7 @@ export function EditorPage() {
   const { projectId } = useParams();
   const document = useEditorStore((state) => state.document);
   const activePageId = useEditorStore((state) => state.activePageId);
+  const activeModalId = useEditorStore((state) => state.activeModalId);
   const setActivePageId = useEditorStore((state) => state.setActivePageId);
   const setDocument = useEditorStore((state) => state.setDocument);
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
@@ -389,14 +391,14 @@ export function EditorPage() {
   }, [projectId]);
 
   function setComponentMode(mode: ComponentEditorMode | null) {
-    setScopedComponentMode(mode ? scopeMode(activePageId, mode) : null);
+    setScopedComponentMode(mode ? scopeMode(activeModalId ?? activePageId, mode) : null);
   }
 
   function setComponentDefinitionMode(
     mode: ComponentDefinitionEditorMode | null
   ) {
     setScopedComponentDefinitionMode(
-      mode ? scopeMode(activePageId, mode) : null
+      mode ? scopeMode(activeModalId ?? activePageId, mode) : null
     );
   }
 
@@ -457,18 +459,23 @@ export function EditorPage() {
   }
 
   const activePage = getPage(document, activePageId);
+  const activeModal = activeModalId ? document.modals?.[activeModalId] : undefined;
+  const activeSurfaceId = activeModal?.id ?? activePageId;
   const componentMode = resolveComponentEditorMode(
     document,
-    activePageId,
+    activeSurfaceId,
     scopedComponentMode
   );
   const componentDefinitionMode = resolveComponentDefinitionEditorMode(
     document,
-    activePageId,
+    activeSurfaceId,
     scopedComponentDefinitionMode
   );
-  const activeDocument: UiDocument = { ...document, rootId: activePage.rootId };
-  const activeRenderDocument = createPageRenderDocument(document, activePage.id);
+  const activeRootId = activeModal?.rootId ?? activePage.rootId;
+  const activeDocument: UiDocument = { ...document, rootId: activeRootId };
+  const activeRenderDocument = activeModal
+    ? { ...document, rootId: activeModal.rootId }
+    : createPageRenderDocument(document, activePage.id);
   const focusedNode = componentMode
     ? document.nodes[componentMode.nodeId]
     : undefined;
@@ -634,7 +641,7 @@ export function EditorPage() {
                   </div>
                 ) : (
                   <div className="text-xs text-[var(--editor-text-muted)]">
-                    Designer mode
+                    {activeModal ? `Modal · ${activeModal.name}` : "Designer mode"}
                   </div>
                 )}
               </div>
@@ -684,6 +691,17 @@ export function EditorPage() {
                       mode={componentMode}
                     />
                   </ComponentPreviewFrame>
+                ) : activeModal ? (
+                  <>
+                    <div className="flex min-h-[620px] w-full items-center justify-center rounded-xl bg-black/35 p-16">
+                      <RendererRoot
+                        document={activeRenderDocument}
+                        registry={editorRegistry}
+                        projectId={projectId}
+                      />
+                    </div>
+                    <ModalDesignerSurface registry={editorRegistry} />
+                  </>
                 ) : (
                   <>
                     <PageViewportFrame

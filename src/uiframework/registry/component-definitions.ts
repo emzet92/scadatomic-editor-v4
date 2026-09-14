@@ -4,6 +4,7 @@ import { chartDefinition } from "./components/chart";
 import { containerDefinition } from "./components/container";
 import { imageDefinition } from "./components/image";
 import { navigationDefinition } from "./components/navigation";
+import { modalDefinition } from "./components/modal";
 import { pageDefinition } from "./components/page";
 import { pageSlotDefinition } from "./components/page-slot";
 import { textDefinition } from "./components/text";
@@ -12,6 +13,7 @@ export type { ComponentDefinition, InspectorControl } from "./component-definiti
 
 export const componentDefinitions = {
   Page: pageDefinition,
+  Modal: modalDefinition,
   PageSlot: pageSlotDefinition,
   Navigation: navigationDefinition,
   Container: containerDefinition,

@@ -411,6 +411,7 @@ function ScriptEditor({
                   selfComponent={selfComponent}
                   internalComponents={internalComponents}
                   navigation={navigationTree}
+                  modals={Object.values(document?.modals ?? {})}
                   projectData={document?.data}
                 />
 
@@ -429,6 +430,8 @@ function ScriptEditor({
                     <code>ctx.ui.ComponentName.variant.current</code>
                     <code>ctx.navigateTo("Page/SubPage")</code>
                     <code>ctx.nav.Page1.go()</code>
+                    <code>ctx.modals.ConfirmDelete.open(payload?)</code>
+                    <code>ctx.modals.ConfirmDelete.close(result?)</code>
                     <code>tags.LineSpeed</code>
                     <code>tags.LineSpeed = 1200</code>
                     <code>tags.Pump1.speed = 1450</code>
@@ -595,10 +598,20 @@ function getScopedComponentApi(
   const page = Object.values(document.pages).find((candidate) =>
     subtreeContains(document, candidate.rootId, sourceNodeId)
   );
-  if (!page) return components;
+  if (page) {
+    const nodeIds = collectSubtreeNodeIds(document, page.rootId);
+    return components.filter((component) => nodeIds.has(component.nodeId));
+  }
 
-  const nodeIds = collectSubtreeNodeIds(document, page.rootId);
-  return components.filter((component) => nodeIds.has(component.nodeId));
+  const modal = Object.values(document.modals ?? {}).find((candidate) =>
+    subtreeContains(document, candidate.rootId, sourceNodeId)
+  );
+  if (modal) {
+    const nodeIds = collectSubtreeNodeIds(document, modal.rootId);
+    return components.filter((component) => nodeIds.has(component.nodeId));
+  }
+
+  return components;
 }
 
 function subtreeContains(

@@ -1,0 +1,1869 @@
+diff --git a/MODAL_SYSTEM.md b/MODAL_SYSTEM.md
+new file mode 100644
+index 0000000..8945c54
+--- /dev/null
++++ b/MODAL_SYSTEM.md
+@@ -0,0 +1,103 @@
++# SCADAtomic Modal System
++
++## Model
++
++Modals are project-global document entities, separate from Pages and reusable Components:
++
++```text
++UiDocument
++├── pages
++├── modals
++├── nodes
++└── components
++```
++
++A modal owns a root `Modal` node and a normal UI subtree stored in the global node table. This keeps node IDs stable and lets the existing DesignerSurface, tree editor, property panel, bindings and component palette edit modal content without a second editor implementation.
++
++## Designer
++
++Use **Pages → Modals → +** to create a modal. Selecting it switches the normal designer to a centered modal preview over a dimmed backdrop. The same component palette, component tree, variants, bindings and event editor are reused.
++
++Modal root properties:
++
++- width
++- minimum height
++- background
++- padding / gap / columns / display
++- corner radius
++- close on backdrop
++- close on Escape
++
++Modal root events:
++
++- `open` / **On open**
++- `close` / **On close**
++
++## Script API
++
++Every project modal is generated under `ctx.modals`:
++
++```js
++ctx.modals.ConfirmDelete.open({ deviceId: "edge-01" });
++ctx.modals.ConfirmDelete.close({ accepted: true });
++```
++
++Autocomplete exposes the actual modal names from the project.
++
++`open()` and `close()` do not manipulate the DOM directly. They collect typed execution intents:
++
++```text
++modal-open
++modal-close
++```
++
++The Executor routes those effects to the client modal runtime. This contract is language-independent and can be generated from the future Python proxy API without changing the execution model.
++
++## Lifecycle payload
++
++`On open` receives the object passed to `open()` as `ctx.payload`.
++
++```js
++ctx.log(ctx.payload.deviceId);
++```
++
++`On close` receives the result passed to `close()`:
++
++```js
++ctx.modals.ConfirmDelete.close({ accepted: true });
++```
++
++Backdrop and Escape closures also go through the same close transition:
++
++```js
++ctx.payload.reason === "backdrop"
++ctx.payload.reason === "escape"
++```
++
++This means cleanup, custom events, state updates and other handler logic belong in the normal modal `On close` handler.
++
++## Runtime
++
++```text
++handler
++  ↓
++ctx.modals.X.open()
++  ↓
++ModalOpenIntent
++  ↓
++Execution Planner
++  ↓
++Execution Graph
++  ↓
++Executor
++  ↓
++UI client modal runtime
++  ↓
++overlay + modal tree
++  ↓
++On open handler
++```
++
++Closing follows the same path and emits the `On close` lifecycle handler.
++
++The runtime maintains a modal stack. Multiple modals may be open; the latest entry is the top modal and receives Escape/backdrop dismissal.
+diff --git a/src/execution/executor/executor.ts b/src/execution/executor/executor.ts
+index a77e89b..1abc200 100644
+--- a/src/execution/executor/executor.ts
++++ b/src/execution/executor/executor.ts
+@@ -105,6 +105,10 @@ async function executeNode(node: ExecutionNode, effects: RuntimeEffects) {
+       return effects.setVariant(intent.target, intent.variantName);
+     case "emit-event":
+       return effects.emitEvent(intent.event, intent.payload);
++    case "modal-open":
++      return effects.openModal(intent.target, intent.payload);
++    case "modal-close":
++      return effects.closeModal(intent.target, intent.payload);
+     case "navigate":
+       return effects.navigate(intent.path);
+     case "state-set":
+diff --git a/src/execution/executor/runtime-effects.ts b/src/execution/executor/runtime-effects.ts
+index d6dbb77..520dbeb 100644
+--- a/src/execution/executor/runtime-effects.ts
++++ b/src/execution/executor/runtime-effects.ts
+@@ -3,6 +3,7 @@ import type {
+   ComponentVariantReference,
+   EventReference,
+   MethodReference,
++  ModalReference,
+   RuntimeReference,
+ } from "../model/intent";
+ 
+@@ -11,6 +12,8 @@ export interface RuntimeEffects {
+   setProperty(target: ComponentPropertyReference, value: unknown): void | Promise<void>;
+   setVariant(target: ComponentVariantReference, variantName: string): void | Promise<void>;
+   emitEvent(event: EventReference, payload?: Record<string, unknown>): void | Promise<void>;
++  openModal(target: ModalReference, payload?: Record<string, unknown>): void | Promise<void>;
++  closeModal(target: ModalReference, payload?: Record<string, unknown>): void | Promise<void>;
+   navigate(path: string): void | Promise<void>;
+   setState(key: string, value: unknown): void | Promise<void>;
+   deleteState(key: string): void | Promise<void>;
+diff --git a/src/execution/model/intent.ts b/src/execution/model/intent.ts
+index bb4b57f..b85db8e 100644
+--- a/src/execution/model/intent.ts
++++ b/src/execution/model/intent.ts
+@@ -33,6 +33,12 @@ export type EventReference = {
+   eventName: string;
+ };
+ 
++export type ModalReference = {
++  kind: "modal";
++  modalId: string;
++  name: string;
++};
++
+ export type MethodReference = {
+   kind: "method";
+   ownerId: string;
+@@ -69,6 +75,18 @@ export type EmitEventIntent = BaseIntent & {
+   payload?: Record<string, unknown> | undefined;
+ };
+ 
++export type ModalOpenIntent = BaseIntent & {
++  type: "modal-open";
++  target: ModalReference;
++  payload?: Record<string, unknown> | undefined;
++};
++
++export type ModalCloseIntent = BaseIntent & {
++  type: "modal-close";
++  target: ModalReference;
++  payload?: Record<string, unknown> | undefined;
++};
++
+ export type NavigateIntent = BaseIntent & {
+   type: "navigate";
+   path: string;
+@@ -112,6 +130,8 @@ export type Intent =
+   | SetPropertyIntent
+   | SetVariantIntent
+   | EmitEventIntent
++  | ModalOpenIntent
++  | ModalCloseIntent
+   | NavigateIntent
+   | StateSetIntent
+   | StateDeleteIntent
+diff --git a/src/execution/planner/execution-planner.ts b/src/execution/planner/execution-planner.ts
+index 94eb06c..01c88c4 100644
+--- a/src/execution/planner/execution-planner.ts
++++ b/src/execution/planner/execution-planner.ts
+@@ -86,6 +86,12 @@ function validateIntents(intents: readonly Intent[]): void {
+           throw new ExecutionPlanningError("emit-event requires owner id and event name.");
+         }
+         break;
++      case "modal-open":
++      case "modal-close":
++        if (!intent.target.modalId || !intent.target.name) {
++          throw new ExecutionPlanningError(`${intent.type} requires a resolved modal reference.`);
++        }
++        break;
+       case "navigate":
+         if (!intent.path) throw new ExecutionPlanningError("navigate requires a path.");
+         break;
+diff --git a/src/execution/visualization/execution-graph-adapter.ts b/src/execution/visualization/execution-graph-adapter.ts
+index 70fb719..b2160e8 100644
+--- a/src/execution/visualization/execution-graph-adapter.ts
++++ b/src/execution/visualization/execution-graph-adapter.ts
+@@ -81,6 +81,8 @@ export function intentTitle(intent: Intent): string {
+     case "set-property": return `Set ${intent.target.path ?? intent.target.property}`;
+     case "set-variant": return `Variant ${intent.target.path ?? intent.target.componentId}`;
+     case "emit-event": return `Emit ${intent.event.eventName}`;
++    case "modal-open": return `Open ${intent.target.name}`;
++    case "modal-close": return `Close ${intent.target.name}`;
+     case "navigate": return `Navigate`;
+     case "state-set": return `State set ${intent.key}`;
+     case "state-delete": return `State delete ${intent.key}`;
+@@ -95,6 +97,8 @@ export function intentDetail(intent: Intent): string {
+     case "set-property": return formatValue(intent.value);
+     case "set-variant": return intent.variantName;
+     case "emit-event": return intent.payload ? formatValue(intent.payload) : "no payload";
++    case "modal-open": return intent.payload ? formatValue(intent.payload) : "open modal";
++    case "modal-close": return intent.payload ? formatValue(intent.payload) : "close modal";
+     case "navigate": return intent.path;
+     case "state-set": return formatValue(intent.value);
+     case "state-delete": return "delete";
+diff --git a/src/mock/mock-runtime-socket.ts b/src/mock/mock-runtime-socket.ts
+index f207210..d334331 100644
+--- a/src/mock/mock-runtime-socket.ts
++++ b/src/mock/mock-runtime-socket.ts
+@@ -6,6 +6,7 @@ import {
+ } from "../uiframework/core/document";
+ import { buildNavigationTree } from "../uiframework/navigation/navigation";
+ import { getPageLayout } from "../uiframework/core/page-layouts";
++import { collectModalNodeIds } from "../uiframework/core/modals";
+ import { getMockProjectSnapshot } from "./mock-project-store";
+ import {
+   applyMockRuntimeUiState,
+@@ -239,6 +240,14 @@ class MockRuntimeSocket extends EventTarget {
+           const document = this.getProjectDocument(projectId);
+           if (!document) return undefined;
+ 
++          const owningModal = Object.values(document.modals ?? {}).find((modal) =>
++            collectModalNodeIds(document, modal.id).includes(sourceNodeId)
++          );
++          if (owningModal) {
++            const modalNode = findNodeByNameInSubtree(document, owningModal.rootId, name);
++            if (modalNode) return modalNode;
++          }
++
+           const page = pageId ? document.pages[pageId] : undefined;
+           if (!page) {
+             return Object.values(document.nodes).find((node) => node.name === name);
+@@ -267,6 +276,10 @@ class MockRuntimeSocket extends EventTarget {
+           const document = this.getProjectDocument(projectId);
+           return document ? buildNavigationTree(document) : [];
+         },
++        getModals: () => {
++          const document = this.getProjectDocument(projectId);
++          return Object.values(document?.modals ?? {});
++        },
+         navigateTo: (path) => {
+           this.emitMockResponse({
+             type: "runtime.navigate",
+diff --git a/src/mock/script-runtime/context-factory.ts b/src/mock/script-runtime/context-factory.ts
+index 8d7cc7c..5d33513 100644
+--- a/src/mock/script-runtime/context-factory.ts
++++ b/src/mock/script-runtime/context-factory.ts
+@@ -3,6 +3,7 @@ import { createIntentId, shadowKey } from "../../execution";
+ import { getMockSessionValue } from "../mock-session-state";
+ import { createUiApi } from "./component-api";
+ import { createNavigationApi } from "./navigation-api";
++import { createModalApi } from "./modal-api";
+ import { createTagRuntimeContext } from "./tag-api";
+ import type {
+   MockScriptContext,
+@@ -20,6 +21,7 @@ export function createScriptContext(
+ ): MockScriptContext {
+   const ui = createUiApi(host, event.projectId, () => ctx, environment);
+   const nav = createNavigationApi(host, environment);
++  const modals = createModalApi(host.getModals(), environment);
+   const tagRuntime = host.getTagRuntime();
+   const contextRef: { current?: MockScriptContext } = {};
+   const stateWrites = new Map<string, { deleted: boolean; value?: unknown }>();
+@@ -78,6 +80,7 @@ export function createScriptContext(
+     }),
+     ui,
+     nav,
++    modals,
+     ...(tags ? { tags } : {}),
+     navigateTo(path: string) {
+       environment.collector.push({
+diff --git a/src/mock/script-runtime/modal-api.ts b/src/mock/script-runtime/modal-api.ts
+new file mode 100644
+index 0000000..c457e3c
+--- /dev/null
++++ b/src/mock/script-runtime/modal-api.ts
+@@ -0,0 +1,46 @@
++import { createIntentId } from "../../execution";
++import type { UiModal } from "../../uiframework/core/document";
++import type {
++  MockScriptExecutionEnvironment,
++  MockScriptModalApi,
++  MockScriptModalsApi,
++} from "./types";
++
++export function createModalApi(
++  modals: UiModal[],
++  environment: MockScriptExecutionEnvironment
++): MockScriptModalsApi {
++  const target: Record<string, MockScriptModalApi> = {};
++
++  for (const modal of modals) {
++    target[modal.name] = Object.freeze({
++      open(payload?: Record<string, unknown>) {
++        environment.collector.push({
++          id: createIntentId(),
++          type: "modal-open",
++          source: environment.source,
++          target: { kind: "modal", modalId: modal.id, name: modal.name },
++          ...(payload ? { payload } : {}),
++        });
++      },
++      close(payload?: Record<string, unknown>) {
++        environment.collector.push({
++          id: createIntentId(),
++          type: "modal-close",
++          source: environment.source,
++          target: { kind: "modal", modalId: modal.id, name: modal.name },
++          ...(payload ? { payload } : {}),
++        });
++      },
++    });
++  }
++
++  return new Proxy(Object.freeze(target), {
++    get(current, property) {
++      if (typeof property !== "string") return undefined;
++      const value = current[property];
++      if (!value) throw new Error(`Unknown modal: ${property}`);
++      return value;
++    },
++  });
++}
+diff --git a/src/mock/script-runtime/runtime-effects-adapter.ts b/src/mock/script-runtime/runtime-effects-adapter.ts
+index 2c79bda..222b3f8 100644
+--- a/src/mock/script-runtime/runtime-effects-adapter.ts
++++ b/src/mock/script-runtime/runtime-effects-adapter.ts
+@@ -6,6 +6,7 @@ import {
+   setMockSessionValue,
+ } from "../mock-session-state";
+ import type { MockScriptEvent, MockScriptHost } from "./types";
++import { closeProjectModal, openProjectModal } from "../../uiframework/modal-runtime-state";
+ 
+ /** Compatibility adapter: Executor is the only caller of these legacy effects. */
+ export function createMockRuntimeEffects(
+@@ -30,6 +31,12 @@ export function createMockRuntimeEffects(
+     emitEvent(intentEvent, payload) {
+       host.emit(intentEvent.eventName, payload);
+     },
++    openModal(target, payload) {
++      openProjectModal(event.projectId, target.modalId, payload);
++    },
++    closeModal(target, payload) {
++      closeProjectModal(event.projectId, target.modalId, payload);
++    },
+     navigate(path) {
+       host.navigateTo(path);
+     },
+diff --git a/src/mock/script-runtime/types.ts b/src/mock/script-runtime/types.ts
+index 031e8ae..d0511da 100644
+--- a/src/mock/script-runtime/types.ts
++++ b/src/mock/script-runtime/types.ts
+@@ -1,6 +1,6 @@
+ import type { TagRuntime } from "../../uiframework/data/runtime/TagRuntime";
+ import type { TagRuntimeApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
+-import type { UiComponentDefinition, UiNode } from "../../uiframework/core/document";
++import type { UiComponentDefinition, UiModal, UiNode } from "../../uiframework/core/document";
+ import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
+ import type { IntentCollector, IntentSource } from "../../execution";
+ 
+@@ -34,6 +34,7 @@ export type MockScriptHost = {
+   ): MockRuntimeComponentScope | undefined;
+   getTagRuntime(): TagRuntime | undefined;
+   getNavigationTree(): NavigationTreeNode[];
++  getModals(): UiModal[];
+   navigateTo(path: string): void;
+   emit(eventName: string, payload?: Record<string, unknown>): void;
+ };
+@@ -76,6 +77,13 @@ export type MockScriptNavigationApi = {
+ 
+ export type MockScriptInputsApi = Record<string, unknown>;
+ 
++export type MockScriptModalApi = {
++  open(payload?: Record<string, unknown>): void;
++  close(payload?: Record<string, unknown>): void;
++};
++
++export type MockScriptModalsApi = Record<string, MockScriptModalApi>;
++
+ export type MockScriptContext = {
+   projectId: string;
+   handlerId: string;
+@@ -90,6 +98,7 @@ export type MockScriptContext = {
+   };
+   ui: MockScriptUiApi;
+   nav: MockScriptNavigationApi;
++  modals: MockScriptModalsApi;
+   inputs?: MockScriptInputsApi | undefined;
+   tags?: TagRuntimeApi | undefined;
+   navigateTo(path: string): void;
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index 434f150..ad0e313 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -6,6 +6,7 @@ import { getPage, type UiDocument } from "./core/document";
+ import { createPageRenderDocument } from "./core/page-layouts";
+ import { createComponentDefinitionDocument } from "./reusable-components";
+ import { PageDesignerSurface } from "./designer/PageDesignerSurface";
++import { ModalDesignerSurface } from "./designer/ModalDesignerSurface";
+ import {
+   Canvas,
+   LeftSidebar,
+@@ -182,6 +183,7 @@ export function EditorPage() {
+   const { projectId } = useParams();
+   const document = useEditorStore((state) => state.document);
+   const activePageId = useEditorStore((state) => state.activePageId);
++  const activeModalId = useEditorStore((state) => state.activeModalId);
+   const setActivePageId = useEditorStore((state) => state.setActivePageId);
+   const setDocument = useEditorStore((state) => state.setDocument);
+   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
+@@ -389,14 +391,14 @@ export function EditorPage() {
+   }, [projectId]);
+ 
+   function setComponentMode(mode: ComponentEditorMode | null) {
+-    setScopedComponentMode(mode ? scopeMode(activePageId, mode) : null);
++    setScopedComponentMode(mode ? scopeMode(activeModalId ?? activePageId, mode) : null);
+   }
+ 
+   function setComponentDefinitionMode(
+     mode: ComponentDefinitionEditorMode | null
+   ) {
+     setScopedComponentDefinitionMode(
+-      mode ? scopeMode(activePageId, mode) : null
++      mode ? scopeMode(activeModalId ?? activePageId, mode) : null
+     );
+   }
+ 
+@@ -457,18 +459,23 @@ export function EditorPage() {
+   }
+ 
+   const activePage = getPage(document, activePageId);
++  const activeModal = activeModalId ? document.modals?.[activeModalId] : undefined;
++  const activeSurfaceId = activeModal?.id ?? activePageId;
+   const componentMode = resolveComponentEditorMode(
+     document,
+-    activePageId,
++    activeSurfaceId,
+     scopedComponentMode
+   );
+   const componentDefinitionMode = resolveComponentDefinitionEditorMode(
+     document,
+-    activePageId,
++    activeSurfaceId,
+     scopedComponentDefinitionMode
+   );
+-  const activeDocument: UiDocument = { ...document, rootId: activePage.rootId };
+-  const activeRenderDocument = createPageRenderDocument(document, activePage.id);
++  const activeRootId = activeModal?.rootId ?? activePage.rootId;
++  const activeDocument: UiDocument = { ...document, rootId: activeRootId };
++  const activeRenderDocument = activeModal
++    ? { ...document, rootId: activeModal.rootId }
++    : createPageRenderDocument(document, activePage.id);
+   const focusedNode = componentMode
+     ? document.nodes[componentMode.nodeId]
+     : undefined;
+@@ -634,7 +641,7 @@ export function EditorPage() {
+                   </div>
+                 ) : (
+                   <div className="text-xs text-[var(--editor-text-muted)]">
+-                    Designer mode
++                    {activeModal ? `Modal · ${activeModal.name}` : "Designer mode"}
+                   </div>
+                 )}
+               </div>
+@@ -684,6 +691,17 @@ export function EditorPage() {
+                       mode={componentMode}
+                     />
+                   </ComponentPreviewFrame>
++                ) : activeModal ? (
++                  <>
++                    <div className="flex min-h-[620px] w-full items-center justify-center rounded-xl bg-black/35 p-16">
++                      <RendererRoot
++                        document={activeRenderDocument}
++                        registry={editorRegistry}
++                        projectId={projectId}
++                      />
++                    </div>
++                    <ModalDesignerSurface registry={editorRegistry} />
++                  </>
+                 ) : (
+                   <>
+                     <PageViewportFrame
+diff --git a/src/uiframework/components/Modal.tsx b/src/uiframework/components/Modal.tsx
+new file mode 100644
+index 0000000..45dd9ea
+--- /dev/null
++++ b/src/uiframework/components/Modal.tsx
+@@ -0,0 +1,69 @@
++import type { CSSProperties, HTMLAttributes } from "react";
++
++export type ModalProps = HTMLAttributes<HTMLDivElement> & {
++  width?: number | string;
++  minHeight?: number | string;
++  backgroundColor?: string;
++  padding?: number;
++  gap?: number;
++  columns?: number;
++  display?: "grid" | "flex";
++  borderRadius?: number;
++  closeOnBackdrop?: boolean;
++  closeOnEscape?: boolean;
++};
++
++export function Modal({
++  width = 560,
++  minHeight = 240,
++  backgroundColor = "#ffffff",
++  padding = 24,
++  gap = 12,
++  columns = 1,
++  display = "grid",
++  borderRadius = 18,
++  closeOnBackdrop = true,
++  closeOnEscape = true,
++  children,
++  style,
++  ...props
++}: ModalProps) {
++  const safeColumns = Math.max(1, Math.floor(columns));
++  const modalStyle: CSSProperties = {
++    width: toCssSize(width),
++    minHeight: toCssSize(minHeight),
++    maxWidth: "calc(100vw - 48px)",
++    maxHeight: "calc(100vh - 48px)",
++    overflow: "auto",
++    backgroundColor,
++    padding,
++    gap,
++    display,
++    gridTemplateColumns:
++      display === "grid" ? `repeat(${safeColumns}, minmax(0, 1fr))` : undefined,
++    alignContent: "start",
++    alignItems: display === "flex" ? "flex-start" : undefined,
++    flexDirection: display === "flex" ? "column" : undefined,
++    boxSizing: "border-box",
++    position: "relative",
++    borderRadius,
++    ...style,
++  };
++
++  return (
++    <div
++      {...props}
++      data-scadatomic-modal-root
++      data-close-on-backdrop={closeOnBackdrop || undefined}
++      data-close-on-escape={closeOnEscape || undefined}
++      style={modalStyle}
++    >
++      {children}
++    </div>
++  );
++}
++
++function toCssSize(value: number | string | undefined) {
++  if (value === undefined) return undefined;
++  return typeof value === "number" ? `${value}px` : value;
++}
+diff --git a/src/uiframework/core/document.ts b/src/uiframework/core/document.ts
+index 4e24a98..5b3389c 100644
+--- a/src/uiframework/core/document.ts
++++ b/src/uiframework/core/document.ts
+@@ -6,6 +6,7 @@ import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../..
+ import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
+ export type NodeId = string;
+ export type PageId = string;
++export type ModalId = string;
+ export type PageKind = "page" | "layout";
+ export type ComponentDefinitionId = string;
+ 
+@@ -93,6 +94,14 @@ export type UiNode = {
+  * Page metadata is project-global while the actual page tree lives in the
+  * project-global node table. Node ids stay globally unique inside a project.
+  */
++export type UiModal = {
++  id: ModalId;
++  name: string;
++  rootId: NodeId;
++  closeOnBackdrop?: boolean | undefined;
++  closeOnEscape?: boolean | undefined;
++};
++
+ export type UiPage = {
+   id: PageId;
+   name: string;
+@@ -110,6 +119,8 @@ export type UiDocument = {
+   rootId: NodeId;
+   startPageId: PageId;
+   pages: Record<PageId, UiPage>;
++  /** Project-global modal definitions. Modal node trees share the global node table. */
++  modals?: Record<ModalId, UiModal> | undefined;
+   /** All page nodes. Components remain global per project below. */
+   nodes: Record<NodeId, UiNode>;
+   components?: Record<ComponentDefinitionId, UiComponentDefinition> | undefined;
+@@ -184,6 +195,39 @@ export function getPageByRootId(
+   return Object.values(document.pages).find((page) => page.rootId === rootId);
+ }
+ 
++
++export function getModal(document: UiDocument, modalId: ModalId): UiModal | undefined {
++  return document.modals?.[modalId];
++}
++
++export function getModalByRootId(
++  document: UiDocument,
++  rootId: NodeId
++): UiModal | undefined {
++  return Object.values(document.modals ?? {}).find((modal) => modal.rootId === rootId);
++}
++
++export function createModalRootNode(name: string): UiNode {
++  return {
++    id: crypto.randomUUID(),
++    name,
++    type: "Modal",
++    props: {
++      width: 560,
++      minHeight: 240,
++      backgroundColor: "#ffffff",
++      padding: 24,
++      gap: 12,
++      columns: 1,
++      display: "grid",
++      borderRadius: 18,
++      closeOnBackdrop: true,
++      closeOnEscape: true,
++    },
++    children: [],
++  };
++}
++
+ export function createPageRootNode(name: string): UiNode {
+   return {
+     id: crypto.randomUUID(),
+@@ -268,6 +312,17 @@ export function isUiDocument(value: unknown): value is UiDocument {
+     }
+   }
+ 
++  if (candidate.modals !== undefined) {
++    if (
++      !isRecord(candidate.modals) ||
++      !Object.entries(candidate.modals).every(([id, modal]) =>
++        isUiModal(modal, id, nodes)
++      )
++    ) {
++      return false;
++    }
++  }
++
+   if (candidate.data !== undefined && !isProjectData(candidate.data)) {
+     return false;
+   }
+@@ -355,6 +410,26 @@ function isUiPage(
+   return nodes[value.rootId]?.type === "Page";
+ }
+ 
++
++function isUiModal(
++  value: unknown,
++  expectedId: string,
++  nodes: Record<string, UiNode>
++): value is UiModal {
++  if (!isRecord(value)) return false;
++  if (
++    value.id !== expectedId ||
++    typeof value.name !== "string" ||
++    !isJsIdentifier(value.name) ||
++    typeof value.rootId !== "string" ||
++    (value.closeOnBackdrop !== undefined && typeof value.closeOnBackdrop !== "boolean") ||
++    (value.closeOnEscape !== undefined && typeof value.closeOnEscape !== "boolean")
++  ) {
++    return false;
++  }
++  return nodes[value.rootId]?.type === "Modal";
++}
++
+ function isUiNode(value: unknown, expectedId: string): value is UiNode {
+   if (!value || typeof value !== "object" || Array.isArray(value)) {
+     return false;
+diff --git a/src/uiframework/core/modals.ts b/src/uiframework/core/modals.ts
+new file mode 100644
+index 0000000..0066292
+--- /dev/null
++++ b/src/uiframework/core/modals.ts
+@@ -0,0 +1,23 @@
++import type { ModalId, NodeId, UiDocument, UiModal } from "./document";
++
++export function collectModalNodeIds(document: UiDocument, modalId: ModalId): NodeId[] {
++  const modal = document.modals?.[modalId];
++  if (!modal) return [];
++  const result: NodeId[] = [];
++  const visited = new Set<NodeId>();
++  const stack = [modal.rootId];
++  while (stack.length > 0) {
++    const id = stack.pop();
++    if (!id || visited.has(id)) continue;
++    visited.add(id);
++    const node = document.nodes[id];
++    if (!node) continue;
++    result.push(id);
++    for (const childId of node.children ?? []) stack.push(childId);
++  }
++  return result;
++}
++
++export function getModalByName(document: UiDocument, name: string): UiModal | undefined {
++  return Object.values(document.modals ?? {}).find((modal) => modal.name === name);
++}
+diff --git a/src/uiframework/designer/ModalDesignerSurface.tsx b/src/uiframework/designer/ModalDesignerSurface.tsx
+new file mode 100644
+index 0000000..f3375c0
+--- /dev/null
++++ b/src/uiframework/designer/ModalDesignerSurface.tsx
+@@ -0,0 +1,91 @@
++import { useMemo } from "react";
++import { buildDocumentIndex } from "../core/document-index";
++import { collectModalNodeIds } from "../core/modals";
++import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
++import { useEditorStore } from "../editor-store";
++import type { ComponentRegistry } from "../registry/editor-registry";
++import { DesignerSurface } from "./DesignerSurface";
++import type { DesignerAdapter } from "./designer-adapter";
++
++export function ModalDesignerSurface({ registry }: { registry: ComponentRegistry }) {
++  const document = useEditorStore((state) => state.document);
++  const activeModalId = useEditorStore((state) => state.activeModalId);
++  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
++  const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
++  const modal = activeModalId ? document.modals?.[activeModalId] : undefined;
++
++  const ownedNodeIds = useMemo(
++    () => new Set(modal ? collectModalNodeIds(document, modal.id) : []),
++    [document, modal]
++  );
++  const index = useMemo(
++    () => (modal ? buildDocumentIndex(document, modal.rootId) : null),
++    [document, modal]
++  );
++
++  const adapter = useMemo<DesignerAdapter | null>(() => {
++    if (!modal || !index) return null;
++    return {
++      key: `modal:${modal.id}`,
++      canvasSelector: "[data-editor-canvas]",
++      nodeIdAttribute: "data-node-id",
++      snapshot: {
++        document: { ...document, rootId: modal.rootId },
++        rootId: modal.rootId,
++        selectedNodeId,
++        selectedNodeIds,
++      },
++      read: () => {
++        const state = useEditorStore.getState();
++        const current = state.activeModalId
++          ? state.document.modals?.[state.activeModalId]
++          : undefined;
++        const rootId = current?.rootId ?? modal.rootId;
++        return {
++          document: { ...state.document, rootId },
++          rootId,
++          selectedNodeId: state.selectedNodeId,
++          selectedNodeIds: state.selectedNodeIds,
++        };
++      },
++      selectNode: (nodeId, options) => {
++        if (nodeId && !ownedNodeIds.has(nodeId)) return;
++        useEditorStore.getState().selectNode(nodeId, options);
++      },
++      insertNode: (parentId, insertIndex, node) => {
++        if (!ownedNodeIds.has(parentId)) return null;
++        useEditorStore.getState().insertNode(parentId, insertIndex, node);
++        return useEditorStore.getState().selectedNodeId;
++      },
++      moveNode: (nodeId, targetParentId, targetIndex) => {
++        if (!ownedNodeIds.has(nodeId) || !ownedNodeIds.has(targetParentId)) return;
++        useEditorStore.getState().moveNode(nodeId, targetParentId, targetIndex);
++      },
++      deleteNode: (nodeId) => {
++        if (!ownedNodeIds.has(nodeId)) return;
++        useEditorStore.getState().deleteNode(nodeId);
++      },
++      duplicateNode: (nodeId) => {
++        if (!ownedNodeIds.has(nodeId) || nodeId === modal.rootId) return null;
++        return useEditorStore.getState().duplicateNode(nodeId);
++      },
++      updateNodeProps: (nodeId, patch) => {
++        if (!ownedNodeIds.has(nodeId)) return;
++        useEditorStore.getState().updateNode(nodeId, (current) => ({
++          ...current,
++          props: { ...(current.props ?? {}), ...patch },
++        }));
++      },
++      canMoveNode: (nodeId) => ownedNodeIds.has(nodeId) && nodeId !== modal.rootId,
++      canDeleteNode: (nodeId) => ownedNodeIds.has(nodeId) && nodeId !== modal.rootId,
++      canDuplicateNode: (nodeId) => {
++        if (!ownedNodeIds.has(nodeId) || nodeId === modal.rootId) return false;
++        const parentId = index.parentById.get(nodeId);
++        const parent = parentId ? document.nodes[parentId] : undefined;
++        return !!parent && canAcceptManualChildren(parent);
++      },
++    };
++  }, [document, index, modal, ownedNodeIds, selectedNodeId, selectedNodeIds]);
++
++  return adapter ? <DesignerSurface adapter={adapter} registry={registry} /> : null;
++}
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index 7a0cd0b..ed8cf46 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -7,6 +7,7 @@ import {
+   createEmptyUiDocument,
+   createPageLayoutNodes,
+   createPageRootNode,
++  createModalRootNode,
+   getPage,
+   getPageKind,
+   type Binding,
+@@ -15,6 +16,7 @@ import {
+   type ScopedMethodRef,
+   type UiComponentDefinition,
+   type PageId,
++  type ModalId,
+   type NodeId,
+   type UiDocument,
+   type UiNode,
+@@ -66,6 +68,7 @@ type NodeDragCandidate = {
+ 
+ type EditorState = {
+   activePageId: PageId;
++  activeModalId: ModalId | null;
+   selectedNodeId: NodeId | null;
+   selectedNodeIds: NodeId[];
+   document: UiDocument;
+@@ -80,6 +83,9 @@ type EditorState = {
+   nodeDragCandidate: NodeDragCandidate | null;
+ 
+   setActivePageId: (pageId: PageId) => void;
++  setActiveModalId: (modalId: ModalId | null) => void;
++  addModal: () => ModalId | null;
++  deleteModal: (modalId: ModalId) => boolean;
+   setStartPage: (pageId: PageId) => void;
+   setPageLayout: (pageId: PageId, layoutId: PageId | null) => void;
+   addPage: (parentPageId?: PageId | undefined) => PageId | null;
+@@ -194,7 +200,11 @@ const NODE_DRAG_THRESHOLD_PX = 4;
+ const initialEditorDocument = createEmptyUiDocument();
+ replaceDesignerTagData(initialEditorDocument.data);
+ 
+-function getActiveRootId(state: Pick<EditorState, "document" | "activePageId">) {
++function getActiveRootId(state: Pick<EditorState, "document" | "activePageId" | "activeModalId">) {
++  if (state.activeModalId) {
++    const modal = state.document.modals?.[state.activeModalId];
++    if (modal) return modal.rootId;
++  }
+   return getPage(state.document, state.activePageId).rootId;
+ }
+ 
+@@ -256,6 +266,7 @@ function createUniquePageName(
+ 
+ export const useEditorStore = create<EditorState>((set) => ({
+   activePageId: initialEditorDocument.startPageId,
++  activeModalId: null,
+   selectedNodeId: null,
+   selectedNodeIds: [],
+   document: initialEditorDocument,
+@@ -286,6 +297,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+       if (!page) return state;
+       return {
+         activePageId: pageId,
++        activeModalId: null,
+         selectedNodeId: page.rootId,
+         selectedNodeIds: [page.rootId],
+         draggedNodeId: null,
+@@ -295,6 +307,102 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  setActiveModalId: (modalId) => {
++    set((state) => {
++      if (!modalId) {
++        const page = getPage(state.document, state.activePageId);
++        return {
++          activeModalId: null,
++          selectedNodeId: page.rootId,
++          selectedNodeIds: [page.rootId],
++          draggedNodeId: null,
++          nodeDragCandidate: null,
++          dragPreview: null,
++        };
++      }
++      const modal = state.document.modals?.[modalId];
++      if (!modal) return state;
++      return {
++        activeModalId: modalId,
++        selectedNodeId: modal.rootId,
++        selectedNodeIds: [modal.rootId],
++        draggedNodeId: null,
++        nodeDragCandidate: null,
++        dragPreview: null,
++      };
++    });
++  },
++
++  addModal: () => {
++    let createdId: ModalId | null = null;
++    set((state) => {
++      const existingNames = new Set(Object.values(state.document.modals ?? {}).map((modal) => modal.name));
++      let index = 1;
++      while (existingNames.has(`Modal${index}`)) index += 1;
++      const name = `Modal${index}`;
++      const root = createModalRootNode(name);
++      const modalId = crypto.randomUUID();
++      createdId = modalId;
++      return {
++        document: {
++          ...state.document,
++          modals: {
++            ...(state.document.modals ?? {}),
++            [modalId]: {
++              id: modalId,
++              name,
++              rootId: root.id,
++              closeOnBackdrop: true,
++              closeOnEscape: true,
++            },
++          },
++          nodes: { ...state.document.nodes, [root.id]: root },
++        },
++        activeModalId: modalId,
++        selectedNodeId: root.id,
++        selectedNodeIds: [root.id],
++      };
++    });
++    return createdId;
++  },
++
++  deleteModal: (modalId) => {
++    let deleted = false;
++    set((state) => {
++      const modal = state.document.modals?.[modalId];
++      if (!modal) return state;
++      const ids: string[] = [];
++      const stack = [modal.rootId];
++      const visited = new Set<string>();
++      while (stack.length > 0) {
++        const id = stack.pop();
++        if (!id || visited.has(id)) continue;
++        visited.add(id);
++        const node = state.document.nodes[id];
++        if (!node) continue;
++        ids.push(id);
++        for (const child of node.children ?? []) stack.push(child);
++      }
++      const modals = { ...(state.document.modals ?? {}) };
++      delete modals[modalId];
++      const nodes = { ...state.document.nodes };
++      for (const id of ids) delete nodes[id];
++      const page = getPage(state.document, state.activePageId);
++      deleted = true;
++      return {
++        document: {
++          ...state.document,
++          modals: Object.keys(modals).length > 0 ? modals : undefined,
++          nodes,
++        },
++        activeModalId: state.activeModalId === modalId ? null : state.activeModalId,
++        selectedNodeId: state.activeModalId === modalId ? page.rootId : state.selectedNodeId,
++        selectedNodeIds: state.activeModalId === modalId ? [page.rootId] : state.selectedNodeIds.filter((id) => !!nodes[id]),
++      };
++    });
++    return deleted;
++  },
++
+   setStartPage: (pageId) => {
+     set((state) => {
+       const page = state.document.pages[pageId];
+@@ -358,6 +466,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+           },
+         },
+         activePageId: pageId,
++        activeModalId: null,
+         selectedNodeId: root.id,
+         selectedNodeIds: [root.id],
+       };
+@@ -394,6 +503,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+           },
+         },
+         activePageId: pageId,
++        activeModalId: null,
+         selectedNodeId: root.id,
+         selectedNodeIds: [root.id],
+       };
+@@ -510,6 +620,7 @@ export const useEditorStore = create<EditorState>((set) => ({
+     set({
+       document,
+       activePageId: startPage.id,
++      activeModalId: null,
+       selectedNodeIds: [startPage.rootId],
+       selectedNodeId: startPage.rootId,
+       draggedNodeId: null,
+@@ -548,6 +659,9 @@ export const useEditorStore = create<EditorState>((set) => ({
+       const pageEntry = Object.values(state.document.pages).find(
+         (page) => page.rootId === nodeId
+       );
++      const modalEntry = Object.values(state.document.modals ?? {}).find(
++        (modal) => modal.rootId === nodeId
++      );
+       const validation = validateNodeName(
+         state.document,
+         nodeId,
+@@ -576,6 +690,19 @@ export const useEditorStore = create<EditorState>((set) => ({
+         return state;
+       }
+ 
++      if (
++        modalEntry &&
++        Object.values(state.document.modals ?? {}).some(
++          (modal) => modal.id !== modalEntry.id && modal.name === validation.name
++        )
++      ) {
++        result = {
++          ok: false,
++          error: `“${validation.name}” is already used by another modal.`,
++        };
++        return state;
++      }
++
+       result = { ok: true };
+ 
+       const renamedDocument = applyActiveCommand(state, {
+@@ -585,6 +712,17 @@ export const useEditorStore = create<EditorState>((set) => ({
+           name: validation.name,
+         },
+       });
++      if (modalEntry) {
++        return {
++          document: {
++            ...renamedDocument,
++            modals: {
++              ...(renamedDocument.modals ?? {}),
++              [modalEntry.id]: { ...modalEntry, name: validation.name },
++            },
++          },
++        };
++      }
+       if (!pageEntry) {
+         return { document: renamedDocument };
+       }
+diff --git a/src/uiframework/editor/component-mode.ts b/src/uiframework/editor/component-mode.ts
+index 8021cc9..a2bcab2 100644
+--- a/src/uiframework/editor/component-mode.ts
++++ b/src/uiframework/editor/component-mode.ts
+@@ -32,11 +32,11 @@ export function resolveComponentEditorMode(
+ ): ComponentEditorMode | null {
+   if (!scoped || scoped.pageId !== activePageId) return null;
+ 
+-  const page = document.pages[activePageId];
++  const surfaceRootId = document.pages[activePageId]?.rootId ?? document.modals?.[activePageId]?.rootId;
+   const node = document.nodes[scoped.mode.nodeId];
+-  if (!page || !node?.variants?.[scoped.mode.variantName]) return null;
++  if (!surfaceRootId || !node?.variants?.[scoped.mode.variantName]) return null;
+ 
+-  const pageIndex = buildDocumentIndex(document, page.rootId);
++  const pageIndex = buildDocumentIndex(document, surfaceRootId);
+   return pageIndex.depthById.has(node.id) ? scoped.mode : null;
+ }
+ 
+diff --git a/src/uiframework/gui/components-palette/PaletteItem.tsx b/src/uiframework/gui/components-palette/PaletteItem.tsx
+index ce5e7b8..454acdc 100644
+--- a/src/uiframework/gui/components-palette/PaletteItem.tsx
++++ b/src/uiframework/gui/components-palette/PaletteItem.tsx
+@@ -25,6 +25,7 @@ import {
+ 
+ const icons = {
+   Page: LayoutTemplate,
++  Modal: LayoutTemplate,
+   PageSlot: PanelTop,
+   Container: Box,
+   Text: Type,
+@@ -45,8 +46,9 @@ export function ComponentPalette({
+   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
+   const document = useEditorStore((s) => s.document);
+   const activePageId = useEditorStore((s) => s.activePageId);
++  const activeModalId = useEditorStore((s) => s.activeModalId);
+   const activePage = document.pages[activePageId];
+-  const editingLayout = !!activePage && getPageKind(activePage) === "layout";
++  const editingLayout = !activeModalId && !!activePage && getPageKind(activePage) === "layout";
+   const reusableComponents = useMemo(
+     () => createProjectComponentRepository(document).list(),
+     [document]
+@@ -56,6 +58,7 @@ export function ComponentPalette({
+   const items = Object.values(componentDefinitions).filter(
+     (item) =>
+       item.type !== "Page" &&
++      item.type !== "Modal" &&
+       (item.type !== "PageSlot" || (editingLayout && !ownerComponentId)) &&
+       item.label.toLowerCase().includes(normalizedSearch)
+   );
+diff --git a/src/uiframework/gui/pages/PageTree.tsx b/src/uiframework/gui/pages/PageTree.tsx
+index 3855666..a07c1fd 100644
+--- a/src/uiframework/gui/pages/PageTree.tsx
++++ b/src/uiframework/gui/pages/PageTree.tsx
+@@ -24,6 +24,10 @@ export function PageTree() {
+   const addPage = useEditorStore((state) => state.addPage);
+   const addPageLayout = useEditorStore((state) => state.addPageLayout);
+   const deletePage = useEditorStore((state) => state.deletePage);
++  const activeModalId = useEditorStore((state) => state.activeModalId);
++  const setActiveModalId = useEditorStore((state) => state.setActiveModalId);
++  const addModal = useEditorStore((state) => state.addModal);
++  const deleteModal = useEditorStore((state) => state.deleteModal);
+   const [pendingDeletePageId, setPendingDeletePageId] = useState<string | null>(null);
+ 
+   const tree = useMemo(() => buildNavigationTree(document), [document]);
+@@ -72,7 +76,7 @@ export function PageTree() {
+               key={node.pageId}
+               node={node}
+               depth={0}
+-              activePageId={activePageId}
++              activePageId={activeModalId ? "" : activePageId}
+               startPageId={document.startPageId}
+               runtimePageCount={runtimePageCount}
+               onOpen={setActivePageId}
+@@ -106,7 +110,7 @@ export function PageTree() {
+               <LayoutRow
+                 key={layout.id}
+                 name={layout.name}
+-                active={layout.id === activePageId}
++                active={!activeModalId && layout.id === activePageId}
+                 onOpen={() => setActivePageId(layout.id)}
+                 onDelete={() => setPendingDeletePageId(layout.id)}
+               />
+@@ -119,6 +123,40 @@ export function PageTree() {
+         </div>
+       </section>
+ 
++      <section className="space-y-2 border-t border-[var(--editor-border)] pt-3">
++        <div className="flex items-center justify-between gap-2">
++          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
++            Modals
++          </div>
++          <IconButton
++            aria-label="Add modal"
++            title="Add modal"
++            variant="secondary"
++            onClick={() => addModal()}
++          >
++            <Plus size={14} />
++          </IconButton>
++        </div>
++
++        <div className="space-y-0.5">
++          {Object.values(document.modals ?? {}).length > 0 ? (
++            Object.values(document.modals ?? {}).map((modal) => (
++              <ModalRow
++                key={modal.id}
++                name={modal.name}
++                active={modal.id === activeModalId}
++                onOpen={() => setActiveModalId(modal.id)}
++                onDelete={() => deleteModal(modal.id)}
++              />
++            ))
++          ) : (
++            <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
++              Add a reusable modal surface with its own lifecycle events and script API.
++            </div>
++          )}
++        </div>
++      </section>
++
+       <ConfirmDialog
+         open={!!pendingDeletePage}
+         title={`Delete ${pendingDeletePage?.name ?? (pendingKind === "layout" ? "layout" : "page")}?`}
+@@ -185,6 +223,51 @@ function LayoutRow({
+   );
+ }
+ 
++function ModalRow({
++  name,
++  active,
++  onOpen,
++  onDelete,
++}: {
++  name: string;
++  active: boolean;
++  onOpen(): void;
++  onDelete(): void;
++}) {
++  return (
++    <div
++      className={`group flex h-8 items-center rounded-md px-1 text-xs transition ${
++        active
++          ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
++          : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
++      }`}
++    >
++      <button
++        type="button"
++        onClick={onOpen}
++        className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
++      >
++        <FileText size={12} className="shrink-0 opacity-70" />
++        <span className="truncate font-medium">{name}</span>
++        <span className="ml-auto rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)] group-hover:hidden">
++          modal
++        </span>
++      </button>
++      <div className="hidden shrink-0 group-hover:block">
++        <IconButton
++          aria-label={`Delete ${name}`}
++          title={`Delete ${name}`}
++          variant="danger"
++          size="icon-xs"
++          onClick={onDelete}
++        >
++          <Trash2 size={12} />
++        </IconButton>
++      </div>
++    </div>
++  );
++}
++
+ function PageTreeRow({
+   node,
+   depth,
+diff --git a/src/uiframework/gui/script-editor/HandlerTree.tsx b/src/uiframework/gui/script-editor/HandlerTree.tsx
+index 4eca1f3..2648d8b 100644
+--- a/src/uiframework/gui/script-editor/HandlerTree.tsx
++++ b/src/uiframework/gui/script-editor/HandlerTree.tsx
+@@ -95,6 +95,16 @@ export function HandlerTree({
+               onAddMethod={onAddMethod}
+               onRemoveMethod={onRemoveMethod}
+             />
++
++            {Object.keys(document.modals ?? {}).length > 0 ? (
++              <ModalsApiSection
++                document={document}
++                currentScriptId={currentScriptId}
++                onSelect={onSelect}
++                onAddMethod={onAddMethod}
++                onRemoveMethod={onRemoveMethod}
++              />
++            ) : null}
+           </>
+         )}
+       </div>
+@@ -195,6 +205,56 @@ function PageApiRow({
+   );
+ }
+ 
++function ModalsApiSection({
++  document,
++  currentScriptId,
++  onSelect,
++  onAddMethod,
++  onRemoveMethod,
++}: {
++  document: UiDocument;
++  currentScriptId: string;
++  onSelect: (scriptId: string) => void;
++  onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
++  onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
++}) {
++  const modals = Object.values(document.modals ?? {}).sort((a, b) =>
++    a.name.localeCompare(b.name)
++  );
++
++  return (
++    <details open className="mt-2 rounded-lg border border-sky-100 bg-sky-50/30">
++      <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
++        <ChevronRight size={12} className="text-sky-400" />
++        <span className="flex-1">Modals</span>
++        <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-sky-500">
++          {modals.length}
++        </span>
++      </summary>
++      <div className="pb-1">
++        {modals.map((modal) => (
++          <details key={modal.id} open className="border-t border-sky-100/70 first:border-t-0">
++            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-sky-50/70">
++              <ChevronRight size={12} className="text-zinc-400" />
++              <span className="min-w-0 flex-1 truncate font-medium">{modal.name}</span>
++              <span className="font-mono text-[9px] text-sky-500">ctx.modals.{modal.name}</span>
++            </summary>
++            <HandlerNode
++              document={document}
++              nodeId={modal.rootId}
++              currentScriptId={currentScriptId}
++              onSelect={onSelect}
++              onAddMethod={onAddMethod}
++              onRemoveMethod={onRemoveMethod}
++              depth={1}
++            />
++          </details>
++        ))}
++      </div>
++    </details>
++  );
++}
++
+ function ComponentDefinitionsSection({
+   definitions,
+   currentScriptId,
+diff --git a/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx b/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
+index 749d755..c0a2a9e 100644
+--- a/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
++++ b/src/uiframework/gui/script-editor/JavaScriptCodeEditor.tsx
+@@ -4,6 +4,7 @@ import { useMemo } from "react";
+ import type { ComponentApiDescription } from "../../component-api";
+ import type { ProjectData } from "../../data/tags/TagDefinition";
+ import type { NavigationTreeNode } from "../../navigation/navigation";
++import type { UiModal } from "../../core/document";
+ import {
+   createTagAutocompleteRoots,
+   getTagNamespaceAutocompleteRoot,
+@@ -20,6 +21,7 @@ type JavaScriptCodeEditorProps = {
+   selfComponent?: ComponentApiDescription | undefined;
+   internalComponents?: ComponentApiDescription[] | undefined;
+   navigation?: NavigationTreeNode[] | undefined;
++  modals?: UiModal[] | undefined;
+   projectData?: ProjectData | undefined;
+   extraAutocompleteRoots?: AutocompleteApiNode[] | undefined;
+   autocompleteHint?: string | undefined;
+@@ -33,6 +35,7 @@ export function JavaScriptCodeEditor({
+   selfComponent,
+   internalComponents = [],
+   navigation = [],
++  modals = [],
+   projectData,
+   extraAutocompleteRoots = [],
+   autocompleteHint = "ctx · self · internal · tags autocomplete",
+@@ -54,13 +57,32 @@ export function JavaScriptCodeEditor({
+         internalComponents,
+         navigation,
+         mergeAutocompleteRoots(extraAutocompleteRoots, tagRoots),
+-        ctxTagRoot ? [ctxTagRoot] : []
++        [
++          ...(ctxTagRoot ? [ctxTagRoot] : []),
++          ...(modals.length > 0
++            ? [{
++                label: "modals",
++                completionType: "namespace",
++                detail: "modal runtime API",
++                children: modals.map((modal) => ({
++                  label: modal.name,
++                  completionType: "class",
++                  detail: "modal",
++                  children: [
++                    { label: "open", completionType: "method", detail: "(payload?)" },
++                    { label: "close", completionType: "method", detail: "(result?)" },
++                  ],
++                })),
++              }]
++            : []),
++        ]
+       ),
+     [
+       components,
+       selfComponent,
+       internalComponents,
+       navigation,
++      modals,
+       extraAutocompleteRoots,
+       tagRoots,
+       ctxTagRoot,
+diff --git a/src/uiframework/gui/script-editor/ScriptPage.tsx b/src/uiframework/gui/script-editor/ScriptPage.tsx
+index 219b4df..5a60a44 100644
+--- a/src/uiframework/gui/script-editor/ScriptPage.tsx
++++ b/src/uiframework/gui/script-editor/ScriptPage.tsx
+@@ -411,6 +411,7 @@ function ScriptEditor({
+                   selfComponent={selfComponent}
+                   internalComponents={internalComponents}
+                   navigation={navigationTree}
++                  modals={Object.values(document?.modals ?? {})}
+                   projectData={document?.data}
+                 />
+ 
+@@ -429,6 +430,8 @@ function ScriptEditor({
+                     <code>ctx.ui.ComponentName.variant.current</code>
+                     <code>ctx.navigateTo("Page/SubPage")</code>
+                     <code>ctx.nav.Page1.go()</code>
++                    <code>ctx.modals.ConfirmDelete.open(payload?)</code>
++                    <code>ctx.modals.ConfirmDelete.close(result?)</code>
+                     <code>tags.LineSpeed</code>
+                     <code>tags.LineSpeed = 1200</code>
+                     <code>tags.Pump1.speed = 1450</code>
+@@ -595,10 +598,20 @@ function getScopedComponentApi(
+   const page = Object.values(document.pages).find((candidate) =>
+     subtreeContains(document, candidate.rootId, sourceNodeId)
+   );
+-  if (!page) return components;
++  if (page) {
++    const nodeIds = collectSubtreeNodeIds(document, page.rootId);
++    return components.filter((component) => nodeIds.has(component.nodeId));
++  }
++
++  const modal = Object.values(document.modals ?? {}).find((candidate) =>
++    subtreeContains(document, candidate.rootId, sourceNodeId)
++  );
++  if (modal) {
++    const nodeIds = collectSubtreeNodeIds(document, modal.rootId);
++    return components.filter((component) => nodeIds.has(component.nodeId));
++  }
+ 
+-  const nodeIds = collectSubtreeNodeIds(document, page.rootId);
+-  return components.filter((component) => nodeIds.has(component.nodeId));
++  return components;
+ }
+ 
+ function subtreeContains(
+diff --git a/src/uiframework/gui/tree-view/TreeView.tsx b/src/uiframework/gui/tree-view/TreeView.tsx
+index e524a01..4485487 100644
+--- a/src/uiframework/gui/tree-view/TreeView.tsx
++++ b/src/uiframework/gui/tree-view/TreeView.tsx
+@@ -7,6 +7,7 @@ import { NodeTree } from "./NodeTree";
+ export function TreeView() {
+   const document = useEditorStore((state) => state.document);
+   const activePageId = useEditorStore((state) => state.activePageId);
++  const activeModalId = useEditorStore((state) => state.activeModalId);
+   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+   const selectedNodeIds = useEditorStore((state) => state.selectedNodeIds);
+   const selectNode = useEditorStore((state) => state.selectNode);
+@@ -15,9 +16,11 @@ export function TreeView() {
+   const duplicateNode = useEditorStore((state) => state.duplicateNode);
+   const deleteNode = useEditorStore((state) => state.deleteNode);
+   const page = getPage(document, activePageId);
+-  const index = buildDocumentIndex(document, page.rootId);
++  const modal = activeModalId ? document.modals?.[activeModalId] : undefined;
++  const rootId = modal?.rootId ?? page.rootId;
++  const index = buildDocumentIndex(document, rootId);
+ 
+-  if (!document.nodes[page.rootId]) return null;
++  if (!document.nodes[rootId]) return null;
+ 
+   return (
+     <div className="space-y-1">
+@@ -33,7 +36,7 @@ export function TreeView() {
+       </div>
+ 
+       <NodeTree
+-        rootId={page.rootId}
++        rootId={rootId}
+         nodes={document.nodes}
+         selectedNodeId={selectedNodeId}
+         selectedNodeIds={selectedNodeIds}
+@@ -42,13 +45,13 @@ export function TreeView() {
+         moveNodeDown={moveNodeDown}
+         duplicateNode={duplicateNode}
+         canDuplicateNode={(nodeId) => {
+-          if (nodeId === page.rootId) return false;
++          if (nodeId === rootId) return false;
+           const parentId = index.parentById.get(nodeId);
+           const parent = parentId ? document.nodes[parentId] : undefined;
+           return !!parent && canAcceptManualChildren(parent);
+         }}
+         deleteNode={deleteNode}
+-        canDeleteNode={(nodeId) => nodeId !== page.rootId}
++        canDeleteNode={(nodeId) => nodeId !== rootId}
+       />
+     </div>
+   );
+diff --git a/src/uiframework/modal-runtime-state.ts b/src/uiframework/modal-runtime-state.ts
+new file mode 100644
+index 0000000..3e7e3fa
+--- /dev/null
++++ b/src/uiframework/modal-runtime-state.ts
+@@ -0,0 +1,79 @@
++import { useSyncExternalStore } from "react";
++
++export type OpenModalEntry = {
++  modalId: string;
++  payload?: Record<string, unknown> | undefined;
++};
++
++export type ModalTransition = {
++  id: string;
++  modalId: string;
++  type: "open" | "close";
++  payload?: Record<string, unknown> | undefined;
++};
++
++type ProjectModalState = {
++  open: OpenModalEntry[];
++  transitions: ModalTransition[];
++  listeners: Set<() => void>;
++  revision: number;
++};
++
++const projects = new Map<string, ProjectModalState>();
++
++function getProject(projectId: string): ProjectModalState {
++  let state = projects.get(projectId);
++  if (!state) {
++    state = { open: [], transitions: [], listeners: new Set(), revision: 0 };
++    projects.set(projectId, state);
++  }
++  return state;
++}
++
++function publish(projectId: string) {
++  const state = getProject(projectId);
++  state.revision += 1;
++  for (const listener of state.listeners) listener();
++}
++
++export function openProjectModal(
++  projectId: string,
++  modalId: string,
++  payload?: Record<string, unknown>
++) {
++  const state = getProject(projectId);
++  state.open = [...state.open.filter((entry) => entry.modalId !== modalId), { modalId, ...(payload ? { payload } : {}) }];
++  state.transitions = [...state.transitions.slice(-49), { id: crypto.randomUUID(), modalId, type: "open", ...(payload ? { payload } : {}) }];
++  publish(projectId);
++}
++
++export function closeProjectModal(
++  projectId: string,
++  modalId: string,
++  payload?: Record<string, unknown>
++) {
++  const state = getProject(projectId);
++  if (!state.open.some((entry) => entry.modalId === modalId)) return;
++  state.open = state.open.filter((entry) => entry.modalId !== modalId);
++  state.transitions = [...state.transitions.slice(-49), { id: crypto.randomUUID(), modalId, type: "close", ...(payload ? { payload } : {}) }];
++  publish(projectId);
++}
++
++export function getProjectModalSnapshot(projectId: string) {
++  const state = getProject(projectId);
++  return { open: state.open, transitions: state.transitions, revision: state.revision };
++}
++
++export function subscribeProjectModals(projectId: string, listener: () => void) {
++  const state = getProject(projectId);
++  state.listeners.add(listener);
++  return () => state.listeners.delete(listener);
++}
++
++export function useProjectModalRevision(projectId?: string) {
++  return useSyncExternalStore(
++    (listener) => (projectId ? subscribeProjectModals(projectId, listener) : () => undefined),
++    () => (projectId ? getProject(projectId).revision : 0),
++    () => 0
++  );
++}
+diff --git a/src/uiframework/registry/component-definitions.ts b/src/uiframework/registry/component-definitions.ts
+index 50f6e0c..4629f63 100644
+--- a/src/uiframework/registry/component-definitions.ts
++++ b/src/uiframework/registry/component-definitions.ts
+@@ -4,6 +4,7 @@ import { chartDefinition } from "./components/chart";
+ import { containerDefinition } from "./components/container";
+ import { imageDefinition } from "./components/image";
+ import { navigationDefinition } from "./components/navigation";
++import { modalDefinition } from "./components/modal";
+ import { pageDefinition } from "./components/page";
+ import { pageSlotDefinition } from "./components/page-slot";
+ import { textDefinition } from "./components/text";
+@@ -12,6 +13,7 @@ export type { ComponentDefinition, InspectorControl } from "./component-definiti
+ 
+ export const componentDefinitions = {
+   Page: pageDefinition,
++  Modal: modalDefinition,
+   PageSlot: pageSlotDefinition,
+   Navigation: navigationDefinition,
+   Container: containerDefinition,
+diff --git a/src/uiframework/registry/components/modal.ts b/src/uiframework/registry/components/modal.ts
+new file mode 100644
+index 0000000..bab6d64
+--- /dev/null
++++ b/src/uiframework/registry/components/modal.ts
+@@ -0,0 +1,39 @@
++import { Modal } from "../../components/Modal";
++import type { ComponentDefinition } from "../component-definition-types";
++
++export const modalDefinition = {
++  type: "Modal",
++  label: "Modal",
++  description: "Modal root surface",
++  editor: Modal,
++  runtime: Modal,
++  defaults: {
++    width: 560,
++    minHeight: 240,
++    backgroundColor: "#ffffff",
++    padding: 24,
++    gap: 12,
++    columns: 1,
++    display: "grid",
++    borderRadius: 18,
++    closeOnBackdrop: true,
++    closeOnEscape: true,
++  },
++  acceptsChildren: true,
++  inspector: {
++    width: { kind: "number", min: 240 },
++    minHeight: { kind: "number", min: 120 },
++    backgroundColor: { kind: "color" },
++    padding: { kind: "number", min: 0 },
++    gap: { kind: "number", min: 0 },
++    columns: { kind: "number", min: 1, max: 24 },
++    display: { kind: "select", options: ["grid", "flex"] },
++    borderRadius: { kind: "number", min: 0, max: 64 },
++    closeOnBackdrop: { kind: "toggle" },
++    closeOnEscape: { kind: "toggle" },
++  },
++  events: {
++    open: { label: "On open", defaultSuffix: "Opened" },
++    close: { label: "On close", defaultSuffix: "Closed" },
++  },
++} satisfies ComponentDefinition;
+diff --git a/src/uiframework/runtime/RenderPage.tsx b/src/uiframework/runtime/RenderPage.tsx
+index b04de31..618fa31 100644
+--- a/src/uiframework/runtime/RenderPage.tsx
++++ b/src/uiframework/runtime/RenderPage.tsx
+@@ -19,6 +19,7 @@ import {
+ import { NavigationRuntimeProvider } from "../navigation/NavigationRuntimeProvider";
+ import { runtimeRegistry } from "../registry/runtime-registry";
+ import { RuntimeProvider } from "../runtime-provider";
++import { RuntimeModalLayer } from "./RuntimeModalLayer";
+ import { getComponentVariantProps } from "../component-variants";
+ import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
+ import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
+@@ -240,6 +241,14 @@ export function RenderPage() {
+         </div>
+       </NavigationRuntimeProvider>
+ 
++      {projectId ? (
++        <RuntimeModalLayer
++          projectId={projectId}
++          document={document}
++          pageId={currentPage.id}
++        />
++      ) : null}
++
+       {updateToastVisible && (
+         <div className="fixed right-5 bottom-5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">
+           Screen updated
+diff --git a/src/uiframework/runtime/RuntimeModalLayer.tsx b/src/uiframework/runtime/RuntimeModalLayer.tsx
+new file mode 100644
+index 0000000..aa85b3e
+--- /dev/null
++++ b/src/uiframework/runtime/RuntimeModalLayer.tsx
+@@ -0,0 +1,204 @@
++import { useEffect, useRef } from "react";
++import {
++  getMockRuntimeNodeProps,
++  getMockRuntimeNodeVariant,
++} from "../../mock/mock-runtime-ui-state";
++import { getComponentVariantProps } from "../component-variants";
++import type { UiDocument, UiNode } from "../core/document";
++import {
++  closeProjectModal,
++  getProjectModalSnapshot,
++  useProjectModalRevision,
++} from "../modal-runtime-state";
++import {
++  getReactiveNodeProps,
++  getReactiveNodeVariant,
++} from "../reactive-ui-state";
++import { RenderNode } from "../Renderer";
++import { runtimeRegistry } from "../registry/runtime-registry";
++import { sendRuntimeEvent } from "../components/runtime-helpers";
++
++export function RuntimeModalLayer({
++  projectId,
++  document,
++  pageId,
++}: {
++  projectId: string;
++  document: UiDocument;
++  pageId: string;
++}) {
++  useProjectModalRevision(projectId);
++  const snapshot = getProjectModalSnapshot(projectId);
++  const seenTransitions = useRef(new Set<string>());
++
++  useEffect(() => {
++    for (const transition of snapshot.transitions) {
++      if (seenTransitions.current.has(transition.id)) continue;
++      seenTransitions.current.add(transition.id);
++      const modal = document.modals?.[transition.modalId];
++      const root = modal ? document.nodes[modal.rootId] : undefined;
++      const handler = root?.events?.[transition.type];
++      if (!modal || !root || !handler) continue;
++      sendRuntimeEvent({
++        handlerId: handler.handlerId,
++        eventName: transition.type,
++        nodeId: root.id,
++        projectId,
++        pageId,
++        payload: transition.payload,
++      });
++    }
++  }, [document, pageId, projectId, snapshot.transitions]);
++
++  const topEntry = snapshot.open.at(-1);
++  const topModal = topEntry ? document.modals?.[topEntry.modalId] : undefined;
++  const topRoot = topModal ? document.nodes[topModal.rootId] : undefined;
++
++  useEffect(() => {
++    if (!topEntry || !topModal || !topRoot) return undefined;
++    const closeOnEscape = topRoot.props?.closeOnEscape !== false;
++    if (!closeOnEscape) return undefined;
++    const onKeyDown = (event: KeyboardEvent) => {
++      if (event.key !== "Escape") return;
++      event.preventDefault();
++      closeProjectModal(projectId, topModal.id, { reason: "escape" });
++    };
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++  }, [projectId, topEntry, topModal, topRoot]);
++
++  const openEntries = snapshot.open
++    .map((entry) => ({ entry, modal: document.modals?.[entry.modalId] }))
++    .filter(
++      (item): item is {
++        entry: (typeof snapshot.open)[number];
++        modal: NonNullable<typeof item.modal>;
++      } => !!item.modal
++    );
++
++  if (openEntries.length === 0) return null;
++
++  return (
++    <div className="fixed inset-0 z-[1000] pointer-events-none">
++      {openEntries.map(({ modal }, index) => {
++        const root = document.nodes[modal.rootId];
++        if (!root) return null;
++        const isTop = index === openEntries.length - 1;
++        const closeOnBackdrop = root.props?.closeOnBackdrop !== false;
++        return (
++          <div
++            key={modal.id}
++            className="absolute inset-0 flex items-center justify-center bg-black/45 p-6 pointer-events-auto"
++            style={{ zIndex: 1000 + index }}
++            onMouseDown={(event) => {
++              if (!isTop || !closeOnBackdrop || event.target !== event.currentTarget) return;
++              closeProjectModal(projectId, modal.id, { reason: "backdrop" });
++            }}
++          >
++            <div className="shadow-2xl">
++              <RenderNode
++                id={modal.rootId}
++                document={{ ...document, rootId: modal.rootId }}
++                registry={runtimeRegistry}
++                decorateComponentInternals
++                resolveNode={(node, context) =>
++                  resolveRuntimeNode(projectId, node, context.componentInstanceId)
++                }
++                decorateProps={(node, context) => {
++                  const runtimeNodeId = context.componentInstanceId
++                    ? `${context.componentInstanceId}::${node.id}`
++                    : node.id;
++                  const base = {
++                    "data-node-id": runtimeNodeId,
++                    "data-scadatomic-type": node.type,
++                  };
++                  if (node.type === "Text" || node.type === "Chart") {
++                    return { ...base, runtimeBindings: node.bindings };
++                  }
++                  if (node.type === "Button") {
++                    return {
++                      ...base,
++                      runtimeEvents: node.events,
++                      runtimeProjectId: projectId,
++                      runtimePageId: pageId,
++                    };
++                  }
++                  return base;
++                }}
++              />
++            </div>
++          </div>
++        );
++      })}
++    </div>
++  );
++}
++
++function resolveRuntimeNode(
++  projectId: string,
++  node: UiNode,
++  componentInstanceId?: string
++): UiNode {
++  const runtimeNodeId = componentInstanceId
++    ? `${componentInstanceId}::${node.id}`
++    : node.id;
++  const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
++  const reactiveProps = getReactiveNodeProps(projectId, runtimeNodeId);
++  const requestedVariant =
++    getReactiveNodeVariant(projectId, runtimeNodeId) ??
++    getMockRuntimeNodeVariant(projectId, runtimeNodeId);
++  const variantName =
++    requestedVariant && node.variants?.[requestedVariant]
++      ? requestedVariant
++      : node.defaultVariant;
++  const variantProps = getComponentVariantProps(node, variantName);
++  const normalizedReactive = normalizeReactiveProps(
++    { ...(node.props ?? {}), ...variantProps, ...runtimeProps },
++    reactiveProps
++  );
++
++  if (
++    Object.keys(runtimeProps).length === 0 &&
++    Object.keys(reactiveProps).length === 0 &&
++    Object.keys(variantProps).length === 0
++  ) {
++    return node;
++  }
++
++  return {
++    ...node,
++    props: {
++      ...(node.props ?? {}),
++      ...variantProps,
++      ...runtimeProps,
++      ...normalizedReactive,
++    },
++  };
++}
++
++function normalizeReactiveProps(
++  baseProps: Record<string, unknown>,
++  reactiveProps: Record<string, unknown>
++) {
++  const next = { ...reactiveProps };
++  if (Object.prototype.hasOwnProperty.call(next, "enabled")) {
++    next.disabled = !next.enabled;
++    delete next.enabled;
++  }
++  if (Object.prototype.hasOwnProperty.call(next, "visible")) {
++    const visible = Boolean(next.visible);
++    const baseStyle = isRecord(baseProps.style) ? baseProps.style : {};
++    const reactiveStyle = isRecord(next.style) ? next.style : {};
++    next.style = {
++      ...baseStyle,
++      ...reactiveStyle,
++      ...(visible ? {} : { display: "none" }),
++    };
++    delete next.visible;
++  }
++  return next;
++}
++
++function isRecord(value: unknown): value is Record<string, unknown> {
++  return !!value && typeof value === "object" && !Array.isArray(value);
++}

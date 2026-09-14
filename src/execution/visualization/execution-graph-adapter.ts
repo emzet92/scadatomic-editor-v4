@@ -81,6 +81,8 @@ export function intentTitle(intent: Intent): string {
     case "set-property": return `Set ${intent.target.path ?? intent.target.property}`;
     case "set-variant": return `Variant ${intent.target.path ?? intent.target.componentId}`;
     case "emit-event": return `Emit ${intent.event.eventName}`;
+    case "modal-open": return `Open ${intent.target.name}`;
+    case "modal-close": return `Close ${intent.target.name}`;
     case "navigate": return `Navigate`;
     case "state-set": return `State set ${intent.key}`;
     case "state-delete": return `State delete ${intent.key}`;
@@ -95,6 +97,8 @@ export function intentDetail(intent: Intent): string {
     case "set-property": return formatValue(intent.value);
     case "set-variant": return intent.variantName;
     case "emit-event": return intent.payload ? formatValue(intent.payload) : "no payload";
+    case "modal-open": return intent.payload ? formatValue(intent.payload) : "open modal";
+    case "modal-close": return intent.payload ? formatValue(intent.payload) : "close modal";
     case "navigate": return intent.path;
     case "state-set": return formatValue(intent.value);
     case "state-delete": return "delete";
