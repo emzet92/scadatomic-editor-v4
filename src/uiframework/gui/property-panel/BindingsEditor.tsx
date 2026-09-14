@@ -2,7 +2,9 @@ import { Link2, Unlink } from "lucide-react";
 import {
   createReactivePropertyBinding,
   type BindingExpression,
+  type ComponentTagReactiveRef,
   type ReactivePropertyBinding,
+  type ReactiveRef,
   type TagReactiveRef,
 } from "../../../reactivity";
 import type {
@@ -18,9 +20,9 @@ import { useEditorStore } from "../../editor-store";
 import type { BindingDefinition } from "../../registry/component-definition-types";
 import { Button, FormField, SectionHeader, Select, TextInput } from "../ui";
 import {
+  createComponentTagReactiveRef,
   formatBindingPath,
   getKnownBindingPaths,
-  parseBindingPath,
 } from "./binding-paths";
 
 type TransformKind = "direct" | "not" | "equals" | "conditional";
@@ -103,7 +105,12 @@ function BindingCard({
     }
 
     if (relativePaths.includes(path)) {
-      onChange(parseBindingPath(path, componentInputs));
+      const ref = createComponentTagReactiveRef(path, projectData, componentInputs);
+      if (!ref) return;
+      const nextTransform = definition.valueType === "variant" && transform === "direct"
+        ? "conditional"
+        : transform;
+      onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
       return;
     }
 
@@ -120,20 +127,24 @@ function BindingCard({
       ref: resolved.ref,
       path: resolved.path,
     };
-    onChange(buildReactiveBinding(ref, transform, binding, definition, node));
+    const nextTransform = definition.valueType === "variant" && transform === "direct"
+      ? "conditional"
+      : transform;
+    onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
   }
 
   function setTransform(nextTransform: TransformKind) {
-    const ref = getAbsoluteReactiveRef(binding, projectData);
+    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
     if (!ref) return;
     onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
   }
 
   function updateConditionalBranch(branch: "true" | "false", rawValue: string) {
-    const reactive = binding?.kind === "reactive" ? binding : undefined;
-    const ref = getAbsoluteReactiveRef(binding, projectData);
-    if (!reactive || !ref) return;
-    const current = readConditionalValues(reactive);
+    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
+    if (!ref) return;
+    const current = binding?.kind === "reactive"
+      ? readConditionalValues(binding)
+      : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
     const value = coerceEditorValue(rawValue, definition.valueType);
     onChange(createReactivePropertyBinding(
       {
@@ -147,7 +158,7 @@ function BindingCard({
   }
 
   function updateEqualsValue(rawValue: string) {
-    const ref = getAbsoluteReactiveRef(binding, projectData);
+    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
     if (!ref) return;
     onChange(createReactivePropertyBinding(
       {
@@ -162,6 +173,13 @@ function BindingCard({
   const conditionValues = binding?.kind === "reactive"
     ? readConditionalValues(binding)
     : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
+  const editorRef = getEditorReactiveRef(binding, projectData, componentInputs);
+  const canEditReactive = binding?.kind === "reactive" || Boolean(editorRef);
+  const effectiveTransform = binding?.kind === "reactive"
+    ? transform
+    : definition.valueType === "variant" && editorRef
+      ? "conditional"
+      : transform;
 
   return (
     <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3 space-y-3">
@@ -202,10 +220,10 @@ function BindingCard({
         </Select>
       </FormField>
 
-      {binding?.kind === "reactive" ? (
+      {canEditReactive ? (
         <>
           <FormField label="Transform" compact>
-            <Select value={transform} onChange={(event) => setTransform(event.target.value as TransformKind)}>
+            <Select value={effectiveTransform} onChange={(event) => setTransform(event.target.value as TransformKind)}>
               <option value="direct">Direct</option>
               {definition.valueType === "boolean" ? <option value="not">NOT</option> : null}
               <option value="equals">Equals</option>
@@ -213,16 +231,16 @@ function BindingCard({
             </Select>
           </FormField>
 
-          {transform === "equals" ? (
+          {effectiveTransform === "equals" ? (
             <FormField label="Equals value" compact>
               <TextInput
-                value={String(readEqualsValue(binding) ?? "")}
+                value={String(binding?.kind === "reactive" ? readEqualsValue(binding) ?? "" : "")}
                 onChange={(event) => updateEqualsValue(event.target.value)}
               />
             </FormField>
           ) : null}
 
-          {transform === "conditional" ? (
+          {effectiveTransform === "conditional" ? (
             <div className="grid grid-cols-2 gap-2">
               <BindingResultField
                 label="When true"
@@ -243,7 +261,7 @@ function BindingCard({
         </>
       ) : binding ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">
-          Legacy/relative binding. It remains compatible and will be resolved at runtime.
+          This binding source cannot currently be resolved. The saved reference is preserved so it can recover when the source is available again.
         </div>
       ) : null}
     </div>
@@ -298,17 +316,21 @@ function resolveCurrentBindingPath(
   binding: Binding | undefined,
   projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
 ) {
-  if (binding?.kind === "reactive" && projectData) {
-    const tagRef = binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
-    if (tagRef) {
-      return resolveTagFieldRef(projectData, tagRef.ref)?.path ?? tagRef.path ?? "";
+  if (binding?.kind === "reactive") {
+    const sourceRef = binding.dependencies.find(
+      (ref): ref is TagReactiveRef | ComponentTagReactiveRef =>
+        ref.kind === "tag" || ref.kind === "component-tag"
+    );
+    if (sourceRef?.kind === "component-tag") return sourceRef.path ?? "";
+    if (sourceRef?.kind === "tag" && projectData) {
+      return resolveTagFieldRef(projectData, sourceRef.ref)?.path ?? sourceRef.path ?? "";
     }
   }
   return formatBindingPath(binding);
 }
 
 function buildReactiveBinding(
-  ref: TagReactiveRef,
+  ref: ReactiveRef,
   transform: TransformKind,
   current: Binding | undefined,
   definition: BindingDefinition,
@@ -340,17 +362,28 @@ function buildReactiveBinding(
   return createReactivePropertyBinding(expression, [ref]);
 }
 
-function getAbsoluteReactiveRef(
+function getEditorReactiveRef(
   binding: Binding | undefined,
-  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
-): TagReactiveRef | undefined {
+  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"],
+  componentInputs: Record<string, ComponentInputDefinition> | undefined,
+): TagReactiveRef | ComponentTagReactiveRef | undefined {
   if (!binding) return undefined;
   if (binding.kind === "reactive") {
-    return binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
+    return binding.dependencies.find(
+      (ref): ref is TagReactiveRef | ComponentTagReactiveRef =>
+        ref.kind === "tag" || ref.kind === "component-tag"
+    );
   }
   if (binding.kind === "tag" && projectData) {
     const resolved = findTagFieldRefByPath(projectData, binding.path);
     return resolved ? { kind: "tag", ref: resolved.ref, path: resolved.path } : undefined;
+  }
+  if (binding.kind === "tagRef") {
+    return createComponentTagReactiveRef(
+      `${binding.input}${binding.path ? `.${binding.path}` : ""}`,
+      projectData,
+      componentInputs,
+    );
   }
   return undefined;
 }

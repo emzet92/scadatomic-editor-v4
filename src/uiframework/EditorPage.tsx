@@ -48,31 +48,64 @@ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
 import { sendWsMessage } from "./websocket";
 import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
+import { configureProjectReactiveRuntime } from "./reactive-runtime-session";
+import {
+  getReactiveNodeProps,
+  getReactiveNodeVariant,
+  useProjectReactiveUiRevision,
+} from "./reactive-ui-state";
 
 export function RendererRoot({
   document,
   registry,
+  projectId,
 }: {
   document: UiDocument;
   registry: ComponentRegistry;
+  projectId?: string | undefined;
 }) {
+  useProjectReactiveUiRevision(projectId);
+
   return (
     <RenderNode
       id={document.rootId}
       document={document}
       registry={registry}
-      decorateProps={(node) => ({
-        ...getDefaultComponentVariantProps(node),
-        ...(node.type === "Page" && !node.props?.embeddedInLayout
-          ? {
-              style: {
-                boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
-              },
-            }
-          : {}),
-        "data-node-id": node.id,
-        "data-scadatomic-type": node.type,
-      })}
+      decorateComponentInternals
+      decorateProps={(node, context) => {
+        const runtimeNodeId = context.internal && context.componentInstanceId
+          ? `${context.componentInstanceId}::${node.id}`
+          : node.id;
+        const reactiveVariant = projectId
+          ? getReactiveNodeVariant(projectId, runtimeNodeId)
+          : undefined;
+        const reactiveProps = projectId
+          ? getReactiveNodeProps(projectId, runtimeNodeId)
+          : {};
+        const variantProps = reactiveVariant
+          ? getComponentVariantProps(node, reactiveVariant)
+          : getDefaultComponentVariantProps(node);
+
+        return {
+          ...variantProps,
+          ...reactiveProps,
+          ...(node.type === "Page" && !node.props?.embeddedInLayout
+            ? {
+                style: {
+                  ...(typeof variantProps.style === "object" && variantProps.style
+                    ? variantProps.style as Record<string, unknown>
+                    : {}),
+                  ...(typeof reactiveProps.style === "object" && reactiveProps.style
+                    ? reactiveProps.style as Record<string, unknown>
+                    : {}),
+                  boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
+                },
+              }
+            : {}),
+          ...(!context.internal ? { "data-node-id": node.id } : {}),
+          "data-scadatomic-type": node.type,
+        };
+      }}
     />
   );
 }
@@ -338,6 +371,11 @@ export function EditorPage() {
       document.data ?? { udts: {}, tags: {} }
     );
   }, [document.data, loading, projectId]);
+
+  useEffect(() => {
+    if (!projectId || loading) return;
+    return configureProjectReactiveRuntime(projectId, document);
+  }, [document, loading, projectId]);
 
   useEffect(() => {
     designerSimulationSession.configure(document.data ?? { udts: {}, tags: {} });
@@ -653,7 +691,7 @@ export function EditorPage() {
                       height={pageHeight}
                       deviceMode={pageDeviceMode}
                     >
-                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} />
+                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} projectId={projectId} />
                     </PageViewportFrame>
                     <PageDesignerSurface registry={editorRegistry} />
                   </>

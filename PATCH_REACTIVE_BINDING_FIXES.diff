@@ -1,0 +1,557 @@
+diff --git a/src/reactivity/model/reactive-ref.ts b/src/reactivity/model/reactive-ref.ts
+index c40678c..6b85883 100644
+--- a/src/reactivity/model/reactive-ref.ts
++++ b/src/reactivity/model/reactive-ref.ts
+@@ -8,6 +8,16 @@ export type TagReactiveRef = {
+   path?: string | undefined;
+ };
+ 
++export type ComponentTagReactiveRef = {
++  kind: "component-tag";
++  /** Reusable-component TagRef input name. */
++  input: string;
++  /** Stable UDT field ids relative to the component input. */
++  fieldIds: string[];
++  /** Human-readable diagnostic path, e.g. Pump.running. */
++  path?: string | undefined;
++};
++
+ export type PageStateReactiveRef = {
+   kind: "page-state";
+   pageId: string;
+@@ -27,6 +37,7 @@ export type MemoryReactiveRef = {
+ 
+ export type ReactiveRef =
+   | TagReactiveRef
++  | ComponentTagReactiveRef
+   | PageStateReactiveRef
+   | ComponentStateReactiveRef
+   | MemoryReactiveRef;
+@@ -37,6 +48,8 @@ export function toReactiveKey(ref: ReactiveRef): ReactiveKey {
+   switch (ref.kind) {
+     case "tag":
+       return `tag:${tagFieldRefKey(ref.ref)}`;
++    case "component-tag":
++      return `component-tag:${ref.input}:${ref.fieldIds.join("/")}`;
+     case "page-state":
+       return `page-state:${ref.pageId}:${ref.key}`;
+     case "component-state":
+@@ -57,6 +70,13 @@ export function isReactiveRef(value: unknown): value is ReactiveRef {
+       (value.path === undefined || typeof value.path === "string");
+   }
+ 
++  if (value.kind === "component-tag") {
++    return typeof value.input === "string" &&
++      Array.isArray(value.fieldIds) &&
++      value.fieldIds.every((fieldId) => typeof fieldId === "string") &&
++      (value.path === undefined || typeof value.path === "string");
++  }
++
+   if (value.kind === "page-state") {
+     return typeof value.pageId === "string" && typeof value.key === "string";
+   }
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index d6f0c7f..434f150 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -48,31 +48,64 @@ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+ import { sendWsMessage } from "./websocket";
+ import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
++import { configureProjectReactiveRuntime } from "./reactive-runtime-session";
++import {
++  getReactiveNodeProps,
++  getReactiveNodeVariant,
++  useProjectReactiveUiRevision,
++} from "./reactive-ui-state";
+ 
+ export function RendererRoot({
+   document,
+   registry,
++  projectId,
+ }: {
+   document: UiDocument;
+   registry: ComponentRegistry;
++  projectId?: string | undefined;
+ }) {
++  useProjectReactiveUiRevision(projectId);
++
+   return (
+     <RenderNode
+       id={document.rootId}
+       document={document}
+       registry={registry}
+-      decorateProps={(node) => ({
+-        ...getDefaultComponentVariantProps(node),
+-        ...(node.type === "Page" && !node.props?.embeddedInLayout
+-          ? {
+-              style: {
+-                boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
+-              },
+-            }
+-          : {}),
+-        "data-node-id": node.id,
+-        "data-scadatomic-type": node.type,
+-      })}
++      decorateComponentInternals
++      decorateProps={(node, context) => {
++        const runtimeNodeId = context.internal && context.componentInstanceId
++          ? `${context.componentInstanceId}::${node.id}`
++          : node.id;
++        const reactiveVariant = projectId
++          ? getReactiveNodeVariant(projectId, runtimeNodeId)
++          : undefined;
++        const reactiveProps = projectId
++          ? getReactiveNodeProps(projectId, runtimeNodeId)
++          : {};
++        const variantProps = reactiveVariant
++          ? getComponentVariantProps(node, reactiveVariant)
++          : getDefaultComponentVariantProps(node);
++
++        return {
++          ...variantProps,
++          ...reactiveProps,
++          ...(node.type === "Page" && !node.props?.embeddedInLayout
++            ? {
++                style: {
++                  ...(typeof variantProps.style === "object" && variantProps.style
++                    ? variantProps.style as Record<string, unknown>
++                    : {}),
++                  ...(typeof reactiveProps.style === "object" && reactiveProps.style
++                    ? reactiveProps.style as Record<string, unknown>
++                    : {}),
++                  boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
++                },
++              }
++            : {}),
++          ...(!context.internal ? { "data-node-id": node.id } : {}),
++          "data-scadatomic-type": node.type,
++        };
++      }}
+     />
+   );
+ }
+@@ -339,6 +372,11 @@ export function EditorPage() {
+     );
+   }, [document.data, loading, projectId]);
+ 
++  useEffect(() => {
++    if (!projectId || loading) return;
++    return configureProjectReactiveRuntime(projectId, document);
++  }, [document, loading, projectId]);
++
+   useEffect(() => {
+     designerSimulationSession.configure(document.data ?? { udts: {}, tags: {} });
+   }, [document.data]);
+@@ -653,7 +691,7 @@ export function EditorPage() {
+                       height={pageHeight}
+                       deviceMode={pageDeviceMode}
+                     >
+-                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} />
++                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} projectId={projectId} />
+                     </PageViewportFrame>
+                     <PageDesignerSurface registry={editorRegistry} />
+                   </>
+diff --git a/src/uiframework/gui/property-panel/BindingsEditor.tsx b/src/uiframework/gui/property-panel/BindingsEditor.tsx
+index 1e57036..f536344 100644
+--- a/src/uiframework/gui/property-panel/BindingsEditor.tsx
++++ b/src/uiframework/gui/property-panel/BindingsEditor.tsx
+@@ -2,7 +2,9 @@ import { Link2, Unlink } from "lucide-react";
+ import {
+   createReactivePropertyBinding,
+   type BindingExpression,
++  type ComponentTagReactiveRef,
+   type ReactivePropertyBinding,
++  type ReactiveRef,
+   type TagReactiveRef,
+ } from "../../../reactivity";
+ import type {
+@@ -18,9 +20,9 @@ import { useEditorStore } from "../../editor-store";
+ import type { BindingDefinition } from "../../registry/component-definition-types";
+ import { Button, FormField, SectionHeader, Select, TextInput } from "../ui";
+ import {
++  createComponentTagReactiveRef,
+   formatBindingPath,
+   getKnownBindingPaths,
+-  parseBindingPath,
+ } from "./binding-paths";
+ 
+ type TransformKind = "direct" | "not" | "equals" | "conditional";
+@@ -103,7 +105,12 @@ function BindingCard({
+     }
+ 
+     if (relativePaths.includes(path)) {
+-      onChange(parseBindingPath(path, componentInputs));
++      const ref = createComponentTagReactiveRef(path, projectData, componentInputs);
++      if (!ref) return;
++      const nextTransform = definition.valueType === "variant" && transform === "direct"
++        ? "conditional"
++        : transform;
++      onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
+       return;
+     }
+ 
+@@ -120,20 +127,24 @@ function BindingCard({
+       ref: resolved.ref,
+       path: resolved.path,
+     };
+-    onChange(buildReactiveBinding(ref, transform, binding, definition, node));
++    const nextTransform = definition.valueType === "variant" && transform === "direct"
++      ? "conditional"
++      : transform;
++    onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
+   }
+ 
+   function setTransform(nextTransform: TransformKind) {
+-    const ref = getAbsoluteReactiveRef(binding, projectData);
++    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
+     if (!ref) return;
+     onChange(buildReactiveBinding(ref, nextTransform, binding, definition, node));
+   }
+ 
+   function updateConditionalBranch(branch: "true" | "false", rawValue: string) {
+-    const reactive = binding?.kind === "reactive" ? binding : undefined;
+-    const ref = getAbsoluteReactiveRef(binding, projectData);
+-    if (!reactive || !ref) return;
+-    const current = readConditionalValues(reactive);
++    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
++    if (!ref) return;
++    const current = binding?.kind === "reactive"
++      ? readConditionalValues(binding)
++      : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
+     const value = coerceEditorValue(rawValue, definition.valueType);
+     onChange(createReactivePropertyBinding(
+       {
+@@ -147,7 +158,7 @@ function BindingCard({
+   }
+ 
+   function updateEqualsValue(rawValue: string) {
+-    const ref = getAbsoluteReactiveRef(binding, projectData);
++    const ref = getEditorReactiveRef(binding, projectData, componentInputs);
+     if (!ref) return;
+     onChange(createReactivePropertyBinding(
+       {
+@@ -162,6 +173,13 @@ function BindingCard({
+   const conditionValues = binding?.kind === "reactive"
+     ? readConditionalValues(binding)
+     : { whenTrue: defaultTrueValue(definition, node), whenFalse: defaultFalseValue(definition, node) };
++  const editorRef = getEditorReactiveRef(binding, projectData, componentInputs);
++  const canEditReactive = binding?.kind === "reactive" || Boolean(editorRef);
++  const effectiveTransform = binding?.kind === "reactive"
++    ? transform
++    : definition.valueType === "variant" && editorRef
++      ? "conditional"
++      : transform;
+ 
+   return (
+     <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3 space-y-3">
+@@ -202,10 +220,10 @@ function BindingCard({
+         </Select>
+       </FormField>
+ 
+-      {binding?.kind === "reactive" ? (
++      {canEditReactive ? (
+         <>
+           <FormField label="Transform" compact>
+-            <Select value={transform} onChange={(event) => setTransform(event.target.value as TransformKind)}>
++            <Select value={effectiveTransform} onChange={(event) => setTransform(event.target.value as TransformKind)}>
+               <option value="direct">Direct</option>
+               {definition.valueType === "boolean" ? <option value="not">NOT</option> : null}
+               <option value="equals">Equals</option>
+@@ -213,16 +231,16 @@ function BindingCard({
+             </Select>
+           </FormField>
+ 
+-          {transform === "equals" ? (
++          {effectiveTransform === "equals" ? (
+             <FormField label="Equals value" compact>
+               <TextInput
+-                value={String(readEqualsValue(binding) ?? "")}
++                value={String(binding?.kind === "reactive" ? readEqualsValue(binding) ?? "" : "")}
+                 onChange={(event) => updateEqualsValue(event.target.value)}
+               />
+             </FormField>
+           ) : null}
+ 
+-          {transform === "conditional" ? (
++          {effectiveTransform === "conditional" ? (
+             <div className="grid grid-cols-2 gap-2">
+               <BindingResultField
+                 label="When true"
+@@ -243,7 +261,7 @@ function BindingCard({
+         </>
+       ) : binding ? (
+         <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">
+-          Legacy/relative binding. It remains compatible and will be resolved at runtime.
++          This binding source cannot currently be resolved. The saved reference is preserved so it can recover when the source is available again.
+         </div>
+       ) : null}
+     </div>
+@@ -298,17 +316,21 @@ function resolveCurrentBindingPath(
+   binding: Binding | undefined,
+   projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
+ ) {
+-  if (binding?.kind === "reactive" && projectData) {
+-    const tagRef = binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
+-    if (tagRef) {
+-      return resolveTagFieldRef(projectData, tagRef.ref)?.path ?? tagRef.path ?? "";
++  if (binding?.kind === "reactive") {
++    const sourceRef = binding.dependencies.find(
++      (ref): ref is TagReactiveRef | ComponentTagReactiveRef =>
++        ref.kind === "tag" || ref.kind === "component-tag"
++    );
++    if (sourceRef?.kind === "component-tag") return sourceRef.path ?? "";
++    if (sourceRef?.kind === "tag" && projectData) {
++      return resolveTagFieldRef(projectData, sourceRef.ref)?.path ?? sourceRef.path ?? "";
+     }
+   }
+   return formatBindingPath(binding);
+ }
+ 
+ function buildReactiveBinding(
+-  ref: TagReactiveRef,
++  ref: ReactiveRef,
+   transform: TransformKind,
+   current: Binding | undefined,
+   definition: BindingDefinition,
+@@ -340,18 +362,29 @@ function buildReactiveBinding(
+   return createReactivePropertyBinding(expression, [ref]);
+ }
+ 
+-function getAbsoluteReactiveRef(
++function getEditorReactiveRef(
+   binding: Binding | undefined,
+-  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"]
+-): TagReactiveRef | undefined {
++  projectData: ReturnType<typeof useEditorStore.getState>["document"]["data"],
++  componentInputs: Record<string, ComponentInputDefinition> | undefined,
++): TagReactiveRef | ComponentTagReactiveRef | undefined {
+   if (!binding) return undefined;
+   if (binding.kind === "reactive") {
+-    return binding.dependencies.find((ref): ref is TagReactiveRef => ref.kind === "tag");
++    return binding.dependencies.find(
++      (ref): ref is TagReactiveRef | ComponentTagReactiveRef =>
++        ref.kind === "tag" || ref.kind === "component-tag"
++    );
+   }
+   if (binding.kind === "tag" && projectData) {
+     const resolved = findTagFieldRefByPath(projectData, binding.path);
+     return resolved ? { kind: "tag", ref: resolved.ref, path: resolved.path } : undefined;
+   }
++  if (binding.kind === "tagRef") {
++    return createComponentTagReactiveRef(
++      `${binding.input}${binding.path ? `.${binding.path}` : ""}`,
++      projectData,
++      componentInputs,
++    );
++  }
+   return undefined;
+ }
+ 
+diff --git a/src/uiframework/gui/property-panel/binding-paths.ts b/src/uiframework/gui/property-panel/binding-paths.ts
+index 3099a67..cc6f587 100644
+--- a/src/uiframework/gui/property-panel/binding-paths.ts
++++ b/src/uiframework/gui/property-panel/binding-paths.ts
+@@ -1,3 +1,4 @@
++import type { ComponentTagReactiveRef } from "../../../reactivity";
+ import type { Binding, ComponentInputDefinition } from "../../core/document";
+ import type { ProjectData } from "../../data/tags/TagDefinition";
+ import { flattenTagValues } from "../../data/runtime/UdtRuntime";
+@@ -41,14 +42,48 @@ export function parseBindingPath(
+ export function formatBindingPath(binding: Binding | undefined) {
+   if (!binding) return "";
+   if (binding.kind === "reactive") {
+-    const dependency = binding.dependencies.find((ref) => ref.kind === "tag");
+-    return dependency?.kind === "tag" ? dependency.path ?? "" : "";
++    const dependency = binding.dependencies.find(
++      (ref) => ref.kind === "tag" || ref.kind === "component-tag"
++    );
++    return dependency?.path ?? "";
+   }
+   return binding.kind === "tag"
+     ? binding.path
+     : `${binding.input}${binding.path ? `.${binding.path}` : ""}`;
+ }
+ 
++export function createComponentTagReactiveRef(
++  path: string,
++  projectData: ProjectData | undefined,
++  componentInputs: Record<string, ComponentInputDefinition> | undefined,
++): ComponentTagReactiveRef | undefined {
++  const [inputName, ...segments] = path.split(".").filter(Boolean);
++  if (!inputName || segments.length === 0) return undefined;
++  const input = componentInputs?.[inputName];
++  if (!input || input.type !== "tagRef" || !projectData) return undefined;
++
++  let udtId = input.udtId;
++  const fieldIds: string[] = [];
++  for (const segment of segments) {
++    const definition = projectData.udts[udtId];
++    const field = definition?.fields.find((candidate) => candidate.name === segment);
++    if (!field) return undefined;
++    fieldIds.push(field.id);
++    if (field.type.kind === "udt") {
++      udtId = field.type.udtId;
++    } else if (segment !== segments[segments.length - 1]) {
++      return undefined;
++    }
++  }
++
++  return {
++    kind: "component-tag",
++    input: inputName,
++    fieldIds,
++    path,
++  };
++}
++
+ function collectUdtFieldPaths(
+   udts: ProjectData["udts"],
+   prefix: string,
+diff --git a/src/uiframework/reusable-components/instance-runtime.ts b/src/uiframework/reusable-components/instance-runtime.ts
+index 120726d..679c121 100644
+--- a/src/uiframework/reusable-components/instance-runtime.ts
++++ b/src/uiframework/reusable-components/instance-runtime.ts
+@@ -1,6 +1,9 @@
++import type { BindingExpression, ReactivePropertyBinding, ReactiveRef } from "../../reactivity";
+ import type { Binding, UiComponentDefinition, UiDocument, UiNode } from "../core/document";
+ import { createProjectComponentRepository } from "../component-repository";
+-import { isTagRef, resolveTagRef } from "../data/collections/TagRef";
++import { isTagRef, resolveTagRef, type TagRef } from "../data/collections/TagRef";
++import { resolveTagFieldRef } from "../data/tags/TagFieldRef";
++import type { ProjectData } from "../data/tags/TagDefinition";
+ 
+ export function getComponentDefinitionForInstance(
+   document: UiDocument,
+@@ -66,7 +69,7 @@ export function applyComponentInstanceInputs(
+       if (!isTagRef(value)) continue;
+       const tag = resolveTagRef(document.data, value);
+       if (!tag) continue;
+-      resolveRelativeTagBindings(nodes, name, tag.name);
++      resolveRelativeTagBindings(nodes, name, tag.name, value, document.data);
+       continue;
+     }
+ 
+@@ -104,7 +107,9 @@ export function applyComponentInstanceInputs(
+ function resolveRelativeTagBindings(
+   nodes: Record<string, UiNode>,
+   inputName: string,
+-  tagName: string
++  tagName: string,
++  tagRef: TagRef,
++  projectData: ProjectData | undefined,
+ ) {
+   for (const [nodeId, node] of Object.entries(nodes)) {
+     if (!node.bindings) continue;
+@@ -112,14 +117,105 @@ function resolveRelativeTagBindings(
+     const bindings: Record<string, Binding> = { ...node.bindings };
+ 
+     for (const [property, binding] of Object.entries(bindings)) {
+-      if (binding.kind !== "tagRef" || binding.input !== inputName) continue;
+-      bindings[property] = {
+-        kind: "tag",
+-        path: binding.path ? `${tagName}.${binding.path}` : tagName,
+-      };
+-      changed = true;
++      if (binding.kind === "tagRef" && binding.input === inputName) {
++        bindings[property] = {
++          kind: "tag",
++          path: binding.path ? `${tagName}.${binding.path}` : tagName,
++        };
++        changed = true;
++        continue;
++      }
++
++      if (binding.kind === "reactive") {
++        const resolved = resolveComponentTagBinding(
++          binding,
++          inputName,
++          tagRef,
++          projectData,
++        );
++        if (resolved !== binding) {
++          bindings[property] = resolved;
++          changed = true;
++        }
++      }
+     }
+ 
+     if (changed) nodes[nodeId] = { ...node, bindings };
+   }
+ }
++
++
++function resolveComponentTagBinding(
++  binding: ReactivePropertyBinding,
++  inputName: string,
++  tagRef: TagRef,
++  projectData: ProjectData | undefined,
++): ReactivePropertyBinding {
++  let changed = false;
++  const mapRef = (ref: ReactiveRef): ReactiveRef => {
++    if (ref.kind !== "component-tag" || ref.input !== inputName) return ref;
++    changed = true;
++    const absolute = { tagId: tagRef.tagId, fieldIds: [...ref.fieldIds] };
++    const resolved = projectData ? resolveTagFieldRef(projectData, absolute) : undefined;
++    return {
++      kind: "tag",
++      ref: absolute,
++      path: resolved?.path ?? ref.path,
++    };
++  };
++
++  const dependencies = binding.dependencies.map(mapRef);
++  const expression = mapExpressionRefs(binding.expression, mapRef);
++  return changed ? { ...binding, dependencies, expression } : binding;
++}
++
++function mapExpressionRefs(
++  expression: BindingExpression,
++  mapRef: (ref: ReactiveRef) => ReactiveRef,
++): BindingExpression {
++  switch (expression.type) {
++    case "constant":
++      return expression;
++    case "ref":
++      return { ...expression, ref: mapRef(expression.ref) };
++    case "not":
++      return { ...expression, operand: mapExpressionRefs(expression.operand, mapRef) };
++    case "equals":
++      return {
++        ...expression,
++        left: mapExpressionRefs(expression.left, mapRef),
++        right: mapExpressionRefs(expression.right, mapRef),
++      };
++    case "not-equals":
++      return {
++        ...expression,
++        left: mapExpressionRefs(expression.left, mapRef),
++        right: mapExpressionRefs(expression.right, mapRef),
++      };
++    case "greater-than":
++      return {
++        ...expression,
++        left: mapExpressionRefs(expression.left, mapRef),
++        right: mapExpressionRefs(expression.right, mapRef),
++      };
++    case "less-than":
++      return {
++        ...expression,
++        left: mapExpressionRefs(expression.left, mapRef),
++        right: mapExpressionRefs(expression.right, mapRef),
++      };
++    case "and":
++      return { ...expression, operands: expression.operands.map((item) => mapExpressionRefs(item, mapRef)) };
++    case "or":
++      return { ...expression, operands: expression.operands.map((item) => mapExpressionRefs(item, mapRef)) };
++    case "conditional":
++      return {
++        ...expression,
++        condition: mapExpressionRefs(expression.condition, mapRef),
++        whenTrue: mapExpressionRefs(expression.whenTrue, mapRef),
++        whenFalse: mapExpressionRefs(expression.whenFalse, mapRef),
++      };
++    case "format":
++      return { ...expression, value: mapExpressionRefs(expression.value, mapRef) };
++  }
++}

@@ -1,63 +1,52 @@
-# SCADAtomic Reactive Runtime + Property Bindings
+# Reactive Binding Fixes
 
-Base: `scadatomic-editor-modularized-source.zip`
+Base: `scadatomic-editor-reactive-runtime-source.zip`
 
-This patch introduces the first production-oriented Reactive Runtime slice and starts replacing the old tag runtime boundary without creating a second copy of tag values.
+This patch fixes three issues found in the first Reactive Runtime implementation.
 
-## Runtime flow
+## 1. Relative Component TagRef is now a first-class reactive source
 
-```text
-Device / Simulator
-      -> DriverRuntime
-      -> TagStore (single process image)
-      -> TagReactiveSource
-      -> ReactiveStore
-      -> DependencyRegistry
-      -> BindingRuntime
-      -> Runtime UI overrides
-```
+Previously a reusable-component source such as `Pump.running` was persisted as legacy `kind: "tagRef"` and therefore the new transform UI was hidden.
 
-Writes still follow the command path:
+Now it is persisted as `kind: "reactive"` with a `component-tag` dependency using stable UDT field IDs. When a component instance is materialized, the relative dependency is resolved to an absolute tag reference.
 
-```text
-Handler -> Script -> Intent[] -> ExecutionGraph -> Executor
-        -> ReactiveTagRuntime.write() -> DriverRuntime -> driver/readback
-```
+This means relative TagRef bindings support the same transforms as project-tag bindings, including Variant conditional mappings.
 
-`src/uiframework/data/runtime/TagRuntime.ts` is now a compatibility re-export of the new `ReactiveTagRuntime` implementation in `src/reactivity/sources/reactive-tag-runtime.ts`.
+## 2. Variant binding UX
 
-## Included features
+When the target property is `Variant`, choosing a source defaults to `Condition` instead of `Direct`.
 
-- ReactiveRef / stable tag field references
-- ReactiveStore
-- DependencyRegistry
-- BindingRuntime + pure BindingEvaluator
-- Tag reactive source backed by the existing TagStore process image
-- Property bindings for variant / enabled / visible / value/text where supported
-- Initial binding evaluation
-- Runtime UI override layer (does not mutate document props)
-- Binding trace
-- Tag reactive listeners: value changed / rising edge / falling edge
-- Tag listeners reuse the normal Handler -> Script -> Intent -> ExecutionGraph pipeline
-- Reusable component instance scoping for binding targets
-- Repeat-instance-safe runtime IDs
-- Property Panel binding editor
-- Tag event editor
+The property panel immediately shows:
 
-## Apply
+- `When true` -> existing component variant dropdown
+- `When false` -> existing component variant dropdown
 
-From the root of the source corresponding to `scadatomic-editor-modularized-source.zip`:
+The choices are derived from the node's actual `variants` map.
 
-```bash
-git apply PATCH_REACTIVE_RUNTIME_BINDINGS.diff
-```
+## 3. Reactive bindings are visible in the Designer during simulation
 
-Alternatively copy the included `src/` files over the same base.
+The Editor now starts/configures the same `BindingRuntime` used by runtime rendering.
 
-## Validation performed before packaging
+`RendererRoot` subscribes to reactive UI state and applies runtime property/variant overrides while preserving the persisted document state.
 
-- TypeScript project build/typecheck: passed
-- ESLint on changed/new modules: passed
-- Runtime smoke test through ProjectRuntimeSession -> ReactiveTagRuntime -> DriverRuntime -> driver/readback -> TagStore -> ReactiveStore -> BindingRuntime: passed
+So a simulated tag change such as:
 
-The repository still has the previously existing Fast Refresh lint issue in `navigation-context.tsx`, unrelated to this patch.
+`Pump1.running: true -> false`
+
+updates a bound Button/Pump component directly on the designer canvas.
+
+Reusable-component internals are addressed using the same runtime scoped IDs as the runtime renderer.
+
+## About the old warning
+
+`Legacy/relative binding. It remains compatible and will be resolved at runtime.`
+
+meant that a reusable component `TagRef` binding was still stored in the old pre-Reactive-Runtime format. It could resolve to a concrete tag when an instance was rendered, but it did not support the new expression/transform editor.
+
+New relative bindings no longer use that compatibility path. Existing old relative bindings are editable and are upgraded to the new reactive form when their transform/source is edited.
+
+## Validation
+
+- TypeScript build: PASS
+- ESLint on touched files: PASS
+- `git apply --check`: PASS

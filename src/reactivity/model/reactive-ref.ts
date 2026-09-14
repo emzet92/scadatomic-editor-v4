@@ -8,6 +8,16 @@ export type TagReactiveRef = {
   path?: string | undefined;
 };
 
+export type ComponentTagReactiveRef = {
+  kind: "component-tag";
+  /** Reusable-component TagRef input name. */
+  input: string;
+  /** Stable UDT field ids relative to the component input. */
+  fieldIds: string[];
+  /** Human-readable diagnostic path, e.g. Pump.running. */
+  path?: string | undefined;
+};
+
 export type PageStateReactiveRef = {
   kind: "page-state";
   pageId: string;
@@ -27,6 +37,7 @@ export type MemoryReactiveRef = {
 
 export type ReactiveRef =
   | TagReactiveRef
+  | ComponentTagReactiveRef
   | PageStateReactiveRef
   | ComponentStateReactiveRef
   | MemoryReactiveRef;
@@ -37,6 +48,8 @@ export function toReactiveKey(ref: ReactiveRef): ReactiveKey {
   switch (ref.kind) {
     case "tag":
       return `tag:${tagFieldRefKey(ref.ref)}`;
+    case "component-tag":
+      return `component-tag:${ref.input}:${ref.fieldIds.join("/")}`;
     case "page-state":
       return `page-state:${ref.pageId}:${ref.key}`;
     case "component-state":
@@ -54,6 +67,13 @@ export function isReactiveRef(value: unknown): value is ReactiveRef {
       typeof value.ref.tagId === "string" &&
       Array.isArray(value.ref.fieldIds) &&
       value.ref.fieldIds.every((fieldId) => typeof fieldId === "string") &&
+      (value.path === undefined || typeof value.path === "string");
+  }
+
+  if (value.kind === "component-tag") {
+    return typeof value.input === "string" &&
+      Array.isArray(value.fieldIds) &&
+      value.fieldIds.every((fieldId) => typeof fieldId === "string") &&
       (value.path === undefined || typeof value.path === "string");
   }
 

@@ -1,3 +1,4 @@
+import type { ComponentTagReactiveRef } from "../../../reactivity";
 import type { Binding, ComponentInputDefinition } from "../../core/document";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import { flattenTagValues } from "../../data/runtime/UdtRuntime";
@@ -41,12 +42,46 @@ export function parseBindingPath(
 export function formatBindingPath(binding: Binding | undefined) {
   if (!binding) return "";
   if (binding.kind === "reactive") {
-    const dependency = binding.dependencies.find((ref) => ref.kind === "tag");
-    return dependency?.kind === "tag" ? dependency.path ?? "" : "";
+    const dependency = binding.dependencies.find(
+      (ref) => ref.kind === "tag" || ref.kind === "component-tag"
+    );
+    return dependency?.path ?? "";
   }
   return binding.kind === "tag"
     ? binding.path
     : `${binding.input}${binding.path ? `.${binding.path}` : ""}`;
+}
+
+export function createComponentTagReactiveRef(
+  path: string,
+  projectData: ProjectData | undefined,
+  componentInputs: Record<string, ComponentInputDefinition> | undefined,
+): ComponentTagReactiveRef | undefined {
+  const [inputName, ...segments] = path.split(".").filter(Boolean);
+  if (!inputName || segments.length === 0) return undefined;
+  const input = componentInputs?.[inputName];
+  if (!input || input.type !== "tagRef" || !projectData) return undefined;
+
+  let udtId = input.udtId;
+  const fieldIds: string[] = [];
+  for (const segment of segments) {
+    const definition = projectData.udts[udtId];
+    const field = definition?.fields.find((candidate) => candidate.name === segment);
+    if (!field) return undefined;
+    fieldIds.push(field.id);
+    if (field.type.kind === "udt") {
+      udtId = field.type.udtId;
+    } else if (segment !== segments[segments.length - 1]) {
+      return undefined;
+    }
+  }
+
+  return {
+    kind: "component-tag",
+    input: inputName,
+    fieldIds,
+    path,
+  };
 }
 
 function collectUdtFieldPaths(
