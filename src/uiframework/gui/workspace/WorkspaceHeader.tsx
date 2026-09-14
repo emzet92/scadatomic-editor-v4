@@ -1,8 +1,8 @@
-import { Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
+import { Cloud, Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
-export type WorkspaceId = "editor" | "scripts" | "dependencies";
+export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
 
 type WorkspaceRouteContext = {
   projectId?: string | undefined;
@@ -41,6 +41,12 @@ const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
       projectId
         ? `/project/${encodeURIComponent(projectId)}/dependencies`
         : null,
+  },
+  {
+    id: "cloud",
+    label: "Cloud",
+    icon: Cloud,
+    href: () => "/cloud/fleet",
   },
 ];
 

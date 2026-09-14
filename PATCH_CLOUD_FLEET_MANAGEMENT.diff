@@ -1,0 +1,1520 @@
+diff --git a/CLOUD_FLEET_MANAGEMENT.md b/CLOUD_FLEET_MANAGEMENT.md
+new file mode 100644
+index 0000000..52a7e35
+--- /dev/null
++++ b/CLOUD_FLEET_MANAGEMENT.md
+@@ -0,0 +1,94 @@
++# SCADAtomic Cloud / Fleet Management prototype
++
++## Route
++
++- `/cloud/fleet`
++- `/cloud` redirects to `/cloud/fleet`
++- The existing workspace header now includes a `Cloud` entry.
++
++## UI
++
++The new Cloud module reuses the existing SCADAtomic design tokens and GUI primitives (`Button`, `PanelCard`, `SectionHeader`, `Dialog`, `TextInput`, `Select`).
++
++Reusable Cloud UI components:
++
++- `CloudShell`
++- `CloudPageHeader`
++- `FleetStatCard`
++- `EdgeDeviceCard`
++- `RegistrationKeysPanel`
++- `RegistrationKeyDialog`
++
++The Fleet Management example includes:
++
++- top bar with SCADAtomic logo and Designer / Cloud navigation,
++- left navigation with `Cloud → Fleet Management`,
++- online/offline/provisioning/key summary cards,
++- seeded fake Edge Agents with versions, host data, labels and metrics,
++- local Edge registration key creation, copy and delete flow.
++
++## Backend abstraction
++
++The page/hooks only depend on `FleetApi`:
++
++```ts
++interface FleetApi {
++  getSummary(...): Promise<FleetSummary>;
++  listDevices(...): Promise<EdgeDevice[]>;
++  listRegistrationKeys(...): Promise<RegistrationKey[]>;
++  createRegistrationKey(...): Promise<RegistrationKey>;
++  deleteRegistrationKey(...): Promise<void>;
++}
++```
++
++Development defaults to `createIndexedDbFleetApi()` through `src/cloud/api/client.ts`.
++
++When the backend exists, switch the adapter during bootstrap:
++
++```ts
++configureFleetApi(createHttpFleetApi("https://cloud.example.com"));
++```
++
++The UI does not need to change.
++
++## Planned HTTP contract already implemented by the HTTP adapter
++
++```text
++GET    /api/cloud/projects/:projectId/fleet/summary
++GET    /api/cloud/projects/:projectId/fleet/devices
++GET    /api/cloud/projects/:projectId/fleet/registration-keys
++POST   /api/cloud/projects/:projectId/fleet/registration-keys
++DELETE /api/cloud/projects/:projectId/fleet/registration-keys/:keyId
++```
++
++`POST registration-keys` body:
++
++```json
++{
++  "name": "Factory edge enrollment",
++  "expiresInHours": 168
++}
++```
++
++## Local persistence
++
++Development data is stored in IndexedDB database:
++
++```text
++scadatomic-cloud-dev
++```
++
++Object stores:
++
++```text
++fleet-devices
++fleet-registration-keys
++```
++
++The local adapter adds small artificial request latency and logs mock HTTP-like requests to the browser console.
++
++## Validation
++
++- TypeScript `tsc -b`: passes.
++- ESLint for changed Cloud/App/WorkspaceHeader files: passes.
++- Vite build in this environment remains blocked by the pre-existing missing optional native Rolldown Linux binding from the provided `node_modules` archive.
+diff --git a/src/App.tsx b/src/App.tsx
+index 37bf908..b0ef966 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,14 +1,17 @@
+-import { Route, Routes } from "react-router-dom";
++import { Navigate, Route, Routes } from "react-router-dom";
+ import { EditorPage } from "./uiframework/EditorPage";
+ import { ScriptPage } from "./uiframework/gui/script-editor/ScriptPage";
+ import { RenderPage } from "./uiframework/runtime/RenderPage";
+ import { DependenciesPage } from "./uiframework/gui/dependencies/DependenciesPage";
++import { FleetManagementPage } from "./cloud/pages/FleetManagementPage";
+ 
+ function App() {
+   return (
+     <Routes>
+       <Route path="/" element={<EditorPage />} />
+       <Route path="/project/:projectId" element={<EditorPage />} />
++      <Route path="/cloud" element={<Navigate to="/cloud/fleet" replace />} />
++      <Route path="/cloud/fleet" element={<FleetManagementPage />} />
+       <Route path="/render/:projectId/*" element={<RenderPage />} />
+       <Route
+         path="/project/:projectId/dependencies"
+diff --git a/src/cloud/api/client.ts b/src/cloud/api/client.ts
+new file mode 100644
+index 0000000..29201ce
+--- /dev/null
++++ b/src/cloud/api/client.ts
+@@ -0,0 +1,30 @@
++import type { FleetApi } from "./fleet-api";
++import { createIndexedDbFleetApi } from "./indexed-db-fleet-api";
++
++let activeFleetApi: FleetApi = createIndexedDbFleetApi();
++
++/**
++ * Allows application bootstrap to replace the local IndexedDB adapter with a
++ * real backend client later, without changing Fleet pages/components.
++ */
++export function configureFleetApi(api: FleetApi) {
++  activeFleetApi = api;
++}
++
++export const fleetApi: FleetApi = {
++  getSummary(request) {
++    return activeFleetApi.getSummary(request);
++  },
++  listDevices(request) {
++    return activeFleetApi.listDevices(request);
++  },
++  listRegistrationKeys(request) {
++    return activeFleetApi.listRegistrationKeys(request);
++  },
++  createRegistrationKey(request) {
++    return activeFleetApi.createRegistrationKey(request);
++  },
++  deleteRegistrationKey(request) {
++    return activeFleetApi.deleteRegistrationKey(request);
++  },
++};
+diff --git a/src/cloud/api/fleet-api.ts b/src/cloud/api/fleet-api.ts
+new file mode 100644
+index 0000000..10be204
+--- /dev/null
++++ b/src/cloud/api/fleet-api.ts
+@@ -0,0 +1,29 @@
++import type {
++  CreateRegistrationKeyRequest,
++  DeleteRegistrationKeyRequest,
++  EdgeDevice,
++  FleetSummary,
++  GetFleetSummaryRequest,
++  ListFleetDevicesRequest,
++  ListRegistrationKeysRequest,
++  RegistrationKey,
++} from "../model/fleet";
++
++/**
++ * Backend boundary for Cloud/Fleet Management.
++ *
++ * The UI only depends on this interface. The development implementation uses
++ * IndexedDB, while a future backend can replace it with HTTP/RPC without
++ * changing the page or hooks.
++ */
++export interface FleetApi {
++  getSummary(request: GetFleetSummaryRequest): Promise<FleetSummary>;
++  listDevices(request: ListFleetDevicesRequest): Promise<EdgeDevice[]>;
++  listRegistrationKeys(
++    request: ListRegistrationKeysRequest
++  ): Promise<RegistrationKey[]>;
++  createRegistrationKey(
++    request: CreateRegistrationKeyRequest
++  ): Promise<RegistrationKey>;
++  deleteRegistrationKey(request: DeleteRegistrationKeyRequest): Promise<void>;
++}
+diff --git a/src/cloud/api/http-fleet-api.ts b/src/cloud/api/http-fleet-api.ts
+new file mode 100644
+index 0000000..91bd213
+--- /dev/null
++++ b/src/cloud/api/http-fleet-api.ts
+@@ -0,0 +1,80 @@
++import type {
++  CreateRegistrationKeyRequest,
++  DeleteRegistrationKeyRequest,
++  EdgeDevice,
++  FleetSummary,
++  GetFleetSummaryRequest,
++  ListFleetDevicesRequest,
++  ListRegistrationKeysRequest,
++  RegistrationKey,
++} from "../model/fleet";
++import type { FleetApi } from "./fleet-api";
++
++/**
++ * Production HTTP adapter for the future Cloud backend.
++ *
++ * Endpoint contract intentionally mirrors the IndexedDB development adapter:
++ *
++ * GET    /api/cloud/projects/:projectId/fleet/summary
++ * GET    /api/cloud/projects/:projectId/fleet/devices
++ * GET    /api/cloud/projects/:projectId/fleet/registration-keys
++ * POST   /api/cloud/projects/:projectId/fleet/registration-keys
++ * DELETE /api/cloud/projects/:projectId/fleet/registration-keys/:keyId
++ */
++export function createHttpFleetApi(baseUrl = ""): FleetApi {
++  const root = baseUrl.replace(/\/$/, "");
++
++  return {
++    getSummary(request: GetFleetSummaryRequest) {
++      return requestJson<FleetSummary>(
++        `${root}/api/cloud/projects/${encodeURIComponent(request.projectId)}/fleet/summary`
++      );
++    },
++
++    listDevices(request: ListFleetDevicesRequest) {
++      return requestJson<EdgeDevice[]>(
++        `${root}/api/cloud/projects/${encodeURIComponent(request.projectId)}/fleet/devices`
++      );
++    },
++
++    listRegistrationKeys(request: ListRegistrationKeysRequest) {
++      return requestJson<RegistrationKey[]>(
++        `${root}/api/cloud/projects/${encodeURIComponent(request.projectId)}/fleet/registration-keys`
++      );
++    },
++
++    createRegistrationKey(request: CreateRegistrationKeyRequest) {
++      return requestJson<RegistrationKey>(
++        `${root}/api/cloud/projects/${encodeURIComponent(request.projectId)}/fleet/registration-keys`,
++        {
++          method: "POST",
++          headers: { "content-type": "application/json" },
++          body: JSON.stringify({
++            name: request.name,
++            expiresInHours: request.expiresInHours,
++          }),
++        }
++      );
++    },
++
++    async deleteRegistrationKey(request: DeleteRegistrationKeyRequest) {
++      await requestJson<unknown>(
++        `${root}/api/cloud/projects/${encodeURIComponent(request.projectId)}/fleet/registration-keys/${encodeURIComponent(request.keyId)}`,
++        { method: "DELETE" }
++      );
++    },
++  };
++}
++
++async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
++  const response = await fetch(url, init);
++  if (!response.ok) {
++    throw new Error(`Fleet API ${response.status}: ${response.statusText}`);
++  }
++
++  if (response.status === 204) {
++    return undefined as T;
++  }
++
++  return (await response.json()) as T;
++}
+diff --git a/src/cloud/api/indexed-db-fleet-api.ts b/src/cloud/api/indexed-db-fleet-api.ts
+new file mode 100644
+index 0000000..5e0e5f7
+--- /dev/null
++++ b/src/cloud/api/indexed-db-fleet-api.ts
+@@ -0,0 +1,199 @@
++import {
++  FLEET_STORES,
++  deleteRecord,
++  getAllByProject,
++  putRecord,
++} from "../data/indexed-db";
++import type {
++  CreateRegistrationKeyRequest,
++  DeleteRegistrationKeyRequest,
++  EdgeDevice,
++  FleetSummary,
++  GetFleetSummaryRequest,
++  ListFleetDevicesRequest,
++  ListRegistrationKeysRequest,
++  RegistrationKey,
++} from "../model/fleet";
++import type { FleetApi } from "./fleet-api";
++
++const MOCK_LATENCY_MS = 140;
++
++export function createIndexedDbFleetApi(): FleetApi {
++  return {
++    async getSummary(request: GetFleetSummaryRequest): Promise<FleetSummary> {
++      await mockRequest("GET", `/api/cloud/projects/${request.projectId}/fleet/summary`);
++      await ensureSeeded(request.projectId);
++
++      const [devices, keys] = await Promise.all([
++        getAllByProject<EdgeDevice>(FLEET_STORES.devices, request.projectId),
++        getAllByProject<RegistrationKey>(
++          FLEET_STORES.registrationKeys,
++          request.projectId
++        ),
++      ]);
++
++      const now = Date.now();
++      const activeRegistrationKeys = keys.filter((key) => {
++        if (key.usedAt) return false;
++        if (!key.expiresAt) return true;
++        return new Date(key.expiresAt).getTime() > now;
++      }).length;
++
++      return {
++        onlineDevices: devices.filter((device) => device.status === "online").length,
++        offlineDevices: devices.filter((device) => device.status === "offline").length,
++        provisioningDevices: devices.filter(
++          (device) => device.status === "provisioning"
++        ).length,
++        activeRegistrationKeys,
++        totalDevices: devices.length,
++      };
++    },
++
++    async listDevices(request: ListFleetDevicesRequest): Promise<EdgeDevice[]> {
++      await mockRequest("GET", `/api/cloud/projects/${request.projectId}/fleet/devices`);
++      await ensureSeeded(request.projectId);
++      const devices = await getAllByProject<EdgeDevice>(
++        FLEET_STORES.devices,
++        request.projectId
++      );
++      return devices.sort((left, right) => left.name.localeCompare(right.name));
++    },
++
++    async listRegistrationKeys(
++      request: ListRegistrationKeysRequest
++    ): Promise<RegistrationKey[]> {
++      await mockRequest(
++        "GET",
++        `/api/cloud/projects/${request.projectId}/fleet/registration-keys`
++      );
++      const keys = await getAllByProject<RegistrationKey>(
++        FLEET_STORES.registrationKeys,
++        request.projectId
++      );
++      return keys.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
++    },
++
++    async createRegistrationKey(
++      request: CreateRegistrationKeyRequest
++    ): Promise<RegistrationKey> {
++      await mockRequest(
++        "POST",
++        `/api/cloud/projects/${request.projectId}/fleet/registration-keys`
++      );
++
++      const createdAt = new Date();
++      const key: RegistrationKey = {
++        id: crypto.randomUUID(),
++        projectId: request.projectId,
++        name: request.name.trim() || "Edge registration key",
++        token: createRegistrationToken(),
++        createdAt: createdAt.toISOString(),
++        expiresAt:
++          request.expiresInHours === null
++            ? null
++            : new Date(
++                createdAt.getTime() + request.expiresInHours * 60 * 60 * 1000
++              ).toISOString(),
++        usedAt: null,
++        createdBy: "local.developer@scadatomic",
++      };
++
++      await putRecord(FLEET_STORES.registrationKeys, key);
++      return key;
++    },
++
++    async deleteRegistrationKey(
++      request: DeleteRegistrationKeyRequest
++    ): Promise<void> {
++      await mockRequest(
++        "DELETE",
++        `/api/cloud/projects/${request.projectId}/fleet/registration-keys/${request.keyId}`
++      );
++      await deleteRecord(FLEET_STORES.registrationKeys, request.keyId);
++    },
++  };
++}
++
++async function ensureSeeded(projectId: string) {
++  const existing = await getAllByProject<EdgeDevice>(FLEET_STORES.devices, projectId);
++  if (existing.length > 0) return;
++
++  const now = Date.now();
++  const devices: EdgeDevice[] = [
++    {
++      id: "edge-pump-station-01",
++      projectId,
++      name: "Pump Station Edge 01",
++      status: "online",
++      hostname: "scada-edge-pump-01",
++      location: "North Pump Station",
++      architecture: "amd64",
++      operatingSystem: "Ubuntu 24.04 LTS",
++      agentVersion: "0.8.2-dev",
++      runtimeVersion: "0.12.0-dev",
++      ipAddress: "10.24.8.41",
++      lastSeenAt: new Date(now - 18_000).toISOString(),
++      registeredAt: new Date(now - 14 * 24 * 60 * 60 * 1000).toISOString(),
++      metrics: {
++        cpuPercent: 18,
++        memoryPercent: 42,
++        diskPercent: 31,
++      },
++      labels: ["production", "pump-station", "docker"],
++    },
++    {
++      id: "edge-boiler-room-01",
++      projectId,
++      name: "Boiler Room Edge 01",
++      status: "online",
++      hostname: "scada-edge-boiler-01",
++      location: "Boiler Room",
++      architecture: "arm64",
++      operatingSystem: "Debian 13",
++      agentVersion: "0.8.2-dev",
++      runtimeVersion: "0.12.0-dev",
++      ipAddress: "10.24.9.18",
++      lastSeenAt: new Date(now - 41_000).toISOString(),
++      registeredAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString(),
++      metrics: {
++        cpuPercent: 11,
++        memoryPercent: 36,
++        diskPercent: 24,
++      },
++      labels: ["production", "boiler", "arm64"],
++    },
++    {
++      id: "edge-lab-02",
++      projectId,
++      name: "Lab Edge 02",
++      status: "offline",
++      hostname: "scada-edge-lab-02",
++      location: "Development Lab",
++      architecture: "amd64",
++      operatingSystem: "Fedora IoT 43",
++      agentVersion: "0.8.1-dev",
++      runtimeVersion: "0.11.4-dev",
++      ipAddress: "10.24.30.72",
++      lastSeenAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
++      registeredAt: new Date(now - 29 * 24 * 60 * 60 * 1000).toISOString(),
++      metrics: {
++        cpuPercent: 0,
++        memoryPercent: 0,
++        diskPercent: 47,
++      },
++      labels: ["development", "lab"],
++    },
++  ];
++
++  await Promise.all(devices.map((device) => putRecord(FLEET_STORES.devices, device)));
++}
++
++function createRegistrationToken() {
++  return `scada_edge_${crypto.randomUUID().replaceAll("-", "")}`;
++}
++
++async function mockRequest(method: string, path: string) {
++  console.info(`[mock-cloud] ${method} ${path}`);
++  await new Promise<void>((resolve) => window.setTimeout(resolve, MOCK_LATENCY_MS));
++}
+diff --git a/src/cloud/data/indexed-db.ts b/src/cloud/data/indexed-db.ts
+new file mode 100644
+index 0000000..0448a26
+--- /dev/null
++++ b/src/cloud/data/indexed-db.ts
+@@ -0,0 +1,99 @@
++const DATABASE_NAME = "scadatomic-cloud-dev";
++const DATABASE_VERSION = 1;
++
++export const FLEET_STORES = {
++  devices: "fleet-devices",
++  registrationKeys: "fleet-registration-keys",
++} as const;
++
++type FleetStoreName = (typeof FLEET_STORES)[keyof typeof FLEET_STORES];
++
++let databasePromise: Promise<IDBDatabase> | null = null;
++
++export function openFleetDatabase(): Promise<IDBDatabase> {
++  if (!databasePromise) {
++    databasePromise = new Promise((resolve, reject) => {
++      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
++
++      request.onupgradeneeded = () => {
++        const database = request.result;
++
++        if (!database.objectStoreNames.contains(FLEET_STORES.devices)) {
++          const store = database.createObjectStore(FLEET_STORES.devices, {
++            keyPath: "id",
++          });
++          store.createIndex("projectId", "projectId", { unique: false });
++        }
++
++        if (
++          !database.objectStoreNames.contains(FLEET_STORES.registrationKeys)
++        ) {
++          const store = database.createObjectStore(
++            FLEET_STORES.registrationKeys,
++            { keyPath: "id" }
++          );
++          store.createIndex("projectId", "projectId", { unique: false });
++        }
++      };
++
++      request.onsuccess = () => resolve(request.result);
++      request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
++    });
++  }
++
++  return databasePromise;
++}
++
++export async function getAllByProject<T extends { projectId: string }>(
++  storeName: FleetStoreName,
++  projectId: string
++): Promise<T[]> {
++  const database = await openFleetDatabase();
++
++  return new Promise((resolve, reject) => {
++    const transaction = database.transaction(storeName, "readonly");
++    const store = transaction.objectStore(storeName);
++    const index = store.index("projectId");
++    const request = index.getAll(projectId);
++
++    request.onsuccess = () => resolve((request.result ?? []) as T[]);
++    request.onerror = () => reject(request.error ?? new Error("IndexedDB read failed"));
++  });
++}
++
++export async function putRecord<T>(
++  storeName: FleetStoreName,
++  record: T
++): Promise<void> {
++  const database = await openFleetDatabase();
++
++  return new Promise((resolve, reject) => {
++    const transaction = database.transaction(storeName, "readwrite");
++    const store = transaction.objectStore(storeName);
++    store.put(record);
++
++    transaction.oncomplete = () => resolve();
++    transaction.onerror = () =>
++      reject(transaction.error ?? new Error("IndexedDB write failed"));
++    transaction.onabort = () =>
++      reject(transaction.error ?? new Error("IndexedDB write aborted"));
++  });
++}
++
++export async function deleteRecord(
++  storeName: FleetStoreName,
++  id: string
++): Promise<void> {
++  const database = await openFleetDatabase();
++
++  return new Promise((resolve, reject) => {
++    const transaction = database.transaction(storeName, "readwrite");
++    transaction.objectStore(storeName).delete(id);
++
++    transaction.oncomplete = () => resolve();
++    transaction.onerror = () =>
++      reject(transaction.error ?? new Error("IndexedDB delete failed"));
++    transaction.onabort = () =>
++      reject(transaction.error ?? new Error("IndexedDB delete aborted"));
++  });
++}
+diff --git a/src/cloud/hooks/useFleetDashboard.ts b/src/cloud/hooks/useFleetDashboard.ts
+new file mode 100644
+index 0000000..e1199fc
+--- /dev/null
++++ b/src/cloud/hooks/useFleetDashboard.ts
+@@ -0,0 +1,82 @@
++import { useCallback, useEffect, useState } from "react";
++import { fleetApi } from "../api/client";
++import type {
++  CreateRegistrationKeyRequest,
++  EdgeDevice,
++  FleetSummary,
++  RegistrationKey,
++} from "../model/fleet";
++
++type FleetDashboardState = {
++  summary: FleetSummary | null;
++  devices: EdgeDevice[];
++  registrationKeys: RegistrationKey[];
++  loading: boolean;
++  error: string | null;
++};
++
++const EMPTY_STATE: FleetDashboardState = {
++  summary: null,
++  devices: [],
++  registrationKeys: [],
++  loading: true,
++  error: null,
++};
++
++export function useFleetDashboard(projectId: string) {
++  const [state, setState] = useState<FleetDashboardState>(EMPTY_STATE);
++
++  const reload = useCallback(async () => {
++    setState((current) => ({ ...current, loading: true, error: null }));
++
++    try {
++      const [summary, devices, registrationKeys] = await Promise.all([
++        fleetApi.getSummary({ projectId }),
++        fleetApi.listDevices({ projectId }),
++        fleetApi.listRegistrationKeys({ projectId }),
++      ]);
++
++      setState({
++        summary,
++        devices,
++        registrationKeys,
++        loading: false,
++        error: null,
++      });
++    } catch (error) {
++      setState((current) => ({
++        ...current,
++        loading: false,
++        error: error instanceof Error ? error.message : "Unable to load fleet",
++      }));
++    }
++  }, [projectId]);
++
++  useEffect(() => {
++    void reload();
++  }, [reload]);
++
++  const createRegistrationKey = useCallback(
++    async (request: Omit<CreateRegistrationKeyRequest, "projectId">) => {
++      const key = await fleetApi.createRegistrationKey({ projectId, ...request });
++      await reload();
++      return key;
++    },
++    [projectId, reload]
++  );
++
++  const deleteRegistrationKey = useCallback(
++    async (keyId: string) => {
++      await fleetApi.deleteRegistrationKey({ projectId, keyId });
++      await reload();
++    },
++    [projectId, reload]
++  );
++
++  return {
++    ...state,
++    reload,
++    createRegistrationKey,
++    deleteRegistrationKey,
++  };
++}
+diff --git a/src/cloud/model/fleet.ts b/src/cloud/model/fleet.ts
+new file mode 100644
+index 0000000..a9520f1
+--- /dev/null
++++ b/src/cloud/model/fleet.ts
+@@ -0,0 +1,67 @@
++export type EdgeDeviceStatus = "online" | "offline" | "provisioning";
++
++export type EdgeDeviceMetrics = {
++  cpuPercent: number;
++  memoryPercent: number;
++  diskPercent: number;
++};
++
++export type EdgeDevice = {
++  id: string;
++  projectId: string;
++  name: string;
++  status: EdgeDeviceStatus;
++  hostname: string;
++  location: string;
++  architecture: "amd64" | "arm64";
++  operatingSystem: string;
++  agentVersion: string;
++  runtimeVersion: string;
++  ipAddress: string;
++  lastSeenAt: string;
++  registeredAt: string;
++  metrics: EdgeDeviceMetrics;
++  labels: string[];
++};
++
++export type RegistrationKey = {
++  id: string;
++  projectId: string;
++  name: string;
++  token: string;
++  createdAt: string;
++  expiresAt: string | null;
++  usedAt: string | null;
++  createdBy: string;
++};
++
++export type FleetSummary = {
++  onlineDevices: number;
++  offlineDevices: number;
++  provisioningDevices: number;
++  activeRegistrationKeys: number;
++  totalDevices: number;
++};
++
++export type CreateRegistrationKeyRequest = {
++  projectId: string;
++  name: string;
++  expiresInHours: number | null;
++};
++
++export type ListFleetDevicesRequest = {
++  projectId: string;
++};
++
++export type ListRegistrationKeysRequest = {
++  projectId: string;
++};
++
++export type GetFleetSummaryRequest = {
++  projectId: string;
++};
++
++export type DeleteRegistrationKeyRequest = {
++  projectId: string;
++  keyId: string;
++};
+diff --git a/src/cloud/pages/FleetManagementPage.tsx b/src/cloud/pages/FleetManagementPage.tsx
+new file mode 100644
+index 0000000..babc9d4
+--- /dev/null
++++ b/src/cloud/pages/FleetManagementPage.tsx
+@@ -0,0 +1,151 @@
++import {
++  KeyRound,
++  MonitorCheck,
++  MonitorOff,
++  Plus,
++  RefreshCw,
++  ServerCog,
++} from "lucide-react";
++import { useState } from "react";
++import { Button, PanelCard, SectionHeader } from "../../uiframework/gui/ui";
++import { useFleetDashboard } from "../hooks/useFleetDashboard";
++import { CloudPageHeader, CloudShell } from "../ui/CloudShell";
++import { EdgeDeviceCard } from "../ui/EdgeDeviceCard";
++import { FleetStatCard } from "../ui/FleetStatCard";
++import { RegistrationKeyDialog } from "../ui/RegistrationKeyDialog";
++import { RegistrationKeysPanel } from "../ui/RegistrationKeysPanel";
++
++const CLOUD_PROJECT_ID = "cloud";
++
++export function FleetManagementPage() {
++  const [registrationDialogOpen, setRegistrationDialogOpen] = useState(false);
++  const dashboard = useFleetDashboard(CLOUD_PROJECT_ID);
++
++  return (
++    <CloudShell projectName="Cloud">
++      <CloudPageHeader
++        eyebrow="Cloud / Cloud"
++        title="Fleet Management"
++        description="Provision and monitor SCADAtomic Edge Agents. This development screen uses the same API contract planned for the backend, with IndexedDB acting as the local adapter."
++        actions={
++          <>
++            <Button size="md" onClick={() => void dashboard.reload()} disabled={dashboard.loading}>
++              <RefreshCw size={14} className={dashboard.loading ? "animate-spin" : undefined} />
++              Refresh
++            </Button>
++            <Button variant="primary" size="md" onClick={() => setRegistrationDialogOpen(true)}>
++              <Plus size={14} />
++              Registration key
++            </Button>
++          </>
++        }
++      />
++
++      <div className="mx-auto max-w-[1500px] space-y-6 p-8">
++        {dashboard.error ? (
++          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
++            {dashboard.error}
++          </div>
++        ) : null}
++
++        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
++          <FleetStatCard
++            label="Online Edge"
++            value={dashboard.summary?.onlineDevices ?? "—"}
++            detail={`${dashboard.summary?.totalDevices ?? 0} devices registered`}
++            icon={MonitorCheck}
++            tone="success"
++          />
++          <FleetStatCard
++            label="Offline Edge"
++            value={dashboard.summary?.offlineDevices ?? "—"}
++            detail="Requires connectivity check"
++            icon={MonitorOff}
++            tone={dashboard.summary?.offlineDevices ? "danger" : "neutral"}
++          />
++          <FleetStatCard
++            label="Provisioning"
++            value={dashboard.summary?.provisioningDevices ?? "—"}
++            detail="Agents completing enrollment"
++            icon={ServerCog}
++            tone="accent"
++          />
++          <FleetStatCard
++            label="Active keys"
++            value={dashboard.summary?.activeRegistrationKeys ?? "—"}
++            detail="Unused enrollment credentials"
++            icon={KeyRound}
++            tone="accent"
++          />
++        </section>
++
++        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.75fr)]">
++          <PanelCard className="rounded-xl p-4 shadow-sm">
++            <SectionHeader
++              title="Edge devices"
++              description="Development data represents agents that would report health and runtime state to the Cloud control plane."
++              action={
++                <span className="rounded-full bg-[var(--editor-surface-muted)] px-2.5 py-1 text-[10px] font-medium text-[var(--editor-text-muted)]">
++                  {dashboard.devices.length} registered
++                </span>
++              }
++            />
++
++            <div className="mt-4 grid gap-3 lg:grid-cols-2">
++              {dashboard.loading && dashboard.devices.length === 0
++                ? Array.from({ length: 4 }, (_, index) => <DeviceSkeleton key={index} />)
++                : dashboard.devices.map((device) => <EdgeDeviceCard key={device.id} device={device} />)}
++            </div>
++          </PanelCard>
++
++          <div className="space-y-6">
++            <RegistrationKeysPanel
++              keys={dashboard.registrationKeys}
++              onCreate={() => setRegistrationDialogOpen(true)}
++              onDelete={dashboard.deleteRegistrationKey}
++            />
++
++            <PanelCard className="rounded-xl p-4 shadow-sm">
++              <SectionHeader
++                title="Provisioning flow"
++                description="The backend implementation can keep this exact UI contract."
++              />
++              <ol className="mt-4 space-y-3 text-xs text-[var(--editor-text-muted)]">
++                <FlowStep number="1" title="Create registration key" detail="POST registration-keys through FleetApi." />
++                <FlowStep number="2" title="Install Edge Agent" detail="Pass the token to the agent during first boot." />
++                <FlowStep number="3" title="Agent enrolls" detail="Backend exchanges the token for device identity and credentials." />
++                <FlowStep number="4" title="Fleet becomes live" detail="Health, runtime version and deployment state appear here." />
++              </ol>
++            </PanelCard>
++          </div>
++        </div>
++      </div>
++
++      <RegistrationKeyDialog
++        open={registrationDialogOpen}
++        onClose={() => setRegistrationDialogOpen(false)}
++        onCreate={dashboard.createRegistrationKey}
++      />
++    </CloudShell>
++  );
++}
++
++function DeviceSkeleton() {
++  return (
++    <div className="h-64 animate-pulse rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]" />
++  );
++}
++
++function FlowStep({ number, title, detail }: { number: string; title: string; detail: string }) {
++  return (
++    <li className="flex gap-3">
++      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--editor-accent-soft)] text-[10px] font-semibold text-[var(--editor-accent)]">
++        {number}
++      </div>
++      <div>
++        <div className="font-medium text-[var(--editor-text)]">{title}</div>
++        <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-soft)]">{detail}</div>
++      </div>
++    </li>
++  );
++}
+diff --git a/src/cloud/ui/CloudShell.tsx b/src/cloud/ui/CloudShell.tsx
+new file mode 100644
+index 0000000..774b9ac
+--- /dev/null
++++ b/src/cloud/ui/CloudShell.tsx
+@@ -0,0 +1,167 @@
++import {
++  Box,
++  ChevronRight,
++  Cloud,
++  FolderKanban,
++  Gauge,
++  LayoutDashboard,
++  MonitorDot,
++  Settings,
++  type LucideIcon,
++} from "lucide-react";
++import type { ReactNode } from "react";
++import { useNavigate } from "react-router-dom";
++import { Button, cx } from "../../uiframework/gui/ui";
++
++type CloudShellProps = {
++  projectName: string;
++  children: ReactNode;
++};
++
++type SidebarItemProps = {
++  icon: LucideIcon;
++  label: string;
++  active?: boolean;
++  disabled?: boolean;
++  nested?: boolean;
++  onClick?: () => void;
++};
++
++export function CloudShell({ projectName, children }: CloudShellProps) {
++  const navigate = useNavigate();
++
++  return (
++    <div className="flex h-screen min-h-0 flex-col bg-[var(--editor-app-bg)] text-[var(--editor-text)]">
++      <header className="flex h-16 shrink-0 items-center justify-between gap-6 border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-6">
++        <div className="flex min-w-0 items-center gap-5">
++          <img src="/logo6.svg" alt="Scadatomic" className="h-9 w-auto shrink-0" />
++
++          <nav className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-1">
++            <button
++              type="button"
++              onClick={() => navigate("/")}
++              className="inline-flex h-7 items-center gap-2 rounded-md px-3 text-sm font-medium text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-surface)] hover:text-[var(--editor-text)]"
++            >
++              <LayoutDashboard size={15} strokeWidth={1.8} />
++              Designer
++            </button>
++            <button
++              type="button"
++              aria-current="page"
++              className="inline-flex h-7 items-center gap-2 rounded-md bg-[var(--editor-surface)] px-3 text-sm font-medium text-[var(--editor-accent)] shadow-sm ring-1 ring-[var(--editor-border)]"
++            >
++              <Cloud size={15} strokeWidth={1.8} />
++              Cloud
++            </button>
++          </nav>
++        </div>
++
++        <div className="flex items-center gap-3">
++          <div className="hidden text-right md:block">
++            <div className="text-xs font-medium text-[var(--editor-text)]">Local development</div>
++            <div className="text-[10px] text-[var(--editor-text-soft)]">IndexedDB adapter</div>
++          </div>
++          <div className="flex size-9 items-center justify-center rounded-full border border-[var(--editor-border)] bg-[var(--editor-accent-soft)] text-xs font-semibold text-[var(--editor-accent)]">
++            SA
++          </div>
++        </div>
++      </header>
++
++      <div className="flex min-h-0 flex-1">
++        <aside className="w-64 shrink-0 overflow-auto border-r border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4">
++          <div className="mb-6 px-2">
++            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--editor-text-soft)]">
++              Cloud projects
++            </div>
++          </div>
++
++          <div className="space-y-1">
++            <SidebarItem icon={FolderKanban} label={projectName} active />
++            <div className="ml-4 border-l border-[var(--editor-border)] pl-3">
++              <SidebarItem
++                icon={MonitorDot}
++                label="Fleet Management"
++                active
++                nested
++              />
++              <SidebarItem icon={Box} label="Deployments" disabled nested />
++              <SidebarItem icon={Gauge} label="Telemetry" disabled nested />
++            </div>
++          </div>
++
++          <div className="mt-8 border-t border-[var(--editor-border)] pt-4">
++            <SidebarItem icon={Settings} label="Project settings" disabled />
++          </div>
++        </aside>
++
++        <main className="min-w-0 flex-1 overflow-auto">{children}</main>
++      </div>
++    </div>
++  );
++}
++
++function SidebarItem({
++  icon: Icon,
++  label,
++  active = false,
++  disabled = false,
++  nested = false,
++  onClick,
++}: SidebarItemProps) {
++  return (
++    <button
++      type="button"
++      disabled={disabled}
++      onClick={onClick}
++      className={cx(
++        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition",
++        nested && "text-xs",
++        active
++          ? "bg-[var(--editor-selected-soft)] font-medium text-[var(--editor-accent)]"
++          : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface)] hover:text-[var(--editor-text)]",
++        disabled && "cursor-not-allowed opacity-45"
++      )}
++    >
++      <Icon size={nested ? 14 : 16} strokeWidth={1.8} />
++      <span className="min-w-0 flex-1 truncate">{label}</span>
++      {active && nested ? <ChevronRight size={13} /> : null}
++    </button>
++  );
++}
++
++export function CloudPageHeader({
++  eyebrow,
++  title,
++  description,
++  actions,
++}: {
++  eyebrow: string;
++  title: string;
++  description: string;
++  actions?: ReactNode;
++}) {
++  return (
++    <div className="flex flex-col gap-4 border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-8 py-7 lg:flex-row lg:items-center lg:justify-between">
++      <div>
++        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++          {eyebrow}
++        </div>
++        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--editor-text)]">
++          {title}
++        </h1>
++        <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++          {description}
++        </p>
++      </div>
++      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
++    </div>
++  );
++}
++
++export function CloudHeaderButton({ children, ...props }: React.ComponentProps<typeof Button>) {
++  return (
++    <Button size="md" {...props}>
++      {children}
++    </Button>
++  );
++}
+diff --git a/src/cloud/ui/EdgeDeviceCard.tsx b/src/cloud/ui/EdgeDeviceCard.tsx
+new file mode 100644
+index 0000000..011d657
+--- /dev/null
++++ b/src/cloud/ui/EdgeDeviceCard.tsx
+@@ -0,0 +1,127 @@
++import { Cpu, HardDrive, MapPin, MemoryStick, Radio, Server } from "lucide-react";
++import type { EdgeDevice } from "../model/fleet";
++import { cx } from "../../uiframework/gui/ui";
++
++export function EdgeDeviceCard({ device }: { device: EdgeDevice }) {
++  return (
++    <article className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm transition hover:border-[var(--editor-accent-border)]">
++      <div className="flex items-start justify-between gap-4">
++        <div className="min-w-0">
++          <div className="flex items-center gap-2">
++            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]">
++              <Server size={17} />
++            </div>
++            <div className="min-w-0">
++              <h3 className="truncate text-sm font-semibold text-[var(--editor-text)]">
++                {device.name}
++              </h3>
++              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-[var(--editor-text-soft)]">
++                <MapPin size={11} />
++                {device.location}
++              </div>
++            </div>
++          </div>
++        </div>
++        <StatusBadge status={device.status} />
++      </div>
++
++      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
++        <Metadata label="Hostname" value={device.hostname} />
++        <Metadata label="IP address" value={device.ipAddress} mono />
++        <Metadata label="Agent" value={device.agentVersion} />
++        <Metadata label="Runtime" value={device.runtimeVersion} />
++      </div>
++
++      <div className="mt-4 grid grid-cols-3 gap-2">
++        <Metric icon={Cpu} label="CPU" value={device.metrics.cpuPercent} />
++        <Metric icon={MemoryStick} label="Memory" value={device.metrics.memoryPercent} />
++        <Metric icon={HardDrive} label="Disk" value={device.metrics.diskPercent} />
++      </div>
++
++      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-[var(--editor-border)] pt-3">
++        {device.labels.map((label) => (
++          <span
++            key={label}
++            className="rounded-md bg-[var(--editor-surface-muted)] px-2 py-1 text-[9px] font-medium text-[var(--editor-text-muted)]"
++          >
++            {label}
++          </span>
++        ))}
++        <span className="ml-auto inline-flex items-center gap-1 text-[9px] text-[var(--editor-text-soft)]">
++          <Radio size={10} />
++          {formatLastSeen(device.lastSeenAt)}
++        </span>
++      </div>
++    </article>
++  );
++}
++
++function StatusBadge({ status }: { status: EdgeDevice["status"] }) {
++  return (
++    <span
++      className={cx(
++        "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold",
++        status === "online" && "bg-green-50 text-green-700",
++        status === "offline" && "bg-red-50 text-red-700",
++        status === "provisioning" && "bg-amber-50 text-amber-700"
++      )}
++    >
++      <span
++        className={cx(
++          "size-1.5 rounded-full",
++          status === "online" && "bg-green-500",
++          status === "offline" && "bg-red-500",
++          status === "provisioning" && "bg-amber-500"
++        )}
++      />
++      {status === "online" ? "Online" : status === "offline" ? "Offline" : "Provisioning"}
++    </span>
++  );
++}
++
++function Metadata({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
++  return (
++    <div className="min-w-0">
++      <div className="text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">{label}</div>
++      <div className={cx("mt-0.5 truncate text-[var(--editor-text-muted)]", mono && "font-mono")}>{value}</div>
++    </div>
++  );
++}
++
++function Metric({
++  icon: Icon,
++  label,
++  value,
++}: {
++  icon: typeof Cpu;
++  label: string;
++  value: number;
++}) {
++  return (
++    <div className="rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5">
++      <div className="flex items-center justify-between gap-2 text-[9px] text-[var(--editor-text-muted)]">
++        <span className="inline-flex items-center gap-1">
++          <Icon size={11} />
++          {label}
++        </span>
++        <span>{value}%</span>
++      </div>
++      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--editor-border)]">
++        <div
++          className="h-full rounded-full bg-[var(--editor-accent)] transition-all"
++          style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
++        />
++      </div>
++    </div>
++  );
++}
++
++function formatLastSeen(value: string) {
++  const diffMs = Date.now() - new Date(value).getTime();
++  const minutes = Math.max(0, Math.floor(diffMs / 60_000));
++  if (minutes < 1) return "seen now";
++  if (minutes < 60) return `seen ${minutes}m ago`;
++  const hours = Math.floor(minutes / 60);
++  if (hours < 24) return `seen ${hours}h ago`;
++  return `seen ${Math.floor(hours / 24)}d ago`;
++}
+diff --git a/src/cloud/ui/FleetStatCard.tsx b/src/cloud/ui/FleetStatCard.tsx
+new file mode 100644
+index 0000000..10bc456
+--- /dev/null
++++ b/src/cloud/ui/FleetStatCard.tsx
+@@ -0,0 +1,41 @@
++import type { LucideIcon } from "lucide-react";
++import { cx } from "../../uiframework/gui/ui";
++
++export function FleetStatCard({
++  label,
++  value,
++  detail,
++  icon: Icon,
++  tone = "neutral",
++}: {
++  label: string;
++  value: number | string;
++  detail: string;
++  icon: LucideIcon;
++  tone?: "neutral" | "success" | "danger" | "accent";
++}) {
++  return (
++    <div className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm">
++      <div className="flex items-start justify-between gap-3">
++        <div>
++          <div className="text-xs font-medium text-[var(--editor-text-muted)]">{label}</div>
++          <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--editor-text)]">
++            {value}
++          </div>
++        </div>
++        <div
++          className={cx(
++            "flex size-9 items-center justify-center rounded-lg",
++            tone === "success" && "bg-green-50 text-green-700",
++            tone === "danger" && "bg-red-50 text-red-700",
++            tone === "accent" && "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]",
++            tone === "neutral" && "bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]"
++          )}
++        >
++          <Icon size={17} strokeWidth={1.8} />
++        </div>
++      </div>
++      <div className="mt-3 text-[11px] text-[var(--editor-text-soft)]">{detail}</div>
++    </div>
++  );
++}
+diff --git a/src/cloud/ui/RegistrationKeyDialog.tsx b/src/cloud/ui/RegistrationKeyDialog.tsx
+new file mode 100644
+index 0000000..70d06df
+--- /dev/null
++++ b/src/cloud/ui/RegistrationKeyDialog.tsx
+@@ -0,0 +1,110 @@
++import { KeyRound } from "lucide-react";
++import { useState, type FormEvent } from "react";
++import { Button, Dialog, FormField, Select, TextInput } from "../../uiframework/gui/ui";
++import type { RegistrationKey } from "../model/fleet";
++
++export function RegistrationKeyDialog({
++  open,
++  onClose,
++  onCreate,
++}: {
++  open: boolean;
++  onClose(): void;
++  onCreate(input: { name: string; expiresInHours: number | null }): Promise<RegistrationKey>;
++}) {
++  const [name, setName] = useState("Factory edge enrollment");
++  const [expires, setExpires] = useState("168");
++  const [submitting, setSubmitting] = useState(false);
++  const [createdKey, setCreatedKey] = useState<RegistrationKey | null>(null);
++  const [copied, setCopied] = useState(false);
++
++  const close = () => {
++    if (submitting) return;
++    setCreatedKey(null);
++    setCopied(false);
++    onClose();
++  };
++
++  const submit = async (event: FormEvent) => {
++    event.preventDefault();
++    setSubmitting(true);
++    try {
++      const key = await onCreate({
++        name,
++        expiresInHours: expires === "never" ? null : Number(expires),
++      });
++      setCreatedKey(key);
++    } finally {
++      setSubmitting(false);
++    }
++  };
++
++  const copy = async () => {
++    if (!createdKey) return;
++    await navigator.clipboard.writeText(createdKey.token);
++    setCopied(true);
++  };
++
++  return (
++    <Dialog
++      open={open}
++      onClose={close}
++      title={createdKey ? "Registration key created" : "Create Edge registration key"}
++      description={
++        createdKey
++          ? "Use this token when provisioning a new SCADAtomic Edge Agent."
++          : "The local development adapter persists the key in IndexedDB. Later the same request will be handled by the Cloud backend."
++      }
++      icon={
++        <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++          <KeyRound size={17} />
++        </div>
++      }
++      footer={
++        createdKey ? (
++          <Button variant="primary" onClick={close}>Done</Button>
++        ) : (
++          <>
++            <Button onClick={close}>Cancel</Button>
++            <Button variant="primary" form="create-edge-registration-key" type="submit" disabled={submitting || !name.trim()}>
++              {submitting ? "Creating…" : "Create key"}
++            </Button>
++          </>
++        )
++      }
++    >
++      {createdKey ? (
++        <div className="space-y-4">
++          <div className="rounded-xl border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-4">
++            <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-accent)]">
++              Enrollment token
++            </div>
++            <div className="mt-2 break-all rounded-lg border border-[var(--editor-accent-border)] bg-white/70 p-3 font-mono text-xs text-[var(--editor-text)]">
++              {createdKey.token}
++            </div>
++            <Button className="mt-3" size="sm" onClick={() => void copy()}>
++              {copied ? "Copied" : "Copy token"}
++            </Button>
++          </div>
++          <p className="text-xs leading-5 text-[var(--editor-text-muted)]">
++            Treat registration keys as secrets. The future backend adapter can return a one-time token while the UI contract stays unchanged.
++          </p>
++        </div>
++      ) : (
++        <form id="create-edge-registration-key" onSubmit={(event) => void submit(event)} className="space-y-4">
++          <FormField label="Key name" description="A human-readable name for the enrollment workflow.">
++            <TextInput value={name} onChange={(event) => setName(event.target.value)} autoFocus />
++          </FormField>
++          <FormField label="Expires after">
++            <Select value={expires} onChange={(event) => setExpires(event.target.value)}>
++              <option value="24">24 hours</option>
++              <option value="168">7 days</option>
++              <option value="720">30 days</option>
++              <option value="never">Never</option>
++            </Select>
++          </FormField>
++        </form>
++      )}
++    </Dialog>
++  );
++}
+diff --git a/src/cloud/ui/RegistrationKeysPanel.tsx b/src/cloud/ui/RegistrationKeysPanel.tsx
+new file mode 100644
+index 0000000..e89c298
+--- /dev/null
++++ b/src/cloud/ui/RegistrationKeysPanel.tsx
+@@ -0,0 +1,109 @@
++import { Copy, KeyRound, Trash2 } from "lucide-react";
++import { useState } from "react";
++import { Button, PanelCard, SectionHeader } from "../../uiframework/gui/ui";
++import type { RegistrationKey } from "../model/fleet";
++
++export function RegistrationKeysPanel({
++  keys,
++  onCreate,
++  onDelete,
++}: {
++  keys: RegistrationKey[];
++  onCreate(): void;
++  onDelete(keyId: string): Promise<void>;
++}) {
++  return (
++    <PanelCard className="space-y-4 rounded-xl p-4 shadow-sm">
++      <SectionHeader
++        title="Edge registration keys"
++        description="Enrollment credentials for new agents. Stored locally in IndexedDB in development."
++        action={
++          <Button variant="primary" size="sm" onClick={onCreate}>
++            <KeyRound size={13} />
++            Create key
++          </Button>
++        }
++      />
++
++      {keys.length === 0 ? (
++        <div className="rounded-lg border border-dashed border-[var(--editor-border)] px-4 py-8 text-center">
++          <KeyRound className="mx-auto text-[var(--editor-text-soft)]" size={22} />
++          <div className="mt-2 text-xs font-medium text-[var(--editor-text)]">No active registration keys</div>
++          <div className="mt-1 text-[10px] text-[var(--editor-text-soft)]">Create a key to enroll the next Edge Agent.</div>
++        </div>
++      ) : (
++        <div className="space-y-2">
++          {keys.map((key) => (
++            <RegistrationKeyRow key={key.id} registrationKey={key} onDelete={onDelete} />
++          ))}
++        </div>
++      )}
++    </PanelCard>
++  );
++}
++
++function RegistrationKeyRow({
++  registrationKey,
++  onDelete,
++}: {
++  registrationKey: RegistrationKey;
++  onDelete(keyId: string): Promise<void>;
++}) {
++  const [copied, setCopied] = useState(false);
++  const [deleting, setDeleting] = useState(false);
++
++  const copy = async () => {
++    await navigator.clipboard.writeText(registrationKey.token);
++    setCopied(true);
++    window.setTimeout(() => setCopied(false), 1200);
++  };
++
++  return (
++    <div className="rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3">
++      <div className="flex items-start gap-3">
++        <div className="min-w-0 flex-1">
++          <div className="text-xs font-semibold text-[var(--editor-text)]">{registrationKey.name}</div>
++          <div className="mt-1 truncate font-mono text-[10px] text-[var(--editor-text-muted)]">
++            {maskToken(registrationKey.token)}
++          </div>
++          <div className="mt-2 text-[9px] text-[var(--editor-text-soft)]">
++            Created {formatDate(registrationKey.createdAt)} · {registrationKey.expiresAt ? `expires ${formatDate(registrationKey.expiresAt)}` : "does not expire"}
++          </div>
++        </div>
++        <div className="flex shrink-0 items-center gap-1">
++          <Button size="icon-xs" variant="ghost" title="Copy key" aria-label="Copy key" onClick={() => void copy()}>
++            <Copy size={12} />
++          </Button>
++          <Button
++            size="icon-xs"
++            variant="danger"
++            title="Delete key"
++            aria-label="Delete key"
++            disabled={deleting}
++            onClick={() => {
++              setDeleting(true);
++              void onDelete(registrationKey.id).finally(() => setDeleting(false));
++            }}
++          >
++            <Trash2 size={12} />
++          </Button>
++        </div>
++      </div>
++      {copied ? <div className="mt-2 text-[9px] font-medium text-green-700">Copied to clipboard</div> : null}
++    </div>
++  );
++}
++
++function maskToken(token: string) {
++  if (token.length <= 18) return token;
++  return `${token.slice(0, 13)}••••••••${token.slice(-6)}`;
++}
++
++function formatDate(value: string) {
++  return new Intl.DateTimeFormat(undefined, {
++    month: "short",
++    day: "numeric",
++    hour: "2-digit",
++    minute: "2-digit",
++  }).format(new Date(value));
++}
+diff --git a/src/uiframework/gui/workspace/WorkspaceHeader.tsx b/src/uiframework/gui/workspace/WorkspaceHeader.tsx
+index 8a4be62..8faefde 100644
+--- a/src/uiframework/gui/workspace/WorkspaceHeader.tsx
++++ b/src/uiframework/gui/workspace/WorkspaceHeader.tsx
+@@ -1,8 +1,8 @@
+-import { Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
++import { Cloud, Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
+ import type { ReactNode } from "react";
+ import { useNavigate } from "react-router-dom";
+ 
+-export type WorkspaceId = "editor" | "scripts" | "dependencies";
++export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
+ 
+ type WorkspaceRouteContext = {
+   projectId?: string | undefined;
+@@ -42,6 +42,12 @@ const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
+         ? `/project/${encodeURIComponent(projectId)}/dependencies`
+         : null,
+   },
++  {
++    id: "cloud",
++    label: "Cloud",
++    icon: Cloud,
++    href: () => "/cloud/fleet",
++  },
+ ];
+ 
+ export function WorkspaceNav({
