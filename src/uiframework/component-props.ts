@@ -52,7 +52,9 @@ export type ContainerNodeProps = {
   minRowHeight?: number;
   gridRowMode?: ContainerGridRowMode;
   gridItemAlignment?: ContainerGridItemAlignment;
+  border?: string;
   borderSize?: number;
+  borderColor?: string;
   borderRadius?: number;
   shadow?: string;
   display?: "grid" | "flex";
@@ -93,6 +95,7 @@ export type TextNodeProps = {
   italic?: boolean;
   underline?: boolean;
   uppercase?: boolean;
+  border?: string;
   borderSize?: number;
   borderColor?: string;
   borderRadius?: number;
@@ -147,6 +150,7 @@ export type ButtonNodeProps = {
   paddingY?: number;
   marginX?: number;
   marginY?: number;
+  border?: string;
   borderRadius?: number;
   shadow?: string;
 };
@@ -170,6 +174,7 @@ export type ImageNodeProps = {
   height?: CssSize;
   fit?: ImageFit;
   alt?: string;
+  border?: string;
   borderRadius?: number;
   backgroundColor?: string;
   shadow?: string;
@@ -232,6 +237,7 @@ export type NavigationNodeProps = {
   activeColor?: string;
   gap?: number;
   padding?: number;
+  border?: string;
   borderRadius?: number;
   shadow?: string;
 };

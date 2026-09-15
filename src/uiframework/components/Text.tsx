@@ -40,6 +40,7 @@ export function Text({
   underline,
   uppercase,
 
+  border,
   borderSize,
   borderColor,
   borderRadius,
@@ -175,9 +176,10 @@ export function Text({
             : undefined,
 
         border:
-          hasBorder
+          border ??
+          (hasBorder
             ? `${resolvedProps.borderSize}px solid ${resolvedProps.borderColor}`
-            : undefined,
+            : undefined),
 
         borderRadius:
           resolvedProps.borderRadius,

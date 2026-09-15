@@ -29,6 +29,7 @@ export const modalDefinition = {
     gap: { kind: "spacing", min: 0 },
     columns: { kind: "number", min: 1, max: 24 },
     display: { kind: "select", options: ["grid", "flex"] },
+    border: { kind: "border" },
     borderRadius: { kind: "radius", min: 0, max: 999 },
     shadow: { kind: "shadow" },
     closeOnBackdrop: { kind: "toggle" },

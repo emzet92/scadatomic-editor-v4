@@ -25,7 +25,7 @@ export const containerDefinition = {
     minRowHeight: { kind: "number", min: 24, max: 480 },
     gridRowMode: { kind: "select", options: ["content", "minimum"] },
     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
-    borderSize: { kind: "border-size", min: 0 },
+    border: { kind: "border" },
     borderRadius: { kind: "radius", min: 0, max: 999 },
     shadow: { kind: "shadow" },
     display: { kind: "select", options: ["grid", "flex"] },

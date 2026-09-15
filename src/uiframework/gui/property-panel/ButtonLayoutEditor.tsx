@@ -5,6 +5,7 @@ import type { UpdateNode } from "./property-panel-types";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
 import { ShadowValueControl } from "./ShadowValueControl";
+import { BorderValueControl } from "./BorderValueControl";
 
 export function ButtonLayoutEditor({
   node,
@@ -18,6 +19,7 @@ export function ButtonLayoutEditor({
   const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
   const marginX = props.marginX ?? defaultButtonProps.marginX;
   const marginY = props.marginY ?? defaultButtonProps.marginY;
+  const border = props.border;
   const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
   const shadow = props.shadow;
 
@@ -91,7 +93,12 @@ export function ButtonLayoutEditor({
           />
         </div>
 
-        <div className="mt-2">
+        <div className="mt-2 space-y-2">
+          <BorderValueControl
+            label="Border / stroke"
+            value={border}
+            onChange={(value) => patch({ border: value })}
+          />
           <RadiusValueControl
             compact
             icon={<Radius size={12} />}

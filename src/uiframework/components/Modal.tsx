@@ -8,6 +8,7 @@ export type ModalProps = HTMLAttributes<HTMLDivElement> & {
   gap?: number;
   columns?: number;
   display?: "grid" | "flex";
+  border?: string;
   borderRadius?: number;
   shadow?: string;
   closeOnBackdrop?: boolean;
@@ -22,6 +23,7 @@ export function Modal({
   gap = 12,
   columns = 1,
   display = "grid",
+  border,
   borderRadius = 18,
   shadow,
   closeOnBackdrop = true,
@@ -48,6 +50,7 @@ export function Modal({
     flexDirection: display === "flex" ? "column" : undefined,
     boxSizing: "border-box",
     position: "relative",
+    border,
     borderRadius,
     boxShadow: shadow,
     ...style,

@@ -10,6 +10,7 @@ import { isTypographyToken, type TypographyToken, type TypographyTokenId } from 
 import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
 import { isRadiusToken, type RadiusToken, type RadiusTokenId } from "./radius";
 import { isShadowToken, type ShadowToken, type ShadowTokenId } from "./shadows";
+import { isBorderToken, type BorderToken, type BorderTokenId } from "./borders";
 
 export type ColorTokenId = string;
 
@@ -31,12 +32,13 @@ export type DesignSystem = {
   spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
   radius?: Record<RadiusTokenId, RadiusToken> | undefined;
   shadows?: Record<ShadowTokenId, ShadowToken> | undefined;
+  borders?: Record<BorderTokenId, BorderToken> | undefined;
 };
 
 export const DEFAULT_COLOR_LITERAL = "#18181b";
 
 export function createEmptyDesignSystem(): DesignSystem {
-  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {} };
+  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {}, borders: {} };
 }
 
 export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
@@ -87,6 +89,13 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
   if (value.shadows !== undefined) {
     if (!isRecord(value.shadows)) return false;
     if (!Object.entries(value.shadows).every(([id, token]) => isShadowToken(token, id))) {
+      return false;
+    }
+  }
+
+  if (value.borders !== undefined) {
+    if (!isRecord(value.borders)) return false;
+    if (!Object.entries(value.borders).every(([id, token]) => isBorderToken(token, id))) {
       return false;
     }
   }

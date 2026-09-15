@@ -1,0 +1,1304 @@
+diff --git a/DESIGN_SYSTEM_BORDERS.md b/DESIGN_SYSTEM_BORDERS.md
+new file mode 100644
+index 0000000..8414096
+--- /dev/null
++++ b/DESIGN_SYSTEM_BORDERS.md
+@@ -0,0 +1,58 @@
++# Design System — Borders / Stroke Styles
++
++SCADAtomic stores borders as structured design-system values instead of raw CSS strings.
++
++## Token model
++
++```ts
++type BorderStyle = {
++  width: number;
++  style: "solid" | "dashed" | "dotted" | "double";
++  color: string;
++};
++
++type BorderTokenRef = {
++  kind: "border-token";
++  tokenId: string;
++};
++```
++
++A component property can keep a local `BorderStyle` or a stable `BorderTokenRef`. The renderer resolves either representation immediately before component rendering and hands the React component the final CSS border string.
++
++## Design System workspace
++
++`Design System → Borders / Strokes` supports:
++
++- create / rename / edit / delete token,
++- width, line style and color editing,
++- live border preview,
++- usage count,
++- starter styles (`Stroke/Subtle`, `Stroke/Default`, `Stroke/Strong`, `Stroke/Focus`, `Stroke/Dashed`).
++
++## Property editor
++
++Border-enabled components expose one unified control:
++
++- `None`,
++- `Local border / stroke`,
++- any project border token.
++
++Local mode edits `width + style + color`. The old split `borderSize` / `borderColor` representation remains render-compatible, but opting into the new control writes the unified `border` property.
++
++## Safe deletion
++
++Deleting a token does not create a broken reference. Every `border-token` reference is replaced with a local copy of the token's current structured value, preserving the rendered appearance.
++
++## Rendering
++
++```text
++{ kind: "border-token", tokenId }
++              ↓
++       DesignSystemResolver
++              ↓
++      1px solid #d4d4d8
++              ↓
++    Button / Container / Modal / ...
++```
++
++`width: 0` resolves to `none`, which also allows the new system to explicitly override legacy component borders.
+diff --git a/src/uiframework/EditorPage.tsx b/src/uiframework/EditorPage.tsx
+index aeaf131..88f7856 100644
+--- a/src/uiframework/EditorPage.tsx
++++ b/src/uiframework/EditorPage.tsx
+@@ -50,6 +50,7 @@ import { TypographyLibraryWorkspace } from "./gui/design-system/TypographyLibrar
+ import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorkspace";
+ import { RadiusLibraryWorkspace } from "./gui/design-system/RadiusLibraryWorkspace";
+ import { ShadowLibraryWorkspace } from "./gui/design-system/ShadowLibraryWorkspace";
++import { BorderLibraryWorkspace } from "./gui/design-system/BorderLibraryWorkspace";
+ import type { DataSelection } from "./gui/data/data-selection";
+ import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
+ import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
+@@ -610,8 +611,10 @@ export function EditorPage() {
+                 <SpacingLibraryWorkspace />
+               ) : designSystemSection === "radius" ? (
+                 <RadiusLibraryWorkspace />
+-              ) : (
++              ) : designSystemSection === "shadows" ? (
+                 <ShadowLibraryWorkspace />
++              ) : (
++                <BorderLibraryWorkspace />
+               )}
+             </div>
+           ) : (
+diff --git a/src/uiframework/component-props.ts b/src/uiframework/component-props.ts
+index 8043940..9664e92 100644
+--- a/src/uiframework/component-props.ts
++++ b/src/uiframework/component-props.ts
+@@ -52,7 +52,9 @@ export type ContainerNodeProps = {
+   minRowHeight?: number;
+   gridRowMode?: ContainerGridRowMode;
+   gridItemAlignment?: ContainerGridItemAlignment;
++  border?: string;
+   borderSize?: number;
++  borderColor?: string;
+   borderRadius?: number;
+   shadow?: string;
+   display?: "grid" | "flex";
+@@ -93,6 +95,7 @@ export type TextNodeProps = {
+   italic?: boolean;
+   underline?: boolean;
+   uppercase?: boolean;
++  border?: string;
+   borderSize?: number;
+   borderColor?: string;
+   borderRadius?: number;
+@@ -147,6 +150,7 @@ export type ButtonNodeProps = {
+   paddingY?: number;
+   marginX?: number;
+   marginY?: number;
++  border?: string;
+   borderRadius?: number;
+   shadow?: string;
+ };
+@@ -170,6 +174,7 @@ export type ImageNodeProps = {
+   height?: CssSize;
+   fit?: ImageFit;
+   alt?: string;
++  border?: string;
+   borderRadius?: number;
+   backgroundColor?: string;
+   shadow?: string;
+@@ -232,6 +237,7 @@ export type NavigationNodeProps = {
+   activeColor?: string;
+   gap?: number;
+   padding?: number;
++  border?: string;
+   borderRadius?: number;
+   shadow?: string;
+ };
+diff --git a/src/uiframework/components/Button.tsx b/src/uiframework/components/Button.tsx
+index 4340a3b..359fc46 100644
+--- a/src/uiframework/components/Button.tsx
++++ b/src/uiframework/components/Button.tsx
+@@ -15,6 +15,7 @@ export function Button({
+   paddingY = defaultButtonProps.paddingY,
+   marginX = defaultButtonProps.marginX,
+   marginY = defaultButtonProps.marginY,
++  border,
+   borderRadius = defaultButtonProps.borderRadius,
+   shadow,
+   className,
+@@ -37,6 +38,7 @@ export function Button({
+         paddingBlock: safePaddingY,
+         marginInline: safeMarginX,
+         marginBlock: safeMarginY,
++        border,
+         borderRadius: safeRadius,
+         boxShadow: shadow,
+         boxSizing: "border-box",
+diff --git a/src/uiframework/components/Container.tsx b/src/uiframework/components/Container.tsx
+index 55b4ad8..1cea032 100644
+--- a/src/uiframework/components/Container.tsx
++++ b/src/uiframework/components/Container.tsx
+@@ -16,7 +16,9 @@ export function Container({
+   minHeight = defaultContainerProps.minHeight,
+   maxWidth,
+   maxHeight,
++  border,
+   borderSize = defaultContainerProps.borderSize,
++  borderColor = "#d4d4d8",
+   borderRadius = defaultContainerProps.borderRadius,
+   shadow,
+   padding = defaultContainerProps.padding,
+@@ -45,7 +47,7 @@ export function Container({
+     minHeight: toCssSize(minHeight),
+     maxWidth: toCssSize(maxWidth),
+     maxHeight: toCssSize(maxHeight),
+-    border: borderSize > 0 ? `${borderSize}px solid #d4d4d8` : undefined,
++    border: border ?? (borderSize > 0 ? `${borderSize}px solid ${borderColor}` : undefined),
+     borderRadius,
+     boxShadow: shadow,
+     padding,
+diff --git a/src/uiframework/components/Image.tsx b/src/uiframework/components/Image.tsx
+index f53df50..4861cbf 100644
+--- a/src/uiframework/components/Image.tsx
++++ b/src/uiframework/components/Image.tsx
+@@ -16,6 +16,7 @@ export function Image({
+   height = defaultImageProps.height,
+   fit = defaultImageProps.fit,
+   alt = defaultImageProps.alt,
++  border,
+   borderRadius = defaultImageProps.borderRadius,
+   backgroundColor = defaultImageProps.backgroundColor,
+   shadow,
+@@ -36,6 +37,7 @@ export function Image({
+         minWidth: 24,
+         minHeight: 24,
+         overflow: "hidden",
++        border,
+         borderRadius,
+         backgroundColor,
+         boxShadow: shadow,
+diff --git a/src/uiframework/components/Modal.tsx b/src/uiframework/components/Modal.tsx
+index 0b1ce51..c36e80c 100644
+--- a/src/uiframework/components/Modal.tsx
++++ b/src/uiframework/components/Modal.tsx
+@@ -8,6 +8,7 @@ export type ModalProps = HTMLAttributes<HTMLDivElement> & {
+   gap?: number;
+   columns?: number;
+   display?: "grid" | "flex";
++  border?: string;
+   borderRadius?: number;
+   shadow?: string;
+   closeOnBackdrop?: boolean;
+@@ -22,6 +23,7 @@ export function Modal({
+   gap = 12,
+   columns = 1,
+   display = "grid",
++  border,
+   borderRadius = 18,
+   shadow,
+   closeOnBackdrop = true,
+@@ -48,6 +50,7 @@ export function Modal({
+     flexDirection: display === "flex" ? "column" : undefined,
+     boxSizing: "border-box",
+     position: "relative",
++    border,
+     borderRadius,
+     boxShadow: shadow,
+     ...style,
+diff --git a/src/uiframework/components/Navigation.tsx b/src/uiframework/components/Navigation.tsx
+index 7e105d6..c45faf1 100644
+--- a/src/uiframework/components/Navigation.tsx
++++ b/src/uiframework/components/Navigation.tsx
+@@ -12,6 +12,7 @@ export function Navigation({
+   activeColor = "#7c3aed",
+   gap = 4,
+   padding = 4,
++  border,
+   borderRadius = 8,
+   shadow,
+   style,
+@@ -30,6 +31,7 @@ export function Navigation({
+         alignItems: "center",
+         gap,
+         padding,
++        border,
+         borderRadius,
+         backgroundColor,
+         boxShadow: shadow,
+diff --git a/src/uiframework/components/Text.tsx b/src/uiframework/components/Text.tsx
+index a362903..ebbd3cb 100644
+--- a/src/uiframework/components/Text.tsx
++++ b/src/uiframework/components/Text.tsx
+@@ -40,6 +40,7 @@ export function Text({
+   underline,
+   uppercase,
+ 
++  border,
+   borderSize,
+   borderColor,
+   borderRadius,
+@@ -175,9 +176,10 @@ export function Text({
+             : undefined,
+ 
+         border:
+-          hasBorder
++          border ??
++          (hasBorder
+             ? `${resolvedProps.borderSize}px solid ${resolvedProps.borderColor}`
+-            : undefined,
++            : undefined),
+ 
+         borderRadius:
+           resolvedProps.borderRadius,
+diff --git a/src/uiframework/design-system/borders.ts b/src/uiframework/design-system/borders.ts
+new file mode 100644
+index 0000000..4e02764
+--- /dev/null
++++ b/src/uiframework/design-system/borders.ts
+@@ -0,0 +1,141 @@
++import type { DesignSystem } from "./colors";
++import {
++  countTokenReferences,
++  isDesignTokenReference,
++  isRecord,
++  replaceTokenReferences,
++  type DesignTokenBase,
++  type DesignTokenReference,
++} from "./tokens";
++
++export type BorderTokenId = string;
++export type BorderLineStyle = "solid" | "dashed" | "dotted" | "double";
++
++export type BorderStyle = {
++  width: number;
++  style: BorderLineStyle;
++  color: string;
++};
++
++export type BorderToken = DesignTokenBase & BorderStyle;
++export type BorderTokenRef = DesignTokenReference<"border-token">;
++export type BorderValue = BorderStyle | BorderTokenRef;
++
++export const DEFAULT_BORDER_STYLE: BorderStyle = {
++  width: 1,
++  style: "solid",
++  color: "#d4d4d8",
++};
++
++export function createBorderTokenRef(tokenId: BorderTokenId): BorderTokenRef {
++  return { kind: "border-token", tokenId };
++}
++
++export function isBorderTokenRef(value: unknown): value is BorderTokenRef {
++  return isDesignTokenReference(value, "border-token");
++}
++
++export function isBorderLineStyle(value: unknown): value is BorderLineStyle {
++  return value === "solid" || value === "dashed" || value === "dotted" || value === "double";
++}
++
++export function isBorderStyle(value: unknown): value is BorderStyle {
++  if (!isRecord(value)) return false;
++  return (
++    isFiniteNumber(value.width) &&
++    value.width >= 0 &&
++    isBorderLineStyle(value.style) &&
++    typeof value.color === "string" &&
++    value.color.trim().length > 0
++  );
++}
++
++export function isBorderToken(value: unknown, id?: string): value is BorderToken {
++  if (!isRecord(value) || !isBorderStyle(value)) return false;
++  const candidate = value as BorderStyle & Record<string, unknown>;
++  return (
++    typeof candidate.id === "string" &&
++    (id === undefined || candidate.id === id) &&
++    typeof candidate.name === "string" &&
++    candidate.name.trim().length > 0 &&
++    (candidate.description === undefined || typeof candidate.description === "string")
++  );
++}
++
++export function resolveBorderStyle(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback: BorderStyle = DEFAULT_BORDER_STYLE
++): BorderStyle {
++  if (isBorderStyle(value)) return value;
++  if (isBorderTokenRef(value)) {
++    const token = designSystem?.borders?.[value.tokenId];
++    if (token) return pickStyle(token);
++  }
++  return fallback;
++}
++
++export function resolveBorderValue(
++  value: unknown,
++  designSystem: DesignSystem | undefined,
++  fallback = "none"
++): string {
++  if (typeof value === "string" && value.trim()) return value;
++  if (!isBorderStyle(value) && !isBorderTokenRef(value)) return fallback;
++  return borderStyleToCss(resolveBorderStyle(value, designSystem));
++}
++
++export function borderStyleToCss(style: BorderStyle): string {
++  if (style.width <= 0) return "none";
++  return `${style.width}px ${style.style} ${style.color}`;
++}
++
++export function detachBorderTokenReference(
++  value: unknown,
++  tokenId: BorderTokenId,
++  replacement: BorderStyle
++): unknown {
++  return replaceTokenReferences(
++    value,
++    (candidate) => isBorderTokenRef(candidate) && candidate.tokenId === tokenId,
++    () => ({ ...replacement })
++  );
++}
++
++export function countBorderTokenReferences(value: unknown, tokenId: BorderTokenId): number {
++  return countTokenReferences(
++    value,
++    (candidate) => isBorderTokenRef(candidate) && candidate.tokenId === tokenId
++  );
++}
++
++export function createStarterBorderTokens(): BorderToken[] {
++  return [
++    createToken("Stroke/Subtle", 1, "solid", "#e4e4e7"),
++    createToken("Stroke/Default", 1, "solid", "#d4d4d8"),
++    createToken("Stroke/Strong", 1, "solid", "#a1a1aa"),
++    createToken("Stroke/Focus", 2, "solid", "#7c3aed"),
++    createToken("Stroke/Dashed", 1, "dashed", "#a1a1aa"),
++  ];
++}
++
++function createToken(
++  name: string,
++  width: number,
++  style: BorderLineStyle,
++  color: string
++): BorderToken {
++  return { id: crypto.randomUUID(), name, width, style, color };
++}
++
++function pickStyle(token: BorderToken): BorderStyle {
++  return {
++    width: token.width,
++    style: token.style,
++    color: token.color,
++  };
++}
++
++function isFiniteNumber(value: unknown): value is number {
++  return typeof value === "number" && Number.isFinite(value);
++}
+diff --git a/src/uiframework/design-system/colors.ts b/src/uiframework/design-system/colors.ts
+index 488e23d..4c583d7 100644
+--- a/src/uiframework/design-system/colors.ts
++++ b/src/uiframework/design-system/colors.ts
+@@ -10,6 +10,7 @@ import { isTypographyToken, type TypographyToken, type TypographyTokenId } from
+ import { isSpacingToken, type SpacingToken, type SpacingTokenId } from "./spacing";
+ import { isRadiusToken, type RadiusToken, type RadiusTokenId } from "./radius";
+ import { isShadowToken, type ShadowToken, type ShadowTokenId } from "./shadows";
++import { isBorderToken, type BorderToken, type BorderTokenId } from "./borders";
+ 
+ export type ColorTokenId = string;
+ 
+@@ -31,12 +32,13 @@ export type DesignSystem = {
+   spacing?: Record<SpacingTokenId, SpacingToken> | undefined;
+   radius?: Record<RadiusTokenId, RadiusToken> | undefined;
+   shadows?: Record<ShadowTokenId, ShadowToken> | undefined;
++  borders?: Record<BorderTokenId, BorderToken> | undefined;
+ };
+ 
+ export const DEFAULT_COLOR_LITERAL = "#18181b";
+ 
+ export function createEmptyDesignSystem(): DesignSystem {
+-  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {} };
++  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {}, borders: {} };
+ }
+ 
+ export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
+@@ -91,6 +93,13 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
+     }
+   }
+ 
++  if (value.borders !== undefined) {
++    if (!isRecord(value.borders)) return false;
++    if (!Object.entries(value.borders).every(([id, token]) => isBorderToken(token, id))) {
++      return false;
++    }
++  }
++
+   return true;
+ }
+ 
+diff --git a/src/uiframework/design-system/document-borders.ts b/src/uiframework/design-system/document-borders.ts
+new file mode 100644
+index 0000000..14dfa39
+--- /dev/null
++++ b/src/uiframework/design-system/document-borders.ts
+@@ -0,0 +1,98 @@
++import type { ComponentInputDefinition, UiDocument, UiNode } from "../core/document";
++import {
++  countBorderTokenReferences,
++  detachBorderTokenReference,
++  type BorderStyle,
++  type BorderTokenId,
++} from "./borders";
++
++export function detachBorderTokenFromDocument(
++  document: UiDocument,
++  tokenId: BorderTokenId,
++  replacement: BorderStyle
++): UiDocument {
++  return {
++    ...document,
++    nodes: mapNodes(document.nodes, tokenId, replacement),
++    components: document.components
++      ? Object.fromEntries(
++          Object.entries(document.components).map(([id, definition]) => [
++            id,
++            {
++              ...definition,
++              nodes: mapNodes(definition.nodes, tokenId, replacement),
++              inputs: definition.inputs
++                ? mapInputs(definition.inputs, tokenId, replacement)
++                : undefined,
++            },
++          ])
++        )
++      : document.components,
++  };
++}
++
++export function countBorderTokenUsages(document: UiDocument, tokenId: BorderTokenId): number {
++  let count = countBorderTokenReferences(document.nodes, tokenId);
++  for (const definition of Object.values(document.components ?? {})) {
++    count += countBorderTokenReferences(definition.nodes, tokenId);
++    count += countBorderTokenReferences(definition.inputs, tokenId);
++  }
++  return count;
++}
++
++function mapNodes(
++  nodes: Record<string, UiNode>,
++  tokenId: BorderTokenId,
++  replacement: BorderStyle
++): Record<string, UiNode> {
++  return Object.fromEntries(
++    Object.entries(nodes).map(([id, node]) => [id, detachTokenFromNode(node, tokenId, replacement)])
++  );
++}
++
++function detachTokenFromNode(
++  node: UiNode,
++  tokenId: BorderTokenId,
++  replacement: BorderStyle
++): UiNode {
++  return {
++    ...node,
++    props: node.props
++      ? (detachBorderTokenReference(node.props, tokenId, replacement) as Record<string, unknown>)
++      : node.props,
++    variants: node.variants
++      ? Object.fromEntries(
++          Object.entries(node.variants).map(([name, variant]) => [
++            name,
++            {
++              ...variant,
++              props: detachBorderTokenReference(
++                variant.props,
++                tokenId,
++                replacement
++              ) as Record<string, unknown>,
++            },
++          ])
++        )
++      : node.variants,
++  };
++}
++
++function mapInputs(
++  inputs: Record<string, ComponentInputDefinition>,
++  tokenId: BorderTokenId,
++  replacement: BorderStyle
++): Record<string, ComponentInputDefinition> {
++  return Object.fromEntries(
++    Object.entries(inputs).map(([name, input]) => {
++      if (input.type === "tagRef" || input.defaultValue === undefined) return [name, input];
++      return [
++        name,
++        {
++          ...input,
++          defaultValue: detachBorderTokenReference(input.defaultValue, tokenId, replacement),
++        },
++      ];
++    })
++  );
++}
+diff --git a/src/uiframework/design-system/resolver.ts b/src/uiframework/design-system/resolver.ts
+index e76c29b..9b454c8 100644
+--- a/src/uiframework/design-system/resolver.ts
++++ b/src/uiframework/design-system/resolver.ts
+@@ -3,6 +3,7 @@ import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
+ import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
+ import { isRadiusTokenRef, resolveRadiusValue } from "./radius";
+ import { isShadowStyle, isShadowTokenRef, resolveShadowValue } from "./shadows";
++import { isBorderStyle, isBorderTokenRef, resolveBorderValue } from "./borders";
+ import { isRecord } from "./tokens";
+ 
+ /**
+@@ -18,6 +19,7 @@ export function resolveDesignTokenReferences(
+   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
+   if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
+   if (isShadowTokenRef(value) || isShadowStyle(value)) return resolveShadowValue(value, designSystem);
++  if (isBorderTokenRef(value) || isBorderStyle(value)) return resolveBorderValue(value, designSystem);
+   if (Array.isArray(value)) {
+     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+   }
+diff --git a/src/uiframework/editor-store.ts b/src/uiframework/editor-store.ts
+index baf59a8..e6b6b84 100644
+--- a/src/uiframework/editor-store.ts
++++ b/src/uiframework/editor-store.ts
+@@ -79,6 +79,14 @@ import {
+   type ShadowTokenId,
+ } from "./design-system/shadows";
+ import { detachShadowTokenFromDocument } from "./design-system/document-shadows";
++import {
++  createStarterBorderTokens,
++  isBorderLineStyle,
++  type BorderStyle,
++  type BorderToken,
++  type BorderTokenId,
++} from "./design-system/borders";
++import { detachBorderTokenFromDocument } from "./design-system/document-borders";
+ import { createUniqueTokenName } from "./design-system/tokens";
+ 
+ export type DragPreview = {
+@@ -128,6 +136,10 @@ type EditorState = {
+   addStarterShadowScale: () => void;
+   updateShadowToken: (tokenId: ShadowTokenId, patch: Partial<Omit<ShadowToken, "id">>) => void;
+   deleteShadowToken: (tokenId: ShadowTokenId) => void;
++  addBorderToken: (draft?: Partial<Omit<BorderToken, "id">>) => BorderTokenId;
++  addStarterBorderScale: () => void;
++  updateBorderToken: (tokenId: BorderTokenId, patch: Partial<Omit<BorderToken, "id">>) => void;
++  deleteBorderToken: (tokenId: BorderTokenId) => void;
+   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
+ 
+   dragPreview: DragPreview | null;
+@@ -815,6 +827,100 @@ export const useEditorStore = create<EditorState>((set) => ({
+     });
+   },
+ 
++  addBorderToken: (draft) => {
++    const tokenId = crypto.randomUUID();
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const borders = designSystem.borders ?? {};
++      const name = createUniqueTokenName(borders, draft?.name?.trim() || "Stroke");
++      const token: BorderToken = {
++        id: tokenId,
++        name,
++        width: Math.max(0, finiteOr(draft?.width, 1)),
++        style: isBorderLineStyle(draft?.style) ? draft.style : "solid",
++        color: draft?.color?.trim() || "#d4d4d8",
++        ...(draft?.description !== undefined ? { description: draft.description } : {}),
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, borders: { ...borders, [tokenId]: token } },
++        },
++      };
++    });
++    return tokenId;
++  },
++
++  addStarterBorderScale: () => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const nextBorders = { ...(designSystem.borders ?? {}) };
++      for (const token of createStarterBorderTokens()) {
++        const name = createUniqueTokenName(nextBorders, token.name);
++        nextBorders[token.id] = { ...token, name };
++      }
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, borders: nextBorders },
++        },
++      };
++    });
++  },
++
++  updateBorderToken: (tokenId, patch) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const borders = designSystem.borders ?? {};
++      const current = borders[tokenId];
++      if (!current) return state;
++      const nextName = patch.name === undefined
++        ? current.name
++        : createUniqueTokenName(borders, patch.name.trim() || current.name, tokenId);
++      const nextToken: BorderToken = {
++        ...current,
++        ...patch,
++        name: nextName,
++        width: patch.width === undefined ? current.width : Math.max(0, finiteOr(patch.width, current.width)),
++        style: patch.style === undefined
++          ? current.style
++          : isBorderLineStyle(patch.style)
++            ? patch.style
++            : current.style,
++        color: patch.color === undefined ? current.color : patch.color.trim() || current.color,
++      };
++      return {
++        document: {
++          ...state.document,
++          designSystem: { ...designSystem, borders: { ...borders, [tokenId]: nextToken } },
++        },
++      };
++    });
++  },
++
++  deleteBorderToken: (tokenId) => {
++    set((state) => {
++      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
++      const borders = designSystem.borders ?? {};
++      const token = borders[tokenId];
++      if (!token) return state;
++      const replacement: BorderStyle = {
++        width: token.width,
++        style: token.style,
++        color: token.color,
++      };
++      const detached = detachBorderTokenFromDocument(state.document, tokenId, replacement);
++      const nextBorders = { ...borders };
++      delete nextBorders[tokenId];
++      return {
++        document: {
++          ...detached,
++          designSystem: { ...designSystem, borders: nextBorders },
++        },
++      };
++    });
++  },
++
+   setTagValue: (path, value) => {
+     return writeDesignerTagValue(path, value);
+   },
+diff --git a/src/uiframework/gui/design-system/BorderLibraryWorkspace.tsx b/src/uiframework/gui/design-system/BorderLibraryWorkspace.tsx
+new file mode 100644
+index 0000000..43f03cb
+--- /dev/null
++++ b/src/uiframework/gui/design-system/BorderLibraryWorkspace.tsx
+@@ -0,0 +1,143 @@
++import { Plus, Square, Trash2 } from "lucide-react";
++import { useMemo } from "react";
++import { countBorderTokenUsages } from "../../design-system/document-borders";
++import {
++  borderStyleToCss,
++  type BorderLineStyle,
++} from "../../design-system/borders";
++import { useEditorStore } from "../../editor-store";
++import { Button, ColorPickerInput, PanelCard, Select, TextInput } from "../ui";
++
++const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
++
++export function BorderLibraryWorkspace() {
++  const document = useEditorStore((state) => state.document);
++  const addBorderToken = useEditorStore((state) => state.addBorderToken);
++  const addStarterBorderScale = useEditorStore((state) => state.addStarterBorderScale);
++  const updateBorderToken = useEditorStore((state) => state.updateBorderToken);
++  const deleteBorderToken = useEditorStore((state) => state.deleteBorderToken);
++
++  const tokens = useMemo(
++    () => Object.values(document.designSystem?.borders ?? {}).sort((a, b) =>
++      a.name.localeCompare(b.name)
++    ),
++    [document.designSystem?.borders]
++  );
++
++  return (
++    <div className="mx-auto w-full max-w-7xl p-8">
++      <div className="mb-7 flex items-start justify-between gap-5">
++        <div>
++          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
++            <Square size={14} /> Design System
++          </div>
++          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Borders / Stroke Styles</h1>
++          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
++            Define reusable structural strokes with width, line style and color. Components reference the token by stable ID while renderers receive a final border value.
++          </p>
++        </div>
++        <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
++          <Plus size={14} /> Add stroke
++        </Button>
++      </div>
++
++      {tokens.length === 0 ? (
++        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
++          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
++            <Square size={20} />
++          </div>
++          <div className="text-sm font-semibold text-[var(--editor-text)]">No border tokens yet</div>
++          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
++            Create individual strokes or seed a practical Subtle / Default / Strong / Focus / Dashed starter set.
++          </div>
++          <div className="mt-4 flex items-center gap-2">
++            <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
++              <Plus size={14} /> Add stroke
++            </Button>
++            <Button size="sm" variant="secondary" onClick={addStarterBorderScale}>
++              Create starter strokes
++            </Button>
++          </div>
++        </PanelCard>
++      ) : (
++        <div className="space-y-3">
++          {tokens.map((token) => {
++            const usageCount = countBorderTokenUsages(document, token.id);
++            return (
++              <div
++                key={token.id}
++                className="grid grid-cols-[minmax(190px,.9fr)_minmax(210px,1fr)_minmax(360px,1.7fr)_44px] items-center gap-4 rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm"
++              >
++                <div className="space-y-2">
++                  <TextInput
++                    aria-label="Border token name"
++                    value={token.name}
++                    onChange={(event) => updateBorderToken(token.id, { name: event.target.value })}
++                  />
++                  <div className="text-[10px] text-[var(--editor-text-soft)]">
++                    {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
++                  </div>
++                </div>
++
++                <div className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
++                  <div
++                    className="h-10 w-24 rounded-xl bg-[var(--editor-surface)]"
++                    style={{ border: borderStyleToCss(token), boxSizing: "border-box" }}
++                  />
++                </div>
++
++                <div className="space-y-2">
++                  <div className="grid grid-cols-[120px_minmax(140px,1fr)] gap-2">
++                    <label className="min-w-0">
++                      <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">Width</span>
++                      <TextInput
++                        controlSize="sm"
++                        aria-label={`${token.name} width`}
++                        type="number"
++                        min={0}
++                        step={1}
++                        value={token.width}
++                        onChange={(event) => updateBorderToken(token.id, { width: Math.max(0, Number(event.target.value)) })}
++                      />
++                    </label>
++                    <label className="min-w-0">
++                      <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">Style</span>
++                      <Select
++                        aria-label={`${token.name} line style`}
++                        value={token.style}
++                        onChange={(event) => updateBorderToken(token.id, { style: event.target.value as BorderLineStyle })}
++                      >
++                        {BORDER_STYLES.map((style) => (
++                          <option key={style} value={style}>{style}</option>
++                        ))}
++                      </Select>
++                    </label>
++                  </div>
++                  <ColorPickerInput
++                    compact
++                    ariaLabel={`${token.name} border color`}
++                    value={token.color}
++                    onChange={(color) => updateBorderToken(token.id, { color })}
++                  />
++                </div>
++
++                <button
++                  type="button"
++                  title="Delete border token and detach usages"
++                  onClick={() => deleteBorderToken(token.id)}
++                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
++                >
++                  <Trash2 size={14} />
++                </button>
++              </div>
++            );
++          })}
++        </div>
++      )}
++
++      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
++        Deleting a border token detaches every reference to a local structured stroke with the same width, style and color, preserving the rendered appearance.
++      </div>
++    </div>
++  );
++}
+diff --git a/src/uiframework/gui/design-system/DesignSystemPanel.tsx b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+index 93ca351..084cecb 100644
+--- a/src/uiframework/gui/design-system/DesignSystemPanel.tsx
++++ b/src/uiframework/gui/design-system/DesignSystemPanel.tsx
+@@ -1,9 +1,9 @@
+ import type { ReactNode } from "react";
+-import { Layers, MoveHorizontal, Palette, Radius, Type } from "lucide-react";
++import { Layers, MoveHorizontal, Palette, Radius, Square, Type } from "lucide-react";
+ import { useEditorStore } from "../../editor-store";
+ import { SectionHeader } from "../ui";
+ 
+-export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows";
++export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
+ 
+ export function DesignSystemPanel({
+   activeSection,
+@@ -27,6 +27,9 @@ export function DesignSystemPanel({
+   const shadowCount = useEditorStore(
+     (state) => Object.keys(state.document.designSystem?.shadows ?? {}).length
+   );
++  const borderCount = useEditorStore(
++    (state) => Object.keys(state.document.designSystem?.borders ?? {}).length
++  );
+ 
+   return (
+     <div className="space-y-3">
+@@ -69,8 +72,15 @@ export function DesignSystemPanel({
+         count={shadowCount}
+         onClick={() => onSelectSection("shadows")}
+       />
++      <TokenSectionButton
++        active={activeSection === "borders"}
++        icon={<Square size={15} />}
++        title="Borders / Strokes"
++        count={borderCount}
++        onClick={() => onSelectSection("borders")}
++      />
+       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
+-        Borders, opacity and motion can use the same token reference model next.
++        Opacity, motion and semantic aliases can use the same token reference model next.
+       </div>
+     </div>
+   );
+diff --git a/src/uiframework/gui/property-panel/BorderValueControl.tsx b/src/uiframework/gui/property-panel/BorderValueControl.tsx
+new file mode 100644
+index 0000000..5ec5ab0
+--- /dev/null
++++ b/src/uiframework/gui/property-panel/BorderValueControl.tsx
+@@ -0,0 +1,140 @@
++import {
++  borderStyleToCss,
++  createBorderTokenRef,
++  DEFAULT_BORDER_STYLE,
++  isBorderStyle,
++  isBorderTokenRef,
++  resolveBorderStyle,
++  type BorderLineStyle,
++  type BorderStyle,
++} from "../../design-system/borders";
++import { useEditorStore } from "../../editor-store";
++import { ColorPickerInput, FormField, Select, TextInput } from "../ui";
++
++const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
++
++export function BorderValueControl({
++  label,
++  value,
++  fallback,
++  onChange,
++}: {
++  label: string;
++  value: unknown;
++  fallback?: BorderStyle | undefined;
++  onChange: (value: unknown) => void;
++}) {
++  const designSystem = useEditorStore((state) => state.document.designSystem);
++  const tokens = Object.values(designSystem?.borders ?? {}).sort((a, b) =>
++    a.name.localeCompare(b.name)
++  );
++  const tokenRef = isBorderTokenRef(value) ? value : undefined;
++  const localStyle = isBorderStyle(value);
++  const selectedToken = tokenRef ? designSystem?.borders?.[tokenRef.tokenId] : undefined;
++  const selection = tokenRef?.tokenId ?? (localStyle && value.width > 0 ? "__local__" : "__none__");
++  const editableStyle = resolveBorderStyle(
++    value,
++    designSystem,
++    fallback ?? DEFAULT_BORDER_STYLE
++  );
++
++  function select(next: string) {
++    if (next === "__none__") {
++      onChange({ ...editableStyle, width: 0 });
++      return;
++    }
++    if (next === "__local__") {
++      onChange({
++        ...editableStyle,
++        width: editableStyle.width > 0 ? editableStyle.width : fallback?.width ?? 1,
++      });
++      return;
++    }
++    onChange(createBorderTokenRef(next));
++  }
++
++  function updateLocal(patch: Partial<BorderStyle>) {
++    onChange({ ...editableStyle, ...patch });
++  }
++
++  return (
++    <FormField label={label}>
++      <div className="space-y-2">
++        <Select value={selection} onChange={(event) => select(event.target.value)}>
++          <option value="__none__">None</option>
++          <option value="__local__">Local border / stroke</option>
++          {tokens.map((token) => (
++            <option key={token.id} value={token.id}>
++              {token.name} — {token.width}px {token.style}
++            </option>
++          ))}
++        </Select>
++
++        {selection === "__local__" ? (
++          <div className="space-y-2 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5">
++            <div className="grid grid-cols-2 gap-2">
++              <label className="min-w-0">
++                <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">Width</span>
++                <TextInput
++                  controlSize="sm"
++                  aria-label={`${label} width`}
++                  type="number"
++                  min={0}
++                  step={1}
++                  value={editableStyle.width}
++                  onChange={(event) =>
++                    updateLocal({ width: Math.max(0, Number(event.target.value)) })
++                  }
++                />
++              </label>
++              <label className="min-w-0">
++                <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">Style</span>
++                <Select
++                  aria-label={`${label} style`}
++                  value={editableStyle.style}
++                  onChange={(event) =>
++                    updateLocal({ style: event.target.value as BorderLineStyle })
++                  }
++                >
++                  {BORDER_STYLES.map((style) => (
++                    <option key={style} value={style}>{style}</option>
++                  ))}
++                </Select>
++              </label>
++            </div>
++            <ColorPickerInput
++              compact
++              ariaLabel={`${label} color`}
++              value={editableStyle.color}
++              onChange={(color) => updateLocal({ color })}
++            />
++            <BorderPreview style={editableStyle} />
++          </div>
++        ) : selectedToken ? (
++          <BorderPreview style={selectedToken} />
++        ) : tokenRef ? (
++          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
++            Missing border token. Choose another stroke or switch to Local.
++          </div>
++        ) : null}
++
++        {tokens.length === 0 ? (
++          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
++            Add styles in Design System → Borders to enable token references.
++          </div>
++        ) : null}
++      </div>
++    </FormField>
++  );
++}
++
++function BorderPreview({ style }: { style: BorderStyle }) {
++  return (
++    <div className="flex h-14 items-center justify-center rounded-lg bg-[var(--editor-canvas-bg)]">
++      <div
++        className="h-8 w-24 rounded-lg bg-[var(--editor-surface)]"
++        style={{ border: borderStyleToCss(style), boxSizing: "border-box" }}
++      />
++    </div>
++  );
++}
+diff --git a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+index 6af0cbc..37978bd 100644
+--- a/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ButtonLayoutEditor.tsx
+@@ -5,6 +5,7 @@ import type { UpdateNode } from "./property-panel-types";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
+ import { ShadowValueControl } from "./ShadowValueControl";
++import { BorderValueControl } from "./BorderValueControl";
+ 
+ export function ButtonLayoutEditor({
+   node,
+@@ -18,6 +19,7 @@ export function ButtonLayoutEditor({
+   const paddingY = props.paddingY ?? defaultButtonProps.paddingY;
+   const marginX = props.marginX ?? defaultButtonProps.marginX;
+   const marginY = props.marginY ?? defaultButtonProps.marginY;
++  const border = props.border;
+   const borderRadius = props.borderRadius ?? defaultButtonProps.borderRadius;
+   const shadow = props.shadow;
+ 
+@@ -91,7 +93,12 @@ export function ButtonLayoutEditor({
+           />
+         </div>
+ 
+-        <div className="mt-2">
++        <div className="mt-2 space-y-2">
++          <BorderValueControl
++            label="Border / stroke"
++            value={border}
++            onChange={(value) => patch({ border: value })}
++          />
+           <RadiusValueControl
+             compact
+             icon={<Radius size={12} />}
+diff --git a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+index 4ad9736..17628dd 100644
+--- a/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
++++ b/src/uiframework/gui/property-panel/ContainerLayoutEditor.tsx
+@@ -12,6 +12,7 @@ import type { UpdateNode } from "./property-panel-types";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
+ import { ShadowValueControl } from "./ShadowValueControl";
++import { BorderValueControl } from "./BorderValueControl";
+ 
+ type GridPreset = {
+   id: string;
+@@ -94,6 +95,11 @@ export function ContainerLayoutEditor({
+   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
+   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
+   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
++  const borderValue = rawProps.border ?? {
++    width: typeof rawProps.borderSize === "number" ? rawProps.borderSize : defaultContainerProps.borderSize ?? 1,
++    style: "solid" as const,
++    color: typeof rawProps.borderColor === "string" ? rawProps.borderColor : "#d4d4d8",
++  };
+   const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
+   const shadowValue = rawProps.shadow;
+   const gap = clampInt(
+@@ -377,7 +383,13 @@ export function ContainerLayoutEditor({
+             onChange={(value) => patch({ padding: value })}
+           />
+         </div>
+-        <div className="mt-2">
++        <div className="mt-2 space-y-2">
++          <BorderValueControl
++            label="Border / stroke"
++            value={borderValue}
++            fallback={{ width: defaultContainerProps.borderSize ?? 1, style: "solid", color: "#d4d4d8" }}
++            onChange={(value) => patch({ border: value })}
++          />
+           <RadiusValueControl
+             compact
+             icon={<Radius size={12} />}
+diff --git a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+index 2237ea2..b2ea23c 100644
+--- a/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
++++ b/src/uiframework/gui/property-panel/NodePropertiesEditor.tsx
+@@ -19,6 +19,7 @@ const BUTTON_LAYOUT_CONTROL_KEYS = new Set([
+   "marginX",
+   "marginY",
+   "borderRadius",
++  "border",
+ ]);
+ 
+ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
+@@ -32,6 +33,7 @@ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
+   "gridRowMode",
+   "gridItemAlignment",
+   "borderRadius",
++  "border",
+ ]);
+ 
+ /**
+diff --git a/src/uiframework/gui/property-panel/property-control-registry.tsx b/src/uiframework/gui/property-panel/property-control-registry.tsx
+index 202bebb..10e5fdc 100644
+--- a/src/uiframework/gui/property-panel/property-control-registry.tsx
++++ b/src/uiframework/gui/property-panel/property-control-registry.tsx
+@@ -28,6 +28,7 @@ import { ChartSeriesInput } from "./ChartSeriesInput";
+ import { SpacingValueControl } from "./SpacingValueControl";
+ import { RadiusValueControl } from "./RadiusValueControl";
+ import { ShadowValueControl } from "./ShadowValueControl";
++import { BorderValueControl } from "./BorderValueControl";
+ import { ImageAssetPicker } from "../assets/ImageAssetPicker";
+ import {
+   Checkbox,
+@@ -71,6 +72,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
+   spacing: (props) => <SpacingControl {...props} />,
+   radius: (props) => <RadiusControl {...props} />,
+   shadow: (props) => <ShadowControl {...props} />,
++  border: (props) => <BorderControl {...props} />,
+   number: (props) => <NumberControl {...props} />,
+   text: (props) => <TextControl {...props} />,
+ };
+@@ -619,6 +621,52 @@ function ShadowControl({ control, propName, value, updateProp }: PropertyControl
+   return <ShadowValueControl label={propName} value={value} onChange={updateProp} />;
+ }
+ 
++function BorderControl({
++  control,
++  nodeId,
++  propName,
++  value,
++  values,
++  updateNode,
++  updateProp,
++}: PropertyControlRendererProps) {
++  if (control.kind !== "border") return null;
++
++  const legacyWidth = typeof values.borderSize === "number" ? values.borderSize : 0;
++  const legacyColor = typeof values.borderColor === "string" && values.borderColor
++    ? values.borderColor
++    : "#d4d4d8";
++  const effectiveValue = value ?? (legacyWidth > 0
++    ? { width: legacyWidth, style: "solid" as const, color: legacyColor }
++    : undefined);
++
++  function updateBorder(next: unknown) {
++    const hasLegacyBorder = "borderSize" in values || "borderColor" in values;
++    if (!hasLegacyBorder) {
++      updateProp(next);
++      return;
++    }
++
++    updateNode(nodeId, (currentNode) => {
++      const nextProps = { ...(currentNode.props ?? {}) };
++      if (next === undefined) delete nextProps[propName];
++      else nextProps[propName] = next;
++      delete nextProps.borderSize;
++      delete nextProps.borderColor;
++      return { ...currentNode, props: nextProps };
++    });
++  }
++
++  return (
++    <BorderValueControl
++      label={propName}
++      value={effectiveValue}
++      fallback={{ width: Math.max(1, legacyWidth || 1), style: "solid", color: legacyColor }}
++      onChange={updateBorder}
++    />
++  );
++}
++
+ function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
+   if (control.kind !== "number") return null;
+   return (
+diff --git a/src/uiframework/registry/component-definition-types.ts b/src/uiframework/registry/component-definition-types.ts
+index f3c4b10..a8d885a 100644
+--- a/src/uiframework/registry/component-definition-types.ts
++++ b/src/uiframework/registry/component-definition-types.ts
+@@ -6,6 +6,7 @@ export type InspectorControl =
+   | { kind: "spacing"; min?: number; max?: number; step?: number }
+   | { kind: "radius"; min?: number; max?: number; step?: number }
+   | { kind: "shadow" }
++  | { kind: "border" }
+   | { kind: "color" }
+   | { kind: "toggle" }
+   | { kind: "image-asset" }
+diff --git a/src/uiframework/registry/components/button.ts b/src/uiframework/registry/components/button.ts
+index 4f11e73..09b4c7f 100644
+--- a/src/uiframework/registry/components/button.ts
++++ b/src/uiframework/registry/components/button.ts
+@@ -18,6 +18,7 @@ export const buttonDefinition = {
+     paddingY: { kind: "spacing", min: 0, max: 48 },
+     marginX: { kind: "spacing", min: 0, max: 64 },
+     marginY: { kind: "spacing", min: 0, max: 64 },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+   },
+diff --git a/src/uiframework/registry/components/container.ts b/src/uiframework/registry/components/container.ts
+index 7f00169..e8528b6 100644
+--- a/src/uiframework/registry/components/container.ts
++++ b/src/uiframework/registry/components/container.ts
+@@ -25,7 +25,7 @@ export const containerDefinition = {
+     minRowHeight: { kind: "number", min: 24, max: 480 },
+     gridRowMode: { kind: "select", options: ["content", "minimum"] },
+     gridItemAlignment: { kind: "select", options: ["start", "center", "end", "stretch"] },
+-    borderSize: { kind: "border-size", min: 0 },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+     display: { kind: "select", options: ["grid", "flex"] },
+diff --git a/src/uiframework/registry/components/image.ts b/src/uiframework/registry/components/image.ts
+index 2651fc7..b876db2 100644
+--- a/src/uiframework/registry/components/image.ts
++++ b/src/uiframework/registry/components/image.ts
+@@ -15,6 +15,7 @@ export const imageDefinition = {
+     height: { kind: "text" },
+     fit: { kind: "select", options: ["contain", "cover", "fill", "none", "scale-down"] },
+     alt: { kind: "text" },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+     backgroundColor: { kind: "color" },
+diff --git a/src/uiframework/registry/components/modal.ts b/src/uiframework/registry/components/modal.ts
+index 7eb9992..8b03e89 100644
+--- a/src/uiframework/registry/components/modal.ts
++++ b/src/uiframework/registry/components/modal.ts
+@@ -29,6 +29,7 @@ export const modalDefinition = {
+     gap: { kind: "spacing", min: 0 },
+     columns: { kind: "number", min: 1, max: 24 },
+     display: { kind: "select", options: ["grid", "flex"] },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+     closeOnBackdrop: { kind: "toggle" },
+diff --git a/src/uiframework/registry/components/navigation.ts b/src/uiframework/registry/components/navigation.ts
+index a75e4d9..096a8d7 100644
+--- a/src/uiframework/registry/components/navigation.ts
++++ b/src/uiframework/registry/components/navigation.ts
+@@ -15,6 +15,7 @@ export const navigationDefinition = {
+     activeColor: { kind: "color" },
+     gap: { kind: "spacing", min: 0, max: 48 },
+     padding: { kind: "spacing", min: 0, max: 48 },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+   },
+diff --git a/src/uiframework/registry/components/text.ts b/src/uiframework/registry/components/text.ts
+index 705e571..08b803c 100644
+--- a/src/uiframework/registry/components/text.ts
++++ b/src/uiframework/registry/components/text.ts
+@@ -18,8 +18,7 @@ export const textDefinition = {
+     align: { kind: "text-align" },
+     variant: { kind: "select", options: ["body", "label", "title", "caption"] },
+     uppercase: { kind: "toggle" },
+-    borderSize: { kind: "border-size", min: 0 },
+-    borderColor: { kind: "color" },
++    border: { kind: "border" },
+     borderRadius: { kind: "radius", min: 0, max: 999 },
+     shadow: { kind: "shadow" },
+   },

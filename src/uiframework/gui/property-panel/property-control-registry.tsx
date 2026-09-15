@@ -28,6 +28,7 @@ import { ChartSeriesInput } from "./ChartSeriesInput";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
 import { ShadowValueControl } from "./ShadowValueControl";
+import { BorderValueControl } from "./BorderValueControl";
 import { ImageAssetPicker } from "../assets/ImageAssetPicker";
 import {
   Checkbox,
@@ -71,6 +72,7 @@ const renderers: Partial<Record<InspectorControl["kind"], PropertyControlRendere
   spacing: (props) => <SpacingControl {...props} />,
   radius: (props) => <RadiusControl {...props} />,
   shadow: (props) => <ShadowControl {...props} />,
+  border: (props) => <BorderControl {...props} />,
   number: (props) => <NumberControl {...props} />,
   text: (props) => <TextControl {...props} />,
 };
@@ -617,6 +619,52 @@ function RadiusControl({ control, propName, value, updateProp }: PropertyControl
 function ShadowControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
   if (control.kind !== "shadow") return null;
   return <ShadowValueControl label={propName} value={value} onChange={updateProp} />;
+}
+
+function BorderControl({
+  control,
+  nodeId,
+  propName,
+  value,
+  values,
+  updateNode,
+  updateProp,
+}: PropertyControlRendererProps) {
+  if (control.kind !== "border") return null;
+
+  const legacyWidth = typeof values.borderSize === "number" ? values.borderSize : 0;
+  const legacyColor = typeof values.borderColor === "string" && values.borderColor
+    ? values.borderColor
+    : "#d4d4d8";
+  const effectiveValue = value ?? (legacyWidth > 0
+    ? { width: legacyWidth, style: "solid" as const, color: legacyColor }
+    : undefined);
+
+  function updateBorder(next: unknown) {
+    const hasLegacyBorder = "borderSize" in values || "borderColor" in values;
+    if (!hasLegacyBorder) {
+      updateProp(next);
+      return;
+    }
+
+    updateNode(nodeId, (currentNode) => {
+      const nextProps = { ...(currentNode.props ?? {}) };
+      if (next === undefined) delete nextProps[propName];
+      else nextProps[propName] = next;
+      delete nextProps.borderSize;
+      delete nextProps.borderColor;
+      return { ...currentNode, props: nextProps };
+    });
+  }
+
+  return (
+    <BorderValueControl
+      label={propName}
+      value={effectiveValue}
+      fallback={{ width: Math.max(1, legacyWidth || 1), style: "solid", color: legacyColor }}
+      onChange={updateBorder}
+    />
+  );
 }
 
 function NumberControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {

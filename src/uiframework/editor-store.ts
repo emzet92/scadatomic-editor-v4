@@ -79,6 +79,14 @@ import {
   type ShadowTokenId,
 } from "./design-system/shadows";
 import { detachShadowTokenFromDocument } from "./design-system/document-shadows";
+import {
+  createStarterBorderTokens,
+  isBorderLineStyle,
+  type BorderStyle,
+  type BorderToken,
+  type BorderTokenId,
+} from "./design-system/borders";
+import { detachBorderTokenFromDocument } from "./design-system/document-borders";
 import { createUniqueTokenName } from "./design-system/tokens";
 
 export type DragPreview = {
@@ -128,6 +136,10 @@ type EditorState = {
   addStarterShadowScale: () => void;
   updateShadowToken: (tokenId: ShadowTokenId, patch: Partial<Omit<ShadowToken, "id">>) => void;
   deleteShadowToken: (tokenId: ShadowTokenId) => void;
+  addBorderToken: (draft?: Partial<Omit<BorderToken, "id">>) => BorderTokenId;
+  addStarterBorderScale: () => void;
+  updateBorderToken: (tokenId: BorderTokenId, patch: Partial<Omit<BorderToken, "id">>) => void;
+  deleteBorderToken: (tokenId: BorderTokenId) => void;
   setTagValue: (path: string, value: unknown) => TagRuntimeWriteResult;
 
   dragPreview: DragPreview | null;
@@ -810,6 +822,100 @@ export const useEditorStore = create<EditorState>((set) => ({
         document: {
           ...detached,
           designSystem: { ...designSystem, shadows: nextShadows },
+        },
+      };
+    });
+  },
+
+  addBorderToken: (draft) => {
+    const tokenId = crypto.randomUUID();
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const borders = designSystem.borders ?? {};
+      const name = createUniqueTokenName(borders, draft?.name?.trim() || "Stroke");
+      const token: BorderToken = {
+        id: tokenId,
+        name,
+        width: Math.max(0, finiteOr(draft?.width, 1)),
+        style: isBorderLineStyle(draft?.style) ? draft.style : "solid",
+        color: draft?.color?.trim() || "#d4d4d8",
+        ...(draft?.description !== undefined ? { description: draft.description } : {}),
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, borders: { ...borders, [tokenId]: token } },
+        },
+      };
+    });
+    return tokenId;
+  },
+
+  addStarterBorderScale: () => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const nextBorders = { ...(designSystem.borders ?? {}) };
+      for (const token of createStarterBorderTokens()) {
+        const name = createUniqueTokenName(nextBorders, token.name);
+        nextBorders[token.id] = { ...token, name };
+      }
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, borders: nextBorders },
+        },
+      };
+    });
+  },
+
+  updateBorderToken: (tokenId, patch) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const borders = designSystem.borders ?? {};
+      const current = borders[tokenId];
+      if (!current) return state;
+      const nextName = patch.name === undefined
+        ? current.name
+        : createUniqueTokenName(borders, patch.name.trim() || current.name, tokenId);
+      const nextToken: BorderToken = {
+        ...current,
+        ...patch,
+        name: nextName,
+        width: patch.width === undefined ? current.width : Math.max(0, finiteOr(patch.width, current.width)),
+        style: patch.style === undefined
+          ? current.style
+          : isBorderLineStyle(patch.style)
+            ? patch.style
+            : current.style,
+        color: patch.color === undefined ? current.color : patch.color.trim() || current.color,
+      };
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, borders: { ...borders, [tokenId]: nextToken } },
+        },
+      };
+    });
+  },
+
+  deleteBorderToken: (tokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const borders = designSystem.borders ?? {};
+      const token = borders[tokenId];
+      if (!token) return state;
+      const replacement: BorderStyle = {
+        width: token.width,
+        style: token.style,
+        color: token.color,
+      };
+      const detached = detachBorderTokenFromDocument(state.document, tokenId, replacement);
+      const nextBorders = { ...borders };
+      delete nextBorders[tokenId];
+      return {
+        document: {
+          ...detached,
+          designSystem: { ...designSystem, borders: nextBorders },
         },
       };
     });

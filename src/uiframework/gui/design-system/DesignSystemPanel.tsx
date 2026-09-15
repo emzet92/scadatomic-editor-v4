@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Layers, MoveHorizontal, Palette, Radius, Type } from "lucide-react";
+import { Layers, MoveHorizontal, Palette, Radius, Square, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { SectionHeader } from "../ui";
 
-export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows";
+export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
 
 export function DesignSystemPanel({
   activeSection,
@@ -26,6 +26,9 @@ export function DesignSystemPanel({
   );
   const shadowCount = useEditorStore(
     (state) => Object.keys(state.document.designSystem?.shadows ?? {}).length
+  );
+  const borderCount = useEditorStore(
+    (state) => Object.keys(state.document.designSystem?.borders ?? {}).length
   );
 
   return (
@@ -69,8 +72,15 @@ export function DesignSystemPanel({
         count={shadowCount}
         onClick={() => onSelectSection("shadows")}
       />
+      <TokenSectionButton
+        active={activeSection === "borders"}
+        icon={<Square size={15} />}
+        title="Borders / Strokes"
+        count={borderCount}
+        onClick={() => onSelectSection("borders")}
+      />
       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
-        Borders, opacity and motion can use the same token reference model next.
+        Opacity, motion and semantic aliases can use the same token reference model next.
       </div>
     </div>
   );

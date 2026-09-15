@@ -19,6 +19,7 @@ const BUTTON_LAYOUT_CONTROL_KEYS = new Set([
   "marginX",
   "marginY",
   "borderRadius",
+  "border",
 ]);
 
 const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
@@ -32,6 +33,7 @@ const CONTAINER_LAYOUT_CONTROL_KEYS = new Set([
   "gridRowMode",
   "gridItemAlignment",
   "borderRadius",
+  "border",
 ]);
 
 /**

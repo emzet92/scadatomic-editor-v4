@@ -12,6 +12,7 @@ import type { UpdateNode } from "./property-panel-types";
 import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
 import { ShadowValueControl } from "./ShadowValueControl";
+import { BorderValueControl } from "./BorderValueControl";
 
 type GridPreset = {
   id: string;
@@ -94,6 +95,11 @@ export function ContainerLayoutEditor({
   const columns = clampInt(rawProps.columns, 1, 12, defaultContainerProps.columns);
   const gapValue = rawProps.gap ?? defaultContainerProps.gap;
   const paddingValue = rawProps.padding ?? defaultContainerProps.padding;
+  const borderValue = rawProps.border ?? {
+    width: typeof rawProps.borderSize === "number" ? rawProps.borderSize : defaultContainerProps.borderSize ?? 1,
+    style: "solid" as const,
+    color: typeof rawProps.borderColor === "string" ? rawProps.borderColor : "#d4d4d8",
+  };
   const borderRadiusValue = rawProps.borderRadius ?? defaultContainerProps.borderRadius;
   const shadowValue = rawProps.shadow;
   const gap = clampInt(
@@ -377,7 +383,13 @@ export function ContainerLayoutEditor({
             onChange={(value) => patch({ padding: value })}
           />
         </div>
-        <div className="mt-2">
+        <div className="mt-2 space-y-2">
+          <BorderValueControl
+            label="Border / stroke"
+            value={borderValue}
+            fallback={{ width: defaultContainerProps.borderSize ?? 1, style: "solid", color: "#d4d4d8" }}
+            onChange={(value) => patch({ border: value })}
+          />
           <RadiusValueControl
             compact
             icon={<Radius size={12} />}

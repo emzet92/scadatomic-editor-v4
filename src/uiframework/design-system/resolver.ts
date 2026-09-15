@@ -3,6 +3,7 @@ import { isTypographyTokenRef, resolveTypographyValue } from "./typography";
 import { isSpacingTokenRef, resolveSpacingValue } from "./spacing";
 import { isRadiusTokenRef, resolveRadiusValue } from "./radius";
 import { isShadowStyle, isShadowTokenRef, resolveShadowValue } from "./shadows";
+import { isBorderStyle, isBorderTokenRef, resolveBorderValue } from "./borders";
 import { isRecord } from "./tokens";
 
 /**
@@ -18,6 +19,7 @@ export function resolveDesignTokenReferences(
   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
   if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
   if (isShadowTokenRef(value) || isShadowStyle(value)) return resolveShadowValue(value, designSystem);
+  if (isBorderTokenRef(value) || isBorderStyle(value)) return resolveBorderValue(value, designSystem);
   if (Array.isArray(value)) {
     return value.map((item) => resolveDesignTokenReferences(item, designSystem));
   }
