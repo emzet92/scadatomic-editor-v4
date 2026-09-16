@@ -14,7 +14,7 @@ import {
   buildNavigationTree,
   type NavigationTreeNode,
 } from "../../navigation/navigation";
-import { ConfirmDialog, IconButton } from "../ui";
+import { Badge, Callout, ConfirmDialog, IconButton, SidebarSection } from "../ui";
 
 export function PageTree() {
   const document = useEditorStore((state) => state.document);
@@ -55,21 +55,14 @@ export function PageTree() {
 
   return (
     <div data-editor-ignore className="space-y-4">
-      <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-            Pages
-          </div>
-          <IconButton
-            aria-label="Add top-level page"
-            title="Add top-level page"
-            variant="secondary"
-            onClick={() => addPage()}
-          >
+      <SidebarSection
+        title="Pages"
+        actions={
+          <IconButton aria-label="Add top-level page" variant="secondary" onClick={() => addPage()}>
             <Plus size={14} />
           </IconButton>
-        </div>
-
+        }
+      >
         <div className="space-y-0.5">
           {tree.map((node) => (
             <PageTreeRow
@@ -87,23 +80,17 @@ export function PageTree() {
             />
           ))}
         </div>
-      </section>
+      </SidebarSection>
 
-      <section className="space-y-2 border-t border-[var(--editor-border)] pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-            Layouts
-          </div>
-          <IconButton
-            aria-label="Add page layout"
-            title="Add page layout"
-            variant="secondary"
-            onClick={() => addPageLayout()}
-          >
+      <SidebarSection
+        title="Layouts"
+        className="border-t border-[var(--editor-border)] pt-3"
+        actions={
+          <IconButton aria-label="Add page layout" variant="secondary" onClick={() => addPageLayout()}>
             <Plus size={14} />
           </IconButton>
-        </div>
-
+        }
+      >
         <div className="space-y-0.5">
           {layouts.length > 0 ? (
             layouts.map((layout) => (
@@ -116,28 +103,22 @@ export function PageTree() {
               />
             ))
           ) : (
-            <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+            <Callout dashed size="sm">
               Add a layout to share navigation, headers, sidebars and other chrome between pages.
-            </div>
+            </Callout>
           )}
         </div>
-      </section>
+      </SidebarSection>
 
-      <section className="space-y-2 border-t border-[var(--editor-border)] pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-            Modals
-          </div>
-          <IconButton
-            aria-label="Add modal"
-            title="Add modal"
-            variant="secondary"
-            onClick={() => addModal()}
-          >
+      <SidebarSection
+        title="Modals"
+        className="border-t border-[var(--editor-border)] pt-3"
+        actions={
+          <IconButton aria-label="Add modal" variant="secondary" onClick={() => addModal()}>
             <Plus size={14} />
           </IconButton>
-        </div>
-
+        }
+      >
         <div className="space-y-0.5">
           {Object.values(document.modals ?? {}).length > 0 ? (
             Object.values(document.modals ?? {}).map((modal) => (
@@ -150,12 +131,12 @@ export function PageTree() {
               />
             ))
           ) : (
-            <div className="rounded-md border border-dashed border-[var(--editor-border)] px-2.5 py-2 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+            <Callout dashed size="sm">
               Add a reusable modal surface with its own lifecycle events and script API.
-            </div>
+            </Callout>
           )}
         </div>
-      </section>
+      </SidebarSection>
 
       <ConfirmDialog
         open={!!pendingDeletePage}
@@ -249,9 +230,7 @@ function ModalRow({
       >
         <FileText size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
-        <span className="ml-auto rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)] group-hover:hidden">
-          modal
-        </span>
+        <Badge className="ml-auto group-hover:hidden">modal</Badge>
       </button>
       <div className="hidden shrink-0 group-hover:block">
         <IconButton

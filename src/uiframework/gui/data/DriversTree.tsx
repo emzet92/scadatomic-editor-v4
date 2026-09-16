@@ -1,5 +1,6 @@
 import { Cable, Gauge, Hand } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../data/simulation/default-driver-registry";
+import { SidebarNavItem, SidebarSection } from "../ui";
 import type { DataSelection } from "./data-selection";
 
 function DriverIcon({ kind }: { kind: string }) {
@@ -18,35 +19,23 @@ export function DriversTree({
   const drivers = defaultTagDriverRegistry.list();
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-        Drivers
-      </div>
+    <SidebarSection title="Drivers">
       <div className="space-y-0.5">
         {drivers.map((driver) => {
           const active = selection?.kind === "driver" && selection.driverKind === driver.kind;
           return (
-            <button
+            <SidebarNavItem
               key={driver.kind}
-              type="button"
+              variant="row"
+              active={active}
+              icon={<DriverIcon kind={driver.kind} />}
+              title={driver.displayName}
+              description={driver.kind === "manual" ? "Built in · default source" : "Built in · configurable"}
               onClick={() => onSelect({ kind: "driver", driverKind: driver.kind })}
-              className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs transition ${
-                active
-                  ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
-                  : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
-              }`}
-            >
-              <DriverIcon kind={driver.kind} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{driver.displayName}</span>
-                <span className="mt-0.5 block truncate text-[10px] text-[var(--editor-text-soft)]">
-                  {driver.kind === "manual" ? "Built in · default source" : "Built in · configurable"}
-                </span>
-              </span>
-            </button>
+            />
           );
         })}
       </div>
-    </div>
+    </SidebarSection>
   );
 }

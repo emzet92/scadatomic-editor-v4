@@ -7,10 +7,12 @@ import {
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
 import {
+  Badge,
   Button,
   EmptyAction,
   IconButton,
   PanelCard,
+  PanelSection,
   SectionHeader,
   TextInput,
 } from "../ui";
@@ -90,7 +92,7 @@ export function VariantsEditor({
   }
 
   return (
-    <section className="space-y-3 border-t border-[var(--editor-border)] pt-5">
+    <PanelSection divided>
       <SectionHeader
         title="Variants"
         description="Visual states exposed as generated API methods."
@@ -198,9 +200,9 @@ export function VariantsEditor({
                       {variantName}()
                     </span>
                     {isDefault ? (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
-                        <Star size={8} fill="currentColor" /> default
-                      </span>
+                      <Badge variant="warning" icon={<Star size={8} fill="currentColor" />}>
+                        default
+                      </Badge>
                     ) : null}
                   </div>
                   <div className="mt-0.5 truncate font-mono text-[9px] text-[var(--editor-text-muted)] opacity-60">
@@ -243,6 +245,6 @@ export function VariantsEditor({
           })}
         </div>
       )}
-    </section>
+    </PanelSection>
   );
 }

@@ -1,6 +1,6 @@
 import type { UiDocument, UiNode } from "../../core/document";
 import type { UpdateNode } from "../property-panel/property-panel-types";
-import { FormField, PanelCard, SectionHeader, Select } from "../ui";
+import { Callout, FormField, PanelCard, PanelSection, SectionHeader, Select } from "../ui";
 
 export function RepeatBehaviorEditor({
   document,
@@ -45,7 +45,7 @@ export function RepeatBehaviorEditor({
   }
 
   return (
-    <section className="border-t border-[var(--editor-border)] pt-5">
+    <PanelSection divided>
       <SectionHeader
         title="Content"
         description="Render static children or repeat a reusable component for project tags."
@@ -103,9 +103,9 @@ export function RepeatBehaviorEditor({
                 ))}
               </Select>
             </FormField>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800">
+            <Callout variant="warning" size="sm">
               Repeat mode owns this container&apos;s children. Manual add, move and duplicate into this container are disabled until Content mode is switched back to Static.
-            </div>
+            </Callout>
             {templates.length === 0 ? (
               <div className="text-[10px] text-amber-700">
                 Create a user component with a public TagRef input for this UDT first.
@@ -114,7 +114,7 @@ export function RepeatBehaviorEditor({
           </>
         ) : null}
       </PanelCard>
-    </section>
+    </PanelSection>
   );
 }
 

@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { cx } from "./cx";
 
+export type PanelCardVariant = "default" | "muted" | "accent" | "warning" | "danger";
+export type PanelCardPadding = "none" | "sm" | "md" | "lg";
+
 type SectionHeaderProps = {
   title: ReactNode;
   description?: ReactNode | undefined;
@@ -35,21 +38,67 @@ type PanelCardProps = {
   children: ReactNode;
   className?: string | undefined;
   accent?: boolean | undefined;
+  variant?: PanelCardVariant | undefined;
+  padding?: PanelCardPadding | undefined;
 };
 
-export function PanelCard({ children, className, accent = false }: PanelCardProps) {
+const panelVariantClassNames: Record<PanelCardVariant, string> = {
+  default: "border-[var(--editor-border)] bg-[var(--editor-surface)]",
+  muted: "border-[var(--editor-border)] bg-[var(--editor-surface-muted)]",
+  accent: "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)]",
+  warning: "border-amber-200 bg-amber-50",
+  danger: "border-red-200 bg-red-50",
+};
+
+const panelPaddingClassNames: Record<PanelCardPadding, string> = {
+  none: "p-0",
+  sm: "p-2.5",
+  md: "p-3",
+  lg: "p-4",
+};
+
+export function PanelCard({
+  children,
+  className,
+  accent = false,
+  variant = "default",
+  padding = "md",
+}: PanelCardProps) {
+  const resolvedVariant = accent ? "accent" : variant;
+
   return (
     <div
       className={cx(
-        "rounded-lg border p-3",
-        accent
-          ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)]"
-          : "border-[var(--editor-border)] bg-[var(--editor-surface)]",
+        "rounded-lg border",
+        panelVariantClassNames[resolvedVariant],
+        panelPaddingClassNames[padding],
         className
       )}
     >
       {children}
     </div>
+  );
+}
+
+export function PanelSection({
+  children,
+  className,
+  divided = false,
+}: {
+  children: ReactNode;
+  className?: string | undefined;
+  divided?: boolean | undefined;
+}) {
+  return (
+    <section
+      className={cx(
+        "space-y-3",
+        divided && "border-t border-[var(--editor-border)] pt-5",
+        className
+      )}
+    >
+      {children}
+    </section>
   );
 }
 

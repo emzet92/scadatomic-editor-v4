@@ -2,7 +2,7 @@ import { ChevronRight, Database, Plus, Tag } from "lucide-react";
 import { useState } from "react";
 import { isUdtTag, type ProjectData, type TagDefinition } from "../../data/tags/TagDefinition";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
-import { IconButton } from "../ui";
+import { Callout, IconButton, SidebarSection } from "../ui";
 import type { DataSelection } from "./data-selection";
 
 export function TagsTree({
@@ -18,21 +18,22 @@ export function TagsTree({
 }) {
   const tags = Object.values(data.tags).sort((a, b) => a.name.localeCompare(b.name));
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Tags</div>
-        <IconButton aria-label="Create tag" title="Create tag" variant="secondary" onClick={onCreate}>
+    <SidebarSection
+      title="Tags"
+      actions={
+        <IconButton aria-label="Create tag" variant="secondary" onClick={onCreate}>
           <Plus size={14} />
         </IconButton>
-      </div>
+      }
+    >
       <div className="space-y-0.5">
         {tags.length === 0 ? (
-          <div className="rounded-md border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-soft)]">No tags yet.</div>
+          <Callout dashed size="sm">No tags yet.</Callout>
         ) : tags.map((tag) => (
           <TagTreeRow key={tag.id} tag={tag} data={data} active={selection?.kind === "tag" && selection.tagId === tag.id} onSelect={() => onSelect({ kind: "tag", tagId: tag.id })} />
         ))}
       </div>
-    </div>
+    </SidebarSection>
   );
 }
 

@@ -8,7 +8,7 @@ import {
   type ShadowStyle,
 } from "../../design-system/shadows";
 import { useEditorStore } from "../../editor-store";
-import { ColorPickerInput, FormField, Select, TextInput } from "../ui";
+import { Callout, ColorPickerInput, FormField, Select, TextInput } from "../ui";
 
 export function ShadowValueControl({
   label,
@@ -87,9 +87,9 @@ export function ShadowValueControl({
             />
           </div>
         ) : tokenRef ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+          <Callout variant="warning" size="sm">
             Missing shadow token. Choose another elevation or switch to Local.
-          </div>
+          </Callout>
         ) : null}
 
         {tokens.length === 0 ? (

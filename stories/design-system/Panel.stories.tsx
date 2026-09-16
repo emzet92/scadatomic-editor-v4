@@ -1,12 +1,10 @@
 import { Plus, ServerCog } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button, EmptyAction, PanelCard, SectionHeader } from "../../src/uiframework/gui/ui";
+import { Button, EmptyAction, PanelCard, PanelSection, SectionHeader } from "../../src/uiframework/gui/ui";
 
 const meta = {
   title: "Primitives/Panel",
-  parameters: {
-    controls: { disable: true },
-  },
+  parameters: { controls: { disable: true } },
 } satisfies Meta;
 
 export default meta;
@@ -15,7 +13,7 @@ type Story = StoryObj<typeof meta>;
 export const Gallery: Story = {
   render: () => (
     <div className="mx-auto max-w-2xl space-y-5">
-      <div className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-5">
+      <PanelSection>
         <SectionHeader
           title="Edge runtime"
           description="Reusable section heading with optional action."
@@ -26,12 +24,17 @@ export const Gallery: Story = {
             <div className="text-xs font-semibold">Default card</div>
             <div className="mt-1 text-[11px] text-[var(--editor-text-muted)]">Neutral content surface.</div>
           </PanelCard>
-          <PanelCard accent>
+          <PanelCard variant="accent">
             <div className="text-xs font-semibold text-[var(--editor-accent)]">Accent card</div>
             <div className="mt-1 text-[11px] text-[var(--editor-text-muted)]">Selected or emphasized state.</div>
           </PanelCard>
         </div>
-      </div>
+      </PanelSection>
+
+      <PanelSection divided>
+        <SectionHeader title="Divided section" description="PanelSection can own standard vertical rhythm and dividers." />
+        <PanelCard variant="muted" padding="lg">Muted card with large padding.</PanelCard>
+      </PanelSection>
 
       <EmptyAction onClick={() => undefined}>
         <ServerCog size={16} />

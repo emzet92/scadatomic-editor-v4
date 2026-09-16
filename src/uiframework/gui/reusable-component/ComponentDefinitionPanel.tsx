@@ -16,7 +16,7 @@ import { NodePropertiesEditor } from "../property-panel/NodePropertiesEditor";
 import type { UpdateNode } from "../property-panel/property-panel-types";
 import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
 import { VariantsEditor } from "../property-panel/VariantsEditor";
-import { Button, SectionHeader } from "../ui";
+import { Button, PanelSection, SectionHeader } from "../ui";
 import { createInputControls } from "./component-input-controls";
 import { PublicInputsEditor } from "./PublicInputsEditor";
 
@@ -114,7 +114,7 @@ export function ComponentDefinitionPanel({
           updateDefinition={updateDefinition}
         />
 
-        <section className="border-t border-[var(--editor-border)] pt-5">
+        <PanelSection divided>
           <SectionHeader
             title="Internal properties"
             description={`Private implementation · ${internalNode?.name ?? "No selection"}`}
@@ -165,7 +165,7 @@ export function ComponentDefinitionPanel({
               Select an internal component to edit its properties.
             </div>
           )}
-        </section>
+        </PanelSection>
       </div>
     </div>
   );

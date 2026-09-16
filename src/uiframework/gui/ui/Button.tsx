@@ -70,7 +70,17 @@ type IconButtonProps = Omit<ButtonProps, "children" | "aria-label"> & {
 export function IconButton({
   variant = "ghost",
   size = "icon-sm",
+  title,
+  "aria-label": ariaLabel,
   ...props
 }: IconButtonProps) {
-  return <Button variant={variant} size={size} {...props} />;
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      aria-label={ariaLabel}
+      title={title ?? ariaLabel}
+      {...props}
+    />
+  );
 }

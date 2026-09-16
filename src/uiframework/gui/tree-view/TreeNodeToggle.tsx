@@ -1,7 +1,5 @@
-import {
-  ChevronRight,
-  ChevronDown,
-} from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { IconButton } from "../ui";
 
 export function TreeNodeToggle({
   collapsed,
@@ -12,36 +10,21 @@ export function TreeNodeToggle({
   hasChildren: boolean;
   setCollapsed: (collapsed: boolean) => void;
 }) {
-  return (
-    <div
-      className="
-        flex
-        items-center
-        justify-center
-        w-4
-        h-4
-        text-[var(--editor-text-soft)]
-        hover:text-[var(--editor-accent)]
-        shrink-0
-        transition
-      "
-      onClick={(e) => {
-        e.stopPropagation();
+  if (!hasChildren) {
+    return <div className="size-4 shrink-0" aria-hidden="true" />;
+  }
 
-        if (hasChildren) {
-          setCollapsed(!collapsed);
-        }
+  return (
+    <IconButton
+      aria-label={collapsed ? "Expand node" : "Collapse node"}
+      size="icon-xs"
+      className="size-4 shrink-0 rounded-sm text-[var(--editor-text-soft)]"
+      onClick={(event) => {
+        event.stopPropagation();
+        setCollapsed(!collapsed);
       }}
     >
-      {hasChildren ? (
-        collapsed ? (
-          <ChevronRight size={14} />
-        ) : (
-          <ChevronDown size={14} />
-        )
-      ) : (
-        <div className="w-3" />
-      )}
-    </div>
+      {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+    </IconButton>
   );
 }

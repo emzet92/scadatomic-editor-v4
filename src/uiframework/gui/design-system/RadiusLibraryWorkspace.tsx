@@ -2,7 +2,16 @@ import { Plus, Radius, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { countRadiusTokenUsages } from "../../design-system/document-radius";
 import { useEditorStore } from "../../editor-store";
-import { Button, PanelCard, TextInput } from "../ui";
+import {
+  Button,
+  Callout,
+  EmptyState,
+  IconButton,
+  PageContainer,
+  PageHeader,
+  PanelCard,
+  TextInput,
+} from "../ui";
 
 export function RadiusLibraryWorkspace() {
   const document = useEditorStore((state) => state.document);
@@ -20,49 +29,44 @@ export function RadiusLibraryWorkspace() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-8">
-      <div className="mb-7 flex items-start justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
-            <Radius size={14} /> Design System
-          </div>
-          <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Radius</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--editor-text-muted)]">
-            Define a shared corner-radius scale for buttons, containers, modals, images and other surfaces. Components reference stable token IDs, so renaming a radius step is safe.
-          </p>
-        </div>
-        <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-          <Plus size={14} /> Add radius
-        </Button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        icon={<Radius size={14} />}
+        title="Radius"
+        description="Define a shared corner-radius scale for buttons, containers, modals, images and other surfaces. Components reference stable token IDs, so renaming a radius step is safe."
+        actions={
+          <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
+            <Plus size={14} /> Add radius
+          </Button>
+        }
+      />
 
       {tokens.length === 0 ? (
-        <PanelCard className="flex min-h-56 flex-col items-center justify-center text-center">
-          <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-            <Radius size={20} />
-          </div>
-          <div className="text-sm font-semibold text-[var(--editor-text)]">No radius tokens yet</div>
-          <div className="mt-1 max-w-md text-xs leading-5 text-[var(--editor-text-muted)]">
-            Create individual values or seed a practical 0 / 2 / 4 / 8 / 12 / 16 / 24 / pill scale.
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-              <Plus size={14} /> Add radius
-            </Button>
-            <Button size="sm" variant="secondary" onClick={addStarterRadiusScale}>
-              Create starter scale
-            </Button>
-          </div>
-        </PanelCard>
+        <EmptyState
+          icon={<Radius size={20} />}
+          title="No radius tokens yet"
+          description="Create individual values or seed a practical 0 / 2 / 4 / 8 / 12 / 16 / 24 / pill scale."
+          actions={
+            <>
+              <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
+                <Plus size={14} /> Add radius
+              </Button>
+              <Button size="sm" variant="secondary" onClick={addStarterRadiusScale}>
+                Create starter scale
+              </Button>
+            </>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countRadiusTokenUsages(document, token.id);
             const previewRadius = Math.min(30, token.value);
             return (
-              <div
+              <PanelCard
                 key={token.id}
-                className="grid grid-cols-[minmax(210px,1fr)_minmax(240px,1.3fr)_130px_48px] items-center gap-4 rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-4 shadow-sm"
+                padding="lg"
+                className="grid grid-cols-[minmax(210px,1fr)_minmax(240px,1.3fr)_130px_48px] items-center gap-4 rounded-2xl shadow-sm"
               >
                 <div className="space-y-2">
                   <TextInput
@@ -102,23 +106,23 @@ export function RadiusLibraryWorkspace() {
                   <span className="text-xs text-[var(--editor-text-muted)]">px</span>
                 </div>
 
-                <button
-                  type="button"
-                  title="Delete radius token and detach usages"
+                <IconButton
+                  aria-label="Delete radius token and detach usages"
+                  variant="danger"
+                  size="icon"
                   onClick={() => deleteRadiusToken(token.id)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--editor-text-muted)] transition hover:bg-red-50 hover:text-red-600"
                 >
                   <Trash2 size={14} />
-                </button>
-              </div>
+                </IconButton>
+              </PanelCard>
             );
           })}
         </div>
       )}
 
-      <div className="mt-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-4 text-xs leading-5 text-[var(--editor-text-muted)]">
+      <Callout className="mt-5">
         Deleting a radius token detaches every reference to its current numeric value, preserving the visual shape instead of leaving broken references.
-      </div>
-    </div>
+      </Callout>
+    </PageContainer>
   );
 }

@@ -79,7 +79,8 @@ export function ImageAssetPicker({
   return (
     <div className="space-y-2">
       <PanelCard
-        className={`overflow-hidden p-0 transition ${
+        padding="none"
+        className={`overflow-hidden transition ${
           dragging ? "border-[var(--editor-accent)] bg-[var(--editor-accent-soft)]" : ""
         }`}
       >

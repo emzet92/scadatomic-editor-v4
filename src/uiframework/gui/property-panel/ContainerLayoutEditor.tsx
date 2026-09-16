@@ -1,4 +1,4 @@
-import { LayoutGrid, Minus, Plus, Radius, Rows3 } from "lucide-react";
+import { LayoutGrid, Radius, Rows3 } from "lucide-react";
 import {
   defaultContainerProps,
   type ContainerGridItemAlignment,
@@ -13,6 +13,13 @@ import { SpacingValueControl } from "./SpacingValueControl";
 import { RadiusValueControl } from "./RadiusValueControl";
 import { ShadowValueControl } from "./ShadowValueControl";
 import { BorderValueControl } from "./BorderValueControl";
+import {
+  Badge,
+  ChoiceCard,
+  SegmentedControl,
+  SegmentedControlItem,
+  Stepper,
+} from "../ui";
 
 type GridPreset = {
   id: string;
@@ -160,20 +167,24 @@ export function ContainerLayoutEditor({
       </div>
 
       <div className="px-3 pb-3">
-        <div className="grid grid-cols-2 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
-          <SegmentButton
+        <SegmentedControl variant="soft" fullWidth>
+          <SegmentedControlItem
+            variant="soft"
+            grow
             active={display === "grid"}
             onClick={() => patch({ display: "grid" })}
           >
             Grid
-          </SegmentButton>
-          <SegmentButton
+          </SegmentedControlItem>
+          <SegmentedControlItem
+            variant="soft"
+            grow
             active={display === "flex"}
             onClick={() => patch({ display: "flex" })}
           >
             Flow
-          </SegmentButton>
-        </div>
+          </SegmentedControlItem>
+        </SegmentedControl>
       </div>
 
       {display === "grid" ? (
@@ -188,9 +199,9 @@ export function ContainerLayoutEditor({
                   Pick a safe starting structure.
                 </div>
               </div>
-              <span className="rounded-full bg-[var(--editor-accent-soft)] px-2 py-1 text-[10px] font-semibold text-[var(--editor-accent)]">
+              <Badge variant="accent" size="sm">
                 {gridMode === "adaptive" ? "Adaptive" : `${columns} col`}
-              </span>
+              </Badge>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -199,9 +210,18 @@ export function ContainerLayoutEditor({
                   preset.mode === gridMode &&
                   (preset.mode === "adaptive" || preset.columns === columns);
                 return (
-                  <button
+                  <ChoiceCard
                     key={preset.id}
-                    type="button"
+                    selected={active}
+                    title={preset.label}
+                    description={preset.description}
+                    preview={
+                      <MiniGrid
+                        columns={preset.mode === "adaptive" ? 3 : preset.columns}
+                        adaptive={preset.mode === "adaptive"}
+                        active={active}
+                      />
+                    }
                     onClick={() =>
                       patch({
                         gridMode: preset.mode,
@@ -213,24 +233,7 @@ export function ContainerLayoutEditor({
                           : {}),
                       })
                     }
-                    className={`group rounded-[16px] border p-3 text-left transition ${
-                      active
-                        ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] shadow-[0_0_0_1px_var(--editor-accent-border)]"
-                        : "border-[var(--editor-border)] bg-[var(--editor-surface)] hover:border-[var(--editor-border-strong)] hover:bg-[var(--editor-surface-muted)]"
-                    }`}
-                  >
-                    <MiniGrid
-                      columns={preset.mode === "adaptive" ? 3 : preset.columns}
-                      adaptive={preset.mode === "adaptive"}
-                      active={active}
-                    />
-                    <div className="mt-2 text-xs font-semibold text-[var(--editor-text)]">
-                      {preset.label}
-                    </div>
-                    <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
-                      {preset.description}
-                    </div>
-                  </button>
+                  />
                 );
               })}
             </div>
@@ -246,7 +249,7 @@ export function ContainerLayoutEditor({
               }
             >
               {gridMode === "adaptive" ? (
-                <NumberPill
+                <Stepper
                   value={minColumnWidth}
                   suffix="px"
                   onDecrease={() =>
@@ -257,7 +260,7 @@ export function ContainerLayoutEditor({
                   }
                 />
               ) : (
-                <NumberPill
+                <Stepper
                   value={columns}
                   onDecrease={() => patch({ columns: Math.max(1, columns - 1) })}
                   onIncrease={() => patch({ columns: Math.min(12, columns + 1) })}
@@ -269,20 +272,24 @@ export function ContainerLayoutEditor({
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
                 Vertical sizing
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
-                <SegmentButton
+              <SegmentedControl variant="soft" fullWidth className="mt-2">
+                <SegmentedControlItem
+                  variant="soft"
+                  grow
                   active={gridRowMode === "content"}
                   onClick={() => patch({ gridRowMode: "content" })}
                 >
                   Hug content
-                </SegmentButton>
-                <SegmentButton
+                </SegmentedControlItem>
+                <SegmentedControlItem
+                  variant="soft"
+                  grow
                   active={gridRowMode === "minimum"}
                   onClick={() => patch({ gridRowMode: "minimum" })}
                 >
                   Minimum row
-                </SegmentButton>
-              </div>
+                </SegmentedControlItem>
+              </SegmentedControl>
               <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
                 Hug keeps rows as short as their content. Minimum reserves a predictable target height.
               </div>
@@ -294,7 +301,7 @@ export function ContainerLayoutEditor({
                   label="Minimum row"
                   description="Only used while Minimum row sizing is enabled."
                 >
-                  <NumberPill
+                  <Stepper
                     value={minRowHeight}
                     suffix="px"
                     onDecrease={() =>
@@ -312,22 +319,24 @@ export function ContainerLayoutEditor({
               <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
                 Items in row
               </div>
-              <div className="mt-2 grid grid-cols-4 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
+              <SegmentedControl variant="soft" fullWidth className="mt-2">
                 {([
                   ["start", "Top"],
                   ["center", "Center"],
                   ["end", "Bottom"],
                   ["stretch", "Fill"],
                 ] as const).map(([value, label]) => (
-                  <SegmentButton
+                  <SegmentedControlItem
                     key={value}
+                    variant="soft"
+                    grow
                     active={gridItemAlignment === value}
                     onClick={() => patch({ gridItemAlignment: value })}
                   >
                     {label}
-                  </SegmentButton>
+                  </SegmentedControlItem>
                 ))}
-              </div>
+              </SegmentedControl>
               <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
                 Top is the default: components keep their own height instead of filling downward.
               </div>
@@ -352,17 +361,19 @@ export function ContainerLayoutEditor({
         <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
           Spacing
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-1 rounded-[16px] bg-[var(--editor-surface-muted)] p-1">
+        <SegmentedControl variant="soft" fullWidth className="mt-2">
           {SPACING_PRESETS.map((preset) => (
-            <SegmentButton
+            <SegmentedControlItem
               key={preset.value}
+              variant="soft"
+              grow
               active={gap === preset.value && padding === preset.value}
               onClick={() => patch({ gap: preset.value, padding: preset.value })}
             >
               {preset.label}
-            </SegmentButton>
+            </SegmentedControlItem>
           ))}
-        </div>
+        </SegmentedControl>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <SpacingValueControl
             compact
@@ -408,30 +419,6 @@ export function ContainerLayoutEditor({
         </div>
       </div>
     </section>
-  );
-}
-
-function SegmentButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-9 rounded-[12px] px-2.5 text-[11px] font-semibold transition ${
-        active
-          ? "bg-[var(--editor-surface)] text-[var(--editor-text)] shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
-          : "text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -487,54 +474,6 @@ function ControlRow({
       </div>
       {children}
     </div>
-  );
-}
-
-function NumberPill({
-  value,
-  suffix,
-  onDecrease,
-  onIncrease,
-}: {
-  value: number;
-  suffix?: string;
-  onDecrease: () => void;
-  onIncrease: () => void;
-}) {
-  return (
-    <div className="flex h-9 shrink-0 items-center rounded-full border border-[var(--editor-border)] bg-[var(--editor-surface)] p-1 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <IconButton label="Decrease" onClick={onDecrease}>
-        <Minus size={12} />
-      </IconButton>
-      <div className="min-w-12 px-1 text-center text-[11px] font-semibold tabular-nums text-[var(--editor-text)]">
-        {value}{suffix ?? ""}
-      </div>
-      <IconButton label="Increase" onClick={onIncrease}>
-        <Plus size={12} />
-      </IconButton>
-    </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-full text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-accent)]"
-    >
-      {children}
-    </button>
   );
 }
 

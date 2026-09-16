@@ -9,7 +9,7 @@ import {
   type BorderStyle,
 } from "../../design-system/borders";
 import { useEditorStore } from "../../editor-store";
-import { ColorPickerInput, FormField, Select, TextInput } from "../ui";
+import { Callout, ColorPickerInput, FormField, Select, TextInput } from "../ui";
 
 const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
 
@@ -113,9 +113,9 @@ export function BorderValueControl({
         ) : selectedToken ? (
           <BorderPreview style={selectedToken} />
         ) : tokenRef ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+          <Callout variant="warning" size="sm">
             Missing border token. Choose another stroke or switch to Local.
-          </div>
+          </Callout>
         ) : null}
 
         {tokens.length === 0 ? (

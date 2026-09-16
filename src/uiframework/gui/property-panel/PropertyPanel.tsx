@@ -24,6 +24,7 @@ import { NodePropertiesEditor } from "./NodePropertiesEditor";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
 import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
+import { Badge, Button, PanelSection } from "../ui";
 
 type Props = {
   document: UiDocument;
@@ -108,13 +109,9 @@ export function PropertyPanel({
     return (
       <div data-editor-ignore className="h-full flex flex-col">
         <div className="border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-4">
-          <button
-            type="button"
-            onClick={onExitComponentMode}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--editor-text-muted)] transition hover:text-[var(--editor-text)]"
-          >
+          <Button variant="ghost" size="xs" onClick={onExitComponentMode} className="-ml-2">
             <ArrowLeft size={13} /> Designer
-          </button>
+          </Button>
 
           <div className="mt-3 flex items-start gap-2">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-700">
@@ -129,9 +126,9 @@ export function PropertyPanel({
               </div>
             </div>
             {node.defaultVariant === componentMode.variantName ? (
-              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-amber-700">
-                <Star size={8} fill="currentColor" /> default
-              </span>
+              <Badge variant="warning" icon={<Star size={8} fill="currentColor" />}>
+                default
+              </Badge>
             ) : null}
           </div>
         </div>
@@ -245,7 +242,7 @@ export function PropertyPanel({
         ) : null}
 
         {node.id !== document.rootId ? (
-          <section className="border-t border-[var(--editor-border)] pt-5">
+          <PanelSection divided>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
@@ -255,18 +252,18 @@ export function PropertyPanel({
                   Encapsulate this subtree behind a public API.
                 </div>
               </div>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => {
                   const componentId = createReusableComponent(node.id);
                   if (componentId) onEditComponentDefinition(componentId);
                 }}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
               >
                 Create component
-              </button>
+              </Button>
             </div>
-          </section>
+          </PanelSection>
         ) : null}
 
       </div>

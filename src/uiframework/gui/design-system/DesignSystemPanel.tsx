@@ -1,7 +1,6 @@
-import type { ReactNode } from "react";
 import { Layers, MoveHorizontal, Palette, Radius, Square, SunMoon, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
-import { SectionHeader } from "../ui";
+import { Callout, SidebarNavItem, SidebarSection } from "../ui";
 
 export type DesignSystemSection = "themes" | "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
 
@@ -34,97 +33,37 @@ export function DesignSystemPanel({
     (state) => Object.keys(state.document.designSystem?.borders ?? {}).length
   );
 
-  return (
-    <div className="space-y-3">
-      <SectionHeader
-        title="Design System"
-        description="Project-local tokens shared by every page and reusable component."
-      />
-      <TokenSectionButton
-        active={activeSection === "themes"}
-        icon={<SunMoon size={15} />}
-        title="Themes & Semantic"
-        count={themeCount}
-        onClick={() => onSelectSection("themes")}
-      />
-      <TokenSectionButton
-        active={activeSection === "colors"}
-        icon={<Palette size={15} />}
-        title="Colors"
-        count={colorCount}
-        onClick={() => onSelectSection("colors")}
-      />
-      <TokenSectionButton
-        active={activeSection === "typography"}
-        icon={<Type size={15} />}
-        title="Typography"
-        count={typographyCount}
-        onClick={() => onSelectSection("typography")}
-      />
-      <TokenSectionButton
-        active={activeSection === "spacing"}
-        icon={<MoveHorizontal size={15} />}
-        title="Spacing"
-        count={spacingCount}
-        onClick={() => onSelectSection("spacing")}
-      />
-      <TokenSectionButton
-        active={activeSection === "radius"}
-        icon={<Radius size={15} />}
-        title="Radius"
-        count={radiusCount}
-        onClick={() => onSelectSection("radius")}
-      />
-      <TokenSectionButton
-        active={activeSection === "shadows"}
-        icon={<Layers size={15} />}
-        title="Shadows / Elevation"
-        count={shadowCount}
-        onClick={() => onSelectSection("shadows")}
-      />
-      <TokenSectionButton
-        active={activeSection === "borders"}
-        icon={<Square size={15} />}
-        title="Borders / Strokes"
-        count={borderCount}
-        onClick={() => onSelectSection("borders")}
-      />
-      <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
-        Components default to design-token references. Semantic colors resolve through the active theme; foundation tokens remain available for explicit overrides.
-      </div>
-    </div>
-  );
-}
+  const sections = [
+    ["themes", "Themes & Semantic", SunMoon, themeCount],
+    ["colors", "Colors", Palette, colorCount],
+    ["typography", "Typography", Type, typographyCount],
+    ["spacing", "Spacing", MoveHorizontal, spacingCount],
+    ["radius", "Radius", Radius, radiusCount],
+    ["shadows", "Shadows / Elevation", Layers, shadowCount],
+    ["borders", "Borders / Strokes", Square, borderCount],
+  ] as const;
 
-function TokenSectionButton({
-  active,
-  icon,
-  title,
-  count,
-  onClick,
-}: {
-  active: boolean;
-  icon: ReactNode;
-  title: string;
-  count: number;
-  onClick: () => void;
-}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-xl border p-3 text-left transition ${
-        active
-          ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)]"
-          : "border-[var(--editor-border)] bg-[var(--editor-surface)] hover:bg-[var(--editor-surface-muted)]"
-      }`}
+    <SidebarSection
+      title="Design System"
+      description="Project-local tokens shared by every page and reusable component."
     >
-      <div className={`flex items-center gap-2 text-sm font-medium ${active ? "text-[var(--editor-accent)]" : "text-[var(--editor-text)]"}`}>
-        {icon} {title}
+      <div className="space-y-2">
+        {sections.map(([id, title, Icon, count]) => (
+          <SidebarNavItem
+            key={id}
+            active={activeSection === id}
+            icon={<Icon size={15} />}
+            title={title}
+            meta={`${count}`}
+            description={`${count} ${count === 1 ? "token" : "tokens"}`}
+            onClick={() => onSelectSection(id)}
+          />
+        ))}
       </div>
-      <div className="mt-1 text-xs text-[var(--editor-text-muted)]">
-        {count} {count === 1 ? "token" : "tokens"}
-      </div>
-    </button>
+      <Callout dashed>
+        Components default to design-token references. Semantic colors resolve through the active theme; foundation tokens remain available for explicit overrides.
+      </Callout>
+    </SidebarSection>
   );
 }

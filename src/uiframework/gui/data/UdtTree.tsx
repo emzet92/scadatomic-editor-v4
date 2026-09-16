@@ -2,21 +2,24 @@ import { Braces, ChevronRight, FunctionSquare, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
-import { IconButton } from "../ui";
+import { Callout, IconButton, SidebarSection } from "../ui";
 import type { DataSelection } from "./data-selection";
 
 export function UdtTree({ data, selection, onSelect, onCreate }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; onCreate(): void }) {
   const udts = Object.values(data.udts).sort((a, b) => a.name.localeCompare(b.name));
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">UDTs</div>
-        <IconButton aria-label="Create UDT" title="Create UDT" variant="secondary" onClick={onCreate}><Plus size={14} /></IconButton>
-      </div>
+    <SidebarSection
+      title="UDTs"
+      actions={<IconButton aria-label="Create UDT" variant="secondary" onClick={onCreate}><Plus size={14} /></IconButton>}
+    >
       <div className="space-y-0.5">
-        {udts.length === 0 ? <div className="rounded-md border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-soft)]">No UDT definitions yet.</div> : udts.map((udt) => <UdtRow key={udt.id} udt={udt} data={data} selection={selection} onSelect={onSelect} />)}
+        {udts.length === 0 ? (
+          <Callout dashed size="sm">No UDT definitions yet.</Callout>
+        ) : udts.map((udt) => (
+          <UdtRow key={udt.id} udt={udt} data={data} selection={selection} onSelect={onSelect} />
+        ))}
       </div>
-    </div>
+    </SidebarSection>
   );
 }
 

@@ -6,7 +6,7 @@ import {
   type RadiusValue,
 } from "../../design-system/radius";
 import { useEditorStore } from "../../editor-store";
-import { Select, TextInput } from "../ui";
+import { Callout, Select, TextInput } from "../ui";
 
 const LOCAL_OPTION = "__local__";
 
@@ -76,9 +76,9 @@ export function RadiusValueControl({
             <span className="shrink-0 font-mono text-[var(--editor-text)]">{selectedToken.value}px</span>
           </div>
         ) : (
-          <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+          <Callout variant="warning" size="sm">
             Missing radius token. Choose another token or switch to Local value.
-          </div>
+          </Callout>
         )
       ) : (
         <div className="flex items-center gap-1.5">

@@ -7,7 +7,21 @@ import {
 } from "../../design-system/colors";
 import { ensureProjectAppearance } from "../../design-system/theme-config";
 import { useEditorStore } from "../../editor-store";
-import { FormField, PanelCard, Select } from "../ui";
+import {
+  Callout,
+  ChoiceCard,
+  DataGrid,
+  DataGridHeader,
+  DataGridRow,
+  FormField,
+  PageContainer,
+  PageHeader,
+  PanelCard,
+  SectionHeader,
+  Select,
+} from "../ui";
+
+const SEMANTIC_GRID = "grid-cols-[minmax(170px,1.1fr)_72px_minmax(220px,1fr)]";
 
 export function ThemeWorkspace() {
   const document = useEditorStore((state) => state.document);
@@ -40,21 +54,22 @@ export function ThemeWorkspace() {
     "";
 
   return (
-    <div className="mx-auto w-full max-w-6xl p-8">
-      <div className="mb-7">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
-          <Palette size={14} /> Design System
-        </div>
-        <h1 className="mt-2 text-2xl font-semibold text-[var(--editor-text)]">Themes & semantic colors</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--editor-text-muted)]">
-          Designer preview is independent from runtime state. Configure the runtime source here, then preview any theme without changing the saved runtime session.
-        </p>
-      </div>
+    <PageContainer>
+      <PageHeader
+        icon={<Palette size={14} />}
+        title="Themes & semantic colors"
+        description="Designer preview is independent from runtime state. Configure the runtime source here, then preview any theme without changing the saved runtime session."
+      />
 
-      <PanelCard className="mb-5">
-        <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          <MonitorCog size={14} /> Runtime theme policy
-        </div>
+      <PanelCard padding="lg" className="mb-5">
+        <SectionHeader
+          className="mb-4"
+          title={
+            <span className="flex items-center gap-2">
+              <MonitorCog size={14} /> Runtime theme policy
+            </span>
+          }
+        />
         <div className="grid gap-4 md:grid-cols-2">
           <FormField label="Theme source">
             <Select
@@ -105,56 +120,42 @@ export function ThemeWorkspace() {
             </>
           ) : null}
         </div>
-        <div className="mt-4 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2.5 text-xs leading-5 text-[var(--editor-text-muted)]">
+        <Callout size="sm" className="mt-4">
           {appearance.themeMode === "runtime"
             ? 'Runtime starts with the initial theme. Scripts may switch it with App.theme = "dark" (theme name or id).'
             : appearance.themeMode === "system"
               ? "Runtime follows prefers-color-scheme and maps system light/dark to the themes selected above."
               : "Runtime always uses the configured default theme."}
-        </div>
+        </Callout>
       </PanelCard>
 
-      <PanelCard className="mb-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          Designer preview & mapping editor
-        </div>
+      <PanelCard padding="lg" className="mb-5">
+        <SectionHeader className="mb-3" title="Designer preview & mapping editor" />
         <div className="grid gap-2 sm:grid-cols-2">
           {themes.map((theme) => {
             const active = theme.id === editingThemeId;
             const dark = theme.name.toLocaleLowerCase().includes("dark");
             const Icon = dark ? Moon : Sun;
             return (
-              <button
+              <ChoiceCard
                 key={theme.id}
-                type="button"
+                selected={active}
+                icon={<Icon size={16} />}
+                title={theme.name}
+                description={active ? "Previewing in Designer" : "Preview without changing runtime state"}
                 onClick={() => setPreviewDesignTheme(theme.id)}
-                className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${
-                  active
-                    ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)]"
-                    : "border-[var(--editor-border)] bg-[var(--editor-surface)] hover:bg-[var(--editor-surface-muted)]"
-                }`}
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]">
-                  <Icon size={16} />
-                </span>
-                <span>
-                  <span className="block text-sm font-medium text-[var(--editor-text)]">{theme.name}</span>
-                  <span className="block text-[10px] text-[var(--editor-text-soft)]">
-                    {active ? "Previewing in Designer" : "Preview without changing runtime state"}
-                  </span>
-                </span>
-              </button>
+              />
             );
           })}
         </div>
       </PanelCard>
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-sm">
-        <div className="grid grid-cols-[minmax(170px,1.1fr)_72px_minmax(220px,1fr)] items-center gap-3 border-b border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+      <DataGrid>
+        <DataGridHeader columns={SEMANTIC_GRID}>
           <span>Semantic role</span>
           <span>Preview</span>
           <span>{themes.find((theme) => theme.id === editingThemeId)?.name ?? "Theme"} mapping</span>
-        </div>
+        </DataGridHeader>
 
         {semanticColors.map((token) => {
           const source = token.values[editingThemeId];
@@ -166,10 +167,7 @@ export function ThemeWorkspace() {
             editingThemeId
           );
           return (
-            <div
-              key={token.id}
-              className="grid grid-cols-[minmax(170px,1.1fr)_72px_minmax(220px,1fr)] items-center gap-3 border-b border-[var(--editor-border)] px-4 py-3 last:border-b-0"
-            >
+            <DataGridRow key={token.id} columns={SEMANTIC_GRID}>
               <div>
                 <div className="text-sm font-medium text-[var(--editor-text)]">{token.name}</div>
                 <div className="mt-0.5 font-mono text-[10px] text-[var(--editor-text-soft)]">{resolved}</div>
@@ -190,10 +188,10 @@ export function ThemeWorkspace() {
                   </option>
                 ))}
               </Select>
-            </div>
+            </DataGridRow>
           );
         })}
-      </div>
-    </div>
+      </DataGrid>
+    </PageContainer>
   );
 }

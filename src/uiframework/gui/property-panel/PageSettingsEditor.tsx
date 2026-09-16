@@ -17,9 +17,11 @@ import {
 } from "../../core/page-layouts";
 import type { UpdateNode } from "./property-panel-types";
 import {
+  Badge,
   Button,
   FormField,
   PanelCard,
+  PanelSection,
   SectionHeader,
   Select,
   TextInput,
@@ -67,46 +69,44 @@ export function PageSettingsEditor({
   return (
     <div className="space-y-6">
       {kind === "layout" ? (
-        <section>
+        <PanelSection>
           <SectionHeader
             title="Page layout"
             description="Shared page chrome. The content slot is filled by each page that uses this layout."
             className="mb-2"
           />
-          <PanelCard className="flex items-center gap-2 p-2.5 text-xs text-violet-700">
+          <PanelCard variant="accent" padding="sm" className="flex items-center gap-2 text-xs text-[var(--editor-accent)]">
             <LayoutTemplate size={13} className="shrink-0" />
             <span>Edit this layout like a page. Keep one content Page Slot where page content should render.</span>
           </PanelCard>
-        </section>
+        </PanelSection>
       ) : null}
 
       {kind === "page" && onSetStartPage ? (
-        <section>
+        <PanelSection>
           <SectionHeader
             title="Runtime entry"
             description="The start page is rendered when runtime opens without an explicit navigation path."
             className="mb-2"
           />
-          <PanelCard className="flex items-center justify-between gap-3 p-2.5">
+          <PanelCard padding="sm" className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--editor-text)]">
               <Home size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
               <span className="truncate">{isStartPage ? "Default start page" : "Not the start page"}</span>
             </div>
             {isStartPage ? (
-              <span className="rounded bg-[var(--editor-accent-soft)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-accent)]">
-                start
-              </span>
+              <Badge variant="accent">start</Badge>
             ) : (
               <Button size="xs" variant="secondary" onClick={onSetStartPage}>
                 Set as start
               </Button>
             )}
           </PanelCard>
-        </section>
+        </PanelSection>
       ) : null}
 
       {kind === "page" && onSetLayout ? (
-        <section>
+        <PanelSection>
           <SectionHeader
             title="Layout"
             description="Render this page inside a shared Page Layout."
@@ -134,10 +134,10 @@ export function PageSettingsEditor({
               ))}
             </Select>
           </FormField>
-        </section>
+        </PanelSection>
       ) : null}
 
-      <section>
+      <PanelSection>
         <SectionHeader title={kind === "layout" ? "Layout viewport" : "Page viewport"} className="mb-2" />
 
         <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)]">
@@ -204,7 +204,7 @@ export function PageSettingsEditor({
             />
           </FormField>
         </div>
-      </section>
+      </PanelSection>
     </div>
   );
 }

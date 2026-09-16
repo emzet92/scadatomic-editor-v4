@@ -1,5 +1,6 @@
 import { Cloud, Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { NavTab, NavTabs } from "../ui";
 import { useNavigate } from "react-router-dom";
 
 export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
@@ -65,10 +66,7 @@ export function WorkspaceNav({
   const routeContext: WorkspaceRouteContext = { projectId, scriptId };
 
   return (
-    <nav
-      aria-label="Project workspace"
-      className="inline-flex h-9 items-center gap-1 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-1"
-    >
+    <NavTabs ariaLabel="Project workspace">
       {DEFAULT_WORKSPACES.map((workspace) => {
         const Icon = workspace.icon;
         const isActive = workspace.id === active;
@@ -76,11 +74,11 @@ export function WorkspaceNav({
         const disabled = href === null;
 
         return (
-          <button
+          <NavTab
             key={workspace.id}
-            type="button"
-            aria-current={isActive ? "page" : undefined}
+            active={isActive}
             disabled={disabled}
+            icon={<Icon size={15} strokeWidth={1.8} />}
             onClick={() => {
               if (isActive || !href) {
                 return;
@@ -89,18 +87,12 @@ export function WorkspaceNav({
               onBeforeNavigate?.(workspace.id);
               navigate(href);
             }}
-            className={`inline-flex h-7 items-center gap-2 rounded-md px-3 text-sm font-medium transition ${
-              isActive
-                ? "bg-[var(--editor-surface)] text-[var(--editor-accent)] shadow-sm ring-1 ring-[var(--editor-border)]"
-                : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface)] hover:text-[var(--editor-text)]"
-            } ${disabled ? "cursor-not-allowed opacity-40" : ""}`}
           >
-            <Icon size={15} strokeWidth={1.8} />
             {workspace.label}
-          </button>
+          </NavTab>
         );
       })}
-    </nav>
+    </NavTabs>
   );
 }
 
