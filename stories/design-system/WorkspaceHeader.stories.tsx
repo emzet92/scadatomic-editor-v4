@@ -5,35 +5,45 @@ import {
   Box,
   Button,
   IconButton,
-  NotificationIcon
+  NotificationIcon,
 } from "../../src/uiframework/gui/ui";
 import { WorkspaceHeader } from "../../src/uiframework/gui/workspace/WorkspaceHeader";
 
 const meta = {
   title: "Organisms/Workspace Header",
   component: WorkspaceHeader,
-  parameters: {
-    layout: "fullscreen",
-    controls: { disable: true },
+  args: {
+    active: "editor",
+    projectId: "demo",
+    scriptId: "default",
+    title: "Demo project",
+    subtitle: "Packaging line",
   },
+  argTypes: {
+    active: { control: "select", options: ["editor", "scripts", "dependencies", "reports", "cloud"] },
+    projectId: { control: "text" },
+    scriptId: { control: "text" },
+    title: { control: "text" },
+    subtitle: { control: "text" },
+    actions: { control: false },
+    onBeforeNavigate: { control: false },
+  },
+  parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof WorkspaceHeader>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Editor: Story = {
-  render: () => (
+export const Playground: Story = {
+  render: (args) => (
     <MemoryRouter initialEntries={["/project/demo"]}>
       <Box className="min-h-[260px] bg-[var(--editor-app-bg)]">
         <WorkspaceHeader
-          active="editor"
-          projectId="demo"
-          title="Demo project"
-          subtitle="Packaging line"
+          {...args}
           actions={
             <>
-              <IconButton aria-label="Notifications"><NotificationIcon size={14} /></IconButton>
-              <Button variant="primary"><AddIcon size={13} />Deploy</Button>
+              <IconButton aria-label="Notifications"><NotificationIcon size="sm" /></IconButton>
+              <Button variant="primary" leadingIcon={<AddIcon size="sm" />}>Deploy</Button>
             </>
           }
         />
@@ -43,31 +53,22 @@ export const Editor: Story = {
 };
 
 export const Reports: Story = {
-  render: () => (
+  args: { active: "reports", title: "Report Designer", subtitle: "Page-based report authoring" },
+  render: (args) => (
     <MemoryRouter initialEntries={["/project/demo/reports"]}>
       <Box className="min-h-[260px] bg-[var(--editor-app-bg)]">
-        <WorkspaceHeader
-          active="reports"
-          projectId="demo"
-          title="Report Designer"
-          subtitle="Page-based report authoring"
-          actions={<Button variant="secondary">Preview report</Button>}
-        />
+        <WorkspaceHeader {...args} actions={<Button variant="secondary">Preview report</Button>} />
       </Box>
     </MemoryRouter>
   ),
 };
 
 export const Cloud: Story = {
-  render: () => (
+  args: { active: "cloud", projectId: undefined, title: "Cloud", subtitle: "Fleet Management" },
+  render: (args) => (
     <MemoryRouter initialEntries={["/cloud/fleet"]}>
       <Box className="min-h-[260px] bg-[var(--editor-app-bg)]">
-        <WorkspaceHeader
-          active="cloud"
-          title="Cloud"
-          subtitle="Fleet Management"
-          actions={<Button variant="primary">Create registration key</Button>}
-        />
+        <WorkspaceHeader {...args} actions={<Button variant="primary">Create registration key</Button>} />
       </Box>
     </MemoryRouter>
   ),

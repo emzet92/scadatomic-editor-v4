@@ -1,31 +1,74 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SegmentedControl, SegmentedControlItem } from "../../src/uiframework/gui/ui";
+import { SegmentedControl, SegmentedControlItem, Surface, Text } from "../../src/uiframework/gui/ui";
+
+type SegmentedStoryArgs = {
+  variant: "outline" | "soft";
+  fullWidth: boolean;
+  itemCount: number;
+  initialIndex: number;
+};
 
 const meta = {
   title: "Molecules/Segmented Control",
-  parameters: { controls: { disable: true } },
-} satisfies Meta;
+  args: {
+    variant: "outline",
+    fullWidth: false,
+    itemCount: 3,
+    initialIndex: 0,
+  },
+  argTypes: {
+    variant: { control: "select", options: ["outline", "soft"] },
+    fullWidth: { control: "boolean" },
+    itemCount: { control: { type: "range", min: 2, max: 5, step: 1 } },
+    initialIndex: { control: { type: "range", min: 0, max: 4, step: 1 } },
+  },
+} satisfies Meta<SegmentedStoryArgs>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function InteractiveSegmentedControl({ variant = "outline" }: { variant?: "outline" | "soft" }) {
-  const [value, setValue] = useState<"fixed" | "adaptive" | "auto">("fixed");
+const LABELS = ["Fixed", "Adaptive", "Auto", "Fill", "Hug"];
+
+function InteractiveSegmentedControl({ variant, fullWidth, itemCount, initialIndex }: SegmentedStoryArgs) {
+  const safeInitial = Math.min(initialIndex, itemCount - 1);
+  const [value, setValue] = useState(safeInitial);
+  useEffect(() => setValue(safeInitial), [safeInitial, itemCount]);
+
   return (
-    <SegmentedControl variant={variant} fullWidth={variant === "soft"}>
-      <SegmentedControlItem variant={variant} grow={variant === "soft"} active={value === "fixed"} onClick={() => setValue("fixed")}>Fixed</SegmentedControlItem>
-      <SegmentedControlItem variant={variant} grow={variant === "soft"} active={value === "adaptive"} onClick={() => setValue("adaptive")}>Adaptive</SegmentedControlItem>
-      <SegmentedControlItem variant={variant} grow={variant === "soft"} active={value === "auto"} onClick={() => setValue("auto")}>Auto</SegmentedControlItem>
+    <SegmentedControl variant={variant} fullWidth={fullWidth}>
+      {LABELS.slice(0, itemCount).map((label, index) => (
+        <SegmentedControlItem
+          key={label}
+          variant={variant}
+          grow={fullWidth}
+          active={value === index}
+          onClick={() => setValue(index)}
+        >
+          {label}
+        </SegmentedControlItem>
+      ))}
     </SegmentedControl>
   );
 }
 
+export const Playground: Story = {
+  render: (args) => (
+    <Surface className="mx-auto max-w-xl">
+      <Text as="div" variant="caption" tone="muted" className="mb-3">Try variant, width and number of items from Controls.</Text>
+      <InteractiveSegmentedControl {...args} />
+    </Surface>
+  ),
+};
+
 export const Variants: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
-    <div className="max-w-xl space-y-5 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-6">
-      <div><div className="mb-2 text-xs font-semibold">Outline</div><InteractiveSegmentedControl /></div>
-      <div><div className="mb-2 text-xs font-semibold">Soft / full width</div><InteractiveSegmentedControl variant="soft" /></div>
-    </div>
+    <Surface className="max-w-xl">
+      <div className="space-y-5">
+        <div><Text as="div" variant="label" className="mb-2">Outline</Text><InteractiveSegmentedControl variant="outline" fullWidth={false} itemCount={3} initialIndex={0} /></div>
+        <div><Text as="div" variant="label" className="mb-2">Soft / full width</Text><InteractiveSegmentedControl variant="soft" fullWidth itemCount={3} initialIndex={1} /></div>
+      </div>
+    </Surface>
   ),
 };

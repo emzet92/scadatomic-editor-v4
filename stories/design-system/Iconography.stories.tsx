@@ -13,17 +13,57 @@ import {
   editorIconTones,
 } from "../../src/uiframework/gui/ui";
 
+type IconPlaygroundArgs = {
+  icon: string;
+  size: keyof typeof editorIconSizes;
+  weight: keyof typeof editorIconStrokeWidths;
+  tone: keyof typeof editorIconTones;
+  label: string;
+};
+
 const meta = {
   title: "Foundations/Iconography",
-  parameters: { controls: { disable: true } },
-} satisfies Meta;
+  args: {
+    icon: "Database",
+    size: "lg",
+    weight: "regular",
+    tone: "accent",
+    label: "",
+  },
+  argTypes: {
+    icon: { control: "select", options: editorIconCatalog.map((entry) => entry.name) },
+    size: { control: "select", options: Object.keys(editorIconSizes) },
+    weight: { control: "select", options: Object.keys(editorIconStrokeWidths) },
+    tone: { control: "select", options: Object.keys(editorIconTones) },
+    label: { control: "text", description: "Optional accessible label. Empty means decorative." },
+  },
+} satisfies Meta<IconPlaygroundArgs>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 const categories = Array.from(new Set(editorIconCatalog.map((icon) => icon.category)));
 
+export const Playground: Story = {
+  render: (args) => {
+    const entry = editorIconCatalog.find((item) => item.name === args.icon) ?? editorIconCatalog[0]!;
+    const Glyph = entry.component;
+    return (
+      <Surface padding="lg" className="mx-auto max-w-lg">
+        <Stack gap="md" align="center">
+          <Glyph size={args.size} weight={args.weight} tone={args.tone} label={args.label || undefined} />
+          <Stack gap="none" align="center">
+            <Text variant="label">{entry.name}Icon</Text>
+            <Text variant="caption" tone="muted">Lucide: {entry.source}</Text>
+          </Stack>
+        </Stack>
+      </Surface>
+    );
+  },
+};
+
 export const Catalog: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <Stack gap="xl" className="mx-auto max-w-7xl">
       <Stack gap="xs">
@@ -64,6 +104,7 @@ export const Catalog: Story = {
 };
 
 export const Tokens: Story = {
+  parameters: { controls: { disable: true } },
   render: () => (
     <Stack gap="xl" className="mx-auto max-w-5xl">
       <Stack gap="xs">
