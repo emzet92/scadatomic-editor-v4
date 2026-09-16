@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import { getPage } from "../../core/document";
 import { buildDocumentIndex } from "../../core/document-index";
 import { canAcceptManualChildren } from "../../repeat/RepeatBehavior";
@@ -23,17 +24,17 @@ export function TreeView() {
   if (!document.nodes[rootId]) return null;
 
   return (
-    <div className="space-y-1">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-xs uppercase tracking-wide font-semibold text-[var(--editor-text-muted)]">
+    <Box className="space-y-1">
+      <Box className="mb-2 flex items-center justify-between gap-2">
+        <Box className="text-xs uppercase tracking-wide font-semibold text-[var(--editor-text-muted)]">
           Component tree
-        </div>
+        </Box>
         {selectedNodeIds.length > 1 ? (
           <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
             {selectedNodeIds.length} selected
           </span>
         ) : null}
-      </div>
+      </Box>
 
       <NodeTree
         rootId={rootId}
@@ -53,6 +54,6 @@ export function TreeView() {
         deleteNode={deleteNode}
         canDeleteNode={(nodeId) => nodeId !== rootId}
       />
-    </div>
+    </Box>
   );
 }

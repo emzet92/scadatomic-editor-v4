@@ -19,6 +19,8 @@ import {
   SegmentedControl,
   SegmentedControlItem,
   Stepper,
+  Box,
+  Icon,
 } from "../ui";
 
 type GridPreset = {
@@ -154,19 +156,19 @@ export function ContainerLayoutEditor({
 
   return (
     <section className="overflow-hidden rounded-[20px] border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-start gap-3 px-4 pb-3 pt-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <LayoutGrid size={17} strokeWidth={2} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-[var(--editor-text)]">Layout</div>
-          <div className="mt-0.5 text-[11px] leading-4 text-[var(--editor-text-muted)]">
+      <Box className="flex items-start gap-3 px-4 pb-3 pt-4">
+        <Box className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
+          <Icon glyph={LayoutGrid} size={17} strokeWidth={2} />
+        </Box>
+        <Box className="min-w-0 flex-1">
+          <Box className="text-sm font-semibold text-[var(--editor-text)]">Layout</Box>
+          <Box className="mt-0.5 text-[11px] leading-4 text-[var(--editor-text-muted)]">
             Stable grid presets with predictable spacing and adaptive reflow.
-          </div>
-        </div>
-      </div>
+          </Box>
+        </Box>
+      </Box>
 
-      <div className="px-3 pb-3">
+      <Box className="px-3 pb-3">
         <SegmentedControl variant="soft" fullWidth>
           <SegmentedControlItem
             variant="soft"
@@ -185,26 +187,26 @@ export function ContainerLayoutEditor({
             Flow
           </SegmentedControlItem>
         </SegmentedControl>
-      </div>
+      </Box>
 
       {display === "grid" ? (
         <>
-          <div className="border-t border-[var(--editor-border)] px-4 py-4">
-            <div className="mb-2.5 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+          <Box className="border-t border-[var(--editor-border)] px-4 py-4">
+            <Box className="mb-2.5 flex items-center justify-between">
+              <Box>
+                <Box className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
                   Grid preset
-                </div>
-                <div className="mt-0.5 text-[10px] text-[var(--editor-text-soft)]">
+                </Box>
+                <Box className="mt-0.5 text-[10px] text-[var(--editor-text-soft)]">
                   Pick a safe starting structure.
-                </div>
-              </div>
+                </Box>
+              </Box>
               <Badge variant="accent" size="sm">
                 {gridMode === "adaptive" ? "Adaptive" : `${columns} col`}
               </Badge>
-            </div>
+            </Box>
 
-            <div className="grid grid-cols-2 gap-2">
+            <Box className="grid grid-cols-2 gap-2">
               {GRID_PRESETS.map((preset) => {
                 const active =
                   preset.mode === gridMode &&
@@ -236,10 +238,10 @@ export function ContainerLayoutEditor({
                   />
                 );
               })}
-            </div>
-          </div>
+            </Box>
+          </Box>
 
-          <div className="border-t border-[var(--editor-border)] px-4 py-4">
+          <Box className="border-t border-[var(--editor-border)] px-4 py-4">
             <ControlRow
               label={gridMode === "adaptive" ? "Min column" : "Columns"}
               description={
@@ -268,10 +270,10 @@ export function ContainerLayoutEditor({
               )}
             </ControlRow>
 
-            <div className="mt-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+            <Box className="mt-4">
+              <Box className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
                 Vertical sizing
-              </div>
+              </Box>
               <SegmentedControl variant="soft" fullWidth className="mt-2">
                 <SegmentedControlItem
                   variant="soft"
@@ -290,13 +292,13 @@ export function ContainerLayoutEditor({
                   Minimum row
                 </SegmentedControlItem>
               </SegmentedControl>
-              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+              <Box className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
                 Hug keeps rows as short as their content. Minimum reserves a predictable target height.
-              </div>
-            </div>
+              </Box>
+            </Box>
 
             {gridRowMode === "minimum" ? (
-              <div className="mt-4">
+              <Box className="mt-4">
                 <ControlRow
                   label="Minimum row"
                   description="Only used while Minimum row sizing is enabled."
@@ -312,13 +314,13 @@ export function ContainerLayoutEditor({
                     }
                   />
                 </ControlRow>
-              </div>
+              </Box>
             ) : null}
 
-            <div className="mt-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+            <Box className="mt-4">
+              <Box className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
                 Items in row
-              </div>
+              </Box>
               <SegmentedControl variant="soft" fullWidth className="mt-2">
                 {([
                   ["start", "Top"],
@@ -337,30 +339,30 @@ export function ContainerLayoutEditor({
                   </SegmentedControlItem>
                 ))}
               </SegmentedControl>
-              <div className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+              <Box className="mt-1.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
                 Top is the default: components keep their own height instead of filling downward.
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Box>
+          </Box>
         </>
       ) : (
-        <div className="border-t border-[var(--editor-border)] px-4 py-4">
-          <div className="flex items-center gap-3 rounded-[16px] bg-[var(--editor-surface-muted)] p-3">
-            <Rows3 size={18} className="text-[var(--editor-accent)]" />
-            <div>
-              <div className="text-xs font-semibold text-[var(--editor-text)]">Flow layout</div>
-              <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+        <Box className="border-t border-[var(--editor-border)] px-4 py-4">
+          <Box className="flex items-center gap-3 rounded-[16px] bg-[var(--editor-surface-muted)] p-3">
+            <Icon glyph={Rows3} size={18} className="text-[var(--editor-accent)]" />
+            <Box>
+              <Box className="text-xs font-semibold text-[var(--editor-text)]">Flow layout</Box>
+              <Box className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
                 Children wrap naturally. Use Grid when alignment must stay locked.
-              </div>
-            </div>
-          </div>
-        </div>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
       )}
 
-      <div className="border-t border-[var(--editor-border)] px-4 py-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
+      <Box className="border-t border-[var(--editor-border)] px-4 py-4">
+        <Box className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--editor-text-muted)]">
           Spacing
-        </div>
+        </Box>
         <SegmentedControl variant="soft" fullWidth className="mt-2">
           {SPACING_PRESETS.map((preset) => (
             <SegmentedControlItem
@@ -374,7 +376,7 @@ export function ContainerLayoutEditor({
             </SegmentedControlItem>
           ))}
         </SegmentedControl>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <Box className="mt-3 grid grid-cols-2 gap-2">
           <SpacingValueControl
             compact
             label="Gap"
@@ -393,8 +395,8 @@ export function ContainerLayoutEditor({
             max={64}
             onChange={(value) => patch({ padding: value })}
           />
-        </div>
-        <div className="mt-2 space-y-2">
+        </Box>
+        <Box className="mt-2 space-y-2">
           <BorderValueControl
             label="Border / stroke"
             value={borderValue}
@@ -403,7 +405,7 @@ export function ContainerLayoutEditor({
           />
           <RadiusValueControl
             compact
-            icon={<Radius size={12} />}
+            icon={<Icon glyph={Radius} size={12} />}
             label="Corner radius"
             value={borderRadiusValue}
             fallback={defaultContainerProps.borderRadius}
@@ -416,8 +418,8 @@ export function ContainerLayoutEditor({
             value={shadowValue}
             onChange={(value) => patch({ shadow: value })}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
     </section>
   );
 }
@@ -432,7 +434,7 @@ function MiniGrid({
   active: boolean;
 }) {
   return (
-    <div
+    <Box
       className="grid h-8 gap-1 rounded-[10px] p-1.5"
       style={{
         gridTemplateColumns: `repeat(${Math.max(1, Math.min(columns, 4))}, minmax(0, 1fr))`,
@@ -451,7 +453,7 @@ function MiniGrid({
           }}
         />
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -465,15 +467,15 @@ function ControlRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="text-xs font-medium text-[var(--editor-text)]">{label}</div>
-        <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+    <Box className="flex items-center justify-between gap-3">
+      <Box className="min-w-0">
+        <Box className="text-xs font-medium text-[var(--editor-text)]">{label}</Box>
+        <Box className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
           {description}
-        </div>
-      </div>
+        </Box>
+      </Box>
       {children}
-    </div>
+    </Box>
   );
 }
 

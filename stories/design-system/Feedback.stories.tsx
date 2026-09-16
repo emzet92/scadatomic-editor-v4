@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge, Button, Callout, EmptyState } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Feedback",
+  title: "Molecules/Feedback",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

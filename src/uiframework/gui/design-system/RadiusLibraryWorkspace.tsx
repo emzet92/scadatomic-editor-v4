@@ -11,6 +11,8 @@ import {
   PageHeader,
   PanelCard,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 export function RadiusLibraryWorkspace() {
@@ -31,25 +33,25 @@ export function RadiusLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Radius size={14} />}
+        icon={<Icon glyph={Radius} size={14} />}
         title="Radius"
         description="Define a shared corner-radius scale for buttons, containers, modals, images and other surfaces. Components reference stable token IDs, so renaming a radius step is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-            <Plus size={14} /> Add radius
+            <Icon glyph={Plus} size={14} /> Add radius
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Radius size={20} />}
+          icon={<Icon glyph={Radius} size={20} />}
           title="No radius tokens yet"
           description="Create individual values or seed a practical 0 / 2 / 4 / 8 / 12 / 16 / 24 / pill scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-                <Plus size={14} /> Add radius
+                <Icon glyph={Plus} size={14} /> Add radius
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterRadiusScale}>
                 Create starter scale
@@ -58,7 +60,7 @@ export function RadiusLibraryWorkspace() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <Box className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countRadiusTokenUsages(document, token.id);
             const previewRadius = Math.min(30, token.value);
@@ -68,31 +70,31 @@ export function RadiusLibraryWorkspace() {
                 padding="lg"
                 className="grid grid-cols-[minmax(210px,1fr)_minmax(240px,1.3fr)_130px_48px] items-center gap-4 rounded-2xl shadow-sm"
               >
-                <div className="space-y-2">
+                <Box className="space-y-2">
                   <TextInput
                     aria-label="Radius token name"
                     value={token.name}
                     onChange={(event) => updateRadiusToken(token.id, { name: event.target.value })}
                   />
-                  <div className="text-[10px] text-[var(--editor-text-soft)]">
+                  <Box className="text-[10px] text-[var(--editor-text-soft)]">
                     {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="flex min-h-16 items-center gap-4 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4">
-                  <div
+                <Box className="flex min-h-16 items-center gap-4 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4">
+                  <Box
                     className="h-10 w-16 border-2 border-[var(--editor-accent)] bg-[var(--editor-accent-soft)]"
                     style={{ borderRadius: `${previewRadius}px` }}
                   />
-                  <div>
-                    <div className="text-xs font-medium text-[var(--editor-text)]">{token.value}px</div>
-                    <div className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
+                  <Box>
+                    <Box className="text-xs font-medium text-[var(--editor-text)]">{token.value}px</Box>
+                    <Box className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
                       {token.value >= 999 ? "Pill / fully rounded" : "Corner radius preview"}
-                    </div>
-                  </div>
-                </div>
+                    </Box>
+                  </Box>
+                </Box>
 
-                <div className="flex items-center gap-2">
+                <Box className="flex items-center gap-2">
                   <TextInput
                     aria-label="Radius value"
                     type="number"
@@ -104,7 +106,7 @@ export function RadiusLibraryWorkspace() {
                     }
                   />
                   <span className="text-xs text-[var(--editor-text-muted)]">px</span>
-                </div>
+                </Box>
 
                 <IconButton
                   aria-label="Delete radius token and detach usages"
@@ -112,12 +114,12 @@ export function RadiusLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteRadiusToken(token.id)}
                 >
-                  <Trash2 size={14} />
+                  <Icon glyph={Trash2} size={14} />
                 </IconButton>
               </PanelCard>
             );
           })}
-        </div>
+        </Box>
       )}
 
       <Callout className="mt-5">

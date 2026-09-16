@@ -41,6 +41,7 @@ import {
   SegmentedControlItem,
   Select,
   TextInput,
+  Box,
 } from "../ui";
 
 export type PropertyControlRendererProps = {
@@ -115,7 +116,7 @@ function TagRefControl({ control, value, updateProp }: PropertyControlRendererPr
 function ChartSeriesControl(props: PropertyControlRendererProps) {
   if (props.control.kind !== "chart-series") return null;
   return (
-    <div className="space-y-2">
+    <Box className="space-y-2">
       <SectionHeader
         title="Data points"
         description="Add multiple live tag series to the same chart."
@@ -128,7 +129,7 @@ function ChartSeriesControl(props: PropertyControlRendererProps) {
         componentInputs={props.componentInputs}
         updateNode={props.updateNode}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -217,7 +218,7 @@ function TypographyControl({
 
   return (
     <FormField label="Typography">
-      <div className="space-y-2">
+      <Box className="space-y-2">
         <SegmentedControl className="w-full">
           <SegmentedControlItem
             active={mode === "local"}
@@ -237,7 +238,7 @@ function TypographyControl({
         </SegmentedControl>
 
         {mode === "token" ? (
-          <div className="space-y-2">
+          <Box className="space-y-2">
             <Select
               aria-label="Design system typography"
               value={tokenRef?.tokenId ?? ""}
@@ -250,7 +251,7 @@ function TypographyControl({
               ))}
             </Select>
             {selectedToken ? (
-              <div
+              <Box
                 className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2 text-[var(--editor-text)]"
                 style={{
                   fontFamily: selectedToken.fontFamily,
@@ -261,23 +262,23 @@ function TypographyControl({
                 }}
               >
                 The quick brown fox
-              </div>
+              </Box>
             ) : (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+              <Box className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
                 Missing typography token. Choose another style or switch to Local.
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="col-span-2">
+          <Box className="grid grid-cols-2 gap-2">
+            <Box className="col-span-2">
               <TextInput
                 aria-label="Font family"
                 value={localStyle.fontFamily}
                 onChange={(event) => updateLocal({ fontFamily: event.target.value })}
                 placeholder="Inter, sans-serif"
               />
-            </div>
+            </Box>
             <TextInput
               aria-label="Font size"
               type="number"
@@ -308,15 +309,15 @@ function TypographyControl({
               value={localStyle.letterSpacing}
               onChange={(event) => updateLocal({ letterSpacing: Number(event.target.value) })}
             />
-          </div>
+          </Box>
         )}
 
         {tokens.length === 0 ? (
-          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+          <Box className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
             Add text styles in Design System → Typography to enable references.
-          </div>
+          </Box>
         ) : null}
-      </div>
+      </Box>
     </FormField>
   );
 }
@@ -440,7 +441,7 @@ function BorderSizeControl({ control, value, updateProp }: PropertyControlRender
   const borderSize = typeof value === "number" ? value : Number(value ?? control.min ?? 0);
   return (
     <FormField label="border">
-      <div
+      <Box
         data-editor-ignore
         className="flex h-9 w-full items-center overflow-hidden rounded-[12px] border border-[var(--editor-border)] bg-[var(--editor-surface)] transition focus-within:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]"
       >
@@ -461,7 +462,7 @@ function BorderSizeControl({ control, value, updateProp }: PropertyControlRender
           className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-[var(--editor-text)] outline-none"
         />
         <span className="pr-3 text-xs text-[var(--editor-text-muted)] opacity-70">px</span>
-      </div>
+      </Box>
     </FormField>
   );
 }
@@ -522,7 +523,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
 
   return (
     <FormField label={propName}>
-      <div className="space-y-2">
+      <Box className="space-y-2">
         <SegmentedControl className="w-full">
           <SegmentedControlItem
             active={mode === "local"}
@@ -542,8 +543,8 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
         </SegmentedControl>
 
         {mode === "token" ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
+          <Box className="space-y-2">
+            <Box className="flex items-center gap-2">
               <span
                 className="h-9 w-9 shrink-0 rounded-[12px] border border-[var(--editor-border)] shadow-sm"
                 style={{ background: resolved }}
@@ -573,18 +574,18 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
                   </optgroup>
                 ) : null}
               </Select>
-            </div>
+            </Box>
             {selectedName ? (
-              <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-[var(--editor-text-soft)]">
+              <Box className="flex items-center justify-between gap-2 px-1 text-[10px] text-[var(--editor-text-soft)]">
                 <span className="truncate">{selectedName}</span>
                 <span className="font-mono">{resolved}</span>
-              </div>
+              </Box>
             ) : (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
+              <Box className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
                 Missing color token. Choose another token or switch to Local.
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         ) : (
           <ColorPickerInput
             ariaLabel={`${propName} color`}
@@ -594,11 +595,11 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
         )}
 
         {colors.length === 0 && semanticColors.length === 0 ? (
-          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+          <Box className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
             Add project colors in Design System → Colors to enable token references.
-          </div>
+          </Box>
         ) : null}
-      </div>
+      </Box>
     </FormField>
   );
 }

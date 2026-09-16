@@ -1,3 +1,4 @@
+import { Box, Pressable } from "../ui";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -303,7 +304,7 @@ function ScriptEditor({
   }
 
   return (
-    <div className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
+    <Box className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
       <WorkspaceHeader
         active="scripts"
         projectId={projectId}
@@ -317,17 +318,17 @@ function ScriptEditor({
               {dirty ? "Unsaved changes" : "Saved locally"}
             </span>
 
-            <button
+            <Pressable
               className="h-9 px-4 rounded-md bg-[var(--editor-accent)] hover:bg-[var(--editor-accent-hover)] text-sm font-medium text-white transition"
               onClick={save}
             >
               Save Script
-            </button>
+            </Pressable>
           </>
         }
       />
 
-      <div className="min-h-0 flex-1 flex">
+      <Box className="min-h-0 flex-1 flex">
         <HandlerTree
           document={document}
           currentScriptId={scriptId}
@@ -339,23 +340,23 @@ function ScriptEditor({
         />
 
         <main className="min-w-0 flex-1 overflow-auto p-6">
-          <div className="max-w-6xl mx-auto space-y-4">
+          <Box className="max-w-6xl mx-auto space-y-4">
             {apiError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <Box className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {apiError}
-              </div>
+              </Box>
             ) : null}
 
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">
+            <Box>
+              <Box className="text-xs font-medium uppercase tracking-wide text-zinc-400">
                 {scriptSelection?.kind === "handler" ||
                 scriptSelection?.kind === "componentHandler"
                   ? "Handler ID"
                   : "Method Script ID"}
-              </div>
-              <div className="mt-1 text-sm font-mono text-zinc-600">
+              </Box>
+              <Box className="mt-1 text-sm font-mono text-zinc-600">
                 {scriptId}
-              </div>
+              </Box>
 
               <h1 className="mt-4 text-xl font-semibold text-zinc-900">
                 {scriptSelection?.kind === "method"
@@ -375,9 +376,9 @@ function ScriptEditor({
                       ? "Component method executed synchronously inside the current handler context."
                       : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
               </p>
-            </div>
+            </Box>
 
-            <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+            <Box className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
               <ScriptViewTab active={view === "code"} onClick={() => setView("code")}>
                 Code
               </ScriptViewTab>
@@ -400,7 +401,7 @@ function ScriptEditor({
                   </ScriptViewTab>
                 </>
               ) : null}
-            </div>
+            </Box>
 
             {view === "code" ? (
               <>
@@ -415,11 +416,11 @@ function ScriptEditor({
                   projectData={document?.data}
                 />
 
-                <div className="rounded-xl border border-zinc-200 bg-white p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <Box className="rounded-xl border border-zinc-200 bg-white p-4">
+                  <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                     ctx API
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
+                  </Box>
+                  <Box className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
                     <code>App.theme = "dark"</code>
                     <code>App.theme / App.themeId</code>
                     <code>ctx.sourceNodeId</code>
@@ -459,11 +460,11 @@ function ScriptEditor({
                     <code>ctx.random.color()</code>
                     <code>ctx.random.number(min, max)</code>
                     <code>ctx.log(...args)</code>
-                  </div>
+                  </Box>
                   <p className="mt-3 text-xs text-amber-700">
                     Prototype only: handlers run with new Function and are not sandboxed.
                   </p>
-                </div>
+                </Box>
               </>
             ) : view === "ast" ? (
               <CodeGraphView source={code} />
@@ -472,10 +473,10 @@ function ScriptEditor({
             ) : supportsExecutionGraph ? (
               <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
             ) : null}
-          </div>
+          </Box>
         </main>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -489,7 +490,7 @@ function ScriptViewTab({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Pressable
       type="button"
       onClick={onClick}
       className={`rounded-md px-3 py-1.5 font-medium transition ${
@@ -499,7 +500,7 @@ function ScriptViewTab({
       }`}
     >
       {children}
-    </button>
+    </Pressable>
   );
 }
 

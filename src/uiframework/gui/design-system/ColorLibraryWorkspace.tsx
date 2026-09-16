@@ -15,6 +15,8 @@ import {
   PageContainer,
   PageHeader,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 const COLOR_GRID = "grid-cols-[56px_minmax(180px,1.3fr)_minmax(160px,.8fr)_100px_84px]";
@@ -45,25 +47,25 @@ export function ColorLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Palette size={14} />}
+        icon={<Icon glyph={Palette} size={14} />}
         title="Color library"
         description="Define named project colors once and reference them from component properties and variants. Rename safely; references use stable IDs."
         actions={
           <Button size="sm" variant="primary" onClick={() => addColorToken({ name: "Color", value: "#7c3aed" })}>
-            <Plus size={14} /> Add color
+            <Icon glyph={Plus} size={14} /> Add color
           </Button>
         }
       />
 
       {colors.length === 0 ? (
         <EmptyState
-          icon={<Palette size={20} />}
+          icon={<Icon glyph={Palette} size={20} />}
           title="No color tokens yet"
           description="Create a color or seed a starter palette for brand, surfaces, text and status colors."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addColorToken()}>
-                <Plus size={14} /> Add color
+                <Icon glyph={Plus} size={14} /> Add color
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterColorPalette}>
                 Create starter palette
@@ -84,7 +86,7 @@ export function ColorLibraryWorkspace() {
             const usageCount = countColorTokenUsages(document, token.id);
             return (
               <DataGridRow key={token.id} columns={COLOR_GRID}>
-                <div className="flex items-center justify-center">
+                <Box className="flex items-center justify-center">
                   <ColorPickerInput
                     compact
                     ariaLabel={`Choose ${token.name}`}
@@ -92,7 +94,7 @@ export function ColorLibraryWorkspace() {
                     onChange={(value) => updateColorToken(token.id, { value })}
                     showValue={false}
                   />
-                </div>
+                </Box>
 
                 <TextInput
                   aria-label="Color token name"
@@ -106,17 +108,17 @@ export function ColorLibraryWorkspace() {
                   onChange={(event) => updateColorToken(token.id, { value: event.target.value })}
                 />
 
-                <div className="text-xs text-[var(--editor-text-muted)]">
+                <Box className="text-xs text-[var(--editor-text-muted)]">
                   {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                </div>
+                </Box>
 
-                <div className="flex items-center justify-end gap-1">
+                <Box className="flex items-center justify-end gap-1">
                   <IconButton
                     aria-label={copiedId === token.id ? "Copied" : "Copy value"}
                     size="icon"
                     onClick={() => void copyToken(token)}
                   >
-                    <Copy size={14} />
+                    <Icon glyph={Copy} size={14} />
                   </IconButton>
                   <IconButton
                     aria-label="Delete token and detach usages"
@@ -124,9 +126,9 @@ export function ColorLibraryWorkspace() {
                     size="icon"
                     onClick={() => deleteColorToken(token.id)}
                   >
-                    <Trash2 size={14} />
+                    <Icon glyph={Trash2} size={14} />
                   </IconButton>
-                </div>
+                </Box>
               </DataGridRow>
             );
           })}

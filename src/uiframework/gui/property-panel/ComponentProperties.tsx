@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import type {
   Binding,
   HandlerRef,
@@ -57,7 +58,7 @@ export function ComponentProperties({
   const hasControls = Object.keys(controls).length > 0;
 
   return (
-    <div className="space-y-5">
+    <Box className="space-y-5">
       {hasControls ? (
         <PropsEditor
           nodeId={node.id}
@@ -68,9 +69,9 @@ export function ComponentProperties({
           updateNode={updateNode}
         />
       ) : (
-        <div className="rounded-lg border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-muted)]">
+        <Box className="rounded-lg border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-muted)]">
           {emptyMessage}
-        </div>
+        </Box>
       )}
 
       {bindingDefinitions && setBinding ? (
@@ -93,6 +94,6 @@ export function ComponentProperties({
           {...(handlerIdPrefix ? { handlerIdPrefix } : {})}
         />
       ) : null}
-    </div>
+    </Box>
   );
 }

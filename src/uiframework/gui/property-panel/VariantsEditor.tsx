@@ -15,6 +15,9 @@ import {
   PanelSection,
   SectionHeader,
   TextInput,
+  Box,
+  Icon,
+  Pressable,
 } from "../ui";
 
 export function VariantsEditor({
@@ -105,7 +108,7 @@ export function VariantsEditor({
                 setError(null);
               }}
             >
-              <Plus size={13} /> Add
+              <Icon glyph={Plus} size={13} /> Add
             </Button>
           ) : null
         }
@@ -113,8 +116,8 @@ export function VariantsEditor({
 
       {adding ? (
         <PanelCard accent>
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1">
+          <Box className="flex items-center gap-2">
+            <Box className="relative min-w-0 flex-1">
               <TextInput
                 autoFocus
                 controlSize="sm"
@@ -144,7 +147,7 @@ export function VariantsEditor({
               <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[10px] text-[var(--editor-text-muted)]">
                 ()
               </span>
-            </div>
+            </Box>
             <IconButton
               variant="primary"
               size="icon"
@@ -152,7 +155,7 @@ export function VariantsEditor({
               onClick={addVariant}
               title="Add variant"
             >
-              <Check size={13} />
+              <Icon glyph={Check} size={13} />
             </IconButton>
             <IconButton
               size="icon"
@@ -163,52 +166,52 @@ export function VariantsEditor({
               }}
               title="Cancel"
             >
-              <X size={13} />
+              <Icon glyph={X} size={13} />
             </IconButton>
-          </div>
+          </Box>
           {error ? (
-            <div className="mt-1.5 text-[10px] leading-4 text-red-600">{error}</div>
+            <Box className="mt-1.5 text-[10px] leading-4 text-red-600">{error}</Box>
           ) : (
-            <div className="mt-1.5 truncate font-mono text-[9px] text-[var(--editor-text-muted)] opacity-70">
+            <Box className="mt-1.5 truncate font-mono text-[9px] text-[var(--editor-text-muted)] opacity-70">
               ctx.ui.{node.name}.variant.{draft || "enabled"}()
-            </div>
+            </Box>
           )}
         </PanelCard>
       ) : null}
 
       {variants.length === 0 ? (
         <EmptyAction onClick={() => setAdding(true)}>
-          <Palette size={14} /> Add the first visual variant
+          <Icon glyph={Palette} size={14} /> Add the first visual variant
         </EmptyAction>
       ) : (
-        <div className="space-y-1.5">
+        <Box className="space-y-1.5">
           {variants.map((variantName) => {
             const isDefault = node.defaultVariant === variantName;
             return (
-              <div
+              <Box
                 key={variantName}
                 className="group flex items-center gap-2 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 py-2"
               >
-                <button
+                <Pressable
                   type="button"
                   data-editor-ignore
                   onClick={() => onEditVariant(node.id, variantName)}
                   className="min-w-0 flex-1 text-left"
                 >
-                  <div className="flex items-center gap-1.5">
+                  <Box className="flex items-center gap-1.5">
                     <span className="truncate font-mono text-xs font-medium text-[var(--editor-text)]">
                       {variantName}()
                     </span>
                     {isDefault ? (
-                      <Badge variant="warning" icon={<Star size={8} fill="currentColor" />}>
+                      <Badge variant="warning" icon={<Icon glyph={Star} size={8} fill="currentColor" />}>
                         default
                       </Badge>
                     ) : null}
-                  </div>
-                  <div className="mt-0.5 truncate font-mono text-[9px] text-[var(--editor-text-muted)] opacity-60">
+                  </Box>
+                  <Box className="mt-0.5 truncate font-mono text-[9px] text-[var(--editor-text-muted)] opacity-60">
                     ctx.ui.{node.name}.variant.{variantName}()
-                  </div>
-                </button>
+                  </Box>
+                </Pressable>
 
                 {!isDefault ? (
                   <IconButton
@@ -217,7 +220,7 @@ export function VariantsEditor({
                     className="opacity-60 hover:bg-amber-50 hover:text-amber-700"
                     title="Set as default variant"
                   >
-                    <Star size={12} />
+                    <Icon glyph={Star} size={12} />
                   </IconButton>
                 ) : null}
 
@@ -228,7 +231,7 @@ export function VariantsEditor({
                   className="opacity-60"
                   title="Edit variant in Component mode"
                 >
-                  <Pencil size={12} />
+                  <Icon glyph={Pencil} size={12} />
                 </IconButton>
 
                 <IconButton
@@ -238,12 +241,12 @@ export function VariantsEditor({
                   className="opacity-40 group-hover:opacity-100"
                   title="Delete variant"
                 >
-                  <Trash2 size={12} />
+                  <Icon glyph={Trash2} size={12} />
                 </IconButton>
-              </div>
+              </Box>
             );
           })}
-        </div>
+        </Box>
       )}
     </PanelSection>
   );

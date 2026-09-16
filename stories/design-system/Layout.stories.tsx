@@ -13,7 +13,7 @@ import {
 } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Patterns/Layout",
+  title: "Templates/Page Layout",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

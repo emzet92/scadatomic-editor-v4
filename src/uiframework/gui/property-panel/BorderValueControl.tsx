@@ -9,7 +9,9 @@ import {
   type BorderStyle,
 } from "../../design-system/borders";
 import { useEditorStore } from "../../editor-store";
-import { Callout, ColorPickerInput, FormField, Select, TextInput } from "../ui";
+import { Callout, ColorPickerInput, FormField, Select, TextInput,
+  Box,
+} from "../ui";
 
 const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
 
@@ -59,7 +61,7 @@ export function BorderValueControl({
 
   return (
     <FormField label={label}>
-      <div className="space-y-2">
+      <Box className="space-y-2">
         <Select value={selection} onChange={(event) => select(event.target.value)}>
           <option value="__none__">None</option>
           <option value="__local__">Local border / stroke</option>
@@ -71,8 +73,8 @@ export function BorderValueControl({
         </Select>
 
         {selection === "__local__" ? (
-          <div className="space-y-2 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5">
-            <div className="grid grid-cols-2 gap-2">
+          <Box className="space-y-2 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5">
+            <Box className="grid grid-cols-2 gap-2">
               <label className="min-w-0">
                 <span className="mb-1 block text-[9px] uppercase tracking-wide text-[var(--editor-text-soft)]">Width</span>
                 <TextInput
@@ -101,7 +103,7 @@ export function BorderValueControl({
                   ))}
                 </Select>
               </label>
-            </div>
+            </Box>
             <ColorPickerInput
               compact
               ariaLabel={`${label} color`}
@@ -109,7 +111,7 @@ export function BorderValueControl({
               onChange={(color) => updateLocal({ color })}
             />
             <BorderPreview style={editableStyle} />
-          </div>
+          </Box>
         ) : selectedToken ? (
           <BorderPreview style={selectedToken} />
         ) : tokenRef ? (
@@ -119,22 +121,22 @@ export function BorderValueControl({
         ) : null}
 
         {tokens.length === 0 ? (
-          <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+          <Box className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
             Add styles in Design System → Borders to enable token references.
-          </div>
+          </Box>
         ) : null}
-      </div>
+      </Box>
     </FormField>
   );
 }
 
 function BorderPreview({ style }: { style: BorderStyle }) {
   return (
-    <div className="flex h-14 items-center justify-center rounded-lg bg-[var(--editor-canvas-bg)]">
-      <div
+    <Box className="flex h-14 items-center justify-center rounded-lg bg-[var(--editor-canvas-bg)]">
+      <Box
         className="h-8 w-24 rounded-lg bg-[var(--editor-surface)]"
         style={{ border: borderStyleToCss(style), boxSizing: "border-box" }}
       />
-    </div>
+    </Box>
   );
 }

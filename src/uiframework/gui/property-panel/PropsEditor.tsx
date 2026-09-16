@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import type { Binding, ComponentInputDefinition } from "../../core/document";
 import type { InspectorControl } from "../../registry/component-definitions";
 import { PropInput } from "./PropInput";
@@ -19,7 +20,7 @@ export function PropsEditor({
   updateNode: UpdateNode;
 }) {
   return (
-    <div className="space-y-4">
+    <Box className="space-y-4">
       {Object.entries(controls).map(([key, control]) => (
         <PropInput
           key={key}
@@ -33,6 +34,6 @@ export function PropsEditor({
           updateNode={updateNode}
         />
       ))}
-    </div>
+    </Box>
   );
 }

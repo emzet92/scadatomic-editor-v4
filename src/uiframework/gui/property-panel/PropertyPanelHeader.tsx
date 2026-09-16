@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
 import type { RenameNodeResult } from "../../editor-store";
 import type { UiNode } from "./property-panel-types";
-import { TextInput } from "../ui";
+import { TextInput,
+  Box,
+} from "../ui";
 
 export function PropertyPanelHeader({
   node,
@@ -37,7 +39,7 @@ export function PropertyPanelHeader({
   }
 
   return (
-    <div
+    <Box
       className="
         px-4
         py-4
@@ -46,7 +48,7 @@ export function PropertyPanelHeader({
         bg-[var(--editor-surface)]
       "
     >
-      <div
+      <Box
         className="
           text-xs
           font-semibold
@@ -56,7 +58,7 @@ export function PropertyPanelHeader({
         "
       >
         Component
-      </div>
+      </Box>
 
       <label className="mt-2 block">
         <span className="sr-only">Component name</span>
@@ -87,12 +89,12 @@ export function PropertyPanelHeader({
       </label>
 
       {error && (
-        <div className="mt-1 text-[11px] leading-4 text-red-600">
+        <Box className="mt-1 text-[11px] leading-4 text-red-600">
           {error}
-        </div>
+        </Box>
       )}
 
-      <div
+      <Box
         className="
           mt-1
           text-xs
@@ -101,7 +103,7 @@ export function PropertyPanelHeader({
         "
       >
         {node.type}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

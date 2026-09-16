@@ -2,7 +2,12 @@ import { ImageIcon, Images, Trash2, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import type { AssetRef } from "../../assets";
 import { useAssetManager, useAssetUrl } from "../../assets";
-import { Button, PanelCard } from "../ui";
+import { Button, PanelCard,
+  Box,
+  Icon,
+  Overlay,
+  Pressable,
+} from "../ui";
 import { ImageAssetChooserDialog } from "./ImageAssetChooserDialog";
 
 export function ImageAssetPicker({
@@ -77,14 +82,14 @@ export function ImageAssetPicker({
   const previewUrl = asset.assetId === assetId ? asset.url : null;
 
   return (
-    <div className="space-y-2">
+    <Box className="space-y-2">
       <PanelCard
         padding="none"
         className={`overflow-hidden transition ${
           dragging ? "border-[var(--editor-accent)] bg-[var(--editor-accent-soft)]" : ""
         }`}
       >
-        <div
+        <Box
           data-editor-ignore
           className="relative flex min-h-28 items-center justify-center overflow-hidden"
           onDragEnter={(event) => {
@@ -110,28 +115,28 @@ export function ImageAssetPicker({
               className="h-32 w-full object-contain bg-[var(--editor-surface-muted)]"
             />
           ) : (
-            <button
+            <Pressable
               type="button"
               data-editor-ignore
               className="flex min-h-28 w-full flex-col items-center justify-center gap-2 px-4 py-5 text-center text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-accent)]"
               onClick={() => fileInputRef.current?.click()}
             >
-              <ImageIcon size={24} strokeWidth={1.5} />
+              <Icon glyph={ImageIcon} size={24} strokeWidth={1.5} />
               <span className="text-xs font-medium">
                 {assetId && asset.missing ? "Asset unavailable — replace image" : "Drop image or choose a file"}
               </span>
               <span className="text-[10px] text-[var(--editor-text-soft)]">
                 PNG, JPEG, WebP, GIF, AVIF, SVG
               </span>
-            </button>
+            </Pressable>
           )}
 
           {dragging ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--editor-accent-soft)]/90 text-xs font-semibold text-[var(--editor-accent)]">
+            <Overlay tone="accent" center className="pointer-events-none text-xs font-semibold text-[var(--editor-accent)]">
               Drop to upload
-            </div>
+            </Overlay>
           ) : null}
-        </div>
+        </Box>
       </PanelCard>
 
       <input
@@ -143,7 +148,7 @@ export function ImageAssetPicker({
         onChange={handleInputChange}
       />
 
-      <div className="flex gap-2">
+      <Box className="flex gap-2">
         <Button
           variant="secondary"
           size="sm"
@@ -151,7 +156,7 @@ export function ImageAssetPicker({
           disabled={uploading}
           onClick={openChooser}
         >
-          <Images size={13} />
+          <Icon glyph={Images} size={13} />
           Choose asset
         </Button>
         <Button
@@ -161,7 +166,7 @@ export function ImageAssetPicker({
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload size={13} />
+          <Icon glyph={Upload} size={13} />
           {uploading ? "Uploading…" : assetId ? "Replace" : "Upload"}
         </Button>
         {assetId ? (
@@ -176,18 +181,18 @@ export function ImageAssetPicker({
               onChange(undefined);
             }}
           >
-            <Trash2 size={14} />
+            <Icon glyph={Trash2} size={14} />
           </Button>
         ) : null}
-      </div>
+      </Box>
 
       {assetId ? (
-        <div className="truncate font-mono text-[9px] text-[var(--editor-text-soft)]" title={assetId}>
+        <Box className="truncate font-mono text-[9px] text-[var(--editor-text-soft)]" title={assetId}>
           asset: {assetId}
-        </div>
+        </Box>
       ) : null}
 
-      {error ? <div className="text-[10px] leading-4 text-red-600">{error}</div> : null}
+      {error ? <Box className="text-[10px] leading-4 text-red-600">{error}</Box> : null}
 
       {chooserOpen ? (
         <ImageAssetChooserDialog
@@ -205,6 +210,6 @@ export function ImageAssetPicker({
           onUploadRequest={() => fileInputRef.current?.click()}
         />
       ) : null}
-    </div>
+    </Box>
   );
 }

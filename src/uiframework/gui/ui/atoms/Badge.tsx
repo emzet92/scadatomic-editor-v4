@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cx } from "./cx";
+import { cx } from "../utils/cx";
 
 export type BadgeVariant = "neutral" | "accent" | "success" | "warning" | "danger";
 export type BadgeSize = "xs" | "sm";

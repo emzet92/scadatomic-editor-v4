@@ -18,6 +18,8 @@ import {
   PanelCard,
   Select,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
@@ -39,25 +41,25 @@ export function BorderLibraryWorkspace() {
   return (
     <PageContainer size="xl">
       <PageHeader
-        icon={<Square size={14} />}
+        icon={<Icon glyph={Square} size={14} />}
         title="Borders / Stroke Styles"
         description="Define reusable structural strokes with width, line style and color. Components reference the token by stable ID while renderers receive a final border value."
         actions={
           <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
-            <Plus size={14} /> Add stroke
+            <Icon glyph={Plus} size={14} /> Add stroke
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Square size={20} />}
+          icon={<Icon glyph={Square} size={20} />}
           title="No border tokens yet"
           description="Create individual strokes or seed a practical Subtle / Default / Strong / Focus / Dashed starter set."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
-                <Plus size={14} /> Add stroke
+                <Icon glyph={Plus} size={14} /> Add stroke
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterBorderScale}>
                 Create starter strokes
@@ -66,7 +68,7 @@ export function BorderLibraryWorkspace() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <Box className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countBorderTokenUsages(document, token.id);
             return (
@@ -75,26 +77,26 @@ export function BorderLibraryWorkspace() {
                 padding="lg"
                 className="grid grid-cols-[minmax(190px,.9fr)_minmax(210px,1fr)_minmax(360px,1.7fr)_44px] items-center gap-4 rounded-2xl shadow-sm"
               >
-                <div className="space-y-2">
+                <Box className="space-y-2">
                   <TextInput
                     aria-label="Border token name"
                     value={token.name}
                     onChange={(event) => updateBorderToken(token.id, { name: event.target.value })}
                   />
-                  <div className="text-[10px] text-[var(--editor-text-soft)]">
+                  <Box className="text-[10px] text-[var(--editor-text-soft)]">
                     {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
-                  <div
+                <Box className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
+                  <Box
                     className="h-10 w-24 rounded-xl bg-[var(--editor-surface)]"
                     style={{ border: borderStyleToCss(token), boxSizing: "border-box" }}
                   />
-                </div>
+                </Box>
 
-                <div className="space-y-2">
-                  <div className="grid grid-cols-[120px_minmax(140px,1fr)] gap-2">
+                <Box className="space-y-2">
+                  <Box className="grid grid-cols-[120px_minmax(140px,1fr)] gap-2">
                     <FormField label="Width" compact>
                       <TextInput
                         controlSize="sm"
@@ -118,14 +120,14 @@ export function BorderLibraryWorkspace() {
                         ))}
                       </Select>
                     </FormField>
-                  </div>
+                  </Box>
                   <ColorPickerInput
                     compact
                     ariaLabel={`${token.name} border color`}
                     value={token.color}
                     onChange={(color) => updateBorderToken(token.id, { color })}
                   />
-                </div>
+                </Box>
 
                 <IconButton
                   aria-label="Delete border token and detach usages"
@@ -133,12 +135,12 @@ export function BorderLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteBorderToken(token.id)}
                 >
-                  <Trash2 size={14} />
+                  <Icon glyph={Trash2} size={14} />
                 </IconButton>
               </PanelCard>
             );
           })}
-        </div>
+        </Box>
       )}
 
       <Callout className="mt-5">

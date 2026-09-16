@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Checkbox, FormField, Select, TextInput } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Form Controls",
+  title: "Atoms/Form Controls",
   parameters: {
     controls: { disable: true },
   },

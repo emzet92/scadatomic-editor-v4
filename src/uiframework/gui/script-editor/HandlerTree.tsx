@@ -1,3 +1,4 @@
+import { Box, Icon, Pressable } from "../ui";
 import {
   Braces,
   Boxes,
@@ -56,25 +57,25 @@ export function HandlerTree({
 
   return (
     <aside className="w-80 shrink-0 border-r border-zinc-200 bg-white overflow-y-auto">
-      <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <Box className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-4">
+        <Box className="flex items-center justify-between gap-3">
+          <Box>
+            <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
               Scripts & Component API
-            </div>
-            <div className="mt-1 text-xs text-zinc-400">
+            </Box>
+            <Box className="mt-1 text-xs text-zinc-400">
               Scene-public APIs + encapsulated component scopes
-            </div>
-          </div>
+            </Box>
+          </Box>
           <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-500">
             {apiEntryCount}
           </span>
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <div className="p-2">
+      <Box className="p-2">
         {!document ? (
-          <div className="px-2 py-3 text-sm text-zinc-400">Loading API…</div>
+          <Box className="px-2 py-3 text-sm text-zinc-400">Loading API…</Box>
         ) : (
           <>
             {Object.keys(document.components ?? {}).length > 0 ? (
@@ -107,7 +108,7 @@ export function HandlerTree({
             ) : null}
           </>
         )}
-      </div>
+      </Box>
     </aside>
   );
 }
@@ -129,7 +130,7 @@ function PagesApiSection({
   onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
 }) {
   return (
-    <div className="space-y-1">
+    <Box className="space-y-1">
       {pages.map((page) => (
         <PageApiRow
           key={page.pageId}
@@ -142,7 +143,7 @@ function PagesApiSection({
           depth={0}
         />
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -172,13 +173,13 @@ function PageApiRow({
         className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold text-zinc-600"
         style={{ paddingLeft: 10 + depth * 10 }}
       >
-        <ChevronRight size={12} className="text-zinc-400" />
+        <Icon glyph={ChevronRight} size={12} className="text-zinc-400" />
         <span className="truncate">{page.name}</span>
         <span className="ml-auto font-mono text-[9px] font-normal text-zinc-400">
           {page.path}
         </span>
       </summary>
-      <div className="pb-1 pl-2">
+      <Box className="pb-1 pl-2">
         <HandlerNode
           document={document}
           nodeId={pageDefinition.rootId}
@@ -200,7 +201,7 @@ function PageApiRow({
             depth={depth + 1}
           />
         ))}
-      </div>
+      </Box>
     </details>
   );
 }
@@ -225,17 +226,17 @@ function ModalsApiSection({
   return (
     <details open className="mt-2 rounded-lg border border-sky-100 bg-sky-50/30">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
-        <ChevronRight size={12} className="text-sky-400" />
+        <Icon glyph={ChevronRight} size={12} className="text-sky-400" />
         <span className="flex-1">Modals</span>
         <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-sky-500">
           {modals.length}
         </span>
       </summary>
-      <div className="pb-1">
+      <Box className="pb-1">
         {modals.map((modal) => (
           <details key={modal.id} open className="border-t border-sky-100/70 first:border-t-0">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-sky-50/70">
-              <ChevronRight size={12} className="text-zinc-400" />
+              <Icon glyph={ChevronRight} size={12} className="text-zinc-400" />
               <span className="min-w-0 flex-1 truncate font-medium">{modal.name}</span>
               <span className="font-mono text-[9px] text-sky-500">ctx.modals.{modal.name}</span>
             </summary>
@@ -250,7 +251,7 @@ function ModalsApiSection({
             />
           </details>
         ))}
-      </div>
+      </Box>
     </details>
   );
 }
@@ -275,18 +276,18 @@ function ComponentDefinitionsSection({
   return (
     <details open className="mb-2 rounded-lg border border-violet-100 bg-violet-50/30">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-violet-700">
-        <ChevronRight
+        <Icon glyph={ChevronRight}
           size={12}
           className="text-violet-400 transition-transform group-open:rotate-90"
         />
-        <Boxes size={13} />
+        <Icon glyph={Boxes} size={13} />
         <span className="flex-1">Component scripts</span>
         <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-violet-500">
           {definitions.length}
         </span>
       </summary>
 
-      <div className="pb-1">
+      <Box className="pb-1">
         {definitions
           .slice()
           .sort((a, b) => a.name.localeCompare(b.name))
@@ -300,7 +301,7 @@ function ComponentDefinitionsSection({
               onRemoveMethod={onRemoveMethod}
             />
           ))}
-      </div>
+      </Box>
     </details>
   );
 }
@@ -357,7 +358,7 @@ function ComponentDefinitionRow({
   return (
     <details open className="group/definition border-t border-violet-100/70 first:border-t-0">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-violet-50/70">
-        <ChevronRight
+        <Icon glyph={ChevronRight}
           size={12}
           className="text-zinc-400 transition-transform group-open/definition:rotate-90"
         />
@@ -373,10 +374,10 @@ function ComponentDefinitionRow({
         />
       </summary>
 
-      <div className="pb-1">
+      <Box className="pb-1">
         {methods.map(([methodName, method]) => (
-          <div key={methodName} className="group/method flex items-center pr-1" style={{ marginLeft: 28 }}>
-            <button
+          <Box key={methodName} className="group/method flex items-center pr-1" style={{ marginLeft: 28 }}>
+            <Pressable
               type="button"
               onClick={() => onSelect(method.scriptId)}
               className={`flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-left ${
@@ -385,7 +386,7 @@ function ComponentDefinitionRow({
                   : "text-zinc-600 hover:bg-violet-50"
               }`}
             >
-              <Code2 size={12} className="mt-0.5 shrink-0" />
+              <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-mono text-xs font-medium">
                   {methodName}()
@@ -394,18 +395,18 @@ function ComponentDefinitionRow({
                   {method.visibility}
                 </span>
               </span>
-            </button>
+            </Pressable>
             <RemoveButton
               label={`Remove ${methodName}`}
               onRemove={() => void onRemoveMethod(definition.id, methodName)}
             />
-          </div>
+          </Box>
         ))}
 
         {internalHandlerCount > 0 ? (
           <TreeSection
             depth={0}
-            icon={<Zap size={12} />}
+            icon={<Icon glyph={Zap} size={12} />}
             label="Internal handlers"
             count={internalHandlerCount}
           >
@@ -420,10 +421,10 @@ function ComponentDefinitionRow({
         ) : null}
 
         {adding ? (
-          <div className="mx-2 ml-7 rounded-md border border-violet-200 bg-white p-2">
-            <div className="mb-2 inline-flex rounded border border-zinc-200 bg-zinc-50 p-0.5 text-[10px]">
+          <Box className="mx-2 ml-7 rounded-md border border-violet-200 bg-white p-2">
+            <Box className="mb-2 inline-flex rounded border border-zinc-200 bg-zinc-50 p-0.5 text-[10px]">
               {(["public", "private"] as const).map((value) => (
-                <button
+                <Pressable
                   key={value}
                   type="button"
                   onClick={() => setVisibility(value)}
@@ -434,10 +435,10 @@ function ComponentDefinitionRow({
                   }`}
                 >
                   {value}
-                </button>
+                </Pressable>
               ))}
-            </div>
-            <div className="flex gap-1.5">
+            </Box>
+            <Box className="flex gap-1.5">
               <input
                 autoFocus
                 value={draft}
@@ -453,26 +454,26 @@ function ComponentDefinitionRow({
                 }}
                 className="h-7 min-w-0 flex-1 rounded border border-zinc-200 px-2 font-mono text-xs outline-none focus:border-violet-400"
               />
-              <button
+              <Pressable
                 type="button"
                 disabled={saving}
                 onClick={() => void addMethod()}
                 className="rounded bg-violet-600 px-2 text-[10px] font-semibold text-white"
               >
                 Add
-              </button>
-              <button
+              </Pressable>
+              <Pressable
                 type="button"
                 onClick={() => setAdding(false)}
                 className="flex size-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100"
               >
-                <X size={12} />
-              </button>
-            </div>
-            {error ? <div className="mt-1 text-[10px] text-red-600">{error}</div> : null}
-          </div>
+                <Icon glyph={X} size={12} />
+              </Pressable>
+            </Box>
+            {error ? <Box className="mt-1 text-[10px] text-red-600">{error}</Box> : null}
+          </Box>
         ) : null}
-      </div>
+      </Box>
     </details>
   );
 }
@@ -506,7 +507,7 @@ function DefinitionHandlerNode({
         className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-2 text-xs text-zinc-600 hover:bg-violet-50/60"
         style={{ paddingLeft: `${30 + depth * 12}px` }}
       >
-        <ChevronRight
+        <Icon glyph={ChevronRight}
           size={11}
           className="shrink-0 text-zinc-300 transition-transform group-open/definition-node:rotate-90"
         />
@@ -516,7 +517,7 @@ function DefinitionHandlerNode({
         </span>
       </summary>
 
-      <div>
+      <Box>
         {events.map(([eventName, handler]) => (
           <ScriptButton
             key={`definition-event:${definition.id}:${node.id}:${eventName}`}
@@ -538,7 +539,7 @@ function DefinitionHandlerNode({
             depth={depth + 1}
           />
         ))}
-      </div>
+      </Box>
     </details>
   );
 }
@@ -630,13 +631,13 @@ function HandlerNode({
   }
 
   return (
-    <div>
+    <Box>
       <details open className="group/component">
         <summary
           className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
           style={{ paddingLeft: `${8 + depth * 12}px` }}
         >
-          <ChevronRight
+          <Icon glyph={ChevronRight}
             size={13}
             className="shrink-0 text-zinc-400 transition-transform group-open/component:rotate-90"
           />
@@ -646,11 +647,11 @@ function HandlerNode({
           </span>
         </summary>
 
-        <div>
+        <Box>
           {eventEntries.length > 0 ? (
             <TreeSection
               depth={depth}
-              icon={<Zap size={12} />}
+              icon={<Icon glyph={Zap} size={12} />}
               label="Events"
               count={eventEntries.length}
             >
@@ -669,7 +670,7 @@ function HandlerNode({
 
           <TreeSection
             depth={depth}
-            icon={<Braces size={12} />}
+            icon={<Icon glyph={Braces} size={12} />}
             label="Methods"
             count={reusableDefinition ? publicDefinitionMethods.length : methodEntries.length}
             action={
@@ -687,7 +688,7 @@ function HandlerNode({
           >
             {reusableDefinition
               ? publicDefinitionMethods.map(([methodName]) => (
-                  <div
+                  <Box
                     key={`definition-method:${node.id}:${methodName}`}
                     className="py-1.5 pr-2 font-mono text-xs text-violet-700"
                     style={{ paddingLeft: `${44 + depth * 12}px` }}
@@ -697,7 +698,7 @@ function HandlerNode({
                     <span className="ml-2 font-sans text-[9px] uppercase tracking-wide text-violet-400">
                       public
                     </span>
-                  </div>
+                  </Box>
                 ))
               : methodEntries.map(([methodName, method]) => (
               <MethodButton
@@ -735,7 +736,7 @@ function HandlerNode({
 
           <TreeSection
             depth={depth}
-            icon={<Palette size={12} />}
+            icon={<Icon glyph={Palette} size={12} />}
             label="Variants"
             count={variantEntries.length}
           >
@@ -749,12 +750,12 @@ function HandlerNode({
               />
             ))}
             {variantEntries.length === 0 ? (
-              <div
+              <Box
                 className="py-1.5 pr-2 text-[10px] text-zinc-400"
                 style={{ paddingLeft: `${44 + depth * 12}px` }}
               >
                 Define variants in the Designer property panel.
-              </div>
+              </Box>
             ) : null}
           </TreeSection>
 
@@ -770,9 +771,9 @@ function HandlerNode({
               depth={depth + 1}
             />
           ))}
-        </div>
+        </Box>
       </details>
-    </div>
+    </Box>
   );
 }
 
@@ -797,7 +798,7 @@ function TreeSection({
         className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-2 text-[11px] font-medium text-zinc-500 hover:bg-zinc-50"
         style={{ paddingLeft: `${26 + depth * 12}px` }}
       >
-        <ChevronRight
+        <Icon glyph={ChevronRight}
           size={11}
           className="shrink-0 text-zinc-300 transition-transform group-open/section:rotate-90"
         />
@@ -806,14 +807,14 @@ function TreeSection({
         <span className="text-[10px] tabular-nums text-zinc-300">{count}</span>
         {action}
       </summary>
-      <div>{children}</div>
+      <Box>{children}</Box>
     </details>
   );
 }
 
 function AddButton({ title, onClick }: { title: string; onClick: () => void }) {
   return (
-    <button
+    <Pressable
       type="button"
       onClick={(event) => {
         event.preventDefault();
@@ -824,8 +825,8 @@ function AddButton({ title, onClick }: { title: string; onClick: () => void }) {
       title={title}
       aria-label={title}
     >
-      <Plus size={13} />
-    </button>
+      <Icon glyph={Plus} size={13} />
+    </Pressable>
   );
 }
 
@@ -853,12 +854,12 @@ function InlineAddForm({
   onCancel: () => void;
 }) {
   return (
-    <div
+    <Box
       className="mr-2 rounded-md border border-sky-200 bg-sky-50/50 p-2"
       style={{ marginLeft: `${44 + depth * 12}px` }}
     >
-      <div className="flex items-center gap-1.5">
-        <div className="relative min-w-0 flex-1">
+      <Box className="flex items-center gap-1.5">
+        <Box className="relative min-w-0 flex-1">
           <input
             autoFocus
             value={value}
@@ -884,32 +885,32 @@ function InlineAddForm({
           <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-[11px] text-zinc-400">
             {suffix}
           </span>
-        </div>
-        <button
+        </Box>
+        <Pressable
           type="button"
           disabled={saving}
           onClick={onSubmit}
           className="h-7 rounded bg-sky-600 px-2 text-[10px] font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
         >
           Add
-        </button>
-        <button
+        </Pressable>
+        <Pressable
           type="button"
           onClick={onCancel}
           className="flex size-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
           aria-label="Cancel"
         >
-          <X size={12} />
-        </button>
-      </div>
+          <Icon glyph={X} size={12} />
+        </Pressable>
+      </Box>
       {error ? (
-        <div className="mt-1 text-[10px] leading-4 text-red-600">{error}</div>
+        <Box className="mt-1 text-[10px] leading-4 text-red-600">{error}</Box>
       ) : (
-        <div className="mt-1 truncate font-mono text-[9px] text-zinc-400">
+        <Box className="mt-1 truncate font-mono text-[9px] text-zinc-400">
           {hint}
-        </div>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -927,7 +928,7 @@ function ScriptButton({
   onSelect: (scriptId: string) => void;
 }) {
   return (
-    <button
+    <Pressable
       type="button"
       onClick={() => onSelect(scriptId)}
       className={`flex w-full items-start gap-2 rounded-md py-1.5 pr-2 text-left transition ${
@@ -938,12 +939,12 @@ function ScriptButton({
       style={{ paddingLeft: `${44 + depth * 12}px` }}
       title={scriptId}
     >
-      <Code2 size={12} className="mt-0.5 shrink-0" />
+      <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium">{label}</span>
         <span className="block truncate text-[10px] opacity-55">{scriptId}</span>
       </span>
-    </button>
+    </Pressable>
   );
 }
 
@@ -963,26 +964,26 @@ function MethodButton({
   onRemove: () => void;
 }) {
   return (
-    <div
+    <Box
       className={`group/method flex items-center rounded-md pr-1 transition ${
         active ? "bg-sky-50 text-sky-700" : "text-zinc-600 hover:bg-zinc-50"
       }`}
       style={{ marginLeft: `${36 + depth * 12}px` }}
     >
-      <button
+      <Pressable
         type="button"
         onClick={() => onSelect(scriptId)}
         className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-2 text-left"
         title={scriptId}
       >
-        <Code2 size={12} className="mt-0.5 shrink-0" />
+        <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-mono text-xs font-medium">{label}</span>
           <span className="block truncate text-[10px] opacity-55">{scriptId}</span>
         </span>
-      </button>
+      </Pressable>
       <RemoveButton label={`Remove ${label}`} onRemove={onRemove} />
-    </div>
+    </Box>
   );
 }
 
@@ -998,12 +999,12 @@ function VariantApiRow({
   apiPath: string;
 }) {
   return (
-    <div
+    <Box
       className="flex items-start gap-2 rounded-md py-1.5 pr-2 text-zinc-600"
       style={{ paddingLeft: `${44 + depth * 12}px` }}
       title={apiPath}
     >
-      <Palette size={12} className="mt-0.5 shrink-0 text-violet-500" />
+      <Icon glyph={Palette} size={12} className="mt-0.5 shrink-0 text-violet-500" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 truncate font-mono text-xs font-medium">
           {label}()
@@ -1012,27 +1013,27 @@ function VariantApiRow({
               className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-700"
               title="Default variant"
             >
-              <Star size={8} fill="currentColor" /> default
+              <Icon glyph={Star} size={8} fill="currentColor" /> default
             </span>
           ) : null}
         </span>
         <span className="block truncate text-[10px] opacity-55">{apiPath}</span>
       </span>
-    </div>
+    </Box>
   );
 }
 
 function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <button
+    <Pressable
       type="button"
       onClick={onRemove}
       className="flex size-6 shrink-0 items-center justify-center rounded text-zinc-300 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover/method:opacity-100 group-hover/variant:opacity-100"
       title={label}
       aria-label={label}
     >
-      <Trash2 size={11} />
-    </button>
+      <Icon glyph={Trash2} size={11} />
+    </Pressable>
   );
 }
 

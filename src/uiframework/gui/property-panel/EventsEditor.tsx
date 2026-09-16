@@ -1,6 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import type { HandlerRef } from "../../core/document";
-import { Checkbox, SectionHeader } from "../ui";
+import { Checkbox, SectionHeader,
+  Box,
+} from "../ui";
 
 export function EventsEditor({
   nodeId,
@@ -24,13 +26,13 @@ export function EventsEditor({
   const { projectId } = useParams();
 
   return (
-    <div className="pt-4 border-t border-[var(--editor-border)] space-y-3">
+    <Box className="pt-4 border-t border-[var(--editor-border)] space-y-3">
       <SectionHeader
         title="Events"
         description="Runtime handlers emitted by this component."
       />
 
-      <div className="space-y-3">
+      <Box className="space-y-3">
         {Object.entries(definitions).map(([eventName, definition]) => {
           const generatedHandlerId = handlerIdPrefix
             ? `${handlerIdPrefix}.${nodeName}.${definition.defaultSuffix}`
@@ -43,7 +45,7 @@ export function EventsEditor({
             : null;
 
           return (
-            <div
+            <Box
               key={eventName}
               className="flex items-center gap-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] px-3 py-3 transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]"
             >
@@ -60,19 +62,19 @@ export function EventsEditor({
                 }}
               />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <div className="text-sm font-medium text-[var(--editor-text)]">
+              <Box className="min-w-0 flex-1">
+                <Box className="flex items-center gap-2">
+                  <Box className="text-sm font-medium text-[var(--editor-text)]">
                     {definition.label}
-                  </div>
+                  </Box>
                   <code className="rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[10px] text-[var(--editor-text-muted)]">
                     {toReactEventName(eventName)}
                   </code>
-                </div>
-                <div className="text-xs text-[var(--editor-text-muted)] truncate">
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)] truncate">
                   {handlerId}
-                </div>
-              </div>
+                </Box>
+              </Box>
 
               {scriptPath ? (
                 <Link
@@ -91,11 +93,11 @@ export function EventsEditor({
                   Save project first
                 </span>
               )}
-            </div>
+            </Box>
           );
         })}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 

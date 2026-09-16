@@ -14,7 +14,11 @@ import {
   buildNavigationTree,
   type NavigationTreeNode,
 } from "../../navigation/navigation";
-import { Badge, Callout, ConfirmDialog, IconButton, SidebarSection } from "../ui";
+import { Badge, Callout, ConfirmDialog, IconButton, SidebarSection,
+  Box,
+  Icon,
+  Pressable,
+} from "../ui";
 
 export function PageTree() {
   const document = useEditorStore((state) => state.document);
@@ -54,16 +58,16 @@ export function PageTree() {
     (pendingKind === "layout" || pendingDeletePageIds.length < runtimePageCount);
 
   return (
-    <div data-editor-ignore className="space-y-4">
+    <Box data-editor-ignore className="space-y-4">
       <SidebarSection
         title="Pages"
         actions={
           <IconButton aria-label="Add top-level page" variant="secondary" onClick={() => addPage()}>
-            <Plus size={14} />
+            <Icon glyph={Plus} size={14} />
           </IconButton>
         }
       >
-        <div className="space-y-0.5">
+        <Box className="space-y-0.5">
           {tree.map((node) => (
             <PageTreeRow
               key={node.pageId}
@@ -79,7 +83,7 @@ export function PageTree() {
               document={document}
             />
           ))}
-        </div>
+        </Box>
       </SidebarSection>
 
       <SidebarSection
@@ -87,11 +91,11 @@ export function PageTree() {
         className="border-t border-[var(--editor-border)] pt-3"
         actions={
           <IconButton aria-label="Add page layout" variant="secondary" onClick={() => addPageLayout()}>
-            <Plus size={14} />
+            <Icon glyph={Plus} size={14} />
           </IconButton>
         }
       >
-        <div className="space-y-0.5">
+        <Box className="space-y-0.5">
           {layouts.length > 0 ? (
             layouts.map((layout) => (
               <LayoutRow
@@ -107,7 +111,7 @@ export function PageTree() {
               Add a layout to share navigation, headers, sidebars and other chrome between pages.
             </Callout>
           )}
-        </div>
+        </Box>
       </SidebarSection>
 
       <SidebarSection
@@ -115,11 +119,11 @@ export function PageTree() {
         className="border-t border-[var(--editor-border)] pt-3"
         actions={
           <IconButton aria-label="Add modal" variant="secondary" onClick={() => addModal()}>
-            <Plus size={14} />
+            <Icon glyph={Plus} size={14} />
           </IconButton>
         }
       >
-        <div className="space-y-0.5">
+        <Box className="space-y-0.5">
           {Object.values(document.modals ?? {}).length > 0 ? (
             Object.values(document.modals ?? {}).map((modal) => (
               <ModalRow
@@ -135,7 +139,7 @@ export function PageTree() {
               Add a reusable modal surface with its own lifecycle events and script API.
             </Callout>
           )}
-        </div>
+        </Box>
       </SidebarSection>
 
       <ConfirmDialog
@@ -158,7 +162,7 @@ export function PageTree() {
           setPendingDeletePageId(null);
         }}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -174,22 +178,22 @@ function LayoutRow({
   onDelete(): void;
 }) {
   return (
-    <div
+    <Box
       className={`group flex h-8 items-center rounded-md px-1 text-xs transition ${
         active
           ? "bg-violet-50 text-violet-700"
           : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
       }`}
     >
-      <button
+      <Pressable
         type="button"
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
       >
-        <LayoutTemplate size={12} className="shrink-0 opacity-70" />
+        <Icon glyph={LayoutTemplate} size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
-      </button>
-      <div className="hidden shrink-0 group-hover:block">
+      </Pressable>
+      <Box className="hidden shrink-0 group-hover:block">
         <IconButton
           aria-label={`Delete ${name}`}
           title={`Delete ${name}`}
@@ -197,10 +201,10 @@ function LayoutRow({
           size="icon-xs"
           onClick={onDelete}
         >
-          <Trash2 size={12} />
+          <Icon glyph={Trash2} size={12} />
         </IconButton>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -216,23 +220,23 @@ function ModalRow({
   onDelete(): void;
 }) {
   return (
-    <div
+    <Box
       className={`group flex h-8 items-center rounded-md px-1 text-xs transition ${
         active
           ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
           : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"
       }`}
     >
-      <button
+      <Pressable
         type="button"
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
       >
-        <FileText size={12} className="shrink-0 opacity-70" />
+        <Icon glyph={FileText} size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
         <Badge className="ml-auto group-hover:hidden">modal</Badge>
-      </button>
-      <div className="hidden shrink-0 group-hover:block">
+      </Pressable>
+      <Box className="hidden shrink-0 group-hover:block">
         <IconButton
           aria-label={`Delete ${name}`}
           title={`Delete ${name}`}
@@ -240,10 +244,10 @@ function ModalRow({
           size="icon-xs"
           onClick={onDelete}
         >
-          <Trash2 size={12} />
+          <Icon glyph={Trash2} size={12} />
         </IconButton>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -278,8 +282,8 @@ function PageTreeRow({
   const canDelete = deleteCount > 0 && deleteCount < runtimePageCount;
 
   return (
-    <div>
-      <div
+    <Box>
+      <Box
         className={`group flex h-8 items-center rounded-md pr-1 text-xs transition ${
           active
             ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
@@ -287,7 +291,7 @@ function PageTreeRow({
         }`}
         style={{ paddingLeft: 4 + depth * 14 }}
       >
-        <button
+        <Pressable
           type="button"
           aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
           onClick={() => setExpanded((value) => !value)}
@@ -296,21 +300,21 @@ function PageTreeRow({
           }`}
           tabIndex={hasChildren ? 0 : -1}
         >
-          <ChevronRight
+          <Icon glyph={ChevronRight}
             size={12}
             className={`transition-transform ${expanded ? "rotate-90" : ""}`}
           />
-        </button>
+        </Pressable>
 
-        <button
+        <Pressable
           type="button"
           onClick={() => onOpen(node.pageId)}
           className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
         >
           {isStartPage ? (
-            <Home size={12} className="shrink-0" />
+            <Icon glyph={Home} size={12} className="shrink-0" />
           ) : (
-            <FileText size={12} className="shrink-0 opacity-60" />
+            <Icon glyph={FileText} size={12} className="shrink-0 opacity-60" />
           )}
           <span className="truncate font-medium">{node.name}</span>
           {isStartPage ? (
@@ -318,9 +322,9 @@ function PageTreeRow({
               start
             </span>
           ) : null}
-        </button>
+        </Pressable>
 
-        <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        <Box className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
           {!isStartPage ? (
             <IconButton
               aria-label={`Set ${node.name} as start page`}
@@ -328,7 +332,7 @@ function PageTreeRow({
               size="icon-xs"
               onClick={() => onSetStartPage(node.pageId)}
             >
-              <Home size={12} />
+              <Icon glyph={Home} size={12} />
             </IconButton>
           ) : null}
           <IconButton
@@ -337,7 +341,7 @@ function PageTreeRow({
             size="icon-xs"
             onClick={() => onAddChild(node.pageId)}
           >
-            <Plus size={12} />
+            <Icon glyph={Plus} size={12} />
           </IconButton>
           <IconButton
             aria-label={`Delete ${node.name}`}
@@ -351,10 +355,10 @@ function PageTreeRow({
             disabled={!canDelete}
             onClick={() => onDelete(node.pageId)}
           >
-            <Trash2 size={12} />
+            <Icon glyph={Trash2} size={12} />
           </IconButton>
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {expanded
         ? node.children.map((child) => (
@@ -373,6 +377,6 @@ function PageTreeRow({
             />
           ))
         : null}
-    </div>
+    </Box>
   );
 }

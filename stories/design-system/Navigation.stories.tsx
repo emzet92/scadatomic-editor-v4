@@ -11,7 +11,7 @@ import {
 } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Patterns/Navigation",
+  title: "Molecules/Navigation",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

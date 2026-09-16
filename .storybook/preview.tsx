@@ -28,7 +28,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ["Foundations", "Primitives", "Patterns"],
+        order: ["Foundations", "Atoms", "Molecules", "Organisms", "Templates"],
       },
     },
   },

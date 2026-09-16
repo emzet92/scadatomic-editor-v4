@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import type {
   Binding,
   HandlerRef,
@@ -95,7 +96,7 @@ export function NodePropertiesEditor({
   };
 
   return (
-    <div className="space-y-5">
+    <Box className="space-y-5">
       {node.type === "Container" ? (
         <ContainerLayoutEditor node={node} updateNode={updateNode} />
       ) : null}
@@ -119,7 +120,7 @@ export function NodePropertiesEditor({
         {...(emptyMessage ? { emptyMessage } : {})}
         {...(componentInputs ? { componentInputs } : {})}
       />
-    </div>
+    </Box>
   );
 }
 

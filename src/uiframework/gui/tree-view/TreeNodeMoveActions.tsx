@@ -1,5 +1,8 @@
 import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
-import { IconButton } from "../ui";
+import { IconButton,
+  Box,
+  Icon,
+} from "../ui";
 
 export function TreeNodeMoveActions({
   nodeId,
@@ -23,7 +26,7 @@ export function TreeNodeMoveActions({
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <Box className="flex shrink-0 items-center gap-1">
       {canDuplicate ? (
         <IconButton
           aria-label="Duplicate node"
@@ -33,7 +36,7 @@ export function TreeNodeMoveActions({
             duplicateNode(nodeId);
           }}
         >
-          <Copy size={14} />
+          <Icon glyph={Copy} size={14} />
         </IconButton>
       ) : null}
 
@@ -47,7 +50,7 @@ export function TreeNodeMoveActions({
             deleteNode(nodeId);
           }}
         >
-          <Trash2 size={14} />
+          <Icon glyph={Trash2} size={14} />
         </IconButton>
       ) : null}
 
@@ -59,7 +62,7 @@ export function TreeNodeMoveActions({
           moveNodeUp(nodeId);
         }}
       >
-        <ChevronUp size={14} />
+        <Icon glyph={ChevronUp} size={14} />
       </IconButton>
 
       <IconButton
@@ -70,8 +73,8 @@ export function TreeNodeMoveActions({
           moveNodeDown(nodeId);
         }}
       >
-        <ChevronDown size={14} />
+        <Icon glyph={ChevronDown} size={14} />
       </IconButton>
-    </div>
+    </Box>
   );
 }

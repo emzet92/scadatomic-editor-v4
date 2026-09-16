@@ -2,7 +2,11 @@ import { Braces, ChevronRight, FunctionSquare, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
-import { Callout, IconButton, SidebarSection } from "../ui";
+import { Callout, IconButton, SidebarSection,
+  Box,
+  Icon,
+  Pressable,
+} from "../ui";
 import type { DataSelection } from "./data-selection";
 
 export function UdtTree({ data, selection, onSelect, onCreate }: { data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void; onCreate(): void }) {
@@ -10,15 +14,15 @@ export function UdtTree({ data, selection, onSelect, onCreate }: { data: Project
   return (
     <SidebarSection
       title="UDTs"
-      actions={<IconButton aria-label="Create UDT" variant="secondary" onClick={onCreate}><Plus size={14} /></IconButton>}
+      actions={<IconButton aria-label="Create UDT" variant="secondary" onClick={onCreate}><Icon glyph={Plus} size={14} /></IconButton>}
     >
-      <div className="space-y-0.5">
+      <Box className="space-y-0.5">
         {udts.length === 0 ? (
           <Callout dashed size="sm">No UDT definitions yet.</Callout>
         ) : udts.map((udt) => (
           <UdtRow key={udt.id} udt={udt} data={data} selection={selection} onSelect={onSelect} />
         ))}
-      </div>
+      </Box>
     </SidebarSection>
   );
 }
@@ -26,14 +30,14 @@ export function UdtTree({ data, selection, onSelect, onCreate }: { data: Project
 function UdtRow({ udt, data, selection, onSelect }: { udt: ProjectData["udts"][string]; data: ProjectData; selection: DataSelection; onSelect(selection: DataSelection): void }) {
   const [expanded, setExpanded] = useState(true);
   const active = (selection?.kind === "udt" || selection?.kind === "udt-method") && selection.udtId === udt.id;
-  return <div>
-    <div className={`flex h-8 items-center rounded-md pr-2 text-xs ${active ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]" : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"}`}>
-      <button type="button" onClick={() => setExpanded((value) => !value)} className="inline-flex h-6 w-6 items-center justify-center text-[var(--editor-text-soft)]"><ChevronRight size={12} className={expanded ? "rotate-90" : ""} /></button>
-      <button type="button" onClick={() => onSelect({ kind: "udt", udtId: udt.id })} className="flex min-w-0 flex-1 items-center gap-2 text-left"><Braces size={13} /><span className="truncate font-medium">{udt.name}</span></button>
-    </div>
-    {expanded ? <div className="ml-8 space-y-0.5 border-l border-[var(--editor-border)] pl-3 py-1">
-      {udt.fields.map((field) => <button key={field.id} type="button" onClick={() => onSelect({ kind: "udt", udtId: udt.id })} className="flex h-7 w-full items-center justify-between gap-2 text-left text-[11px] text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]"><span>{field.name}</span><span className="text-[10px] text-[var(--editor-text-soft)]">{TypeRegistry.getDisplayName(field.type, field.type.kind === "udt" ? data.udts[field.type.udtId]?.name : undefined)}</span></button>)}
-      {udt.methods.map((method) => <button key={method.id} type="button" onClick={() => onSelect({ kind: "udt-method", udtId: udt.id, methodId: method.id })} className={`flex h-7 w-full items-center gap-2 text-left text-[11px] ${selection?.kind === "udt-method" && selection.methodId === method.id ? "text-[var(--editor-accent)]" : "text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]"}`}><FunctionSquare size={11} /><span>{method.name}()</span></button>)}
-    </div> : null}
-  </div>;
+  return <Box>
+    <Box className={`flex h-8 items-center rounded-md pr-2 text-xs ${active ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]" : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"}`}>
+      <Pressable type="button" onClick={() => setExpanded((value) => !value)} className="inline-flex h-6 w-6 items-center justify-center text-[var(--editor-text-soft)]"><Icon glyph={ChevronRight} size={12} className={expanded ? "rotate-90" : ""} /></Pressable>
+      <Pressable type="button" onClick={() => onSelect({ kind: "udt", udtId: udt.id })} className="flex min-w-0 flex-1 items-center gap-2 text-left"><Icon glyph={Braces} size={13} /><span className="truncate font-medium">{udt.name}</span></Pressable>
+    </Box>
+    {expanded ? <Box className="ml-8 space-y-0.5 border-l border-[var(--editor-border)] pl-3 py-1">
+      {udt.fields.map((field) => <Pressable key={field.id} type="button" onClick={() => onSelect({ kind: "udt", udtId: udt.id })} className="flex h-7 w-full items-center justify-between gap-2 text-left text-[11px] text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]"><span>{field.name}</span><span className="text-[10px] text-[var(--editor-text-soft)]">{TypeRegistry.getDisplayName(field.type, field.type.kind === "udt" ? data.udts[field.type.udtId]?.name : undefined)}</span></Pressable>)}
+      {udt.methods.map((method) => <Pressable key={method.id} type="button" onClick={() => onSelect({ kind: "udt-method", udtId: udt.id, methodId: method.id })} className={`flex h-7 w-full items-center gap-2 text-left text-[11px] ${selection?.kind === "udt-method" && selection.methodId === method.id ? "text-[var(--editor-accent)]" : "text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]"}`}><Icon glyph={FunctionSquare} size={11} /><span>{method.name}()</span></Pressable>)}
+    </Box> : null}
+  </Box>;
 }

@@ -1,9 +1,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cx } from "./cx";
+import { Box } from "../atoms/Layout";
+import { Pressable } from "../atoms/Pressable";
+import { cx } from "../utils/cx";
 
 export type SegmentedControlVariant = "outline" | "soft";
 
-type SegmentedControlProps = {
+export type SegmentedControlProps = {
   children: ReactNode;
   className?: string | undefined;
   variant?: SegmentedControlVariant | undefined;
@@ -17,7 +19,7 @@ export function SegmentedControl({
   fullWidth = false,
 }: SegmentedControlProps) {
   return (
-    <div
+    <Box
       data-editor-ignore
       className={cx(
         "inline-flex h-9 overflow-hidden",
@@ -29,11 +31,11 @@ export function SegmentedControl({
       )}
     >
       {children}
-    </div>
+    </Box>
   );
 }
 
-type SegmentedControlItemProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export type SegmentedControlItemProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean | undefined;
   variant?: SegmentedControlVariant | undefined;
   grow?: boolean | undefined;
@@ -48,12 +50,11 @@ export function SegmentedControlItem({
   ...props
 }: SegmentedControlItemProps) {
   return (
-    <button
-      data-editor-ignore
+    <Pressable
       type={type}
       aria-pressed={active}
       className={cx(
-        "inline-flex h-full min-w-10 items-center justify-center px-2 transition focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--editor-accent-soft)]",
+        "inline-flex h-full min-w-10 items-center justify-center px-2 transition focus-visible:z-10 focus-visible:ring-inset",
         grow && "flex-1",
         variant === "outline"
           ? "border-r border-[var(--editor-border)] text-sm last:border-r-0"

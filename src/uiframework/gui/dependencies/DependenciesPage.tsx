@@ -1,3 +1,4 @@
+import { Box, Icon, PageContainer, PageHeader, WorkspaceShell } from "../ui";
 import {
   Background,
   BackgroundVariant,
@@ -161,7 +162,7 @@ function GraphNodeLegend() {
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
+    <Box className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
       {items.map(([label, tone]) => (
         <span
           key={label}
@@ -171,7 +172,7 @@ function GraphNodeLegend() {
           {label}
         </span>
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -208,38 +209,38 @@ function GraphCard({
     data: {
       ...node.data,
       label: (
-        <div className="px-4 py-3 text-left">
-          <div className="flex items-center gap-2">
+        <Box className="px-4 py-3 text-left">
+          <Box className="flex items-center gap-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${toneDotClass(node.data.tone)}`} />
             <span className="text-xs font-semibold text-zinc-900">{node.data.title}</span>
-          </div>
-          <div className="mt-1 pl-4 text-[10px] leading-4 text-zinc-500">
+          </Box>
+          <Box className="mt-1 pl-4 text-[10px] leading-4 text-zinc-500">
             {node.data.detail}
-          </div>
-        </div>
+          </Box>
+        </Box>
       ),
     },
   }));
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-sm">
-      <div className="flex items-start justify-between gap-6 border-b border-[var(--editor-border)] px-5 py-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="mt-0.5 rounded-lg border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-2 text-[var(--editor-accent)]">
+      <Box className="flex items-start justify-between gap-6 border-b border-[var(--editor-border)] px-5 py-4">
+        <Box className="flex min-w-0 items-start gap-3">
+          <Box className="mt-0.5 rounded-lg border border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] p-2 text-[var(--editor-accent)]">
             {icon}
-          </div>
-          <div className="min-w-0">
+          </Box>
+          <Box className="min-w-0">
             <h2 className="text-sm font-semibold text-[var(--editor-text)]">{title}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--editor-text-muted)]">{description}</p>
-          </div>
-        </div>
+          </Box>
+        </Box>
         <span className="shrink-0 rounded-full border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
           Static mock
         </span>
-      </div>
-      <div className="h-[360px] bg-[#f8f9fc]">
+      </Box>
+      <Box className="h-[360px] bg-[#f8f9fc]">
         <StaticGraph nodes={renderedNodes} edges={edges} />
-      </div>
+      </Box>
     </section>
   );
 }
@@ -248,32 +249,20 @@ export function DependenciesPage() {
   const { projectId } = useParams();
 
   return (
-    <div className="flex h-screen flex-col bg-[var(--editor-app-bg)] text-[var(--editor-text)]">
-      <WorkspaceHeader
-        active="dependencies"
-        projectId={projectId}
-        title="Dependencies"
-        subtitle="Static React Flow exploration"
-      />
-
-      <main className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1500px] space-y-5 px-6 py-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--editor-accent)]">
-                <Network size={14} />
-                Project visualization lab
-              </div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight">Dependency graphs</h1>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--editor-text-muted)]">
-                Two hard-coded examples for evaluating React Flow inside SCADAtomic. Nothing here reads project state, executes scripts, subscribes to tags, or emits runtime events yet.
-              </p>
-            </div>
-            <GraphNodeLegend />
-          </div>
+    <WorkspaceShell
+      header={<WorkspaceHeader active="dependencies" projectId={projectId} title="Dependencies" subtitle="Static React Flow exploration" />}
+    >
+      <PageContainer size="full" className="max-w-[1500px] space-y-5 px-6 py-6">
+        <PageHeader
+          eyebrow="Project visualization lab"
+          icon={<Icon glyph={Network} size={14} />}
+          title="Dependency graphs"
+          description="Two hard-coded examples for evaluating React Flow inside SCADAtomic. Nothing here reads project state, executes scripts, subscribes to tags, or emits runtime events yet."
+          actions={<GraphNodeLegend />}
+        />
 
           <GraphCard
-            icon={<MousePointerClick size={17} />}
+            icon={<Icon glyph={MousePointerClick} size={17} />}
             title="Event execution flow"
             description="Example of an onClick event reaching its handler and script, then branching into an emitted runtime event and a PLC-like tag write path."
             nodes={eventFlowNodes}
@@ -281,19 +270,18 @@ export function DependenciesPage() {
           />
 
           <GraphCard
-            icon={<Workflow size={17} />}
+            icon={<Icon glyph={Workflow} size={17} />}
             title="Project dependency graph"
             description="Example relationships between PageLayout, Page, Repeat Container, User Component, TagRef, UDT, TagRuntime, driver and a chart binding."
             nodes={projectGraphNodes}
             edges={projectGraphEdges}
           />
 
-          <div className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--editor-border-strong)] bg-white/60 px-4 py-3 text-xs text-[var(--editor-text-muted)]">
-            <Braces size={15} className="text-[var(--editor-accent)]" />
+          <Box className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--editor-border-strong)] bg-white/60 px-4 py-3 text-xs text-[var(--editor-text-muted)]">
+            <Icon glyph={Braces} size={15} className="text-[var(--editor-accent)]" />
             Next step, deliberately not implemented here: generate nodes and edges from the real UiDocument / script metadata.
-          </div>
-        </div>
-      </main>
-    </div>
+          </Box>
+      </PageContainer>
+    </WorkspaceShell>
   );
 }

@@ -1,6 +1,6 @@
+import { Box, Icon, Pressable } from "../ui";
 import { useMemo, useState } from "react";
 import {
-  Box,
   Boxes,
   ChartLine,
   LayoutTemplate,
@@ -70,14 +70,14 @@ export function ComponentPalette({
   );
 
   return (
-    <div data-editor-ignore className="space-y-4">
-      <div>
-        <div className="text-xs uppercase tracking-wide font-semibold text-[var(--editor-text-muted)] mb-3">
+    <Box data-editor-ignore className="space-y-4">
+      <Box>
+        <Box className="text-xs uppercase tracking-wide font-semibold text-[var(--editor-text-muted)] mb-3">
           Components
-        </div>
+        </Box>
 
-        <div className="relative">
-          <Search
+        <Box className="relative">
+          <Icon glyph={Search}
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--editor-text-soft)] pointer-events-none"
           />
@@ -89,17 +89,17 @@ export function ComponentPalette({
             placeholder="Search components..."
             className="w-full h-10 pl-10 pr-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] text-sm text-[var(--editor-text)] outline-none placeholder:text-[var(--editor-text-soft)] focus:border-[var(--editor-accent-border)] focus:ring-2 focus:ring-[var(--editor-accent-soft)]"
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
-          <Boxes size={12} /> Component library
-        </div>
+      <Box className="space-y-2">
+        <Box className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
+          <Icon glyph={Boxes} size={12} /> Component library
+        </Box>
 
         {reusableItems.length > 0 ? (
           reusableItems.map((item) => (
-            <div
+            <Box
               key={item.id}
               data-editor-ignore
               role="button"
@@ -114,18 +114,18 @@ export function ComponentPalette({
               className="group w-full p-3 rounded-xl border border-violet-200 bg-violet-50/50 hover:bg-violet-50 transition-all flex items-start gap-3 text-left cursor-pointer select-none focus:outline-none focus:ring-2 focus:ring-violet-200"
               title={`Open ${item.name} definition`}
             >
-              <div className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
-                <Boxes size={18} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-[var(--editor-text)]">
+              <Box className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
+                <Icon glyph={Boxes} size={18} />
+              </Box>
+              <Box className="min-w-0 flex-1">
+                <Box className="text-sm font-semibold text-[var(--editor-text)]">
                   {item.name}
-                </div>
-                <div className="text-xs text-[var(--editor-text-muted)]">
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)]">
                   Reusable project component
-                </div>
-              </div>
-              <button
+                </Box>
+              </Box>
+              <Pressable
                 type="button"
                 data-editor-ignore
                 onClick={(event) => event.stopPropagation()}
@@ -148,23 +148,23 @@ export function ComponentPalette({
                 title="Drag component to canvas"
                 aria-label={`Drag ${item.name} to canvas`}
               >
-                <GripVertical size={16} />
-              </button>
-            </div>
+                <Icon glyph={GripVertical} size={16} />
+              </Pressable>
+            </Box>
           ))
         ) : (
-          <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 px-3 py-3 text-[10px] leading-4 text-violet-700/80">
+          <Box className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 px-3 py-3 text-[10px] leading-4 text-violet-700/80">
             Create a component from a Container or multi-selection and it will appear here.
-          </div>
+          </Box>
         )}
-      </div>
+      </Box>
 
-      <div className="space-y-2">
+      <Box className="space-y-2">
         {items.map((item) => {
-          const Icon = icons[item.type as RegisteredComponentType];
+          const ItemIcon = icons[item.type as RegisteredComponentType];
 
           return (
-            <button
+            <Pressable
               key={item.type}
               data-editor-ignore
               onPointerDown={(event) => {
@@ -177,28 +177,28 @@ export function ComponentPalette({
               }}
               className="w-full p-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)] transition-all flex items-start gap-3 text-left cursor-grab select-none"
             >
-              <div className="h-10 w-10 rounded-xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)] flex items-center justify-center shrink-0">
-                <Icon size={18} />
-              </div>
+              <Box className="h-10 w-10 rounded-xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)] flex items-center justify-center shrink-0">
+                <Icon glyph={ItemIcon} size={18} />
+              </Box>
 
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-[var(--editor-text)]">
+              <Box className="min-w-0">
+                <Box className="text-sm font-semibold text-[var(--editor-text)]">
                   {item.label}
-                </div>
-                <div className="text-xs text-[var(--editor-text-muted)]">
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)]">
                   {item.description}
-                </div>
-              </div>
-            </button>
+                </Box>
+              </Box>
+            </Pressable>
           );
         })}
-      </div>
+      </Box>
 
       {items.length === 0 && reusableItems.length === 0 ? (
-        <div className="py-8 text-center text-sm text-[var(--editor-text-muted)]">
+        <Box className="py-8 text-center text-sm text-[var(--editor-text-muted)]">
           No components found
-        </div>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 }

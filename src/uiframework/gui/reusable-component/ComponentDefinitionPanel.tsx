@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, LockKeyhole } from "lucide-react";
+import { ArrowLeft, Box as BoxIcon, LockKeyhole } from "lucide-react";
 import type {
   Binding,
   HandlerRef,
@@ -16,7 +16,10 @@ import { NodePropertiesEditor } from "../property-panel/NodePropertiesEditor";
 import type { UpdateNode } from "../property-panel/property-panel-types";
 import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
 import { VariantsEditor } from "../property-panel/VariantsEditor";
-import { Button, PanelSection, SectionHeader } from "../ui";
+import { Button, PanelSection, SectionHeader,
+  Box,
+  Icon,
+} from "../ui";
 import { createInputControls } from "./component-input-controls";
 import { PublicInputsEditor } from "./PublicInputsEditor";
 
@@ -88,25 +91,25 @@ export function ComponentDefinitionPanel({
   };
 
   return (
-    <div data-editor-ignore className="h-full flex flex-col">
-      <div className="border-b border-[var(--editor-border)] px-4 py-4">
+    <Box data-editor-ignore className="h-full flex flex-col">
+      <Box className="border-b border-[var(--editor-border)] px-4 py-4">
         <Button variant="ghost" size="xs" onClick={onExit} className="-ml-2">
-          <ArrowLeft size={12} /> Designer
+          <Icon glyph={ArrowLeft} size={12} /> Designer
         </Button>
-        <div className="mt-3 flex items-start gap-2">
-          <div className="flex size-8 items-center justify-center rounded-md bg-violet-50 text-violet-700">
-            <Box size={15} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{definition.name}</div>
-            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-violet-600">
-              <LockKeyhole size={10} /> Encapsulated component definition
-            </div>
-          </div>
-        </div>
-      </div>
+        <Box className="mt-3 flex items-start gap-2">
+          <Box className="flex size-8 items-center justify-center rounded-md bg-violet-50 text-violet-700">
+            <Icon glyph={BoxIcon} size={15} />
+          </Box>
+          <Box className="min-w-0 flex-1">
+            <Box className="truncate text-sm font-semibold">{definition.name}</Box>
+            <Box className="mt-0.5 flex items-center gap-1 text-[10px] text-violet-600">
+              <Icon glyph={LockKeyhole} size={10} /> Encapsulated component definition
+            </Box>
+          </Box>
+        </Box>
+      </Box>
 
-      <div className="flex-1 overflow-auto p-4 space-y-6">
+      <Box className="flex-1 overflow-auto p-4 space-y-6">
         <PublicInputsEditor
           projectDocument={projectDocument}
           definition={definition}
@@ -161,12 +164,12 @@ export function ComponentDefinitionPanel({
               </>
             )
           ) : (
-            <div className="text-xs text-[var(--editor-text-muted)]">
+            <Box className="text-xs text-[var(--editor-text-muted)]">
               Select an internal component to edit its properties.
-            </div>
+            </Box>
           )}
         </PanelSection>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

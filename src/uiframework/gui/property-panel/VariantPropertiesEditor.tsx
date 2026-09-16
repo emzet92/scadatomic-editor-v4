@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import { getComponentVariantProps } from "../../component-variants";
 import type { UiNode } from "../../core/document";
 import { getComponentDefinition } from "../../registry/component-definitions";
@@ -21,9 +22,9 @@ export function VariantPropertiesEditor({
 
   if (!variant) {
     return (
-      <div className="text-xs text-amber-700">
+      <Box className="text-xs text-amber-700">
         Variant “{variantName}” no longer exists.
-      </div>
+      </Box>
     );
   }
 
@@ -66,9 +67,9 @@ export function VariantPropertiesEditor({
           updateNode={updateVariantNode}
         />
       ) : (
-        <div className="text-xs text-amber-700">
+        <Box className="text-xs text-amber-700">
           No component definition for {node.type}.
-        </div>
+        </Box>
       )}
 
       <VariantsEditor

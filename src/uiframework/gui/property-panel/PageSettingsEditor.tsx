@@ -25,6 +25,9 @@ import {
   SectionHeader,
   Select,
   TextInput,
+  Box,
+  Icon,
+  Pressable,
 } from "../ui";
 
 const presets = [
@@ -67,7 +70,7 @@ export function PageSettingsEditor({
   }
 
   return (
-    <div className="space-y-6">
+    <Box className="space-y-6">
       {kind === "layout" ? (
         <PanelSection>
           <SectionHeader
@@ -76,7 +79,7 @@ export function PageSettingsEditor({
             className="mb-2"
           />
           <PanelCard variant="accent" padding="sm" className="flex items-center gap-2 text-xs text-[var(--editor-accent)]">
-            <LayoutTemplate size={13} className="shrink-0" />
+            <Icon glyph={LayoutTemplate} size={13} className="shrink-0" />
             <span>Edit this layout like a page. Keep one content Page Slot where page content should render.</span>
           </PanelCard>
         </PanelSection>
@@ -90,10 +93,10 @@ export function PageSettingsEditor({
             className="mb-2"
           />
           <PanelCard padding="sm" className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2 text-xs text-[var(--editor-text)]">
-              <Home size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
+            <Box className="flex min-w-0 items-center gap-2 text-xs text-[var(--editor-text)]">
+              <Icon glyph={Home} size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
               <span className="truncate">{isStartPage ? "Default start page" : "Not the start page"}</span>
-            </div>
+            </Box>
             {isStartPage ? (
               <Badge variant="accent">start</Badge>
             ) : (
@@ -140,12 +143,12 @@ export function PageSettingsEditor({
       <PanelSection>
         <SectionHeader title={kind === "layout" ? "Layout viewport" : "Page viewport"} className="mb-2" />
 
-        <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)]">
+        <Box className="grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)]">
           {presets.map((preset) => {
-            const Icon = preset.icon;
+            const PresetIcon = preset.icon;
             const active = mode === preset.mode;
             return (
-              <button
+              <Pressable
                 key={preset.mode}
                 type="button"
                 onClick={() =>
@@ -165,14 +168,14 @@ export function PageSettingsEditor({
                     : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
                 }`}
               >
-                <Icon size={14} />
+                <Icon glyph={PresetIcon} size={14} />
                 {preset.label}
-              </button>
+              </Pressable>
             );
           })}
-        </div>
+        </Box>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <Box className="mt-3 grid grid-cols-2 gap-2">
           <FormField
             label="Width"
             compact
@@ -203,8 +206,8 @@ export function PageSettingsEditor({
               className="h-auto border-0 bg-transparent p-0 text-xs font-medium focus:ring-0"
             />
           </FormField>
-        </div>
+        </Box>
       </PanelSection>
-    </div>
+    </Box>
   );
 }

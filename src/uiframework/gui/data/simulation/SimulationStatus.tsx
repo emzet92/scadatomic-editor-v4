@@ -6,7 +6,10 @@ import { useDesignerTagValue } from "../../../data/tags/designer-tag-store";
 import { listSimulationBindings } from "../../../data/simulation/SimulationRegistry";
 import { simulationGeneratorRegistry } from "../../../data/simulation/SimulationGeneratorRegistry";
 import { sendWsMessage } from "../../../websocket";
-import { Button, PanelCard } from "../../ui";
+import { Button, PanelCard,
+  Box,
+  Icon,
+} from "../../ui";
 import { designerSimulationSession } from "../../../data/simulation/designer-simulation-session";
 
 export function SimulationStatus({
@@ -49,25 +52,25 @@ export function SimulationStatus({
 
   return (
     <PanelCard className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
-            <Activity size={13} className={snapshot.running ? "text-emerald-600" : "text-[var(--editor-text-soft)]"} />
+      <Box className="flex items-center justify-between gap-2">
+        <Box className="min-w-0">
+          <Box className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
+            <Icon glyph={Activity} size={13} className={snapshot.running ? "text-emerald-600" : "text-[var(--editor-text-soft)]"} />
             Simulation
-          </div>
-          <div className="mt-1 text-[10px] text-[var(--editor-text-soft)]">
+          </Box>
+          <Box className="mt-1 text-[10px] text-[var(--editor-text-soft)]">
             {snapshot.running ? "Running local simulation driver" : "Stopped"} · {activeBindings.length} active {activeBindings.length === 1 ? "binding" : "bindings"}
-          </div>
-        </div>
+          </Box>
+        </Box>
         {snapshot.running ? (
-          <Button size="xs" variant="secondary" onClick={stop}><Square size={11} /> Stop</Button>
+          <Button size="xs" variant="secondary" onClick={stop}><Icon glyph={Square} size={11} /> Stop</Button>
         ) : (
-          <Button size="xs" variant="primary" disabled={activeBindings.length === 0} onClick={start}><Play size={11} /> Start</Button>
+          <Button size="xs" variant="primary" disabled={activeBindings.length === 0} onClick={start}><Icon glyph={Play} size={11} /> Start</Button>
         )}
-      </div>
+      </Box>
 
       {activeBindings.length > 0 ? (
-        <div className="space-y-1.5 border-t border-[var(--editor-border)] pt-2">
+        <Box className="space-y-1.5 border-t border-[var(--editor-border)] pt-2">
           {activeBindings.map((binding) => {
             const resolved = resolveTagFieldRef(data, binding.target);
             if (!resolved) return null;
@@ -80,9 +83,9 @@ export function SimulationStatus({
               />
             );
           })}
-        </div>
+        </Box>
       ) : (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Map fields to Simulation, then add generators only to signals that should be driven automatically.</div>
+        <Box className="text-[10px] leading-4 text-[var(--editor-text-soft)]">Map fields to Simulation, then add generators only to signals that should be driven automatically.</Box>
       )}
     </PanelCard>
   );
@@ -99,16 +102,16 @@ function SimulationBindingStatusRow({
 }) {
   const value = useDesignerTagValue(path);
   return (
-    <div className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2 py-1.5">
-      <div className="flex items-center justify-between gap-2">
+    <Box className="rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2 py-1.5">
+      <Box className="flex items-center justify-between gap-2">
         <span className="truncate font-mono text-[10px] text-[var(--editor-text)]">{path}</span>
         <span className="shrink-0 text-[9px] font-medium text-[var(--editor-accent)]">{generatorName}</span>
-      </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2 text-[9px] text-[var(--editor-text-soft)]">
+      </Box>
+      <Box className="mt-0.5 flex items-center justify-between gap-2 text-[9px] text-[var(--editor-text-soft)]">
         <span>{error ?? "Current"}</span>
         <span className={error ? "text-red-600" : "font-mono text-[var(--editor-text-muted)]"}>{error ? "error" : formatValue(value)}</span>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 

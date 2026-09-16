@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { cx } from "./cx";
+import { Box, Inline } from "../atoms/Layout";
+import { cx } from "../utils/cx";
 
 export type CalloutVariant = "muted" | "accent" | "warning" | "danger" | "success";
 export type CalloutSize = "sm" | "md";
@@ -17,6 +18,15 @@ const sizeClassNames: Record<CalloutSize, string> = {
   md: "rounded-xl p-4 text-xs leading-5",
 };
 
+export type CalloutProps = {
+  children: ReactNode;
+  icon?: ReactNode | undefined;
+  variant?: CalloutVariant | undefined;
+  size?: CalloutSize | undefined;
+  dashed?: boolean | undefined;
+  className?: string | undefined;
+};
+
 export function Callout({
   children,
   icon,
@@ -24,27 +34,21 @@ export function Callout({
   size = "md",
   dashed = false,
   className,
-}: {
-  children: ReactNode;
-  icon?: ReactNode | undefined;
-  variant?: CalloutVariant | undefined;
-  size?: CalloutSize | undefined;
-  dashed?: boolean | undefined;
-  className?: string | undefined;
-}) {
+}: CalloutProps) {
+  const classes = cx(
+    "border",
+    dashed && "border-dashed",
+    variantClassNames[variant],
+    sizeClassNames[size],
+    className
+  );
+
+  if (!icon) return <Box className={classes}>{children}</Box>;
+
   return (
-    <div
-      className={cx(
-        "border",
-        dashed && "border-dashed",
-        variantClassNames[variant],
-        sizeClassNames[size],
-        icon && "flex items-start gap-2",
-        className
-      )}
-    >
-      {icon ? <span className="mt-0.5 shrink-0">{icon}</span> : null}
-      <div className="min-w-0">{children}</div>
-    </div>
+    <Inline align="start" gap="sm" className={classes}>
+      <Box className="mt-0.5 shrink-0">{icon}</Box>
+      <Box className="min-w-0">{children}</Box>
+    </Inline>
   );
 }

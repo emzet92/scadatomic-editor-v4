@@ -1,30 +1,25 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { cx } from "./cx";
+import { Pressable } from "./Pressable";
+import { cx } from "../utils/cx";
 
-export type ButtonVariant =
-  | "primary"
-  | "secondary"
-  | "ghost"
-  | "danger"
-  | "text";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "text";
 export type ButtonSize = "xs" | "sm" | "md" | "icon-xs" | "icon-sm" | "icon";
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+  variant?: ButtonVariant | undefined;
+  size?: ButtonSize | undefined;
+  leadingIcon?: ReactNode | undefined;
+  trailingIcon?: ReactNode | undefined;
 };
 
 const variantClassNames: Record<ButtonVariant, string> = {
-  primary:
-    "bg-[var(--editor-accent)] text-white hover:bg-[var(--editor-accent-hover)]",
+  primary: "bg-[var(--editor-accent)] text-white hover:bg-[var(--editor-accent-hover)]",
   secondary:
     "border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text)] hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)]",
   ghost:
     "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)] hover:text-[var(--editor-text)]",
-  danger:
-    "text-[var(--editor-text-muted)] hover:bg-red-50 hover:text-[var(--editor-danger)]",
-  text:
-    "text-[var(--editor-accent)] hover:bg-[var(--editor-accent-soft)]",
+  danger: "text-[var(--editor-text-muted)] hover:bg-red-50 hover:text-[var(--editor-danger)]",
+  text: "text-[var(--editor-accent)] hover:bg-[var(--editor-accent-soft)]",
 };
 
 const sizeClassNames: Record<ButtonSize, string> = {
@@ -40,6 +35,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   {
     variant = "secondary",
     size = "sm",
+    leadingIcon,
+    trailingIcon,
+    children,
     className,
     type = "button",
     ...props
@@ -47,22 +45,25 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref
 ) {
   return (
-    <button
+    <Pressable
       ref={ref}
-      data-editor-ignore
       type={type}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent-soft)] disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium transition focus-visible:ring-[var(--editor-accent-soft)]",
         variantClassNames[variant],
         sizeClassNames[size],
         className
       )}
       {...props}
-    />
+    >
+      {leadingIcon}
+      {children}
+      {trailingIcon}
+    </Pressable>
   );
 });
 
-type IconButtonProps = Omit<ButtonProps, "children" | "aria-label"> & {
+export type IconButtonProps = Omit<ButtonProps, "children" | "aria-label" | "leadingIcon" | "trailingIcon"> & {
   "aria-label": string;
   children: ReactNode;
 };

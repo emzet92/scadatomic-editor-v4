@@ -6,7 +6,9 @@ import {
   type SpacingValue,
 } from "../../design-system/spacing";
 import { useEditorStore } from "../../editor-store";
-import { Callout, Select, TextInput } from "../ui";
+import { Callout, Select, TextInput,
+  Box,
+} from "../ui";
 
 const LOCAL_OPTION = "__local__";
 
@@ -50,7 +52,7 @@ export function SpacingValueControl({
   }
 
   const content = (
-    <div className={compact ? "space-y-1.5" : "space-y-2"}>
+    <Box className={compact ? "space-y-1.5" : "space-y-2"}>
       <Select
         aria-label={`${label} source`}
         value={selection}
@@ -67,17 +69,17 @@ export function SpacingValueControl({
 
       {tokenRef ? (
         selectedToken ? (
-          <div className="flex min-h-8 items-center justify-between gap-2 rounded-[10px] border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2.5 text-[10px] text-[var(--editor-text-muted)]">
+          <Box className="flex min-h-8 items-center justify-between gap-2 rounded-[10px] border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-2.5 text-[10px] text-[var(--editor-text-muted)]">
             <span className="truncate">{selectedToken.name}</span>
             <span className="shrink-0 font-mono text-[var(--editor-text)]">{selectedToken.value}px</span>
-          </div>
+          </Box>
         ) : (
           <Callout variant="warning" size="sm">
             Missing spacing token. Choose another token or switch to Local value.
           </Callout>
         )
       ) : (
-        <div className="flex items-center gap-1.5">
+        <Box className="flex items-center gap-1.5">
           <TextInput
             aria-label={`${label} value`}
             controlSize={compact ? "sm" : "md"}
@@ -90,34 +92,34 @@ export function SpacingValueControl({
             className="min-w-0 flex-1"
           />
           <span className="shrink-0 text-[10px] text-[var(--editor-text-soft)]">px</span>
-        </div>
+        </Box>
       )}
 
       {tokens.length === 0 && !compact ? (
-        <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
+        <Box className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
           Add values in Design System → Spacing to enable token references.
-        </div>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 
   if (!compact) {
     return (
-      <div>
-        <div className="mb-1.5 text-xs font-medium text-[var(--editor-text-muted)]">{label}</div>
+      <Box>
+        <Box className="mb-1.5 text-xs font-medium text-[var(--editor-text-muted)]">{label}</Box>
         {content}
-      </div>
+      </Box>
     );
   }
 
   return (
-    <div className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
-      <div className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
+    <Box className="rounded-[12px] bg-[var(--editor-surface-muted)] px-2.5 py-2">
+      <Box className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.06em] text-[var(--editor-text-muted)]">
         {icon}
         {label}
-      </div>
+      </Box>
       {content}
-    </div>
+    </Box>
   );
 }
 

@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import type { MouseEvent } from "react";
 import type { TreeSelectionOptions } from "./tree-view-types";
 
@@ -21,12 +22,12 @@ export function TreeNodeLabel({
   }
 
   return (
-    <div
+    <Box
       className="flex-1 min-w-0 truncate text-sm"
       onClick={handleClick}
       title={`${name} · ${type}`}
     >
       {name}
-    </div>
+    </Box>
   );
 }

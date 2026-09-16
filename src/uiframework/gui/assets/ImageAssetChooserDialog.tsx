@@ -2,7 +2,11 @@ import { Check, ImageIcon, Images, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AssetRef } from "../../assets";
 import { useAssetUrl } from "../../assets";
-import { Button, Dialog, EmptyAction, cx } from "../ui";
+import { Button, Dialog, EmptyAction, cx,
+  Box,
+  Icon,
+  Pressable,
+} from "../ui";
 
 export type ImageAssetChooserDialogProps = {
   open: boolean;
@@ -44,15 +48,15 @@ export function ImageAssetChooserDialog({
       description="Reuse an image already stored in this browser. Selecting it does not duplicate the binary file."
       onClose={onClose}
       icon={
-        <div className="flex size-8 items-center justify-center rounded-lg bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <Images size={16} />
-        </div>
+        <Box className="flex size-8 items-center justify-center rounded-lg bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
+          <Icon glyph={Images} size={16} />
+        </Box>
       }
       footer={
         <>
-          <div className="mr-auto min-w-0 truncate text-[10px] text-[var(--editor-text-soft)]">
+          <Box className="mr-auto min-w-0 truncate text-[10px] text-[var(--editor-text-soft)]">
             {selectedAsset ? selectedAsset.name : `${assets.length} asset${assets.length === 1 ? "" : "s"}`}
-          </div>
+          </Box>
           <Button variant="secondary" size="sm" onClick={onClose}>
             Cancel
           </Button>
@@ -66,27 +70,27 @@ export function ImageAssetChooserDialog({
               onClose();
             }}
           >
-            <Check size={13} />
+            <Icon glyph={Check} size={13} />
             Use asset
           </Button>
         </>
       }
     >
       {loading ? (
-        <div className="flex min-h-48 items-center justify-center text-xs text-[var(--editor-text-muted)]">
+        <Box className="flex min-h-48 items-center justify-center text-xs text-[var(--editor-text-muted)]">
           Loading assets…
-        </div>
+        </Box>
       ) : error ? (
-        <div className="space-y-3">
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+        <Box className="space-y-3">
+          <Box className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
             {error}
-          </div>
+          </Box>
           {onRetry ? (
             <Button variant="secondary" size="sm" onClick={onRetry}>
               Try again
             </Button>
           ) : null}
-        </div>
+        </Box>
       ) : assets.length === 0 ? (
         <EmptyAction
           className="min-h-48 justify-center"
@@ -95,7 +99,7 @@ export function ImageAssetChooserDialog({
             onUploadRequest?.();
           }}
         >
-          <Upload size={16} />
+          <Icon glyph={Upload} size={16} />
           <span>
             <span className="block font-medium">No image assets yet</span>
             <span className="mt-0.5 block text-[10px] text-[var(--editor-text-soft)]">
@@ -104,7 +108,7 @@ export function ImageAssetChooserDialog({
           </span>
         </EmptyAction>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <Box className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {assets.map((asset) => (
             <AssetTile
               key={asset.id}
@@ -117,7 +121,7 @@ export function ImageAssetChooserDialog({
               }}
             />
           ))}
-        </div>
+        </Box>
       )}
     </Dialog>
   );
@@ -137,7 +141,7 @@ function AssetTile({
   const preview = useAssetUrl(asset.id);
 
   return (
-    <button
+    <Pressable
       type="button"
       data-editor-ignore
       title={asset.name}
@@ -151,7 +155,7 @@ function AssetTile({
       onClick={onSelect}
       onDoubleClick={onChoose}
     >
-      <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-[var(--editor-surface-muted)]">
+      <Box className="relative flex aspect-square items-center justify-center overflow-hidden bg-[var(--editor-surface-muted)]">
         {preview.url ? (
           <img
             src={preview.url}
@@ -160,23 +164,23 @@ function AssetTile({
             draggable={false}
           />
         ) : (
-          <ImageIcon size={22} className="text-[var(--editor-text-soft)]" />
+          <Icon glyph={ImageIcon} size={22} className="text-[var(--editor-text-soft)]" />
         )}
         {selected ? (
-          <div className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--editor-accent)] text-white shadow-sm">
-            <Check size={12} />
-          </div>
+          <Box className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--editor-accent)] text-white shadow-sm">
+            <Icon glyph={Check} size={12} />
+          </Box>
         ) : null}
-      </div>
-      <div className="min-w-0 px-2 py-1.5">
-        <div className="truncate text-[10px] font-medium text-[var(--editor-text)]">
+      </Box>
+      <Box className="min-w-0 px-2 py-1.5">
+        <Box className="truncate text-[10px] font-medium text-[var(--editor-text)]">
           {asset.name}
-        </div>
-        <div className="mt-0.5 truncate text-[9px] text-[var(--editor-text-soft)]">
+        </Box>
+        <Box className="mt-0.5 truncate text-[9px] text-[var(--editor-text-soft)]">
           {formatFileSize(asset.size)}
-        </div>
-      </div>
-    </button>
+        </Box>
+      </Box>
+    </Pressable>
   );
 }
 

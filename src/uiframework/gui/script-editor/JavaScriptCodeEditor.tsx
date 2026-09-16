@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import { oneDark } from "@codemirror/theme-one-dark";
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo } from "react";
@@ -90,11 +91,11 @@ export function JavaScriptCodeEditor({
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
-      <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
-        <div className="text-xs font-medium text-zinc-300">JavaScript</div>
-        <div className="text-[11px] text-zinc-500">{autocompleteHint}</div>
-      </div>
+    <Box className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-sm">
+      <Box className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2">
+        <Box className="text-xs font-medium text-zinc-300">JavaScript</Box>
+        <Box className="text-[11px] text-zinc-500">{autocompleteHint}</Box>
+      </Box>
 
       <CodeMirror
         value={value}
@@ -110,7 +111,7 @@ export function JavaScriptCodeEditor({
         }}
         onChange={onChange}
       />
-    </div>
+    </Box>
   );
 }
 

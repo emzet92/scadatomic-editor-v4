@@ -1,6 +1,7 @@
 import type { ChangeEvent } from "react";
-import { cx } from "./cx";
-import { TextInput } from "./FormControls";
+import { Inline } from "../atoms/Layout";
+import { TextInput } from "../atoms/FormControls";
+import { cx } from "../utils/cx";
 
 export type ColorPickerInputProps = {
   value: string;
@@ -26,7 +27,7 @@ export function ColorPickerInput({
   }
 
   return (
-    <div className={cx("flex min-w-0 items-center gap-2", className)}>
+    <Inline className={cx("min-w-0", className)}>
       <label
         className={cx(
           "relative shrink-0 cursor-pointer overflow-hidden border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-sm transition hover:border-[var(--editor-accent-border)] focus-within:ring-2 focus-within:ring-[var(--editor-accent-soft)]",
@@ -54,7 +55,7 @@ export function ColorPickerInput({
           className="min-w-0 flex-1"
         />
       ) : null}
-    </div>
+    </Inline>
   );
 }
 

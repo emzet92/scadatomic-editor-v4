@@ -1,6 +1,8 @@
 import { AlertTriangle } from "lucide-react";
 import { useRef } from "react";
-import { Button } from "./Button";
+import { Button } from "../atoms/Button";
+import { Icon } from "../atoms/Icon";
+import { Center } from "../atoms/Layout";
 import { Dialog } from "./Dialog";
 
 export type ConfirmDialogProps = {
@@ -36,9 +38,9 @@ export function ConfirmDialog({
       onClose={onCancel}
       initialFocusRef={cancelRef}
       icon={
-        <div className="flex size-8 items-center justify-center rounded-full bg-red-50 text-[var(--editor-danger)]">
-          <AlertTriangle size={16} />
-        </div>
+        <Center className="size-8 rounded-full bg-red-50 text-[var(--editor-danger)]">
+          <Icon glyph={AlertTriangle} size="md" />
+        </Center>
       }
       footer={
         <>
@@ -48,11 +50,7 @@ export function ConfirmDialog({
           <Button
             variant={destructive ? "danger" : "primary"}
             size="sm"
-            className={
-              destructive
-                ? "border border-red-200 bg-red-50 text-[var(--editor-danger)] hover:bg-red-100"
-                : undefined
-            }
+            className={destructive ? "border border-red-200 bg-red-50 text-[var(--editor-danger)] hover:bg-red-100" : undefined}
             onClick={onConfirm}
           >
             {confirmLabel}

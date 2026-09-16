@@ -7,7 +7,10 @@ import {
   setTagSourceDriver,
 } from "../../../data/drivers/TagSourceMapping";
 import { useEditorStore } from "../../../editor-store";
-import { FormField, Select } from "../../ui";
+import { FormField, Select,
+  Box,
+  Icon,
+} from "../../ui";
 
 export function TagSourceEditor({
   data,
@@ -26,10 +29,10 @@ export function TagSourceEditor({
   }
 
   return (
-    <div className="space-y-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3">
-      <div className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
-        <Cable size={13} className="text-[var(--editor-accent)]" /> Source
-      </div>
+    <Box className="space-y-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3">
+      <Box className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
+        <Icon glyph={Cable} size={13} className="text-[var(--editor-accent)]" /> Source
+      </Box>
 
       <FormField
         label="Driver"
@@ -49,14 +52,14 @@ export function TagSourceEditor({
         </Select>
       </FormField>
 
-      <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
+      <Box className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
         {mapping.explicit
           ? `Explicitly mapped to ${selectedDescriptor?.displayName ?? mapping.driver}.`
           : "No explicit mapping. Manual is used as the fallback source."}
         {mapping.driver === "simulation"
           ? " Configure optional generators under Data → Drivers → Simulation."
           : " Driver-owned configuration is managed under Data → Drivers."}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

@@ -8,7 +8,10 @@ import {
   type ChartSeriesDefinition,
 } from "../../chart-series";
 import { useEditorStore } from "../../editor-store";
-import { Button, FormField, IconButton, TextInput } from "../ui";
+import { Button, FormField, IconButton, TextInput,
+  Box,
+  Icon,
+} from "../ui";
 import type { UpdateNode } from "./property-panel-types";
 import {
   formatBindingPath,
@@ -99,15 +102,15 @@ export function ChartSeriesInput({
   }
 
   return (
-    <div className="space-y-3">
+    <Box className="space-y-3">
       <datalist id={dataListId}>
         {paths.all.map((path) => <option key={path} value={path} />)}
       </datalist>
 
       {visibleSeries.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-muted)]">
+        <Box className="rounded-lg border border-dashed border-[var(--editor-border)] p-3 text-xs text-[var(--editor-text-muted)]">
           Add a data point and bind it to a numeric tag.
-        </div>
+        </Box>
       ) : null}
 
       {visibleSeries.map((series, index) => {
@@ -117,14 +120,14 @@ export function ChartSeriesInput({
         const source = formatBindingPath(binding);
 
         return (
-          <div
+          <Box
             key={series.id}
             className="space-y-2 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-2.5"
           >
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+            <Box className="flex items-center justify-between gap-2">
+              <Box className="text-[10px] font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
                 Data point {index + 1}
-              </div>
+              </Box>
               <IconButton
                 aria-label={`Remove ${series.label}`}
                 title="Remove data point"
@@ -132,11 +135,11 @@ export function ChartSeriesInput({
                 size="icon-xs"
                 onClick={() => removeSeries(series.id)}
               >
-                <Trash2 size={12} />
+                <Icon glyph={Trash2} size={12} />
               </IconButton>
-            </div>
+            </Box>
 
-            <div className="grid grid-cols-[1fr_42px] gap-2">
+            <Box className="grid grid-cols-[1fr_42px] gap-2">
               <FormField label="Label" compact>
                 <TextInput
                   controlSize="sm"
@@ -154,7 +157,7 @@ export function ChartSeriesInput({
                   onChange={(event) => updateSeries(series.id, { color: event.target.value })}
                 />
               </FormField>
-            </div>
+            </Box>
 
             <FormField
               label="Source"
@@ -172,14 +175,14 @@ export function ChartSeriesInput({
                 onChange={(event) => updateBinding(series.id, event.target.value)}
               />
             </FormField>
-          </div>
+          </Box>
         );
       })}
 
       <Button size="xs" onClick={addSeries}>
-        <Plus size={12} /> Add data point
+        <Icon glyph={Plus} size={12} /> Add data point
       </Button>
-    </div>
+    </Box>
   );
 }
 

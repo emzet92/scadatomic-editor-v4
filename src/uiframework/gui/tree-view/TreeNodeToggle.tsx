@@ -1,5 +1,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { IconButton } from "../ui";
+import { IconButton,
+  Box,
+  Icon,
+} from "../ui";
 
 export function TreeNodeToggle({
   collapsed,
@@ -11,7 +14,7 @@ export function TreeNodeToggle({
   setCollapsed: (collapsed: boolean) => void;
 }) {
   if (!hasChildren) {
-    return <div className="size-4 shrink-0" aria-hidden="true" />;
+    return <Box className="size-4 shrink-0" aria-hidden="true" />;
   }
 
   return (
@@ -24,7 +27,7 @@ export function TreeNodeToggle({
         setCollapsed(!collapsed);
       }}
     >
-      {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+      {collapsed ? <Icon glyph={ChevronRight} size={14} /> : <Icon glyph={ChevronDown} size={14} />}
     </IconButton>
   );
 }

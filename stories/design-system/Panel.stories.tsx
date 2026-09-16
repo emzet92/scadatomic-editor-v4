@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button, EmptyAction, PanelCard, PanelSection, SectionHeader } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Panel",
+  title: "Organisms/Panel",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

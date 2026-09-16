@@ -1,6 +1,6 @@
 import { Cloud, Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavTab, NavTabs } from "../ui";
+import { Icon, Inline, NavTab, NavTabs, Stack, Text, Toolbar } from "../ui";
 import { useNavigate } from "react-router-dom";
 
 export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
@@ -18,37 +18,10 @@ type WorkspaceItem = {
 };
 
 const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
-  {
-    id: "editor",
-    label: "Editor",
-    icon: LayoutDashboard,
-    href: ({ projectId }) =>
-      projectId ? `/project/${encodeURIComponent(projectId)}` : "/",
-  },
-  {
-    id: "scripts",
-    label: "Scripts",
-    icon: Code2,
-    href: ({ projectId, scriptId }) =>
-      projectId
-        ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}`
-        : null,
-  },
-  {
-    id: "dependencies",
-    label: "Dependencies",
-    icon: Network,
-    href: ({ projectId }) =>
-      projectId
-        ? `/project/${encodeURIComponent(projectId)}/dependencies`
-        : null,
-  },
-  {
-    id: "cloud",
-    label: "Cloud",
-    icon: Cloud,
-    href: () => "/cloud/fleet",
-  },
+  { id: "editor", label: "Editor", icon: LayoutDashboard, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}` : "/" },
+  { id: "scripts", label: "Scripts", icon: Code2, href: ({ projectId, scriptId }) => projectId ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}` : null },
+  { id: "dependencies", label: "Dependencies", icon: Network, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/dependencies` : null },
+  { id: "cloud", label: "Cloud", icon: Cloud, href: () => "/cloud/fleet" },
 ];
 
 export function WorkspaceNav({
@@ -68,7 +41,7 @@ export function WorkspaceNav({
   return (
     <NavTabs ariaLabel="Project workspace">
       {DEFAULT_WORKSPACES.map((workspace) => {
-        const Icon = workspace.icon;
+        const WorkspaceIcon = workspace.icon;
         const isActive = workspace.id === active;
         const href = workspace.href(routeContext);
         const disabled = href === null;
@@ -78,12 +51,9 @@ export function WorkspaceNav({
             key={workspace.id}
             active={isActive}
             disabled={disabled}
-            icon={<Icon size={15} strokeWidth={1.8} />}
+            icon={<Icon glyph={WorkspaceIcon} size={15} strokeWidth={1.8} />}
             onClick={() => {
-              if (isActive || !href) {
-                return;
-              }
-
+              if (isActive || !href) return;
               onBeforeNavigate?.(workspace.id);
               navigate(href);
             }}
@@ -114,38 +84,22 @@ export function WorkspaceHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="h-16 shrink-0 border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-6 flex items-center justify-between gap-6">
-      <div className="min-w-0 flex items-center gap-5">
-        <img
-          src="/logo6.svg"
-          alt="Scadatomic"
-          className="h-9 w-auto shrink-0"
-        />
-
-        <WorkspaceNav
-          active={active}
-          projectId={projectId}
-          scriptId={scriptId}
-          onBeforeNavigate={onBeforeNavigate}
-        />
-
-        {title ? (
-          <div className="min-w-0 hidden xl:block border-l border-[var(--editor-border)] pl-5">
-            <div className="truncate text-sm font-semibold text-[var(--editor-text)]">
-              {title}
-            </div>
-            {subtitle ? (
-              <div className="truncate text-xs text-[var(--editor-text-muted)]">
-                {subtitle}
-              </div>
+    <header className="shrink-0">
+      <Toolbar
+        start={
+          <Inline gap="xl" className="min-w-0">
+            <img src="/logo6.svg" alt="Scadatomic" className="h-9 w-auto shrink-0" />
+            <WorkspaceNav active={active} projectId={projectId} scriptId={scriptId} onBeforeNavigate={onBeforeNavigate} />
+            {title ? (
+              <Stack gap="none" className="hidden min-w-0 border-l border-[var(--editor-border)] pl-5 xl:flex">
+                <Text as="div" variant="body" truncate className="font-semibold">{title}</Text>
+                {subtitle ? <Text as="div" variant="body-sm" tone="muted" truncate>{subtitle}</Text> : null}
+              </Stack>
             ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      {actions ? (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      ) : null}
+          </Inline>
+        }
+        end={actions}
+      />
     </header>
   );
 }

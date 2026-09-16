@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import type { TreeNodeData, TreeSelectionOptions } from "./tree-view-types";
 import { TreeNodeToggle } from "./TreeNodeToggle";
 import { TreeNodeIcon } from "./TreeNodeIcon";
@@ -38,7 +39,7 @@ export function TreeNodeRow({
   canDelete: boolean;
 }) {
   return (
-    <div
+    <Box
       className={`group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors ${
         primarySelected
           ? "bg-[var(--editor-selected-soft)] text-[var(--editor-accent)] border-l-2 border-[var(--editor-selected)]"
@@ -72,6 +73,6 @@ export function TreeNodeRow({
         deleteNode={deleteNode}
         canDelete={canDelete}
       />
-    </div>
+    </Box>
   );
 }

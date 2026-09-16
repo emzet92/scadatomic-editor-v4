@@ -5,7 +5,7 @@ import { Button, IconButton } from "../../src/uiframework/gui/ui";
 import { WorkspaceHeader } from "../../src/uiframework/gui/workspace/WorkspaceHeader";
 
 const meta = {
-  title: "Patterns/Workspace Header",
+  title: "Organisms/Workspace Header",
   component: WorkspaceHeader,
   parameters: {
     layout: "fullscreen",

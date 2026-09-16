@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { PageDeviceMode } from "../../component-props";
 
@@ -44,19 +45,19 @@ export function PageViewportFrame({
   }, [deviceMode, width]);
 
   return (
-    <div
+    <Box
       ref={hostRef}
       className="flex w-full justify-center px-5 pb-8 pt-5"
       data-page-viewport-frame
     >
-      <div
+      <Box
         className="relative shrink-0"
         style={{
           width: width * scale,
           height: height * scale,
         }}
       >
-        <div
+        <Box
           style={{
             width,
             height,
@@ -65,9 +66,9 @@ export function PageViewportFrame({
           }}
         >
           {children}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 

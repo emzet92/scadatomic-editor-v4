@@ -19,6 +19,8 @@ import {
   PanelCard,
   SectionHeader,
   Select,
+  Box,
+  Icon,
 } from "../ui";
 
 const SEMANTIC_GRID = "grid-cols-[minmax(170px,1.1fr)_72px_minmax(220px,1fr)]";
@@ -56,7 +58,7 @@ export function ThemeWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Palette size={14} />}
+        icon={<Icon glyph={Palette} size={14} />}
         title="Themes & semantic colors"
         description="Designer preview is independent from runtime state. Configure the runtime source here, then preview any theme without changing the saved runtime session."
       />
@@ -66,11 +68,11 @@ export function ThemeWorkspace() {
           className="mb-4"
           title={
             <span className="flex items-center gap-2">
-              <MonitorCog size={14} /> Runtime theme policy
+              <Icon glyph={MonitorCog} size={14} /> Runtime theme policy
             </span>
           }
         />
-        <div className="grid gap-4 md:grid-cols-2">
+        <Box className="grid gap-4 md:grid-cols-2">
           <FormField label="Theme source">
             <Select
               value={appearance.themeMode}
@@ -119,7 +121,7 @@ export function ThemeWorkspace() {
               </FormField>
             </>
           ) : null}
-        </div>
+        </Box>
         <Callout size="sm" className="mt-4">
           {appearance.themeMode === "runtime"
             ? 'Runtime starts with the initial theme. Scripts may switch it with App.theme = "dark" (theme name or id).'
@@ -131,23 +133,23 @@ export function ThemeWorkspace() {
 
       <PanelCard padding="lg" className="mb-5">
         <SectionHeader className="mb-3" title="Designer preview & mapping editor" />
-        <div className="grid gap-2 sm:grid-cols-2">
+        <Box className="grid gap-2 sm:grid-cols-2">
           {themes.map((theme) => {
             const active = theme.id === editingThemeId;
             const dark = theme.name.toLocaleLowerCase().includes("dark");
-            const Icon = dark ? Moon : Sun;
+            const ThemeIcon = dark ? Moon : Sun;
             return (
               <ChoiceCard
                 key={theme.id}
                 selected={active}
-                icon={<Icon size={16} />}
+                icon={<Icon glyph={ThemeIcon} size={16} />}
                 title={theme.name}
                 description={active ? "Previewing in Designer" : "Preview without changing runtime state"}
                 onClick={() => setPreviewDesignTheme(theme.id)}
               />
             );
           })}
-        </div>
+        </Box>
       </PanelCard>
 
       <DataGrid>
@@ -168,10 +170,10 @@ export function ThemeWorkspace() {
           );
           return (
             <DataGridRow key={token.id} columns={SEMANTIC_GRID}>
-              <div>
-                <div className="text-sm font-medium text-[var(--editor-text)]">{token.name}</div>
-                <div className="mt-0.5 font-mono text-[10px] text-[var(--editor-text-soft)]">{resolved}</div>
-              </div>
+              <Box>
+                <Box className="text-sm font-medium text-[var(--editor-text)]">{token.name}</Box>
+                <Box className="mt-0.5 font-mono text-[10px] text-[var(--editor-text-soft)]">{resolved}</Box>
+              </Box>
               <span
                 className="h-9 w-9 rounded-[12px] border border-[var(--editor-border)] shadow-sm"
                 style={{ background: resolved }}

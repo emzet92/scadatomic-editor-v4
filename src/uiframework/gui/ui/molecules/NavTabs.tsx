@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cx } from "./cx";
+import { Pressable } from "../atoms/Pressable";
+import { cx } from "../utils/cx";
 
 export function NavTabs({
   children,
@@ -32,27 +33,26 @@ export type NavTabProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 export function NavTab({
   active = false,
   icon,
-  children,
   className,
   type = "button",
+  children,
   ...props
 }: NavTabProps) {
   return (
-    <button
-      data-editor-ignore
+    <Pressable
       type={type}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "inline-flex h-7 items-center gap-2 rounded-md px-3 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent-soft)] disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition",
         active
-          ? "bg-[var(--editor-surface)] text-[var(--editor-accent)] shadow-sm ring-1 ring-[var(--editor-border)]"
-          : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface)] hover:text-[var(--editor-text)]",
+          ? "bg-[var(--editor-surface)] text-[var(--editor-text)] shadow-sm"
+          : "text-[var(--editor-text-muted)] hover:text-[var(--editor-text)]",
         className
       )}
       {...props}
     >
-      {icon ? <span className="shrink-0">{icon}</span> : null}
+      {icon}
       {children}
-    </button>
+    </Pressable>
   );
 }

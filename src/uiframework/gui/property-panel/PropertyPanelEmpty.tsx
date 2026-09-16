@@ -1,6 +1,7 @@
+import { Box } from "../ui";
 export function PropertyPanelEmpty() {
   return (
-    <div
+    <Box
       data-editor-ignore
       className="
         p-4
@@ -9,6 +10,6 @@ export function PropertyPanelEmpty() {
       "
     >
       Select a component
-    </div>
+    </Box>
   );
 }

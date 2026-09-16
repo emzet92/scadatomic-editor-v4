@@ -6,8 +6,13 @@ import {
   type RefObject,
 } from "react";
 import { X } from "lucide-react";
-import { Button } from "./Button";
-import { cx } from "./cx";
+import { Button } from "../atoms/Button";
+import { Icon } from "../atoms/Icon";
+import { Box, Inline, Stack } from "../atoms/Layout";
+import { Overlay } from "../atoms/Overlay";
+import { Surface } from "../atoms/Surface";
+import { Heading, Text } from "../atoms/Typography";
+import { cx } from "../utils/cx";
 
 export type DialogSize = "sm" | "md" | "lg";
 
@@ -72,60 +77,48 @@ export function Dialog({
   if (!open) return null;
 
   return (
-    <div
+    <Overlay
       data-editor-ignore
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[1px]"
+      fixed
+      center
+      className="z-[100] p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
+      <Surface
         role={role}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={cx(
-          "flex max-h-[82vh] w-full flex-col overflow-hidden rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-2xl",
-          sizeClassNames[size]
-        )}
+        radius="lg"
+        padding="none"
+        shadow="md"
+        className={cx("flex max-h-[82vh] w-full flex-col overflow-hidden", sizeClassNames[size])}
       >
-        <div className="flex shrink-0 items-start gap-3 border-b border-[var(--editor-border)] p-4">
-          {icon ? <div className="shrink-0">{icon}</div> : null}
-          <div className="min-w-0 flex-1">
-            <h2 id={titleId} className="text-sm font-semibold text-[var(--editor-text)]">
-              {title}
-            </h2>
+        <Inline align="start" gap="md" className="shrink-0 border-b border-[var(--editor-border)] p-4">
+          {icon ? <Box className="shrink-0">{icon}</Box> : null}
+          <Stack gap="none" className="min-w-0 flex-1">
+            <Heading id={titleId} level={2} size="sm">{title}</Heading>
             {description ? (
-              <p
-                id={descriptionId}
-                className="mt-1 text-xs leading-5 text-[var(--editor-text-muted)]"
-              >
+              <Text id={descriptionId} as="p" variant="body-sm" tone="muted" className="mt-1">
                 {description}
-              </p>
+              </Text>
             ) : null}
-          </div>
-          <Button
-            ref={closeRef}
-            variant="ghost"
-            aria-label="Close dialog"
-            title="Close"
-            size="icon-xs"
-            onClick={onClose}
-          >
-            <X size={13} />
+          </Stack>
+          <Button ref={closeRef} variant="ghost" aria-label="Close dialog" title="Close" size="icon-xs" onClick={onClose}>
+            <Icon glyph={X} size="sm" />
           </Button>
-        </div>
+        </Inline>
 
-        {children ? (
-          <div className="min-h-0 flex-1 overflow-auto p-4">{children}</div>
-        ) : null}
+        {children ? <Box className="min-h-0 flex-1 overflow-auto p-4">{children}</Box> : null}
 
         {footer ? (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--editor-border)] p-3">
+          <Inline justify="end" className="shrink-0 border-t border-[var(--editor-border)] p-3">
             {footer}
-          </div>
+          </Inline>
         ) : null}
-      </div>
-    </div>
+      </Surface>
+    </Overlay>
   );
 }

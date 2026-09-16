@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button, ConfirmDialog, Dialog, FormField, TextInput } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Dialog",
+  title: "Organisms/Dialog",
   parameters: {
     controls: { disable: true },
   },

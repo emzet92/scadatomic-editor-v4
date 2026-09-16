@@ -1,5 +1,8 @@
 import { X } from "lucide-react";
-import { Button, IconButton, PanelCard, TextInput } from "../ui";
+import { Button, IconButton, PanelCard, TextInput,
+  Box,
+  Icon,
+} from "../ui";
 
 type MethodCreateFormProps = {
   title?: string | undefined;
@@ -26,21 +29,21 @@ export function MethodCreateForm({
 }: MethodCreateFormProps) {
   return (
     <PanelCard className={className}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-xs font-medium text-[var(--editor-text)]">{title}</div>
+      <Box className="mb-2 flex items-center justify-between gap-2">
+        <Box className="text-xs font-medium text-[var(--editor-text)]">{title}</Box>
         <IconButton
           size="icon-xs"
           aria-label="Cancel adding method"
           title="Cancel"
           onClick={onCancel}
         >
-          <X size={13} />
+          <Icon glyph={X} size={13} />
         </IconButton>
-      </div>
+      </Box>
 
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="relative">
+      <Box className="flex items-start gap-2">
+        <Box className="min-w-0 flex-1">
+          <Box className="relative">
             <TextInput
               autoFocus
               controlSize="sm"
@@ -67,16 +70,16 @@ export function MethodCreateForm({
             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--editor-text-soft)]">
               ()
             </span>
-          </div>
+          </Box>
 
           {error ? (
-            <div className="mt-1 text-[11px] leading-4 text-red-600">{error}</div>
+            <Box className="mt-1 text-[11px] leading-4 text-red-600">{error}</Box>
           ) : (
-            <div className="mt-1 truncate text-[10px] text-[var(--editor-text-soft)]">
+            <Box className="mt-1 truncate text-[10px] text-[var(--editor-text-soft)]">
               {hint}
-            </div>
+            </Box>
           )}
-        </div>
+        </Box>
 
         <Button
           variant="primary"
@@ -87,7 +90,7 @@ export function MethodCreateForm({
         >
           Add
         </Button>
-      </div>
+      </Box>
     </PanelCard>
   );
 }

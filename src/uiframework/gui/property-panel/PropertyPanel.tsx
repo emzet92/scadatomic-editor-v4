@@ -1,4 +1,4 @@
-import { ArrowLeft, Box, Palette, Star } from "lucide-react";
+import { ArrowLeft, Box as BoxIcon, Palette, Star } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { getPageByRootId, type UiDocument } from "../../core/document";
 import type {
@@ -24,7 +24,10 @@ import { NodePropertiesEditor } from "./NodePropertiesEditor";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
 import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
-import { Badge, Button, PanelSection } from "../ui";
+import { Badge, Button, PanelSection,
+  Box,
+  Icon,
+} from "../ui";
 
 type Props = {
   document: UiDocument;
@@ -107,41 +110,41 @@ export function PropertyPanel({
     }
 
     return (
-      <div data-editor-ignore className="h-full flex flex-col">
-        <div className="border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-4">
+      <Box data-editor-ignore className="h-full flex flex-col">
+        <Box className="border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-4">
           <Button variant="ghost" size="xs" onClick={onExitComponentMode} className="-ml-2">
-            <ArrowLeft size={13} /> Designer
+            <Icon glyph={ArrowLeft} size={13} /> Designer
           </Button>
 
-          <div className="mt-3 flex items-start gap-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-700">
-              <Palette size={15} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-[var(--editor-text)]">
+          <Box className="mt-3 flex items-start gap-2">
+            <Box className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-700">
+              <Icon glyph={Palette} size={15} />
+            </Box>
+            <Box className="min-w-0 flex-1">
+              <Box className="truncate text-sm font-semibold text-[var(--editor-text)]">
                 {node.name}.{componentMode.variantName}
-              </div>
-              <div className="mt-0.5 truncate font-mono text-[10px] text-[var(--editor-text-muted)]">
+              </Box>
+              <Box className="mt-0.5 truncate font-mono text-[10px] text-[var(--editor-text-muted)]">
                 ctx.ui.{node.name}.variant.{componentMode.variantName}()
-              </div>
-            </div>
+              </Box>
+            </Box>
             {node.defaultVariant === componentMode.variantName ? (
-              <Badge variant="warning" icon={<Star size={8} fill="currentColor" />}>
+              <Badge variant="warning" icon={<Icon glyph={Star} size={8} fill="currentColor" />}>
                 default
               </Badge>
             ) : null}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
-        <div className="flex-1 overflow-auto p-4 space-y-6">
+        <Box className="flex-1 overflow-auto p-4 space-y-6">
           <VariantPropertiesEditor
             node={node}
             variantName={componentMode.variantName}
             updateNode={updateNode}
             onEditVariant={onEditVariant}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
@@ -192,14 +195,14 @@ export function PropertyPanel({
   };
 
   return (
-    <div data-editor-ignore className="h-full flex flex-col">
+    <Box data-editor-ignore className="h-full flex flex-col">
       <PropertyPanelHeader
         key={node.id}
         node={node}
         renameNode={renameNode}
       />
 
-      <div className="flex-1 overflow-auto p-4 space-y-6">
+      <Box className="flex-1 overflow-auto p-4 space-y-6">
         {node.type === "Page" && page ? (
           <PageSettingsEditor
             document={document}
@@ -224,9 +227,9 @@ export function PropertyPanel({
             setEvent={setEvent}
           />
         ) : (
-          <div className="text-xs text-amber-700">
+          <Box className="text-xs text-amber-700">
             No component definition for {node.type}.
-          </div>
+          </Box>
         )}
 
         {node.type === "Container" ? (
@@ -243,15 +246,15 @@ export function PropertyPanel({
 
         {node.id !== document.rootId ? (
           <PanelSection divided>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-                  <Box size={12} /> Component
-                </div>
-                <div className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
+            <Box className="flex items-start justify-between gap-3">
+              <Box>
+                <Box className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+                  <Icon glyph={BoxIcon} size={12} /> Component
+                </Box>
+                <Box className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
                   Encapsulate this subtree behind a public API.
-                </div>
-              </div>
+                </Box>
+              </Box>
               <Button
                 variant="secondary"
                 size="sm"
@@ -262,11 +265,11 @@ export function PropertyPanel({
               >
                 Create component
               </Button>
-            </div>
+            </Box>
           </PanelSection>
         ) : null}
 
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

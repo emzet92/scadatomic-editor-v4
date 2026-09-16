@@ -5,7 +5,7 @@ import type { ProjectData } from "../../data/tags/TagDefinition";
 import type { DataType, PrimitiveDataType } from "../../data/types/DataType";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
 import { useEditorStore } from "../../editor-store";
-import { Button, FormField, PanelCard, TextInput } from "../ui";
+import { Button, Callout, EditorPage, FormField, Icon, PanelCard, TextInput } from "../ui";
 import { DataTypeSelect } from "./DataTypeSelect";
 import { DataValueInput } from "./DataValueInput";
 import type { DataSelection } from "./data-selection";
@@ -36,16 +36,16 @@ export function CreateTagEditor({ data, onSelect }: { data: ProjectData; onSelec
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
   }
 
-  return <EditorFrame title="Create tag" subtitle="Create a primitive value or an independent UDT instance.">
-    <PanelCard className="max-w-xl space-y-4">
-      <FormField label="Name" error={error}><TextInput value={name} onChange={(event) => { setName(event.target.value); setError(null); }} mono /></FormField>
-      <FormField label="Type"><DataTypeSelect data={data} value={type} onChange={changeType} /></FormField>
-      {type.kind !== "udt" ? <FormField label="Default / current value"><DataValueInput type={type as PrimitiveDataType} value={value} onChange={setValue} /></FormField> : <div className="rounded-md bg-[var(--editor-surface-muted)] p-3 text-xs text-[var(--editor-text-muted)]">Fields will be initialized from the UDT defaults.</div>}
-      <Button variant="primary" onClick={create}><Plus size={14} /> Create tag</Button>
-    </PanelCard>
-  </EditorFrame>;
-}
-
-function EditorFrame({ title, subtitle, children }: React.PropsWithChildren<{ title: string; subtitle: string }>) {
-  return <div className="mx-auto max-w-5xl space-y-5 p-8"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-lg bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"><Database size={18} /></div><div><h1 className="text-lg font-semibold text-[var(--editor-text)]">{title}</h1><p className="text-sm text-[var(--editor-text-muted)]">{subtitle}</p></div></div>{children}</div>;
+  return (
+    <EditorPage title="Create tag" description="Create a primitive value or an independent UDT instance." icon={<Icon glyph={Database} size="lg" />}>
+      <PanelCard className="max-w-xl space-y-4">
+        <FormField label="Name" error={error}><TextInput value={name} onChange={(event) => { setName(event.target.value); setError(null); }} mono /></FormField>
+        <FormField label="Type"><DataTypeSelect data={data} value={type} onChange={changeType} /></FormField>
+        {type.kind !== "udt"
+          ? <FormField label="Default / current value"><DataValueInput type={type as PrimitiveDataType} value={value} onChange={setValue} /></FormField>
+          : <Callout size="sm">Fields will be initialized from the UDT defaults.</Callout>}
+        <Button variant="primary" leadingIcon={<Icon glyph={Plus} size="sm" />} onClick={create}>Create tag</Button>
+      </PanelCard>
+    </EditorPage>
+  );
 }

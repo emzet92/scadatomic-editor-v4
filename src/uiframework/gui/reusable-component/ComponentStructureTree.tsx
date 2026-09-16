@@ -1,3 +1,4 @@
+import { Box, Icon } from "../ui";
 import { Layers3 } from "lucide-react";
 import type { UiComponentDefinition } from "../../core/document";
 import { NodeTree } from "../tree-view/NodeTree";
@@ -14,19 +15,19 @@ export function ComponentStructureTree({
   onDelete: (nodeId: string) => void;
 }) {
   return (
-    <div data-editor-ignore className="max-h-[42vh] overflow-auto bg-[var(--editor-surface)]">
-      <div className="border-b border-[var(--editor-border)] px-4 py-3">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          <Layers3 size={13} /> Component structure
-        </div>
-        <div className="mt-1 truncate text-sm font-medium text-[var(--editor-text)]">
+    <Box data-editor-ignore className="max-h-[42vh] overflow-auto bg-[var(--editor-surface)]">
+      <Box className="border-b border-[var(--editor-border)] px-4 py-3">
+        <Box className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
+          <Icon glyph={Layers3} size={13} /> Component structure
+        </Box>
+        <Box className="mt-1 truncate text-sm font-medium text-[var(--editor-text)]">
           {definition.name}
-        </div>
-        <div className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
+        </Box>
+        <Box className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
           Private implementation
-        </div>
-      </div>
-      <div className="p-2">
+        </Box>
+      </Box>
+      <Box className="p-2">
         <NodeTree
           rootId={definition.rootId}
           nodes={definition.nodes}
@@ -35,7 +36,7 @@ export function ComponentStructureTree({
           deleteNode={onDelete}
           canDeleteNode={(nodeId) => nodeId !== definition.rootId}
         />
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

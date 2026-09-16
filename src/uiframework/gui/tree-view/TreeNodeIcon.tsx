@@ -1,3 +1,4 @@
+import { Box } from "../ui";
 import { getNodeIcon } from "./getNodeIcon";
 
 export function TreeNodeIcon({
@@ -6,13 +7,13 @@ export function TreeNodeIcon({
   type: string;
 }) {
   return (
-    <div
+    <Box
       className="
         text-[var(--editor-text-soft)]
         shrink-0
       "
     >
       {getNodeIcon(type)}
-    </div>
+    </Box>
   );
 }

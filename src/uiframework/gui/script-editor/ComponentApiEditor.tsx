@@ -6,7 +6,11 @@ import {
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
 import { MethodCreateForm } from "../component-api/MethodCreateForm";
-import { Button, EmptyAction, IconButton } from "../ui";
+import { Button, EmptyAction, IconButton,
+  Box,
+  Icon,
+  Pressable,
+} from "../ui";
 
 type Props = {
   document: UiDocument | null;
@@ -67,28 +71,28 @@ export function ComponentApiEditor({
 
   return (
     <section className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-      <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-4 py-3.5">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <Box className="flex items-start justify-between gap-4 border-b border-zinc-200 px-4 py-3.5">
+        <Box>
+          <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Component API
-          </div>
+          </Box>
           <p className="mt-1 text-sm text-zinc-500">
             Define the public API exposed through <code>ctx.ui.ComponentName</code>.
           </p>
-        </div>
+        </Box>
         <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-500">
           {components.length} components
         </span>
-      </div>
+      </Box>
 
       {error ? (
-        <div className="m-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <Box className="m-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
-        </div>
+        </Box>
       ) : components.length === 0 ? (
-        <div className="p-4 text-sm text-zinc-400">Loading component API…</div>
+        <Box className="p-4 text-sm text-zinc-400">Loading component API…</Box>
       ) : (
-        <div className="grid gap-3 p-4 xl:grid-cols-2">
+        <Box className="grid gap-3 p-4 xl:grid-cols-2">
           {components.map((component) => {
             const adding = addingNodeId === component.nodeId;
 
@@ -97,15 +101,15 @@ export function ComponentApiEditor({
                 key={component.nodeId}
                 className="min-w-0 rounded-lg border border-zinc-200 bg-zinc-50/60"
               >
-                <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2.5">
-                  <div className="min-w-0">
+                <Box className="flex items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2.5">
+                  <Box className="min-w-0">
                     <code className="block truncate text-sm font-semibold text-zinc-900">
                       ctx.ui.{component.name}
                     </code>
-                    <div className="mt-0.5 text-[11px] text-zinc-400">
+                    <Box className="mt-0.5 text-[11px] text-zinc-400">
                       {component.type}
-                    </div>
-                  </div>
+                    </Box>
+                  </Box>
 
                   {component.apiSurface === "primitive" ? (
                     <Button
@@ -115,7 +119,7 @@ export function ComponentApiEditor({
                         setFormError(null);
                       }}
                     >
-                      <Plus size={13} />
+                      <Icon glyph={Plus} size={13} />
                       Method
                     </Button>
                   ) : (
@@ -123,13 +127,13 @@ export function ComponentApiEditor({
                       Definition-owned API
                     </span>
                   )}
-                </div>
+                </Box>
 
-                <div className="p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                <Box className="p-3">
+                  <Box className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                     Props · read / write
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  </Box>
+                  <Box className="mt-2 flex flex-wrap gap-1.5">
                     {component.properties.map((property) => (
                       <code
                         key={property.name}
@@ -142,16 +146,16 @@ export function ComponentApiEditor({
                         </span>
                       </code>
                     ))}
-                  </div>
+                  </Box>
 
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                  <Box className="mt-4 flex items-center justify-between gap-3">
+                    <Box className="text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
                       Methods
-                    </div>
+                    </Box>
                     <span className="text-[10px] tabular-nums text-zinc-400">
                       {component.methods.length}
                     </span>
-                  </div>
+                  </Box>
 
                   {adding && component.apiSurface === "primitive" ? (
                     <MethodCreateForm
@@ -171,12 +175,12 @@ export function ComponentApiEditor({
                   ) : null}
 
                   {component.methods.length > 0 ? (
-                    <div className="mt-2 space-y-1">
+                    <Box className="mt-2 space-y-1">
                       {component.methods.map((method) => {
                         const active = currentScriptId === method.scriptId;
 
                         return (
-                          <div
+                          <Box
                             key={method.name}
                             className={`group flex min-h-9 items-center gap-2 rounded-md border px-2 py-1.5 transition ${
                               active
@@ -191,17 +195,17 @@ export function ComponentApiEditor({
                                   : "bg-white text-zinc-400"
                               }`}
                             >
-                              <Code2 size={13} />
+                              <Icon glyph={Code2} size={13} />
                             </span>
 
-                            <button
+                            <Pressable
                               type="button"
                               onClick={() => onSelectScript(method.scriptId)}
                               className="min-w-0 flex-1 truncate text-left font-mono text-xs font-medium text-zinc-800"
                               title={`Open ctx.ui.${component.name}.${method.name}()`}
                             >
                               {method.name}()
-                            </button>
+                            </Pressable>
 
                             {component.apiSurface === "primitive" ? (
                               <IconButton
@@ -213,13 +217,13 @@ export function ComponentApiEditor({
                                 }}
                                 className="opacity-60 group-hover:opacity-100"
                               >
-                                <Trash2 size={13} />
+                                <Icon glyph={Trash2} size={13} />
                               </IconButton>
                             ) : null}
-                          </div>
+                          </Box>
                         );
                       })}
-                    </div>
+                    </Box>
                   ) : !adding && component.apiSurface === "primitive" ? (
                     <EmptyAction
                       onClick={() => {
@@ -229,26 +233,26 @@ export function ComponentApiEditor({
                       }}
                       className="mt-2 py-2"
                     >
-                      <Plus size={13} />
+                      <Icon glyph={Plus} size={13} />
                       Add first method
                     </EmptyAction>
                   ) : null}
 
                   {component.apiSurface === "primitive" ? (
-                    <div className="mt-3 text-[10px] font-mono text-zinc-400">
+                    <Box className="mt-3 text-[10px] font-mono text-zinc-400">
                       .setProp(prop, value)
                       {component.colorProperty ? " · .setColor(color)" : ""}
-                    </div>
+                    </Box>
                   ) : (
-                    <div className="mt-3 text-[10px] text-violet-500">
+                    <Box className="mt-3 text-[10px] text-violet-500">
                       Only explicitly exposed inputs, public methods and variants are visible.
-                    </div>
+                    </Box>
                   )}
-                </div>
+                </Box>
               </article>
             );
           })}
-        </div>
+        </Box>
       )}
     </section>
   );

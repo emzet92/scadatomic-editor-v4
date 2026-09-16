@@ -1,6 +1,7 @@
+import { Box } from "../ui";
 export function PropertyPanelNodeNotFound() {
   return (
-    <div
+    <Box
       data-editor-ignore
       className="
         p-4
@@ -9,6 +10,6 @@ export function PropertyPanelNodeNotFound() {
       "
     >
       Node not found
-    </div>
+    </Box>
   );
 }

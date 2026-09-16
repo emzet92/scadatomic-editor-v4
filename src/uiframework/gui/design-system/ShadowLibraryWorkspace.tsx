@@ -14,6 +14,8 @@ import {
   PageHeader,
   PanelCard,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 export function ShadowLibraryWorkspace() {
@@ -33,25 +35,25 @@ export function ShadowLibraryWorkspace() {
   return (
     <PageContainer size="xl">
       <PageHeader
-        icon={<Layers size={14} />}
+        icon={<Icon glyph={Layers} size={14} />}
         title="Shadows / Elevation"
         description="Define structural elevation tokens with X/Y offset, blur, spread and color. Components keep stable token references while renderers receive the final shadow value."
         actions={
           <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
-            <Plus size={14} /> Add shadow
+            <Icon glyph={Plus} size={14} /> Add shadow
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Layers size={20} />}
+          icon={<Icon glyph={Layers} size={20} />}
           title="No shadow tokens yet"
           description="Create individual shadows or seed a practical Elevation/None through Elevation/4 scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
-                <Plus size={14} /> Add shadow
+                <Icon glyph={Plus} size={14} /> Add shadow
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterShadowScale}>
                 Create elevation scale
@@ -60,7 +62,7 @@ export function ShadowLibraryWorkspace() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <Box className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countShadowTokenUsages(document, token.id);
             return (
@@ -69,38 +71,38 @@ export function ShadowLibraryWorkspace() {
                 padding="lg"
                 className="grid grid-cols-[minmax(190px,.9fr)_minmax(230px,1.1fr)_minmax(380px,1.8fr)_44px] items-center gap-4 rounded-2xl shadow-sm"
               >
-                <div className="space-y-2">
+                <Box className="space-y-2">
                   <TextInput
                     aria-label="Shadow token name"
                     value={token.name}
                     onChange={(event) => updateShadowToken(token.id, { name: event.target.value })}
                   />
-                  <div className="text-[10px] text-[var(--editor-text-soft)]">
+                  <Box className="text-[10px] text-[var(--editor-text-soft)]">
                     {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
-                  <div
+                <Box className="flex h-20 items-center justify-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-canvas-bg)]">
+                  <Box
                     className="h-10 w-24 rounded-xl bg-[var(--editor-surface)]"
                     style={{ boxShadow: shadowStyleToCss(token) }}
                   />
-                </div>
+                </Box>
 
-                <div className="space-y-2">
-                  <div className="grid grid-cols-4 gap-2">
+                <Box className="space-y-2">
+                  <Box className="grid grid-cols-4 gap-2">
                     <ShadowNumber label="X" value={token.x} onChange={(x) => updateShadowToken(token.id, { x })} />
                     <ShadowNumber label="Y" value={token.y} onChange={(y) => updateShadowToken(token.id, { y })} />
                     <ShadowNumber label="Blur" min={0} value={token.blur} onChange={(blur) => updateShadowToken(token.id, { blur: Math.max(0, blur) })} />
                     <ShadowNumber label="Spread" value={token.spread} onChange={(spread) => updateShadowToken(token.id, { spread })} />
-                  </div>
+                  </Box>
                   <ColorPickerInput
                     compact
                     ariaLabel={`${token.name} shadow color`}
                     value={token.color}
                     onChange={(color) => updateShadowToken(token.id, { color })}
                   />
-                </div>
+                </Box>
 
                 <IconButton
                   aria-label="Delete shadow token and detach usages"
@@ -108,12 +110,12 @@ export function ShadowLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteShadowToken(token.id)}
                 >
-                  <Trash2 size={14} />
+                  <Icon glyph={Trash2} size={14} />
                 </IconButton>
               </PanelCard>
             );
           })}
-        </div>
+        </Box>
       )}
 
       <Callout className="mt-5">

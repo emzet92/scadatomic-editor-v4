@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { SegmentedControl, SegmentedControlItem } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Segmented Control",
+  title: "Molecules/Segmented Control",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

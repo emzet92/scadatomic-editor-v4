@@ -1,3 +1,4 @@
+import { Box, Icon, Pressable } from "../ui";
 import { Check, RotateCcw, Save, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getResolvedComponentProps } from "../../component-api";
@@ -66,9 +67,9 @@ export function VariantEditor({
 
   if (!node || !variant || !definition || !previewDocument) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <Box className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         Variant or component no longer exists.
-      </div>
+      </Box>
     );
   }
 
@@ -103,98 +104,98 @@ export function VariantEditor({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-violet-500">
+    <Box className="space-y-5">
+      <Box className="flex flex-wrap items-start justify-between gap-4">
+        <Box>
+          <Box className="text-xs font-semibold uppercase tracking-wide text-violet-500">
             Visual Variant
-          </div>
+          </Box>
           <h1 className="mt-1 text-xl font-semibold text-zinc-900">
             {node.name}.variant.{variantName}()
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
             Edit one component in isolation. This generates the runtime API method automatically.
           </p>
-        </div>
+        </Box>
 
-        <div className="flex items-center gap-2">
+        <Box className="flex items-center gap-2">
           {isDefault ? (
             <span className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700">
-              <Star size={13} fill="currentColor" /> Default
+              <Icon glyph={Star} size={13} fill="currentColor" /> Default
             </span>
           ) : (
-            <button
+            <Pressable
               type="button"
               disabled={settingDefault || dirty}
               onClick={() => void makeDefault()}
               title={dirty ? "Save variant before making it default" : "Use this variant by default"}
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
             >
-              <Star size={13} /> Set default
-            </button>
+              <Icon glyph={Star} size={13} /> Set default
+            </Pressable>
           )}
 
-          <button
+          <Pressable
             type="button"
             disabled={!dirty || saving}
             onClick={() => void save()}
             className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sky-600 px-3 text-xs font-semibold text-white transition hover:bg-sky-500 disabled:cursor-default disabled:opacity-40"
           >
-            {saving ? <Check size={13} /> : <Save size={13} />}
+            {saving ? <Icon glyph={Check} size={13} /> : <Icon glyph={Save} size={13} />}
             {saving ? "Saved" : "Save variant"}
-          </button>
-        </div>
-      </div>
+          </Pressable>
+        </Box>
+      </Box>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_320px]">
+      <Box className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_320px]">
         <section className="min-w-0 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <Box className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+            <Box>
+              <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 Focused Preview
-              </div>
-              <div className="mt-0.5 text-xs text-zinc-400">
+              </Box>
+              <Box className="mt-0.5 text-xs text-zinc-400">
                 Only {node.name} and its own subtree
-              </div>
-            </div>
+              </Box>
+            </Box>
             <code className="rounded bg-violet-50 px-2 py-1 text-[11px] text-violet-700">
               ctx.ui.{node.name}.variant.{variantName}()
             </code>
-          </div>
+          </Box>
 
-          <div className="flex min-h-[360px] items-center justify-center overflow-auto bg-zinc-50 p-12 bg-[radial-gradient(circle,#d4d4d8_1px,transparent_1px)] bg-[size:18px_18px]">
-            <div className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-8 shadow-sm">
+          <Box className="flex min-h-[360px] items-center justify-center overflow-auto bg-zinc-50 p-12 bg-[radial-gradient(circle,#d4d4d8_1px,transparent_1px)] bg-[size:18px_18px]">
+            <Box className="pointer-events-none max-w-full rounded-xl border border-dashed border-violet-300 bg-white/90 p-8 shadow-sm">
               <RenderNode
                 id={node.id}
                 document={previewDocument}
                 registry={editorRegistry}
               />
-            </div>
-          </div>
+            </Box>
+          </Box>
         </section>
 
         <aside className="rounded-xl border border-zinc-200 bg-white p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <Box className="flex items-center justify-between gap-3">
+            <Box>
+              <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                 Variant Props
-              </div>
-              <div className="mt-1 text-xs text-zinc-400">
+              </Box>
+              <Box className="mt-1 text-xs text-zinc-400">
                 Complete visual snapshot
-              </div>
-            </div>
-            <button
+              </Box>
+            </Box>
+            <Pressable
               type="button"
               disabled={!dirty}
               onClick={() => setDraftProps({ ...savedProps })}
               className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-25"
               title="Reset unsaved changes"
             >
-              <RotateCcw size={14} />
-            </button>
-          </div>
+              <Icon glyph={RotateCcw} size={14} />
+            </Pressable>
+          </Box>
 
-          <div className="mt-4 space-y-4">
+          <Box className="mt-4 space-y-4">
             {Object.entries(definition.inspector).map(([propName, control]) => (
               <PropInput
                 key={propName}
@@ -206,9 +207,9 @@ export function VariantEditor({
                 updateNode={updateDraft}
               />
             ))}
-          </div>
+          </Box>
         </aside>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

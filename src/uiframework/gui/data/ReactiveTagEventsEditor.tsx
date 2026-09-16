@@ -2,7 +2,10 @@ import { Link2, Radio } from "lucide-react";
 import type { ReactiveEventType } from "../../../reactivity";
 import { tagFieldRefKey, type TagFieldRef } from "../../data/tags/TagFieldRef";
 import { useEditorStore } from "../../editor-store";
-import { Button, Checkbox, FormField, PanelCard, TextInput } from "../ui";
+import { Button, Checkbox, FormField, PanelCard, TextInput,
+  Box,
+  Icon,
+} from "../ui";
 
 const EVENTS: Array<{ type: ReactiveEventType; label: string; suffix: string }> = [
   { type: "value-changed", label: "Value changed", suffix: "Changed" },
@@ -24,16 +27,16 @@ export function ReactiveTagEventsEditor({
 
   return (
     <PanelCard className="space-y-3">
-      <div>
-        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--editor-text)]">
-          <Radio size={14} /> Reactive events
-        </div>
+      <Box>
+        <Box className="flex items-center gap-2 text-sm font-semibold text-[var(--editor-text)]">
+          <Icon glyph={Radio} size={14} /> Reactive events
+        </Box>
         <p className="mt-1 text-xs text-[var(--editor-text-muted)]">
           Bindings synchronize UI without scripts. Use these listeners only when a tag change should execute logic.
         </p>
-      </div>
+      </Box>
 
-      <div className="space-y-2">
+      <Box className="space-y-2">
         {EVENTS.map((event) => {
           const id = reactiveEventId(target, event.type);
           const current = reactiveEvents?.[id];
@@ -44,11 +47,11 @@ export function ReactiveTagEventsEditor({
             : undefined;
 
           return (
-            <div
+            <Box
               key={event.type}
               className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3"
             >
-              <div className="flex items-center gap-3">
+              <Box className="flex items-center gap-3">
                 <Checkbox
                   checked={enabled}
                   onChange={(input) => {
@@ -65,10 +68,10 @@ export function ReactiveTagEventsEditor({
                     });
                   }}
                 />
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-[var(--editor-text)]">{event.label}</div>
-                  <div className="text-[10px] text-[var(--editor-text-muted)]">{path}</div>
-                </div>
+                <Box className="min-w-0 flex-1">
+                  <Box className="text-xs font-semibold text-[var(--editor-text)]">{event.label}</Box>
+                  <Box className="text-[10px] text-[var(--editor-text-muted)]">{path}</Box>
+                </Box>
                 {enabled && href ? (
                   <Button
                     size="xs"
@@ -76,10 +79,10 @@ export function ReactiveTagEventsEditor({
                     onClick={() => window.location.assign(href)}
                     title="Open handler"
                   >
-                    <Link2 size={11} /> Edit
+                    <Icon glyph={Link2} size={11} /> Edit
                   </Button>
                 ) : null}
-              </div>
+              </Box>
 
               {enabled ? (
                 <FormField label="Handler" compact className="mt-3">
@@ -95,10 +98,10 @@ export function ReactiveTagEventsEditor({
                   />
                 </FormField>
               ) : null}
-            </div>
+            </Box>
           );
         })}
-      </div>
+      </Box>
     </PanelCard>
   );
 }

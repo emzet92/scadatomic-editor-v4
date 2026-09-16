@@ -18,7 +18,10 @@ import {
 } from "../../data/tags/TagFieldRef";
 import { useEditorStore } from "../../editor-store";
 import type { BindingDefinition } from "../../registry/component-definition-types";
-import { Button, FormField, SectionHeader, Select, TextInput } from "../ui";
+import { Button, FormField, SectionHeader, Select, TextInput,
+  Box,
+  Icon,
+} from "../ui";
 import {
   createComponentTagReactiveRef,
   formatBindingPath,
@@ -51,7 +54,7 @@ export function BindingsEditor({
   );
 
   return (
-    <div className="pt-4 border-t border-[var(--editor-border)] space-y-3">
+    <Box className="pt-4 border-t border-[var(--editor-border)] space-y-3">
       <SectionHeader
         title="Reactive bindings"
         description="Derive UI state from runtime values. Bindings are pure and never execute commands."
@@ -70,7 +73,7 @@ export function BindingsEditor({
           onChange={(binding) => setBinding(node.id, property, binding)}
         />
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -182,16 +185,16 @@ function BindingCard({
       : transform;
 
   return (
-    <div className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--editor-text)]">
-            <Link2 size={12} /> {definition.label}
-          </div>
-          <div className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
+    <Box className="rounded-2xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)]/50 p-3 space-y-3">
+      <Box className="flex items-start justify-between gap-3">
+        <Box className="min-w-0">
+          <Box className="flex items-center gap-1.5 text-xs font-semibold text-[var(--editor-text)]">
+            <Icon glyph={Link2} size={12} /> {definition.label}
+          </Box>
+          <Box className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
             {definition.description ?? property}
-          </div>
-        </div>
+          </Box>
+        </Box>
         {isBound ? (
           <Button
             size="xs"
@@ -199,10 +202,10 @@ function BindingCard({
             onClick={() => onChange(null)}
             title="Remove binding"
           >
-            <Unlink size={11} /> Remove
+            <Icon glyph={Unlink} size={11} /> Remove
           </Button>
         ) : null}
-      </div>
+      </Box>
 
       <FormField label="Source" compact>
         <Select value={sourcePath} onChange={(event) => bindSource(event.target.value)}>
@@ -241,7 +244,7 @@ function BindingCard({
           ) : null}
 
           {effectiveTransform === "conditional" ? (
-            <div className="grid grid-cols-2 gap-2">
+            <Box className="grid grid-cols-2 gap-2">
               <BindingResultField
                 label="When true"
                 value={conditionValues.whenTrue}
@@ -256,15 +259,15 @@ function BindingCard({
                 node={node}
                 onChange={(value) => updateConditionalBranch("false", value)}
               />
-            </div>
+            </Box>
           ) : null}
         </>
       ) : binding ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">
+        <Box className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-800">
           This binding source cannot currently be resolved. The saved reference is preserved so it can recover when the source is available again.
-        </div>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 }
 

@@ -11,6 +11,8 @@ import {
   PageHeader,
   PanelCard,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 export function SpacingLibraryWorkspace() {
@@ -31,25 +33,25 @@ export function SpacingLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<MoveHorizontal size={14} />}
+        icon={<Icon glyph={MoveHorizontal} size={14} />}
         title="Spacing"
         description="Define a shared spacing scale for padding, gaps and margins. Components reference stable token IDs, so renaming a spacing step is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
-            <Plus size={14} /> Add spacing
+            <Icon glyph={Plus} size={14} /> Add spacing
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<MoveHorizontal size={20} />}
+          icon={<Icon glyph={MoveHorizontal} size={20} />}
           title="No spacing tokens yet"
           description="Create individual values or seed a practical 2 / 4 / 8 / 16 / 24 / 32 / 48 px scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
-                <Plus size={14} /> Add spacing
+                <Icon glyph={Plus} size={14} /> Add spacing
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterSpacingScale}>
                 Create starter scale
@@ -58,7 +60,7 @@ export function SpacingLibraryWorkspace() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <Box className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countSpacingTokenUsages(document, token.id);
             return (
@@ -67,26 +69,26 @@ export function SpacingLibraryWorkspace() {
                 padding="lg"
                 className="grid grid-cols-[minmax(210px,1fr)_minmax(240px,1.3fr)_130px_48px] items-center gap-4 rounded-2xl shadow-sm"
               >
-                <div className="space-y-2">
+                <Box className="space-y-2">
                   <TextInput
                     aria-label="Spacing token name"
                     value={token.name}
                     onChange={(event) => updateSpacingToken(token.id, { name: event.target.value })}
                   />
-                  <div className="text-[10px] text-[var(--editor-text-soft)]">
+                  <Box className="text-[10px] text-[var(--editor-text-soft)]">
                     {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="flex min-h-12 items-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4">
-                  <div
+                <Box className="flex min-h-12 items-center rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4">
+                  <Box
                     className="h-3 rounded-full bg-[var(--editor-accent)] transition-[width]"
                     style={{ width: `${Math.max(2, Math.min(240, token.value * 4))}px` }}
                   />
                   <span className="ml-3 text-xs text-[var(--editor-text-muted)]">{token.value}px</span>
-                </div>
+                </Box>
 
-                <div className="flex items-center gap-2">
+                <Box className="flex items-center gap-2">
                   <TextInput
                     aria-label="Spacing value"
                     type="number"
@@ -98,7 +100,7 @@ export function SpacingLibraryWorkspace() {
                     }
                   />
                   <span className="text-xs text-[var(--editor-text-muted)]">px</span>
-                </div>
+                </Box>
 
                 <IconButton
                   aria-label="Delete spacing token and detach usages"
@@ -106,12 +108,12 @@ export function SpacingLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteSpacingToken(token.id)}
                 >
-                  <Trash2 size={14} />
+                  <Icon glyph={Trash2} size={14} />
                 </IconButton>
               </PanelCard>
             );
           })}
-        </div>
+        </Box>
       )}
 
       <Callout className="mt-5">

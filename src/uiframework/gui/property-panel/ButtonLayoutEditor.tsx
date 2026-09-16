@@ -1,3 +1,4 @@
+import { Box, Icon } from "../ui";
 import { Maximize2, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
 import { defaultButtonProps } from "../../component-props";
 import type { UiNode } from "../../core/document";
@@ -35,25 +36,25 @@ export function ButtonLayoutEditor({
 
   return (
     <section className="overflow-hidden rounded-[18px] border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-start gap-2.5 px-3.5 pb-2.5 pt-3.5">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <Maximize2 size={15} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold text-[var(--editor-text)]">
+      <Box className="flex items-start gap-2.5 px-3.5 pb-2.5 pt-3.5">
+        <Box className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
+          <Icon glyph={Maximize2} size={15} />
+        </Box>
+        <Box className="min-w-0 flex-1">
+          <Box className="text-xs font-semibold text-[var(--editor-text)]">
             Button spacing
-          </div>
-          <div className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
+          </Box>
+          <Box className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
             Compact by default. Grid keeps margins inside the assigned cell.
-          </div>
-        </div>
-      </div>
+          </Box>
+        </Box>
+      </Box>
 
-      <div className="border-t border-[var(--editor-border)] p-3">
-        <div className="grid grid-cols-2 gap-2">
+      <Box className="border-t border-[var(--editor-border)] p-3">
+        <Box className="grid grid-cols-2 gap-2">
           <SpacingValueControl
             compact
-            icon={<MoveHorizontal size={12} />}
+            icon={<Icon glyph={MoveHorizontal} size={12} />}
             label="Padding X"
             value={paddingX}
             fallback={defaultButtonProps.paddingX}
@@ -63,7 +64,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<MoveVertical size={12} />}
+            icon={<Icon glyph={MoveVertical} size={12} />}
             label="Padding Y"
             value={paddingY}
             fallback={defaultButtonProps.paddingY}
@@ -73,7 +74,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<MoveHorizontal size={12} />}
+            icon={<Icon glyph={MoveHorizontal} size={12} />}
             label="Margin X"
             value={marginX}
             fallback={defaultButtonProps.marginX}
@@ -83,7 +84,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<MoveVertical size={12} />}
+            icon={<Icon glyph={MoveVertical} size={12} />}
             label="Margin Y"
             value={marginY}
             fallback={defaultButtonProps.marginY}
@@ -91,9 +92,9 @@ export function ButtonLayoutEditor({
             max={64}
             onChange={(value) => patch({ marginY: value })}
           />
-        </div>
+        </Box>
 
-        <div className="mt-2 space-y-2">
+        <Box className="mt-2 space-y-2">
           <BorderValueControl
             label="Border / stroke"
             value={border}
@@ -101,7 +102,7 @@ export function ButtonLayoutEditor({
           />
           <RadiusValueControl
             compact
-            icon={<Radius size={12} />}
+            icon={<Icon glyph={Radius} size={12} />}
             label="Corner radius"
             value={borderRadius}
             fallback={defaultButtonProps.borderRadius}
@@ -109,16 +110,16 @@ export function ButtonLayoutEditor({
             max={999}
             onChange={(value) => patch({ borderRadius: value })}
           />
-        </div>
+        </Box>
 
-        <div className="mt-2">
+        <Box className="mt-2">
           <ShadowValueControl
             label="Shadow / elevation"
             value={shadow}
             onChange={(value) => patch({ shadow: value })}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
     </section>
   );
 }

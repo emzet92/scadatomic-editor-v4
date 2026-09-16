@@ -13,6 +13,8 @@ import {
   PanelCard,
   Select,
   TextInput,
+  Box,
+  Icon,
 } from "../ui";
 
 export function TypographyLibraryWorkspace() {
@@ -30,25 +32,25 @@ export function TypographyLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Type size={14} />}
+        icon={<Icon glyph={Type} size={14} />}
         title="Typography"
         description="Define reusable text styles once and reference them from Text components. Token references use stable IDs, so renaming styles is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
-            <Plus size={14} /> Add text style
+            <Icon glyph={Plus} size={14} /> Add text style
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Type size={20} />}
+          icon={<Icon glyph={Type} size={20} />}
           title="No typography tokens yet"
           description="Create a text style or seed a starter scale for display, headings, body, labels and captions."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
-                <Plus size={14} /> Add text style
+                <Icon glyph={Plus} size={14} /> Add text style
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterTypographyPalette}>
                 Create starter scale
@@ -57,7 +59,7 @@ export function TypographyLibraryWorkspace() {
           }
         />
       ) : (
-        <div className="space-y-3">
+        <Box className="space-y-3">
           {tokens.map((token) => {
             const usageCount = countTypographyTokenUsages(document, token.id);
             return (
@@ -66,19 +68,19 @@ export function TypographyLibraryWorkspace() {
                 padding="lg"
                 className="grid grid-cols-[minmax(210px,1fr)_minmax(260px,1.6fr)_86px] gap-4 rounded-2xl shadow-sm"
               >
-                <div className="space-y-2">
+                <Box className="space-y-2">
                   <TextInput
                     aria-label="Typography token name"
                     value={token.name}
                     onChange={(event) => updateTypographyToken(token.id, { name: event.target.value })}
                   />
-                  <div className="text-[10px] text-[var(--editor-text-soft)]">
+                  <Box className="text-[10px] text-[var(--editor-text-soft)]">
                     {usageCount === 0 ? "Unused" : `${usageCount} ${usageCount === 1 ? "use" : "uses"}`}
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="space-y-3">
-                  <div
+                <Box className="space-y-3">
+                  <Box
                     className="min-h-14 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-4 py-3 text-[var(--editor-text)]"
                     style={{
                       fontFamily: token.fontFamily,
@@ -89,9 +91,9 @@ export function TypographyLibraryWorkspace() {
                     }}
                   >
                     The quick brown fox jumps over the lazy dog
-                  </div>
+                  </Box>
 
-                  <div className="grid grid-cols-[minmax(180px,1.4fr)_90px_120px_90px_90px] gap-2">
+                  <Box className="grid grid-cols-[minmax(180px,1.4fr)_90px_120px_90px_90px] gap-2">
                     <TextInput
                       aria-label="Font family"
                       value={token.fontFamily}
@@ -126,23 +128,23 @@ export function TypographyLibraryWorkspace() {
                       value={token.letterSpacing}
                       onChange={(event) => updateTypographyToken(token.id, { letterSpacing: Number(event.target.value) })}
                     />
-                  </div>
-                </div>
+                  </Box>
+                </Box>
 
-                <div className="flex items-start justify-end">
+                <Box className="flex items-start justify-end">
                   <IconButton
                     aria-label="Delete style and detach usages"
                     variant="danger"
                     size="icon"
                     onClick={() => deleteTypographyToken(token.id)}
                   >
-                    <Trash2 size={14} />
+                    <Icon glyph={Trash2} size={14} />
                   </IconButton>
-                </div>
+                </Box>
               </PanelCard>
             );
           })}
-        </div>
+        </Box>
       )}
 
       <Callout className="mt-5">

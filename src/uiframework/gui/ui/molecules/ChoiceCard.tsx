@@ -1,5 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { cx } from "./cx";
+import { Box, Inline, Stack } from "../atoms/Layout";
+import { Pressable } from "../atoms/Pressable";
+import { Text } from "../atoms/Typography";
+import { cx } from "../utils/cx";
 
 export type ChoiceCardProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title"> & {
   title: ReactNode;
@@ -20,12 +23,11 @@ export function ChoiceCard({
   ...props
 }: ChoiceCardProps) {
   return (
-    <button
-      data-editor-ignore
+    <Pressable
       type={type}
       aria-pressed={selected}
       className={cx(
-        "group rounded-2xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--editor-accent-soft)]",
+        "group rounded-2xl border p-3 text-left transition",
         selected
           ? "border-[var(--editor-accent-border)] bg-[var(--editor-accent-soft)] shadow-[0_0_0_1px_var(--editor-accent-border)]"
           : "border-[var(--editor-border)] bg-[var(--editor-surface)] hover:border-[var(--editor-border-strong)] hover:bg-[var(--editor-surface-muted)]",
@@ -34,21 +36,21 @@ export function ChoiceCard({
       {...props}
     >
       {preview}
-      <div className={cx("flex min-w-0 items-start gap-3", preview && "mt-2")}>
+      <Inline align="start" gap="md" className={cx("min-w-0", preview && "mt-2")}>
         {icon ? (
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]">
+          <Box className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]">
             {icon}
-          </span>
+          </Box>
         ) : null}
-        <span className="min-w-0">
-          <span className="block text-xs font-semibold text-[var(--editor-text)]">{title}</span>
+        <Stack gap="none" className="min-w-0">
+          <Text as="span" variant="label">{title}</Text>
           {description ? (
-            <span className="mt-0.5 block text-[10px] leading-4 text-[var(--editor-text-muted)]">
+            <Text as="span" variant="metadata" tone="muted" className="mt-0.5">
               {description}
-            </span>
+            </Text>
           ) : null}
-        </span>
-      </div>
-    </button>
+        </Stack>
+      </Inline>
+    </Pressable>
   );
 }

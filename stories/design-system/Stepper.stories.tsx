@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Stepper } from "../../src/uiframework/gui/ui";
 
 const meta = {
-  title: "Primitives/Stepper",
+  title: "Molecules/Stepper",
   parameters: { controls: { disable: true } },
 } satisfies Meta;
 

@@ -28,7 +28,10 @@ import type {
   SimulationGeneratorKind,
 } from "../../../data/simulation/SimulationBinding";
 import { useEditorStore } from "../../../editor-store";
-import { Checkbox, FormField, Select } from "../../ui";
+import { Checkbox, FormField, Select,
+  Box,
+  Icon,
+} from "../../ui";
 import { DataValueInput } from "../DataValueInput";
 import {
   ConstantGeneratorEditor,
@@ -83,11 +86,11 @@ export function SimulationEditor({
   }
 
   return (
-    <div className="space-y-3 border-t border-[var(--editor-border)] pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
-          <Activity size={12} className="text-[var(--editor-accent)]" /> Simulation configuration
-        </div>
+    <Box className="space-y-3 border-t border-[var(--editor-border)] pt-3">
+      <Box className="flex items-center justify-between gap-3">
+        <Box className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
+          <Icon glyph={Activity} size={12} className="text-[var(--editor-accent)]" /> Simulation configuration
+        </Box>
         <label className="flex items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
           <Checkbox
             checked={stableBinding.enabled}
@@ -95,7 +98,7 @@ export function SimulationEditor({
           />
           Enabled
         </label>
-      </div>
+      </Box>
 
       <FormField label="Generator" compact error={validationError}>
         <Select
@@ -128,11 +131,11 @@ export function SimulationEditor({
       />
 
       {!stableBinding.enabled ? (
-        <div className="text-[10px] text-[var(--editor-text-soft)]">
+        <Box className="text-[10px] text-[var(--editor-text-soft)]">
           The Simulation driver is mapped, but this binding is disabled.
-        </div>
+        </Box>
       ) : null}
-    </div>
+    </Box>
   );
 }
 
@@ -256,11 +259,11 @@ function SimulationActivationEditor({
   }
 
   return (
-    <div className="space-y-3 border-t border-[var(--editor-border)] pt-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
-          <GitBranch size={12} className="text-[var(--editor-accent)]" /> Activation
-        </div>
+    <Box className="space-y-3 border-t border-[var(--editor-border)] pt-3">
+      <Box className="flex items-center justify-between gap-3">
+        <Box className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
+          <Icon glyph={GitBranch} size={12} className="text-[var(--editor-accent)]" /> Activation
+        </Box>
         <label className="flex items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
           <Checkbox
             checked={!!activation}
@@ -271,17 +274,17 @@ function SimulationActivationEditor({
           />
           Conditional
         </label>
-      </div>
+      </Box>
 
       {!activation ? (
-        <div className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
+        <Box className="text-[10px] leading-4 text-[var(--editor-text-soft)]">
           {candidates.length > 0
             ? "When enabled, this generator runs only while another tag field matches the configured condition."
             : "Create another primitive tag or UDT field to use as an activation source."}
-        </div>
+        </Box>
       ) : (
         <>
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_110px_minmax(0,1fr)]">
+          <Box className="grid gap-2 md:grid-cols-[minmax(0,1fr)_110px_minmax(0,1fr)]">
             <FormField label="When" compact error={error}>
               <Select
                 controlSize="sm"
@@ -317,9 +320,9 @@ function SimulationActivationEditor({
                 />
               ) : null}
             </FormField>
-          </div>
+          </Box>
 
-          <div className="grid gap-2 md:grid-cols-2">
+          <Box className="grid gap-2 md:grid-cols-2">
             <FormField label="When inactive" compact>
               <Select
                 controlSize="sm"
@@ -342,10 +345,10 @@ function SimulationActivationEditor({
                 />
               </FormField>
             ) : null}
-          </div>
+          </Box>
         </>
       )}
-    </div>
+    </Box>
   );
 }
 

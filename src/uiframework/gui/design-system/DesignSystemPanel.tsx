@@ -1,6 +1,6 @@
 import { Layers, MoveHorizontal, Palette, Radius, Square, SunMoon, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
-import { Callout, SidebarNavItem, SidebarSection } from "../ui";
+import { Box, Callout, Icon, SidebarNavItem, SidebarSection } from "../ui";
 
 export type DesignSystemSection = "themes" | "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
 
@@ -48,19 +48,19 @@ export function DesignSystemPanel({
       title="Design System"
       description="Project-local tokens shared by every page and reusable component."
     >
-      <div className="space-y-2">
-        {sections.map(([id, title, Icon, count]) => (
+      <Box className="space-y-2">
+        {sections.map(([id, title, SectionIcon, count]) => (
           <SidebarNavItem
             key={id}
             active={activeSection === id}
-            icon={<Icon size={15} />}
+            icon={<Icon glyph={SectionIcon} size={15} />}
             title={title}
             meta={`${count}`}
             description={`${count} ${count === 1 ? "token" : "tokens"}`}
             onClick={() => onSelectSection(id)}
           />
         ))}
-      </div>
+      </Box>
       <Callout dashed>
         Components default to design-token references. Semantic colors resolve through the active theme; foundation tokens remain available for explicit overrides.
       </Callout>

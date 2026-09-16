@@ -1,6 +1,6 @@
 import type { UiDocument, UiNode } from "../../core/document";
 import type { UpdateNode } from "../property-panel/property-panel-types";
-import { Callout, FormField, PanelCard, PanelSection, SectionHeader, Select } from "../ui";
+import { Callout, FormField, PanelCard, PanelSection, SectionHeader, Select, Box} from "../ui";
 
 export function RepeatBehaviorEditor({
   document,
@@ -107,9 +107,9 @@ export function RepeatBehaviorEditor({
               Repeat mode owns this container&apos;s children. Manual add, move and duplicate into this container are disabled until Content mode is switched back to Static.
             </Callout>
             {templates.length === 0 ? (
-              <div className="text-[10px] text-amber-700">
+              <Box className="text-[10px] text-amber-700">
                 Create a user component with a public TagRef input for this UDT first.
-              </div>
+              </Box>
             ) : null}
           </>
         ) : null}
