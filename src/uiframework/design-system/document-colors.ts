@@ -10,8 +10,23 @@ export function detachColorTokenFromDocument(
   tokenId: ColorTokenId,
   replacement: string
 ): UiDocument {
+  const semanticColors = document.designSystem?.semanticColors
+    ? Object.fromEntries(
+        Object.entries(document.designSystem.semanticColors).map(([id, token]) => [
+          id,
+          {
+            ...token,
+            values: detachColorTokenReference(token.values, tokenId, replacement) as typeof token.values,
+          },
+        ])
+      )
+    : document.designSystem?.semanticColors;
+
   return {
     ...document,
+    designSystem: document.designSystem
+      ? { ...document.designSystem, semanticColors }
+      : document.designSystem,
     nodes: mapNodes(document.nodes, tokenId, replacement),
     components: document.components
       ? Object.fromEntries(
@@ -36,6 +51,7 @@ export function countColorTokenUsages(document: UiDocument, tokenId: ColorTokenI
     count += countColorTokenReferences(definition.nodes, tokenId);
     count += countColorTokenReferences(definition.inputs, tokenId);
   }
+  count += countColorTokenReferences(document.designSystem?.semanticColors, tokenId);
   return count;
 }
 

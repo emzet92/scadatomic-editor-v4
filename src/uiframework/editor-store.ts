@@ -47,10 +47,13 @@ import type { TagRuntimeWriteResult } from "./data/runtime/TagRuntime";
 import type { ReactiveEventHandlerBinding } from "../reactivity";
 import { replaceDesignerTagData, writeDesignerTagValue } from "./data/tags/designer-tag-store";
 import {
+  createColorTokenRef,
   createEmptyDesignSystem,
   createStarterColorTokens,
   type ColorToken,
   type ColorTokenId,
+  type DesignThemeId,
+  type SemanticColorTokenId,
 } from "./design-system/colors";
 import { detachColorTokenFromDocument } from "./design-system/document-colors";
 import {
@@ -120,6 +123,8 @@ type EditorState = {
   addStarterColorPalette: () => void;
   updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
   deleteColorToken: (tokenId: ColorTokenId) => void;
+  setActiveDesignTheme: (themeId: DesignThemeId) => void;
+  setSemanticColorThemeValue: (tokenId: SemanticColorTokenId, themeId: DesignThemeId, colorTokenId: ColorTokenId) => void;
   addTypographyToken: (draft?: Partial<Omit<TypographyToken, "id">>) => TypographyTokenId;
   addStarterTypographyPalette: () => void;
   updateTypographyToken: (tokenId: TypographyTokenId, patch: Partial<Omit<TypographyToken, "id">>) => void;
@@ -434,7 +439,49 @@ export const useEditorStore = create<EditorState>((set) => ({
       return {
         document: {
           ...detached,
-          designSystem: { ...designSystem, colors: nextColors },
+          designSystem: {
+            ...(detached.designSystem ?? designSystem),
+            colors: nextColors,
+          },
+        },
+      };
+    });
+  },
+
+  setActiveDesignTheme: (themeId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      if (!designSystem.themes?.[themeId] || designSystem.activeThemeId === themeId) return state;
+      return {
+        document: {
+          ...state.document,
+          designSystem: { ...designSystem, activeThemeId: themeId },
+        },
+      };
+    });
+  },
+
+  setSemanticColorThemeValue: (tokenId, themeId, colorTokenId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const token = designSystem.semanticColors?.[tokenId];
+      if (!token || !designSystem.themes?.[themeId] || !designSystem.colors[colorTokenId]) return state;
+      return {
+        document: {
+          ...state.document,
+          designSystem: {
+            ...designSystem,
+            semanticColors: {
+              ...(designSystem.semanticColors ?? {}),
+              [tokenId]: {
+                ...token,
+                values: {
+                  ...token.values,
+                  [themeId]: createColorTokenRef(colorTokenId),
+                },
+              },
+            },
+          },
         },
       };
     });

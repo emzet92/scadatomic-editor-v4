@@ -4,7 +4,9 @@ import type { InspectorControl } from "../../registry/component-definitions";
 import { useEditorStore } from "../../editor-store";
 import {
   createColorTokenRef,
+  createSemanticColorTokenRef,
   isColorTokenRef,
+  isSemanticColorTokenRef,
   resolveColorValue,
 } from "../../design-system/colors";
 import {
@@ -468,14 +470,23 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
   const designSystem = useEditorStore((state) => state.document.designSystem);
   if (control.kind !== "color") return null;
 
+  const semanticColors = Object.values(designSystem?.semanticColors ?? {}).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
   const colors = Object.values(designSystem?.colors ?? {}).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
-  const tokenRef = isColorTokenRef(value) ? value : undefined;
-  const selectedToken = tokenRef ? designSystem?.colors[tokenRef.tokenId] : undefined;
+  const primitiveRef = isColorTokenRef(value) ? value : undefined;
+  const semanticRef = isSemanticColorTokenRef(value) ? value : undefined;
+  const tokenRef = primitiveRef ?? semanticRef;
   const resolved = resolveColorValue(value, designSystem);
   const literalValue = typeof value === "string" && value ? value : resolved;
   const mode = tokenRef ? "token" : "local";
+  const selectedValue = semanticRef
+    ? `semantic:${semanticRef.tokenId}`
+    : primitiveRef
+      ? `foundation:${primitiveRef.tokenId}`
+      : "";
 
   function switchMode(nextMode: "local" | "token") {
     if (nextMode === mode) return;
@@ -483,9 +494,30 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
       updateProp(resolved);
       return;
     }
-    const firstToken = colors[0];
-    if (firstToken) updateProp(createColorTokenRef(firstToken.id));
+    const firstSemantic = semanticColors[0];
+    if (firstSemantic) {
+      updateProp(createSemanticColorTokenRef(firstSemantic.id));
+      return;
+    }
+    const firstFoundation = colors[0];
+    if (firstFoundation) updateProp(createColorTokenRef(firstFoundation.id));
   }
+
+  function selectToken(nextValue: string) {
+    if (nextValue.startsWith("semantic:")) {
+      updateProp(createSemanticColorTokenRef(nextValue.slice("semantic:".length)));
+      return;
+    }
+    if (nextValue.startsWith("foundation:")) {
+      updateProp(createColorTokenRef(nextValue.slice("foundation:".length)));
+    }
+  }
+
+  const selectedName = semanticRef
+    ? designSystem?.semanticColors?.[semanticRef.tokenId]?.name
+    : primitiveRef
+      ? designSystem?.colors?.[primitiveRef.tokenId]?.name
+      : undefined;
 
   return (
     <FormField label={propName}>
@@ -500,7 +532,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
           </SegmentedControlItem>
           <SegmentedControlItem
             active={mode === "token"}
-            disabled={colors.length === 0}
+            disabled={colors.length === 0 && semanticColors.length === 0}
             className="flex-1 text-xs"
             onClick={() => switchMode("token")}
           >
@@ -513,25 +545,38 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
             <div className="flex items-center gap-2">
               <span
                 className="h-9 w-9 shrink-0 rounded-[12px] border border-[var(--editor-border)] shadow-sm"
-                style={{ background: selectedToken?.value ?? resolved }}
+                style={{ background: resolved }}
               />
               <Select
                 aria-label={`${propName} design system color`}
-                value={tokenRef?.tokenId ?? ""}
-                onChange={(event) => updateProp(createColorTokenRef(event.target.value))}
+                value={selectedValue}
+                onChange={(event) => selectToken(event.target.value)}
                 className="min-w-0 flex-1"
               >
-                {colors.map((token) => (
-                  <option key={token.id} value={token.id}>
-                    {token.name} — {token.value}
-                  </option>
-                ))}
+                {semanticColors.length > 0 ? (
+                  <optgroup label="Semantic">
+                    {semanticColors.map((token) => (
+                      <option key={token.id} value={`semantic:${token.id}`}>
+                        {token.name} — {resolveColorValue(createSemanticColorTokenRef(token.id), designSystem)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
+                {colors.length > 0 ? (
+                  <optgroup label="Foundation">
+                    {colors.map((token) => (
+                      <option key={token.id} value={`foundation:${token.id}`}>
+                        {token.name} — {token.value}
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : null}
               </Select>
             </div>
-            {selectedToken ? (
+            {selectedName ? (
               <div className="flex items-center justify-between gap-2 px-1 text-[10px] text-[var(--editor-text-soft)]">
-                <span className="truncate">{selectedToken.name}</span>
-                <span className="font-mono">{selectedToken.value}</span>
+                <span className="truncate">{selectedName}</span>
+                <span className="font-mono">{resolved}</span>
               </div>
             ) : (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] text-amber-700">
@@ -547,7 +592,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
           />
         )}
 
-        {colors.length === 0 ? (
+        {colors.length === 0 && semanticColors.length === 0 ? (
           <div className="px-1 text-[10px] leading-4 text-[var(--editor-text-soft)]">
             Add project colors in Design System → Colors to enable token references.
           </div>

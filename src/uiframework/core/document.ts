@@ -4,7 +4,8 @@ import type { ContainerContentBehavior } from "../repeat/RepeatBehavior";
 import { isContainerContentBehavior } from "../repeat/RepeatBehavior";
 import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../../reactivity";
 import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
-import { createEmptyDesignSystem, isDesignSystem, type DesignSystem } from "../design-system/colors";
+import { isDesignSystem, type DesignSystem } from "../design-system/colors";
+import { createDefaultDesignSystem, ensureDefaultDesignSystem, getDefaultDesignSystemPropsForType } from "../design-system/default-design-system";
 export type NodeId = string;
 export type PageId = string;
 export type ModalId = string;
@@ -154,7 +155,7 @@ export function createUiDocument(
     },
     nodes,
     data: createEmptyProjectData(),
-    designSystem: createEmptyDesignSystem(),
+    designSystem: createDefaultDesignSystem(),
   };
 }
 
@@ -169,6 +170,7 @@ export function createEmptyUiDocument(): UiDocument {
         width: 1440,
         height: 900,
         backgroundColor: "#ffffff",
+        ...getDefaultDesignSystemPropsForType("Page"),
       },
       children: [],
     },
@@ -226,6 +228,7 @@ export function createModalRootNode(name: string): UiNode {
       display: "grid",
       borderRadius: 18,
       shadow: { x: 0, y: 18, blur: 40, spread: -8, color: "rgba(15, 23, 42, 0.20)" },
+      ...getDefaultDesignSystemPropsForType("Modal"),
       closeOnBackdrop: true,
       closeOnEscape: true,
     },
@@ -247,6 +250,7 @@ export function createPageRootNode(name: string): UiNode {
       gap: 12,
       columns: 1,
       display: "grid",
+      ...getDefaultDesignSystemPropsForType("Page"),
     },
     children: [],
   };
@@ -356,7 +360,10 @@ export function parseUiDocument(value: unknown): UiDocument {
     throw new Error("Invalid UiDocument v4");
   }
 
-  return value;
+  return {
+    ...value,
+    designSystem: ensureDefaultDesignSystem(value.designSystem),
+  };
 }
 
 function isPageGraphValid(pages: Record<PageId, UiPage>) {

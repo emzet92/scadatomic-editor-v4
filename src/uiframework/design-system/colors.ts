@@ -13,18 +13,33 @@ import { isShadowToken, type ShadowToken, type ShadowTokenId } from "./shadows";
 import { isBorderToken, type BorderToken, type BorderTokenId } from "./borders";
 
 export type ColorTokenId = string;
+export type DesignThemeId = string;
+export type SemanticColorTokenId = string;
 
 export type ColorToken = DesignTokenBase & {
   value: string;
 };
 
+export type DesignTheme = {
+  id: DesignThemeId;
+  name: string;
+};
+
 export type ColorTokenRef = DesignTokenReference<"color-token">;
-export type ColorValue = string | ColorTokenRef;
+export type SemanticColorTokenRef = DesignTokenReference<"semantic-color-token">;
+export type FoundationColorValue = string | ColorTokenRef;
+export type ColorValue = FoundationColorValue | SemanticColorTokenRef;
+
+export type SemanticColorToken = DesignTokenBase & {
+  values: Record<DesignThemeId, FoundationColorValue>;
+};
 
 /**
  * Project-local design token collection.
- * Token families deliberately live under one stable designSystem root so new
- * families can be added without changing component/document ownership.
+ *
+ * Foundations (colors / typography / spacing / radius / shadows / borders)
+ * are stable project assets. Semantic colors sit one level above primitive
+ * colors and resolve through the currently active theme.
  */
 export type DesignSystem = {
   colors: Record<ColorTokenId, ColorToken>;
@@ -33,20 +48,46 @@ export type DesignSystem = {
   radius?: Record<RadiusTokenId, RadiusToken> | undefined;
   shadows?: Record<ShadowTokenId, ShadowToken> | undefined;
   borders?: Record<BorderTokenId, BorderToken> | undefined;
+  themes?: Record<DesignThemeId, DesignTheme> | undefined;
+  activeThemeId?: DesignThemeId | undefined;
+  semanticColors?: Record<SemanticColorTokenId, SemanticColorToken> | undefined;
+  /** Marks a design system created by the built-in default preset. */
+  preset?: "scadatomic-default" | undefined;
 };
 
 export const DEFAULT_COLOR_LITERAL = "#18181b";
 
 export function createEmptyDesignSystem(): DesignSystem {
-  return { colors: {}, typography: {}, spacing: {}, radius: {}, shadows: {}, borders: {} };
+  return {
+    colors: {},
+    typography: {},
+    spacing: {},
+    radius: {},
+    shadows: {},
+    borders: {},
+    themes: {},
+    semanticColors: {},
+  };
 }
 
 export function createColorTokenRef(tokenId: ColorTokenId): ColorTokenRef {
   return { kind: "color-token", tokenId };
 }
 
+export function createSemanticColorTokenRef(
+  tokenId: SemanticColorTokenId
+): SemanticColorTokenRef {
+  return { kind: "semantic-color-token", tokenId };
+}
+
 export function isColorTokenRef(value: unknown): value is ColorTokenRef {
   return isDesignTokenReference(value, "color-token");
+}
+
+export function isSemanticColorTokenRef(
+  value: unknown
+): value is SemanticColorTokenRef {
+  return isDesignTokenReference(value, "semantic-color-token");
 }
 
 /** Accepts legacy color-only design systems and current multi-family systems. */
@@ -100,6 +141,29 @@ export function isDesignSystem(value: unknown): value is DesignSystem {
     }
   }
 
+  if (value.themes !== undefined) {
+    if (!isRecord(value.themes)) return false;
+    if (!Object.entries(value.themes).every(([id, theme]) => isDesignTheme(theme, id))) {
+      return false;
+    }
+  }
+
+  if (value.activeThemeId !== undefined) {
+    if (typeof value.activeThemeId !== "string") return false;
+    if (value.themes !== undefined && !value.themes[value.activeThemeId]) return false;
+  }
+
+  if (value.semanticColors !== undefined) {
+    if (!isRecord(value.semanticColors)) return false;
+    if (!Object.entries(value.semanticColors).every(([id, token]) => isSemanticColorToken(token, id))) {
+      return false;
+    }
+  }
+
+  if (value.preset !== undefined && value.preset !== "scadatomic-default") {
+    return false;
+  }
+
   return true;
 }
 
@@ -118,9 +182,33 @@ export function resolveColorValue(
   designSystem: DesignSystem | undefined,
   fallback = DEFAULT_COLOR_LITERAL
 ): string {
+  return resolveColorValueInternal(value, designSystem, fallback, new Set());
+}
+
+function resolveColorValueInternal(
+  value: unknown,
+  designSystem: DesignSystem | undefined,
+  fallback: string,
+  visitedSemanticIds: Set<string>
+): string {
   if (typeof value === "string" && value.trim()) return value;
   if (isColorTokenRef(value)) {
     return designSystem?.colors[value.tokenId]?.value ?? fallback;
+  }
+  if (isSemanticColorTokenRef(value)) {
+    if (visitedSemanticIds.has(value.tokenId)) return fallback;
+    const token = designSystem?.semanticColors?.[value.tokenId];
+    if (!token) return fallback;
+
+    const activeThemeId = designSystem?.activeThemeId;
+    const source =
+      (activeThemeId ? token.values[activeThemeId] : undefined) ??
+      Object.values(token.values)[0];
+    if (!source) return fallback;
+
+    const nextVisited = new Set(visitedSemanticIds);
+    nextVisited.add(value.tokenId);
+    return resolveColorValueInternal(source, designSystem, fallback, nextVisited);
   }
   return fallback;
 }
@@ -144,6 +232,16 @@ export function countColorTokenReferences(value: unknown, tokenId: ColorTokenId)
   );
 }
 
+export function countSemanticColorTokenReferences(
+  value: unknown,
+  tokenId: SemanticColorTokenId
+): number {
+  return countTokenReferences(
+    value,
+    (candidate) => isSemanticColorTokenRef(candidate) && candidate.tokenId === tokenId
+  );
+}
+
 export function createStarterColorTokens(): ColorToken[] {
   return [
     createToken("Brand/Primary", "#7c3aed"),
@@ -156,6 +254,28 @@ export function createStarterColorTokens(): ColorToken[] {
     createToken("Status/Warning", "#d97706"),
     createToken("Status/Danger", "#dc2626"),
   ];
+}
+
+function isDesignTheme(value: unknown, id: string): value is DesignTheme {
+  return (
+    isRecord(value) &&
+    value.id === id &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0
+  );
+}
+
+function isSemanticColorToken(value: unknown, id: string): value is SemanticColorToken {
+  if (!isRecord(value) || value.id !== id || typeof value.name !== "string" || !value.name.trim()) {
+    return false;
+  }
+  if (value.description !== undefined && typeof value.description !== "string") return false;
+  if (!isRecord(value.values)) return false;
+  return Object.values(value.values).every(isFoundationColorValue);
+}
+
+function isFoundationColorValue(value: unknown): value is FoundationColorValue {
+  return (typeof value === "string" && value.trim().length > 0) || isColorTokenRef(value);
 }
 
 function createToken(name: string, value: string): ColorToken {

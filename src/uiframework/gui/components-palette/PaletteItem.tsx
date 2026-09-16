@@ -20,6 +20,7 @@ import {
 } from "../../component-repository";
 import {
   componentDefinitions,
+  getDefaultPropsForType,
   type RegisteredComponentType,
 } from "../../registry/component-definitions";
 
@@ -171,7 +172,7 @@ export function ComponentPalette({
                 startComponentDrag({
                   type: item.type,
                   label: item.label,
-                  props: {},
+                  props: getDefaultPropsForType(item.type),
                 });
               }}
               className="w-full p-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)] transition-all flex items-start gap-3 text-left cursor-grab select-none"

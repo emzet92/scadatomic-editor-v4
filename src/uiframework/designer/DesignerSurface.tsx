@@ -23,6 +23,7 @@ import {
 import type { ComponentRegistry } from "../registry/editor-registry";
 import type { DesignerAdapter } from "./designer-adapter";
 import { canAcceptManualChildren } from "../repeat/RepeatBehavior";
+import { resolveDesignTokenReferences } from "../design-system/resolver";
 
 export function DesignerSurface({
   adapter,
@@ -32,6 +33,7 @@ export function DesignerSurface({
   registry: ComponentRegistry;
 }) {
   const dragPreview = useEditorStore((state) => state.dragPreview);
+  const designSystem = useEditorStore((state) => state.document.designSystem);
   const dragX = useEditorStore((state) => state.dragX);
   const dragY = useEditorStore((state) => state.dragY);
 
@@ -336,7 +338,7 @@ export function DesignerSurface({
         <DragPreview
           registry={registry}
           type={dragPreview.type}
-          props={dragPreview.props}
+          props={resolveDesignTokenReferences(dragPreview.props, designSystem) as Record<string, unknown>}
           label={dragPreview.label}
           x={dragX}
           y={dragY}

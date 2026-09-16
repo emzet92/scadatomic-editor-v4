@@ -8,6 +8,7 @@ import {
 import { buildDocumentIndex } from "../core/document-index";
 import { createProjectComponentRepository } from "../component-repository";
 import { defaultContainerProps } from "../component-props";
+import { getDefaultDesignSystemPropsForType } from "../design-system/default-design-system";
 
 export type CreateReusableComponentResult = {
   document: UiDocument;
@@ -123,7 +124,7 @@ export function createReusableComponentFromSelection(
       id: componentRootId,
       name: rootName,
       type: "Container",
-      props: { ...defaultContainerProps },
+      props: { ...defaultContainerProps, ...getDefaultDesignSystemPropsForType("Container") },
       children: selectedRoots.map((node) => idMap.get(node.id) as NodeId),
     };
   }

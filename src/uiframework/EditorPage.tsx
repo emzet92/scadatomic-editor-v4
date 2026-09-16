@@ -51,6 +51,7 @@ import { SpacingLibraryWorkspace } from "./gui/design-system/SpacingLibraryWorks
 import { RadiusLibraryWorkspace } from "./gui/design-system/RadiusLibraryWorkspace";
 import { ShadowLibraryWorkspace } from "./gui/design-system/ShadowLibraryWorkspace";
 import { BorderLibraryWorkspace } from "./gui/design-system/BorderLibraryWorkspace";
+import { ThemeWorkspace } from "./gui/design-system/ThemeWorkspace";
 import type { DataSelection } from "./gui/data/data-selection";
 import { SegmentedControl, SegmentedControlItem } from "./gui/ui";
 import { designerSimulationSession } from "./data/simulation/designer-simulation-session";
@@ -206,7 +207,7 @@ export function EditorPage() {
     "idle" | "saving" | "saved" | "error"
   >("idle");
   const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
-  const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("colors");
+  const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("themes");
   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
 
   const loadedRef = useRef(false);
@@ -603,7 +604,9 @@ export function EditorPage() {
             </div>
           ) : editorArea === "designSystem" ? (
             <div className="min-h-full bg-[var(--editor-canvas-bg)]">
-              {designSystemSection === "colors" ? (
+              {designSystemSection === "themes" ? (
+                <ThemeWorkspace />
+              ) : designSystemSection === "colors" ? (
                 <ColorLibraryWorkspace />
               ) : designSystemSection === "typography" ? (
                 <TypographyLibraryWorkspace />

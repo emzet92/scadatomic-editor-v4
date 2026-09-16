@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
-import { Layers, MoveHorizontal, Palette, Radius, Square, Type } from "lucide-react";
+import { Layers, MoveHorizontal, Palette, Radius, Square, SunMoon, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { SectionHeader } from "../ui";
 
-export type DesignSystemSection = "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
+export type DesignSystemSection = "themes" | "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
 
 export function DesignSystemPanel({
   activeSection,
@@ -12,6 +12,9 @@ export function DesignSystemPanel({
   activeSection: DesignSystemSection;
   onSelectSection: (section: DesignSystemSection) => void;
 }) {
+  const themeCount = useEditorStore(
+    (state) => Object.keys(state.document.designSystem?.themes ?? {}).length
+  );
   const colorCount = useEditorStore(
     (state) => Object.keys(state.document.designSystem?.colors ?? {}).length
   );
@@ -36,6 +39,13 @@ export function DesignSystemPanel({
       <SectionHeader
         title="Design System"
         description="Project-local tokens shared by every page and reusable component."
+      />
+      <TokenSectionButton
+        active={activeSection === "themes"}
+        icon={<SunMoon size={15} />}
+        title="Themes & Semantic"
+        count={themeCount}
+        onClick={() => onSelectSection("themes")}
       />
       <TokenSectionButton
         active={activeSection === "colors"}
@@ -80,7 +90,7 @@ export function DesignSystemPanel({
         onClick={() => onSelectSection("borders")}
       />
       <div className="rounded-xl border border-dashed border-[var(--editor-border)] p-3 text-xs leading-5 text-[var(--editor-text-muted)]">
-        Opacity, motion and semantic aliases can use the same token reference model next.
+        Components default to design-token references. Semantic colors resolve through the active theme; foundation tokens remain available for explicit overrides.
       </div>
     </div>
   );

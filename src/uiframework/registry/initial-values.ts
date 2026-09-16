@@ -1,5 +1,6 @@
 import { createUiDocument, type UiNode } from "../core/document";
 import type { ProjectData } from "../data/tags/TagDefinition";
+import { getDefaultDesignSystemPropsForType } from "../design-system/default-design-system";
 
 const nodes: Record<string, UiNode> = {
   root: {
@@ -15,6 +16,7 @@ const nodes: Record<string, UiNode> = {
       gap: 12,
       columns: 1,
       display: "grid",
+      ...getDefaultDesignSystemPropsForType("Page"),
     },
     children: ["mainContainer"],
   },
@@ -28,6 +30,7 @@ const nodes: Record<string, UiNode> = {
       padding: 16,
       gap: 12,
       borderSize: 1,
+      ...getDefaultDesignSystemPropsForType("Container"),
     },
     children: [
       "stationTitle",
@@ -47,6 +50,7 @@ const nodes: Record<string, UiNode> = {
     props: {
       value: "Pump Station P-101",
       color: "black",
+      ...getDefaultDesignSystemPropsForType("Text"),
     },
     bindings: {
       value: {
@@ -60,7 +64,7 @@ const nodes: Record<string, UiNode> = {
     id: "levelLiters",
     name: "Text2",
     type: "Text",
-    props: { value: "1240 L" },
+    props: { value: "1240 L", ...getDefaultDesignSystemPropsForType("Text") },
     bindings: {
       value: { kind: "tag", path: "tank.levelLiters" },
     },
@@ -70,7 +74,7 @@ const nodes: Record<string, UiNode> = {
     id: "levelPercent",
     name: "Text3",
     type: "Text",
-    props: { value: "62 %" },
+    props: { value: "62 %", ...getDefaultDesignSystemPropsForType("Text") },
     bindings: {
       value: { kind: "tag", path: "tank.levelPercent" },
     },
@@ -80,7 +84,7 @@ const nodes: Record<string, UiNode> = {
     id: "flowRate",
     name: "Text4",
     type: "Text",
-    props: { value: "85 m³/h" },
+    props: { value: "85 m³/h", ...getDefaultDesignSystemPropsForType("Text") },
     bindings: {
       value: { kind: "tag", path: "pump.flowRate" },
     },
@@ -90,7 +94,7 @@ const nodes: Record<string, UiNode> = {
     id: "startButton",
     name: "Button1",
     type: "Button",
-    props: { label: "START" },
+    props: { label: "START", ...getDefaultDesignSystemPropsForType("Button") },
     events: {
       click: { handlerId: "startButton.Clicked" },
     },
@@ -103,7 +107,7 @@ const nodes: Record<string, UiNode> = {
     id: "stopButton",
     name: "Button2",
     type: "Button",
-    props: { label: "STOP" },
+    props: { label: "STOP", ...getDefaultDesignSystemPropsForType("Button") },
     events: {
       click: { handlerId: "stopButton.Clicked" },
     },
@@ -116,6 +120,7 @@ const nodes: Record<string, UiNode> = {
     props: {
       label: "RANDOM COLOR",
       backgroundColor: "#7c3aed",
+      ...getDefaultDesignSystemPropsForType("Button"),
     },
     events: {
       click: { handlerId: "randomColorButton.RandomColorClicked" },

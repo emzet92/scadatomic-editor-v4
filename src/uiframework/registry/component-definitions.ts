@@ -1,4 +1,5 @@
 import type { ComponentDefinition } from "./component-definition-types";
+import { getDefaultDesignSystemPropsForType } from "../design-system/default-design-system";
 import { buttonDefinition } from "./components/button";
 import { chartDefinition } from "./components/chart";
 import { containerDefinition } from "./components/container";
@@ -30,5 +31,8 @@ export function getComponentDefinition(type: string): ComponentDefinition | unde
 }
 
 export function getDefaultPropsForType(type: string): Record<string, unknown> {
-  return { ...(getComponentDefinition(type)?.defaults ?? {}) };
+  return {
+    ...(getComponentDefinition(type)?.defaults ?? {}),
+    ...getDefaultDesignSystemPropsForType(type),
+  };
 }
