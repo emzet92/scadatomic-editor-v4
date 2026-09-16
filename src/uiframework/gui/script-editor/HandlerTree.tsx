@@ -1,16 +1,17 @@
-import { Box, Icon, Pressable } from "../ui";
 import {
-  Braces,
-  Boxes,
-  ChevronRight,
-  Code2,
-  Palette,
-  Plus,
-  Star,
-  Trash2,
-  X,
-  Zap,
-} from "lucide-react";
+  AddIcon,
+  Box,
+  BoxesIcon,
+  BracesIcon,
+  ChevronRightIcon,
+  CloseIcon,
+  CodeIcon,
+  DeleteIcon,
+  PaletteIcon,
+  Pressable,
+  StarIcon,
+  ZapIcon
+} from "../ui";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   validateComponentMethodName,
@@ -173,7 +174,7 @@ function PageApiRow({
         className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold text-zinc-600"
         style={{ paddingLeft: 10 + depth * 10 }}
       >
-        <Icon glyph={ChevronRight} size={12} className="text-zinc-400" />
+        <ChevronRightIcon size={12} className="text-zinc-400" />
         <span className="truncate">{page.name}</span>
         <span className="ml-auto font-mono text-[9px] font-normal text-zinc-400">
           {page.path}
@@ -226,7 +227,7 @@ function ModalsApiSection({
   return (
     <details open className="mt-2 rounded-lg border border-sky-100 bg-sky-50/30">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
-        <Icon glyph={ChevronRight} size={12} className="text-sky-400" />
+        <ChevronRightIcon size={12} className="text-sky-400" />
         <span className="flex-1">Modals</span>
         <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-sky-500">
           {modals.length}
@@ -236,7 +237,7 @@ function ModalsApiSection({
         {modals.map((modal) => (
           <details key={modal.id} open className="border-t border-sky-100/70 first:border-t-0">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-sky-50/70">
-              <Icon glyph={ChevronRight} size={12} className="text-zinc-400" />
+              <ChevronRightIcon size={12} className="text-zinc-400" />
               <span className="min-w-0 flex-1 truncate font-medium">{modal.name}</span>
               <span className="font-mono text-[9px] text-sky-500">ctx.modals.{modal.name}</span>
             </summary>
@@ -276,11 +277,10 @@ function ComponentDefinitionsSection({
   return (
     <details open className="mb-2 rounded-lg border border-violet-100 bg-violet-50/30">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-2.5 py-2 text-xs font-semibold uppercase tracking-wide text-violet-700">
-        <Icon glyph={ChevronRight}
-          size={12}
+        <ChevronRightIcon size={12}
           className="text-violet-400 transition-transform group-open:rotate-90"
         />
-        <Icon glyph={Boxes} size={13} />
+        <BoxesIcon size={13} />
         <span className="flex-1">Component scripts</span>
         <span className="rounded bg-white/80 px-1.5 py-0.5 text-[10px] text-violet-500">
           {definitions.length}
@@ -358,8 +358,7 @@ function ComponentDefinitionRow({
   return (
     <details open className="group/definition border-t border-violet-100/70 first:border-t-0">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2.5 py-1.5 text-sm text-zinc-700 hover:bg-violet-50/70">
-        <Icon glyph={ChevronRight}
-          size={12}
+        <ChevronRightIcon size={12}
           className="text-zinc-400 transition-transform group-open/definition:rotate-90"
         />
         <span className="min-w-0 flex-1 truncate font-medium">{definition.name}</span>
@@ -386,7 +385,7 @@ function ComponentDefinitionRow({
                   : "text-zinc-600 hover:bg-violet-50"
               }`}
             >
-              <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
+              <CodeIcon size={12} className="mt-0.5 shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-mono text-xs font-medium">
                   {methodName}()
@@ -406,7 +405,7 @@ function ComponentDefinitionRow({
         {internalHandlerCount > 0 ? (
           <TreeSection
             depth={0}
-            icon={<Icon glyph={Zap} size={12} />}
+            icon={<ZapIcon size={12} />}
             label="Internal handlers"
             count={internalHandlerCount}
           >
@@ -467,7 +466,7 @@ function ComponentDefinitionRow({
                 onClick={() => setAdding(false)}
                 className="flex size-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100"
               >
-                <Icon glyph={X} size={12} />
+                <CloseIcon size={12} />
               </Pressable>
             </Box>
             {error ? <Box className="mt-1 text-[10px] text-red-600">{error}</Box> : null}
@@ -507,8 +506,7 @@ function DefinitionHandlerNode({
         className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-2 text-xs text-zinc-600 hover:bg-violet-50/60"
         style={{ paddingLeft: `${30 + depth * 12}px` }}
       >
-        <Icon glyph={ChevronRight}
-          size={11}
+        <ChevronRightIcon size={11}
           className="shrink-0 text-zinc-300 transition-transform group-open/definition-node:rotate-90"
         />
         <span className="min-w-0 flex-1 truncate">{node.name}</span>
@@ -637,8 +635,7 @@ function HandlerNode({
           className="flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
           style={{ paddingLeft: `${8 + depth * 12}px` }}
         >
-          <Icon glyph={ChevronRight}
-            size={13}
+          <ChevronRightIcon size={13}
             className="shrink-0 text-zinc-400 transition-transform group-open/component:rotate-90"
           />
           <span className="min-w-0 flex-1 truncate font-medium">{currentNode.name}</span>
@@ -651,7 +648,7 @@ function HandlerNode({
           {eventEntries.length > 0 ? (
             <TreeSection
               depth={depth}
-              icon={<Icon glyph={Zap} size={12} />}
+              icon={<ZapIcon size={12} />}
               label="Events"
               count={eventEntries.length}
             >
@@ -670,7 +667,7 @@ function HandlerNode({
 
           <TreeSection
             depth={depth}
-            icon={<Icon glyph={Braces} size={12} />}
+            icon={<BracesIcon size={12} />}
             label="Methods"
             count={reusableDefinition ? publicDefinitionMethods.length : methodEntries.length}
             action={
@@ -736,7 +733,7 @@ function HandlerNode({
 
           <TreeSection
             depth={depth}
-            icon={<Icon glyph={Palette} size={12} />}
+            icon={<PaletteIcon size={12} />}
             label="Variants"
             count={variantEntries.length}
           >
@@ -798,8 +795,7 @@ function TreeSection({
         className="flex cursor-pointer list-none items-center gap-1.5 rounded-md py-1 pr-2 text-[11px] font-medium text-zinc-500 hover:bg-zinc-50"
         style={{ paddingLeft: `${26 + depth * 12}px` }}
       >
-        <Icon glyph={ChevronRight}
-          size={11}
+        <ChevronRightIcon size={11}
           className="shrink-0 text-zinc-300 transition-transform group-open/section:rotate-90"
         />
         <span className="text-zinc-400">{icon}</span>
@@ -825,7 +821,7 @@ function AddButton({ title, onClick }: { title: string; onClick: () => void }) {
       title={title}
       aria-label={title}
     >
-      <Icon glyph={Plus} size={13} />
+      <AddIcon size={13} />
     </Pressable>
   );
 }
@@ -900,7 +896,7 @@ function InlineAddForm({
           className="flex size-7 items-center justify-center rounded text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
           aria-label="Cancel"
         >
-          <Icon glyph={X} size={12} />
+          <CloseIcon size={12} />
         </Pressable>
       </Box>
       {error ? (
@@ -939,7 +935,7 @@ function ScriptButton({
       style={{ paddingLeft: `${44 + depth * 12}px` }}
       title={scriptId}
     >
-      <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
+      <CodeIcon size={12} className="mt-0.5 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium">{label}</span>
         <span className="block truncate text-[10px] opacity-55">{scriptId}</span>
@@ -976,7 +972,7 @@ function MethodButton({
         className="flex min-w-0 flex-1 items-start gap-2 py-1.5 pl-2 text-left"
         title={scriptId}
       >
-        <Icon glyph={Code2} size={12} className="mt-0.5 shrink-0" />
+        <CodeIcon size={12} className="mt-0.5 shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-mono text-xs font-medium">{label}</span>
           <span className="block truncate text-[10px] opacity-55">{scriptId}</span>
@@ -1004,7 +1000,7 @@ function VariantApiRow({
       style={{ paddingLeft: `${44 + depth * 12}px` }}
       title={apiPath}
     >
-      <Icon glyph={Palette} size={12} className="mt-0.5 shrink-0 text-violet-500" />
+      <PaletteIcon size={12} className="mt-0.5 shrink-0 text-violet-500" />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 truncate font-mono text-xs font-medium">
           {label}()
@@ -1013,7 +1009,7 @@ function VariantApiRow({
               className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wide text-amber-700"
               title="Default variant"
             >
-              <Icon glyph={Star} size={8} fill="currentColor" /> default
+              <StarIcon size={8} fill="currentColor" /> default
             </span>
           ) : null}
         </span>
@@ -1032,7 +1028,7 @@ function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void
       title={label}
       aria-label={label}
     >
-      <Icon glyph={Trash2} size={11} />
+      <DeleteIcon size={11} />
     </Pressable>
   );
 }

@@ -1,4 +1,3 @@
-import { Link2, Unlink } from "lucide-react";
 import {
   createReactivePropertyBinding,
   type BindingExpression,
@@ -18,9 +17,15 @@ import {
 } from "../../data/tags/TagFieldRef";
 import { useEditorStore } from "../../editor-store";
 import type { BindingDefinition } from "../../registry/component-definition-types";
-import { Button, FormField, SectionHeader, Select, TextInput,
+import {
   Box,
-  Icon,
+  Button,
+  FormField,
+  LinkIcon,
+  SectionHeader,
+  Select,
+  TextInput,
+  UnlinkIcon
 } from "../ui";
 import {
   createComponentTagReactiveRef,
@@ -189,7 +194,7 @@ function BindingCard({
       <Box className="flex items-start justify-between gap-3">
         <Box className="min-w-0">
           <Box className="flex items-center gap-1.5 text-xs font-semibold text-[var(--editor-text)]">
-            <Icon glyph={Link2} size={12} /> {definition.label}
+            <LinkIcon size={12} /> {definition.label}
           </Box>
           <Box className="mt-0.5 text-[10px] text-[var(--editor-text-muted)]">
             {definition.description ?? property}
@@ -202,7 +207,7 @@ function BindingCard({
             onClick={() => onChange(null)}
             title="Remove binding"
           >
-            <Icon glyph={Unlink} size={11} /> Remove
+            <UnlinkIcon size={11} /> Remove
           </Button>
         ) : null}
       </Box>

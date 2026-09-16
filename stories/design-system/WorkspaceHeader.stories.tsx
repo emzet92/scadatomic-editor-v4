@@ -1,7 +1,11 @@
-import { Bell, Plus } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router-dom";
-import { Button, IconButton } from "../../src/uiframework/gui/ui";
+import {
+  AddIcon,
+  Button,
+  IconButton,
+  NotificationIcon
+} from "../../src/uiframework/gui/ui";
 import { WorkspaceHeader } from "../../src/uiframework/gui/workspace/WorkspaceHeader";
 
 const meta = {
@@ -27,8 +31,8 @@ export const Editor: Story = {
           subtitle="Packaging line"
           actions={
             <>
-              <IconButton aria-label="Notifications"><Bell size={14} /></IconButton>
-              <Button variant="primary"><Plus size={13} />Deploy</Button>
+              <IconButton aria-label="Notifications"><NotificationIcon size={14} /></IconButton>
+              <Button variant="primary"><AddIcon size={13} />Deploy</Button>
             </>
           }
         />

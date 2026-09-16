@@ -1,11 +1,13 @@
-import { Plus, Trash2, Type } from "lucide-react";
 import { useMemo } from "react";
 import type { TypographyWeight } from "../../design-system/typography";
 import { countTypographyTokenUsages } from "../../design-system/document-typography";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
   Button,
   Callout,
+  DeleteIcon,
   EmptyState,
   IconButton,
   PageContainer,
@@ -13,8 +15,7 @@ import {
   PanelCard,
   Select,
   TextInput,
-  Box,
-  Icon,
+  TypographyIcon
 } from "../ui";
 
 export function TypographyLibraryWorkspace() {
@@ -32,25 +33,25 @@ export function TypographyLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Icon glyph={Type} size={14} />}
+        icon={<TypographyIcon size={14} />}
         title="Typography"
         description="Define reusable text styles once and reference them from Text components. Token references use stable IDs, so renaming styles is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
-            <Icon glyph={Plus} size={14} /> Add text style
+            <AddIcon size={14} /> Add text style
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Icon glyph={Type} size={20} />}
+          icon={<TypographyIcon size={20} />}
           title="No typography tokens yet"
           description="Create a text style or seed a starter scale for display, headings, body, labels and captions."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addTypographyToken()}>
-                <Icon glyph={Plus} size={14} /> Add text style
+                <AddIcon size={14} /> Add text style
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterTypographyPalette}>
                 Create starter scale
@@ -138,7 +139,7 @@ export function TypographyLibraryWorkspace() {
                     size="icon"
                     onClick={() => deleteTypographyToken(token.id)}
                   >
-                    <Icon glyph={Trash2} size={14} />
+                    <DeleteIcon size={14} />
                   </IconButton>
                 </Box>
               </PanelCard>

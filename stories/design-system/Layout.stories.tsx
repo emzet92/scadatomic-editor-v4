@@ -1,15 +1,16 @@
-import { Palette, Plus } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
+  AddIcon,
   Button,
   DataGrid,
   DataGridHeader,
   DataGridRow,
   PageContainer,
   PageHeader,
+  PaletteIcon,
   PanelCard,
   PanelSection,
-  SectionHeader,
+  SectionHeader
 } from "../../src/uiframework/gui/ui";
 
 const meta = {
@@ -28,10 +29,10 @@ export const PageShell: Story = {
       <PageContainer size="lg">
         <PageHeader
           eyebrow="Design system"
-          icon={<Palette size={14} />}
+          icon={<PaletteIcon size={14} />}
           title="Color library"
           description="A standard workspace shell keeps title, description and actions aligned across token libraries."
-          actions={<Button size="sm" variant="primary"><Plus size={13} />Add color</Button>}
+          actions={<Button size="sm" variant="primary"><AddIcon size={13} />Add color</Button>}
         />
         <PanelSection>
           <SectionHeader title="Tokens" description="Reusable semantic values." />

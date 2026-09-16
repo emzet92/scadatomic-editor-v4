@@ -1,8 +1,12 @@
-import { Braces, Cable, Tags } from "lucide-react";
 import { useState } from "react";
 import type { ProjectData } from "../../data/tags/TagDefinition";
-import { SegmentedControl, SegmentedControlItem, SidebarSection,
-  Icon,
+import {
+  BracesIcon,
+  CableIcon,
+  SegmentedControl,
+  SegmentedControlItem,
+  SidebarSection,
+  TagsIcon
 } from "../ui";
 import { DriversTree } from "./DriversTree";
 import { TagsTree } from "./TagsTree";
@@ -35,13 +39,13 @@ export function DataPanel({
     >
       <SegmentedControl fullWidth>
         <SegmentedControlItem active={tab === "tags"} grow className="gap-1.5" onClick={() => setManualTab("tags")}>
-          <Icon glyph={Tags} size={13} /> Tags
+          <TagsIcon size={13} /> Tags
         </SegmentedControlItem>
         <SegmentedControlItem active={tab === "udts"} grow className="gap-1.5" onClick={() => setManualTab("udts")}>
-          <Icon glyph={Braces} size={13} /> UDTs
+          <BracesIcon size={13} /> UDTs
         </SegmentedControlItem>
         <SegmentedControlItem active={tab === "drivers"} grow className="gap-1.5" onClick={() => setManualTab("drivers")}>
-          <Icon glyph={Cable} size={13} /> Drivers
+          <CableIcon size={13} /> Drivers
         </SegmentedControlItem>
       </SegmentedControl>
       {tab === "tags" ? (

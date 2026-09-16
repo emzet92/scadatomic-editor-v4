@@ -1,13 +1,18 @@
-import { Braces, Cable, Database, Gauge, LayoutGrid, Tag } from "lucide-react";
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   Badge,
+  BracesIcon,
+  CableIcon,
   ChoiceCard,
+  DatabaseIcon,
+  GaugeIcon,
+  GridIcon,
   NavTab,
   NavTabs,
   SidebarNavItem,
   SidebarSection,
+  TagIcon
 } from "../../src/uiframework/gui/ui";
 
 const meta = {
@@ -24,9 +29,9 @@ function SidebarExample() {
     <div className="w-72 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-panel-bg)] p-4">
       <SidebarSection title="Data" description="Project-local sources and reusable types.">
         <div className="space-y-1">
-          <SidebarNavItem variant="row" active={selected === "tags"} icon={<Tag size={13} />} title="Tags" meta={<Badge size="xs">12</Badge>} onClick={() => setSelected("tags")} />
-          <SidebarNavItem variant="row" active={selected === "udt"} icon={<Braces size={13} />} title="UDTs" meta="4" onClick={() => setSelected("udt")} />
-          <SidebarNavItem variant="row" active={selected === "driver"} icon={<Cable size={13} />} title="Drivers" description="Built in and configurable" onClick={() => setSelected("driver")} />
+          <SidebarNavItem variant="row" active={selected === "tags"} icon={<TagIcon size={13} />} title="Tags" meta={<Badge size="xs">12</Badge>} onClick={() => setSelected("tags")} />
+          <SidebarNavItem variant="row" active={selected === "udt"} icon={<BracesIcon size={13} />} title="UDTs" meta="4" onClick={() => setSelected("udt")} />
+          <SidebarNavItem variant="row" active={selected === "driver"} icon={<CableIcon size={13} />} title="Drivers" description="Built in and configurable" onClick={() => setSelected("driver")} />
         </div>
       </SidebarSection>
     </div>
@@ -39,9 +44,9 @@ function TabsExample() {
   const [tab, setTab] = useState("designer");
   return (
     <NavTabs ariaLabel="Workspace example">
-      <NavTab active={tab === "designer"} icon={<LayoutGrid size={13} />} onClick={() => setTab("designer")}>Designer</NavTab>
-      <NavTab active={tab === "data"} icon={<Database size={13} />} onClick={() => setTab("data")}>Data</NavTab>
-      <NavTab active={tab === "runtime"} icon={<Gauge size={13} />} onClick={() => setTab("runtime")}>Runtime</NavTab>
+      <NavTab active={tab === "designer"} icon={<GridIcon size={13} />} onClick={() => setTab("designer")}>Designer</NavTab>
+      <NavTab active={tab === "data"} icon={<DatabaseIcon size={13} />} onClick={() => setTab("data")}>Data</NavTab>
+      <NavTab active={tab === "runtime"} icon={<GaugeIcon size={13} />} onClick={() => setTab("runtime")}>Runtime</NavTab>
     </NavTabs>
   );
 }

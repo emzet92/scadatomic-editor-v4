@@ -1,4 +1,3 @@
-import { LayoutGrid, Radius, Rows3 } from "lucide-react";
 import {
   defaultContainerProps,
   type ContainerGridItemAlignment,
@@ -15,12 +14,14 @@ import { ShadowValueControl } from "./ShadowValueControl";
 import { BorderValueControl } from "./BorderValueControl";
 import {
   Badge,
+  Box,
   ChoiceCard,
+  GridIcon,
+  RadiusIcon,
+  RowsIcon,
   SegmentedControl,
   SegmentedControlItem,
-  Stepper,
-  Box,
-  Icon,
+  Stepper
 } from "../ui";
 
 type GridPreset = {
@@ -158,7 +159,7 @@ export function ContainerLayoutEditor({
     <section className="overflow-hidden rounded-[20px] border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <Box className="flex items-start gap-3 px-4 pb-3 pt-4">
         <Box className="flex size-9 shrink-0 items-center justify-center rounded-[14px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <Icon glyph={LayoutGrid} size={17} strokeWidth={2} />
+          <GridIcon size={17} strokeWidth={2} />
         </Box>
         <Box className="min-w-0 flex-1">
           <Box className="text-sm font-semibold text-[var(--editor-text)]">Layout</Box>
@@ -348,7 +349,7 @@ export function ContainerLayoutEditor({
       ) : (
         <Box className="border-t border-[var(--editor-border)] px-4 py-4">
           <Box className="flex items-center gap-3 rounded-[16px] bg-[var(--editor-surface-muted)] p-3">
-            <Icon glyph={Rows3} size={18} className="text-[var(--editor-accent)]" />
+            <RowsIcon size={18} className="text-[var(--editor-accent)]" />
             <Box>
               <Box className="text-xs font-semibold text-[var(--editor-text)]">Flow layout</Box>
               <Box className="mt-0.5 text-[10px] leading-4 text-[var(--editor-text-muted)]">
@@ -405,7 +406,7 @@ export function ContainerLayoutEditor({
           />
           <RadiusValueControl
             compact
-            icon={<Icon glyph={Radius} size={12} />}
+            icon={<RadiusIcon size={12} />}
             label="Corner radius"
             value={borderRadiusValue}
             fallback={defaultContainerProps.borderRadius}

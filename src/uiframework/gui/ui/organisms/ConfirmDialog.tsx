@@ -1,7 +1,8 @@
-import { AlertTriangle } from "lucide-react";
+import {
+  AlertTriangleIcon
+} from "../atoms/icons";
 import { useRef } from "react";
 import { Button } from "../atoms/Button";
-import { Icon } from "../atoms/Icon";
 import { Center } from "../atoms/Layout";
 import { Dialog } from "./Dialog";
 
@@ -39,7 +40,7 @@ export function ConfirmDialog({
       initialFocusRef={cancelRef}
       icon={
         <Center className="size-8 rounded-full bg-red-50 text-[var(--editor-danger)]">
-          <Icon glyph={AlertTriangle} size="md" />
+          <AlertTriangleIcon size="md" />
         </Center>
       }
       footer={

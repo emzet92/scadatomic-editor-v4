@@ -1,6 +1,16 @@
-import { AlertTriangle, Check, Inbox, Info, Plus, X } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Badge, Button, Callout, EmptyState } from "../../src/uiframework/gui/ui";
+import {
+  AddIcon,
+  AlertTriangleIcon,
+  Badge,
+  Button,
+  Callout,
+  CheckIcon,
+  CloseIcon,
+  EmptyState,
+  InboxIcon,
+  InfoIcon
+} from "../../src/uiframework/gui/ui";
 
 const meta = {
   title: "Molecules/Feedback",
@@ -15,9 +25,9 @@ export const Badges: Story = {
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-6">
       <Badge>Neutral</Badge>
       <Badge variant="accent">Selected</Badge>
-      <Badge variant="success" icon={<Check size={9} />}>Ready</Badge>
-      <Badge variant="warning" icon={<AlertTriangle size={9} />}>Default</Badge>
-      <Badge variant="danger" icon={<X size={9} />}>Error</Badge>
+      <Badge variant="success" icon={<CheckIcon size={9} />}>Ready</Badge>
+      <Badge variant="warning" icon={<AlertTriangleIcon size={9} />}>Default</Badge>
+      <Badge variant="danger" icon={<CloseIcon size={9} />}>Error</Badge>
       <Badge size="sm" variant="accent">Larger</Badge>
     </div>
   ),
@@ -26,7 +36,7 @@ export const Badges: Story = {
 export const Callouts: Story = {
   render: () => (
     <div className="mx-auto max-w-xl space-y-3">
-      <Callout icon={<Info size={14} />}>Neutral helper copy for secondary information.</Callout>
+      <Callout icon={<InfoIcon size={14} />}>Neutral helper copy for secondary information.</Callout>
       <Callout variant="accent">An accent callout for context related to the current selection.</Callout>
       <Callout variant="success">Configuration is valid and ready to use.</Callout>
       <Callout variant="warning">A referenced design token is missing.</Callout>
@@ -40,10 +50,10 @@ export const EmptyStates: Story = {
   render: () => (
     <div className="mx-auto max-w-xl space-y-4">
       <EmptyState
-        icon={<Inbox size={20} />}
+        icon={<InboxIcon size={20} />}
         title="No resources yet"
         description="Create the first resource to start building this library."
-        actions={<Button size="sm" variant="primary"><Plus size={13} />Create resource</Button>}
+        actions={<Button size="sm" variant="primary"><AddIcon size={13} />Create resource</Button>}
       />
       <EmptyState
         compact

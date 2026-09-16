@@ -1,11 +1,19 @@
-import { Database, Plus } from "lucide-react";
 import { useState } from "react";
 import { createPrimitiveTag, createTagFromUdt, validateDataName } from "../../data/tags/TagRegistry";
 import type { ProjectData } from "../../data/tags/TagDefinition";
 import type { DataType, PrimitiveDataType } from "../../data/types/DataType";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
 import { useEditorStore } from "../../editor-store";
-import { Button, Callout, EditorPage, FormField, Icon, PanelCard, TextInput } from "../ui";
+import {
+  AddIcon,
+  Button,
+  Callout,
+  DatabaseIcon,
+  EditorPage,
+  FormField,
+  PanelCard,
+  TextInput
+} from "../ui";
 import { DataTypeSelect } from "./DataTypeSelect";
 import { DataValueInput } from "./DataValueInput";
 import type { DataSelection } from "./data-selection";
@@ -37,14 +45,14 @@ export function CreateTagEditor({ data, onSelect }: { data: ProjectData; onSelec
   }
 
   return (
-    <EditorPage title="Create tag" description="Create a primitive value or an independent UDT instance." icon={<Icon glyph={Database} size="lg" />}>
+    <EditorPage title="Create tag" description="Create a primitive value or an independent UDT instance." icon={<DatabaseIcon size="lg" />}>
       <PanelCard className="max-w-xl space-y-4">
         <FormField label="Name" error={error}><TextInput value={name} onChange={(event) => { setName(event.target.value); setError(null); }} mono /></FormField>
         <FormField label="Type"><DataTypeSelect data={data} value={type} onChange={changeType} /></FormField>
         {type.kind !== "udt"
           ? <FormField label="Default / current value"><DataValueInput type={type as PrimitiveDataType} value={value} onChange={setValue} /></FormField>
           : <Callout size="sm">Fields will be initialized from the UDT defaults.</Callout>}
-        <Button variant="primary" leadingIcon={<Icon glyph={Plus} size="sm" />} onClick={create}>Create tag</Button>
+        <Button variant="primary" leadingIcon={<AddIcon size="sm" />} onClick={create}>Create tag</Button>
       </PanelCard>
     </EditorPage>
   );

@@ -1,5 +1,11 @@
-import { Box, Icon, Pressable } from "../ui";
-import { Check, RotateCcw, Save, Star } from "lucide-react";
+import {
+  Box,
+  CheckIcon,
+  Pressable,
+  ResetIcon,
+  SaveIcon,
+  StarIcon
+} from "../ui";
 import { useMemo, useState } from "react";
 import { getResolvedComponentProps } from "../../component-api";
 import type { UiDocument, UiNode } from "../../core/document";
@@ -121,7 +127,7 @@ export function VariantEditor({
         <Box className="flex items-center gap-2">
           {isDefault ? (
             <span className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-xs font-semibold text-amber-700">
-              <Icon glyph={Star} size={13} fill="currentColor" /> Default
+              <StarIcon size={13} fill="currentColor" /> Default
             </span>
           ) : (
             <Pressable
@@ -131,7 +137,7 @@ export function VariantEditor({
               title={dirty ? "Save variant before making it default" : "Use this variant by default"}
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
             >
-              <Icon glyph={Star} size={13} /> Set default
+              <StarIcon size={13} /> Set default
             </Pressable>
           )}
 
@@ -141,7 +147,7 @@ export function VariantEditor({
             onClick={() => void save()}
             className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sky-600 px-3 text-xs font-semibold text-white transition hover:bg-sky-500 disabled:cursor-default disabled:opacity-40"
           >
-            {saving ? <Icon glyph={Check} size={13} /> : <Icon glyph={Save} size={13} />}
+            {saving ? <CheckIcon size={13} /> : <SaveIcon size={13} />}
             {saving ? "Saved" : "Save variant"}
           </Pressable>
         </Box>
@@ -191,7 +197,7 @@ export function VariantEditor({
               className="flex size-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-25"
               title="Reset unsaved changes"
             >
-              <Icon glyph={RotateCcw} size={14} />
+              <ResetIcon size={14} />
             </Pressable>
           </Box>
 

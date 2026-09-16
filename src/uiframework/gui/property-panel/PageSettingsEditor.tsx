@@ -1,11 +1,4 @@
 import {
-  Home,
-  LayoutTemplate,
-  Monitor,
-  Smartphone,
-  Tablet,
-} from "lucide-react";
-import {
   getPageKind,
   type UiDocument,
   type UiNode,
@@ -18,22 +11,26 @@ import {
 import type { UpdateNode } from "./property-panel-types";
 import {
   Badge,
+  Box,
   Button,
   FormField,
+  HomeIcon,
+  MonitorIcon,
   PanelCard,
   PanelSection,
+  Pressable,
   SectionHeader,
   Select,
-  TextInput,
-  Box,
-  Icon,
-  Pressable,
+  SmartphoneIcon,
+  TabletIcon,
+  TemplateIcon,
+  TextInput
 } from "../ui";
 
 const presets = [
-  { mode: "desktop", label: "Desktop", width: 1440, height: 900, icon: Monitor },
-  { mode: "tablet", label: "Tablet", width: 834, height: 1194, icon: Tablet },
-  { mode: "mobile", label: "Mobile", width: 390, height: 844, icon: Smartphone },
+  { mode: "desktop", label: "Desktop", width: 1440, height: 900, icon: MonitorIcon },
+  { mode: "tablet", label: "Tablet", width: 834, height: 1194, icon: TabletIcon },
+  { mode: "mobile", label: "Mobile", width: 390, height: 844, icon: SmartphoneIcon },
 ] as const;
 
 export function PageSettingsEditor({
@@ -79,7 +76,7 @@ export function PageSettingsEditor({
             className="mb-2"
           />
           <PanelCard variant="accent" padding="sm" className="flex items-center gap-2 text-xs text-[var(--editor-accent)]">
-            <Icon glyph={LayoutTemplate} size={13} className="shrink-0" />
+            <TemplateIcon size={13} className="shrink-0" />
             <span>Edit this layout like a page. Keep one content Page Slot where page content should render.</span>
           </PanelCard>
         </PanelSection>
@@ -94,7 +91,7 @@ export function PageSettingsEditor({
           />
           <PanelCard padding="sm" className="flex items-center justify-between gap-3">
             <Box className="flex min-w-0 items-center gap-2 text-xs text-[var(--editor-text)]">
-              <Icon glyph={Home} size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
+              <HomeIcon size={13} className="shrink-0 text-[var(--editor-text-muted)]" />
               <span className="truncate">{isStartPage ? "Default start page" : "Not the start page"}</span>
             </Box>
             {isStartPage ? (
@@ -168,7 +165,7 @@ export function PageSettingsEditor({
                     : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
                 }`}
               >
-                <Icon glyph={PresetIcon} size={14} />
+                <PresetIcon size={14} />
                 {preset.label}
               </Pressable>
             );

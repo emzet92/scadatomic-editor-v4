@@ -1,10 +1,15 @@
-import { Link2, Radio } from "lucide-react";
 import type { ReactiveEventType } from "../../../reactivity";
 import { tagFieldRefKey, type TagFieldRef } from "../../data/tags/TagFieldRef";
 import { useEditorStore } from "../../editor-store";
-import { Button, Checkbox, FormField, PanelCard, TextInput,
+import {
   Box,
-  Icon,
+  Button,
+  Checkbox,
+  FormField,
+  LinkIcon,
+  PanelCard,
+  RadioIcon,
+  TextInput
 } from "../ui";
 
 const EVENTS: Array<{ type: ReactiveEventType; label: string; suffix: string }> = [
@@ -29,7 +34,7 @@ export function ReactiveTagEventsEditor({
     <PanelCard className="space-y-3">
       <Box>
         <Box className="flex items-center gap-2 text-sm font-semibold text-[var(--editor-text)]">
-          <Icon glyph={Radio} size={14} /> Reactive events
+          <RadioIcon size={14} /> Reactive events
         </Box>
         <p className="mt-1 text-xs text-[var(--editor-text-muted)]">
           Bindings synchronize UI without scripts. Use these listeners only when a tag change should execute logic.
@@ -79,7 +84,7 @@ export function ReactiveTagEventsEditor({
                     onClick={() => window.location.assign(href)}
                     title="Open handler"
                   >
-                    <Icon glyph={Link2} size={11} /> Edit
+                    <LinkIcon size={11} /> Edit
                   </Button>
                 ) : null}
               </Box>

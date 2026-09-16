@@ -1,4 +1,3 @@
-import { Plus, Square, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { countBorderTokenUsages } from "../../design-system/document-borders";
 import {
@@ -7,9 +6,12 @@ import {
 } from "../../design-system/borders";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
   Button,
   Callout,
   ColorPickerInput,
+  DeleteIcon,
   EmptyState,
   FormField,
   IconButton,
@@ -17,9 +19,8 @@ import {
   PageHeader,
   PanelCard,
   Select,
-  TextInput,
-  Box,
-  Icon,
+  SquareIcon,
+  TextInput
 } from "../ui";
 
 const BORDER_STYLES: BorderLineStyle[] = ["solid", "dashed", "dotted", "double"];
@@ -41,25 +42,25 @@ export function BorderLibraryWorkspace() {
   return (
     <PageContainer size="xl">
       <PageHeader
-        icon={<Icon glyph={Square} size={14} />}
+        icon={<SquareIcon size={14} />}
         title="Borders / Stroke Styles"
         description="Define reusable structural strokes with width, line style and color. Components reference the token by stable ID while renderers receive a final border value."
         actions={
           <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
-            <Icon glyph={Plus} size={14} /> Add stroke
+            <AddIcon size={14} /> Add stroke
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Icon glyph={Square} size={20} />}
+          icon={<SquareIcon size={20} />}
           title="No border tokens yet"
           description="Create individual strokes or seed a practical Subtle / Default / Strong / Focus / Dashed starter set."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addBorderToken()}>
-                <Icon glyph={Plus} size={14} /> Add stroke
+                <AddIcon size={14} /> Add stroke
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterBorderScale}>
                 Create starter strokes
@@ -135,7 +136,7 @@ export function BorderLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteBorderToken(token.id)}
                 >
-                  <Icon glyph={Trash2} size={14} />
+                  <DeleteIcon size={14} />
                 </IconButton>
               </PanelCard>
             );

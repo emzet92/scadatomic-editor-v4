@@ -1,11 +1,17 @@
-import { Check, ImageIcon, Images, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { AssetRef } from "../../assets";
 import { useAssetUrl } from "../../assets";
-import { Button, Dialog, EmptyAction, cx,
+import {
   Box,
-  Icon,
+  Button,
+  CheckIcon,
+  Dialog,
+  EmptyAction,
+  ImagePlaceholderIcon,
+  ImagesIcon,
   Pressable,
+  UploadIcon,
+  cx
 } from "../ui";
 
 export type ImageAssetChooserDialogProps = {
@@ -49,7 +55,7 @@ export function ImageAssetChooserDialog({
       onClose={onClose}
       icon={
         <Box className="flex size-8 items-center justify-center rounded-lg bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <Icon glyph={Images} size={16} />
+          <ImagesIcon size={16} />
         </Box>
       }
       footer={
@@ -70,7 +76,7 @@ export function ImageAssetChooserDialog({
               onClose();
             }}
           >
-            <Icon glyph={Check} size={13} />
+            <CheckIcon size={13} />
             Use asset
           </Button>
         </>
@@ -99,7 +105,7 @@ export function ImageAssetChooserDialog({
             onUploadRequest?.();
           }}
         >
-          <Icon glyph={Upload} size={16} />
+          <UploadIcon size={16} />
           <span>
             <span className="block font-medium">No image assets yet</span>
             <span className="mt-0.5 block text-[10px] text-[var(--editor-text-soft)]">
@@ -164,11 +170,11 @@ function AssetTile({
             draggable={false}
           />
         ) : (
-          <Icon glyph={ImageIcon} size={22} className="text-[var(--editor-text-soft)]" />
+          <ImagePlaceholderIcon size={22} className="text-[var(--editor-text-soft)]" />
         )}
         {selected ? (
           <Box className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-[var(--editor-accent)] text-white shadow-sm">
-            <Icon glyph={Check} size={12} />
+            <CheckIcon size={12} />
           </Box>
         ) : null}
       </Box>

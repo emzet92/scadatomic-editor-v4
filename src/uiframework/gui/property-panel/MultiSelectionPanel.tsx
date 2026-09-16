@@ -1,9 +1,12 @@
-import { Boxes, MousePointer2 } from "lucide-react";
 import type { UiDocument } from "../../core/document";
 import { validateReusableComponentSelection } from "../../reusable-components";
-import { Button, Callout, PanelCard,
+import {
   Box,
-  Icon,
+  BoxesIcon,
+  Button,
+  Callout,
+  PanelCard,
+  PointerIcon
 } from "../ui";
 
 export function MultiSelectionPanel({
@@ -22,7 +25,7 @@ export function MultiSelectionPanel({
       <Box className="border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-4">
         <Box className="flex items-start gap-3">
           <Box className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-            <Icon glyph={MousePointer2} size={16} />
+            <PointerIcon size={16} />
           </Box>
           <Box>
             <Box className="text-sm font-semibold text-[var(--editor-text)]">
@@ -39,7 +42,7 @@ export function MultiSelectionPanel({
         <PanelCard variant="accent" padding="lg" className="border-violet-200 bg-violet-50/50">
           <Box className="flex items-start gap-3">
             <Box className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-              <Icon glyph={Boxes} size={15} />
+              <BoxesIcon size={15} />
             </Box>
             <Box className="min-w-0 flex-1">
               <Box className="text-xs font-semibold text-violet-900">Create reusable component</Box>
@@ -60,7 +63,7 @@ export function MultiSelectionPanel({
                 onClick={onCreateComponent}
                 className="mt-3"
               >
-                <Icon glyph={Boxes} size={13} /> Create component
+                <BoxesIcon size={13} /> Create component
               </Button>
             </Box>
           </Box>

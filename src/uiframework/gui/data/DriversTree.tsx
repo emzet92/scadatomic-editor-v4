@@ -1,15 +1,18 @@
-import { Cable, Gauge, Hand } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../data/simulation/default-driver-registry";
-import { SidebarNavItem, SidebarSection,
+import {
   Box,
-  Icon,
+  CableIcon,
+  GaugeIcon,
+  HandIcon,
+  SidebarNavItem,
+  SidebarSection
 } from "../ui";
 import type { DataSelection } from "./data-selection";
 
 function DriverIcon({ kind }: { kind: string }) {
-  if (kind === "simulation") return <Icon glyph={Gauge} size={13} />;
-  if (kind === "manual") return <Icon glyph={Hand} size={13} />;
-  return <Icon glyph={Cable} size={13} />;
+  if (kind === "simulation") return <GaugeIcon size={13} />;
+  if (kind === "manual") return <HandIcon size={13} />;
+  return <CableIcon size={13} />;
 }
 
 export function DriversTree({

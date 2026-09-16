@@ -1,5 +1,10 @@
-import { Box, Icon } from "../ui";
-import { Maximize2, MoveHorizontal, MoveVertical, Radius } from "lucide-react";
+import {
+  Box,
+  HorizontalResizeIcon,
+  MaximizeIcon,
+  RadiusIcon,
+  VerticalResizeIcon
+} from "../ui";
 import { defaultButtonProps } from "../../component-props";
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
@@ -38,7 +43,7 @@ export function ButtonLayoutEditor({
     <section className="overflow-hidden rounded-[18px] border border-[var(--editor-border)] bg-[var(--editor-surface)] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <Box className="flex items-start gap-2.5 px-3.5 pb-2.5 pt-3.5">
         <Box className="flex size-8 shrink-0 items-center justify-center rounded-[12px] bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-          <Icon glyph={Maximize2} size={15} />
+          <MaximizeIcon size={15} />
         </Box>
         <Box className="min-w-0 flex-1">
           <Box className="text-xs font-semibold text-[var(--editor-text)]">
@@ -54,7 +59,7 @@ export function ButtonLayoutEditor({
         <Box className="grid grid-cols-2 gap-2">
           <SpacingValueControl
             compact
-            icon={<Icon glyph={MoveHorizontal} size={12} />}
+            icon={<HorizontalResizeIcon size={12} />}
             label="Padding X"
             value={paddingX}
             fallback={defaultButtonProps.paddingX}
@@ -64,7 +69,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<Icon glyph={MoveVertical} size={12} />}
+            icon={<VerticalResizeIcon size={12} />}
             label="Padding Y"
             value={paddingY}
             fallback={defaultButtonProps.paddingY}
@@ -74,7 +79,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<Icon glyph={MoveHorizontal} size={12} />}
+            icon={<HorizontalResizeIcon size={12} />}
             label="Margin X"
             value={marginX}
             fallback={defaultButtonProps.marginX}
@@ -84,7 +89,7 @@ export function ButtonLayoutEditor({
           />
           <SpacingValueControl
             compact
-            icon={<Icon glyph={MoveVertical} size={12} />}
+            icon={<VerticalResizeIcon size={12} />}
             label="Margin Y"
             value={marginY}
             fallback={defaultButtonProps.marginY}
@@ -102,7 +107,7 @@ export function ButtonLayoutEditor({
           />
           <RadiusValueControl
             compact
-            icon={<Icon glyph={Radius} size={12} />}
+            icon={<RadiusIcon size={12} />}
             label="Corner radius"
             value={borderRadius}
             fallback={defaultButtonProps.borderRadius}

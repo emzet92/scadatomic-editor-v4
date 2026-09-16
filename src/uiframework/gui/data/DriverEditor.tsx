@@ -1,4 +1,3 @@
-import { Cable, Gauge, Hand, Link2, Unlink } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../data/simulation/default-driver-registry";
 import {
   clearTagSourceDriverMapping,
@@ -20,9 +19,16 @@ import {
   removeSimulationBindingForTarget,
   upsertSimulationBinding,
 } from "../../data/simulation/SimulationRegistry";
-import { Button, PanelCard, SectionHeader,
+import {
   Box,
-  Icon,
+  Button,
+  CableIcon,
+  GaugeIcon,
+  HandIcon,
+  LinkIcon,
+  PanelCard,
+  SectionHeader,
+  UnlinkIcon
 } from "../ui";
 import { SimulationEditor } from "./simulation/SimulationEditor";
 import { SimulationStatus } from "./simulation/SimulationStatus";
@@ -57,11 +63,11 @@ export function DriverEditor({
       <Box className="flex items-start gap-3">
         <Box className="mt-0.5 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] p-2 text-[var(--editor-accent)]">
           {isSimulation ? (
-            <Icon glyph={Gauge} size={18} />
+            <GaugeIcon size={18} />
           ) : isManual ? (
-            <Icon glyph={Hand} size={18} />
+            <HandIcon size={18} />
           ) : (
-            <Icon glyph={Cable} size={18} />
+            <CableIcon size={18} />
           )}
         </Box>
         <Box className="min-w-0">
@@ -202,15 +208,15 @@ function DriverMappingRow({
 
         {mappedHere && canUnmap ? (
           <Button size="xs" variant="secondary" onClick={onUnmap}>
-            <Icon glyph={Unlink} size={11} /> Unmap
+            <UnlinkIcon size={11} /> Unmap
           </Button>
         ) : mappedHere ? (
           <Button size="xs" variant="secondary" onClick={onMap}>
-            <Icon glyph={Link2} size={11} /> Map explicitly
+            <LinkIcon size={11} /> Map explicitly
           </Button>
         ) : (
           <Button size="xs" variant="primary" onClick={onMap}>
-            <Icon glyph={Link2} size={11} /> Map here
+            <LinkIcon size={11} /> Map here
           </Button>
         )}
       </Box>

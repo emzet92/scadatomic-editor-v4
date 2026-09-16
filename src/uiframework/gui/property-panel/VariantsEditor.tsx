@@ -1,4 +1,3 @@
-import { Check, Palette, Pencil, Plus, Star, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import {
   createComponentVariantSnapshot,
@@ -7,17 +6,23 @@ import {
 import type { UiNode } from "../../core/document";
 import type { UpdateNode } from "./property-panel-types";
 import {
+  AddIcon,
   Badge,
+  Box,
   Button,
+  CheckIcon,
+  CloseIcon,
+  DeleteIcon,
+  EditIcon,
   EmptyAction,
   IconButton,
+  PaletteIcon,
   PanelCard,
   PanelSection,
-  SectionHeader,
-  TextInput,
-  Box,
-  Icon,
   Pressable,
+  SectionHeader,
+  StarIcon,
+  TextInput
 } from "../ui";
 
 export function VariantsEditor({
@@ -108,7 +113,7 @@ export function VariantsEditor({
                 setError(null);
               }}
             >
-              <Icon glyph={Plus} size={13} /> Add
+              <AddIcon size={13} /> Add
             </Button>
           ) : null
         }
@@ -155,7 +160,7 @@ export function VariantsEditor({
               onClick={addVariant}
               title="Add variant"
             >
-              <Icon glyph={Check} size={13} />
+              <CheckIcon size={13} />
             </IconButton>
             <IconButton
               size="icon"
@@ -166,7 +171,7 @@ export function VariantsEditor({
               }}
               title="Cancel"
             >
-              <Icon glyph={X} size={13} />
+              <CloseIcon size={13} />
             </IconButton>
           </Box>
           {error ? (
@@ -181,7 +186,7 @@ export function VariantsEditor({
 
       {variants.length === 0 ? (
         <EmptyAction onClick={() => setAdding(true)}>
-          <Icon glyph={Palette} size={14} /> Add the first visual variant
+          <PaletteIcon size={14} /> Add the first visual variant
         </EmptyAction>
       ) : (
         <Box className="space-y-1.5">
@@ -203,7 +208,7 @@ export function VariantsEditor({
                       {variantName}()
                     </span>
                     {isDefault ? (
-                      <Badge variant="warning" icon={<Icon glyph={Star} size={8} fill="currentColor" />}>
+                      <Badge variant="warning" icon={<StarIcon size={8} fill="currentColor" />}>
                         default
                       </Badge>
                     ) : null}
@@ -220,7 +225,7 @@ export function VariantsEditor({
                     className="opacity-60 hover:bg-amber-50 hover:text-amber-700"
                     title="Set as default variant"
                   >
-                    <Icon glyph={Star} size={12} />
+                    <StarIcon size={12} />
                   </IconButton>
                 ) : null}
 
@@ -231,7 +236,7 @@ export function VariantsEditor({
                   className="opacity-60"
                   title="Edit variant in Component mode"
                 >
-                  <Icon glyph={Pencil} size={12} />
+                  <EditIcon size={12} />
                 </IconButton>
 
                 <IconButton
@@ -241,7 +246,7 @@ export function VariantsEditor({
                   className="opacity-40 group-hover:opacity-100"
                   title="Delete variant"
                 >
-                  <Icon glyph={Trash2} size={12} />
+                  <DeleteIcon size={12} />
                 </IconButton>
               </Box>
             );

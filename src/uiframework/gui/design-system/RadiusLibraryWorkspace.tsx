@@ -1,18 +1,19 @@
-import { Plus, Radius, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { countRadiusTokenUsages } from "../../design-system/document-radius";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
   Button,
   Callout,
+  DeleteIcon,
   EmptyState,
   IconButton,
   PageContainer,
   PageHeader,
   PanelCard,
-  TextInput,
-  Box,
-  Icon,
+  RadiusIcon,
+  TextInput
 } from "../ui";
 
 export function RadiusLibraryWorkspace() {
@@ -33,25 +34,25 @@ export function RadiusLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Icon glyph={Radius} size={14} />}
+        icon={<RadiusIcon size={14} />}
         title="Radius"
         description="Define a shared corner-radius scale for buttons, containers, modals, images and other surfaces. Components reference stable token IDs, so renaming a radius step is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-            <Icon glyph={Plus} size={14} /> Add radius
+            <AddIcon size={14} /> Add radius
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Icon glyph={Radius} size={20} />}
+          icon={<RadiusIcon size={20} />}
           title="No radius tokens yet"
           description="Create individual values or seed a practical 0 / 2 / 4 / 8 / 12 / 16 / 24 / pill scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addRadiusToken()}>
-                <Icon glyph={Plus} size={14} /> Add radius
+                <AddIcon size={14} /> Add radius
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterRadiusScale}>
                 Create starter scale
@@ -114,7 +115,7 @@ export function RadiusLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteRadiusToken(token.id)}
                 >
-                  <Icon glyph={Trash2} size={14} />
+                  <DeleteIcon size={14} />
                 </IconButton>
               </PanelCard>
             );

@@ -1,6 +1,8 @@
-import { Minus, Plus } from "lucide-react";
+import {
+  AddIcon,
+  MinusIcon
+} from "../atoms/icons";
 import { IconButton } from "../atoms/Button";
-import { Icon } from "../atoms/Icon";
 import { Inline } from "../atoms/Layout";
 import { Text } from "../atoms/Typography";
 import { cx } from "../utils/cx";
@@ -33,13 +35,13 @@ export function Stepper({
       )}
     >
       <IconButton aria-label={decreaseLabel} size="icon-xs" className="rounded-full" onClick={onDecrease}>
-        <Icon glyph={Minus} size={12} />
+        <MinusIcon size={12} />
       </IconButton>
       <Text as="div" variant="caption" className="min-w-12 px-1 text-center font-semibold tabular-nums">
         {value}{suffix ?? ""}
       </Text>
       <IconButton aria-label={increaseLabel} size="icon-xs" className="rounded-full" onClick={onIncrease}>
-        <Icon glyph={Plus} size={12} />
+        <AddIcon size={12} />
       </IconButton>
     </Inline>
   );

@@ -1,4 +1,3 @@
-import { Check, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
   ComponentInputDefinition,
@@ -19,15 +18,18 @@ import {
   inferInputType,
 } from "../../reusable-components";
 import {
+  AddIcon,
+  Box,
   Button,
+  CheckIcon,
+  CloseIcon,
+  DeleteIcon,
   FormField,
   IconButton,
   PanelCard,
   SectionHeader,
   Select,
-  TextInput,
-  Box,
-  Icon,
+  TextInput
 } from "../ui";
 
 export function PublicInputsEditor({
@@ -164,13 +166,13 @@ export function PublicInputsEditor({
           !adding ? (
             <Box className="flex gap-1.5">
               <Button disabled={targetNodes.length === 0} onClick={beginAdd}>
-                <Icon glyph={Plus} size={12} /> Expose
+                <AddIcon size={12} /> Expose
               </Button>
               <Button
                 disabled={Object.keys(projectDocument.data?.udts ?? {}).length === 0}
                 onClick={beginAddTagRef}
               >
-                <Icon glyph={Plus} size={12} /> Tag ref
+                <AddIcon size={12} /> Tag ref
               </Button>
             </Box>
           ) : null
@@ -198,7 +200,7 @@ export function PublicInputsEditor({
               className="opacity-0 group-hover:opacity-100"
               title="Remove public input"
             >
-              <Icon glyph={Trash2} size={12} />
+              <DeleteIcon size={12} />
             </IconButton>
           </Box>
         ))}
@@ -290,10 +292,10 @@ export function PublicInputsEditor({
               onClick={() => setAdding(false)}
               title="Cancel"
             >
-              <Icon glyph={X} size={12} />
+              <CloseIcon size={12} />
             </IconButton>
             <Button variant="primary" onClick={addInput}>
-              <Icon glyph={Check} size={12} /> Expose input
+              <CheckIcon size={12} /> Expose input
             </Button>
           </Box>
         </PanelCard>

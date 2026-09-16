@@ -1,13 +1,14 @@
 import {
+  CloseIcon
+} from "../atoms/icons";
+import {
   useEffect,
   useId,
   useRef,
   type ReactNode,
   type RefObject,
 } from "react";
-import { X } from "lucide-react";
 import { Button } from "../atoms/Button";
-import { Icon } from "../atoms/Icon";
 import { Box, Inline, Stack } from "../atoms/Layout";
 import { Overlay } from "../atoms/Overlay";
 import { Surface } from "../atoms/Surface";
@@ -107,7 +108,7 @@ export function Dialog({
             ) : null}
           </Stack>
           <Button ref={closeRef} variant="ghost" aria-label="Close dialog" title="Close" size="icon-xs" onClick={onClose}>
-            <Icon glyph={X} size="sm" />
+            <CloseIcon size="sm" />
           </Button>
         </Inline>
 

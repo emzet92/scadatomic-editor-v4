@@ -1,18 +1,19 @@
-import { MoveHorizontal, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { countSpacingTokenUsages } from "../../design-system/document-spacing";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
   Button,
   Callout,
+  DeleteIcon,
   EmptyState,
+  HorizontalResizeIcon,
   IconButton,
   PageContainer,
   PageHeader,
   PanelCard,
-  TextInput,
-  Box,
-  Icon,
+  TextInput
 } from "../ui";
 
 export function SpacingLibraryWorkspace() {
@@ -33,25 +34,25 @@ export function SpacingLibraryWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Icon glyph={MoveHorizontal} size={14} />}
+        icon={<HorizontalResizeIcon size={14} />}
         title="Spacing"
         description="Define a shared spacing scale for padding, gaps and margins. Components reference stable token IDs, so renaming a spacing step is safe."
         actions={
           <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
-            <Icon glyph={Plus} size={14} /> Add spacing
+            <AddIcon size={14} /> Add spacing
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Icon glyph={MoveHorizontal} size={20} />}
+          icon={<HorizontalResizeIcon size={20} />}
           title="No spacing tokens yet"
           description="Create individual values or seed a practical 2 / 4 / 8 / 16 / 24 / 32 / 48 px scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addSpacingToken()}>
-                <Icon glyph={Plus} size={14} /> Add spacing
+                <AddIcon size={14} /> Add spacing
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterSpacingScale}>
                 Create starter scale
@@ -108,7 +109,7 @@ export function SpacingLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteSpacingToken(token.id)}
                 >
-                  <Icon glyph={Trash2} size={14} />
+                  <DeleteIcon size={14} />
                 </IconButton>
               </PanelCard>
             );

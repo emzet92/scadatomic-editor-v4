@@ -1,6 +1,11 @@
-import { Plus, Settings, Trash2 } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button, IconButton } from "../../src/uiframework/gui/ui";
+import {
+  AddIcon,
+  Button,
+  DeleteIcon,
+  IconButton,
+  SettingsIcon
+} from "../../src/uiframework/gui/ui";
 
 const meta = {
   title: "Atoms/Button",
@@ -53,9 +58,9 @@ export const Sizes: Story = {
 export const IconButtons: Story = {
   render: () => (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-6">
-      <IconButton aria-label="Add" variant="primary"><Plus size={14} /></IconButton>
-      <IconButton aria-label="Settings"><Settings size={14} /></IconButton>
-      <IconButton aria-label="Delete" variant="danger"><Trash2 size={14} /></IconButton>
+      <IconButton aria-label="Add" variant="primary"><AddIcon size={14} /></IconButton>
+      <IconButton aria-label="Settings"><SettingsIcon size={14} /></IconButton>
+      <IconButton aria-label="Delete" variant="danger"><DeleteIcon size={14} /></IconButton>
     </div>
   ),
 };

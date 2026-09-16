@@ -1,6 +1,17 @@
-import { Cloud, Code2, LayoutDashboard, Network, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Icon, Inline, NavTab, NavTabs, Stack, Text, Toolbar } from "../ui";
+import {
+  CloudIcon,
+  CodeIcon,
+  DashboardIcon,
+  Inline,
+  NavTab,
+  NavTabs,
+  NetworkIcon,
+  Stack,
+  Text,
+  Toolbar,
+  type IconComponent
+} from "../ui";
 import { useNavigate } from "react-router-dom";
 
 export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
@@ -13,15 +24,15 @@ type WorkspaceRouteContext = {
 type WorkspaceItem = {
   id: WorkspaceId;
   label: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   href: (context: WorkspaceRouteContext) => string | null;
 };
 
 const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
-  { id: "editor", label: "Editor", icon: LayoutDashboard, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}` : "/" },
-  { id: "scripts", label: "Scripts", icon: Code2, href: ({ projectId, scriptId }) => projectId ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}` : null },
-  { id: "dependencies", label: "Dependencies", icon: Network, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/dependencies` : null },
-  { id: "cloud", label: "Cloud", icon: Cloud, href: () => "/cloud/fleet" },
+  { id: "editor", label: "Editor", icon: DashboardIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}` : "/" },
+  { id: "scripts", label: "Scripts", icon: CodeIcon, href: ({ projectId, scriptId }) => projectId ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}` : null },
+  { id: "dependencies", label: "Dependencies", icon: NetworkIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/dependencies` : null },
+  { id: "cloud", label: "Cloud", icon: CloudIcon, href: () => "/cloud/fleet" },
 ];
 
 export function WorkspaceNav({
@@ -51,7 +62,7 @@ export function WorkspaceNav({
             key={workspace.id}
             active={isActive}
             disabled={disabled}
-            icon={<Icon glyph={WorkspaceIcon} size={15} strokeWidth={1.8} />}
+            icon={<WorkspaceIcon size={15} strokeWidth={1.8} />}
             onClick={() => {
               if (isActive || !href) return;
               onBeforeNavigate?.(workspace.id);

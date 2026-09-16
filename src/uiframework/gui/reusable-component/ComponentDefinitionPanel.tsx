@@ -1,4 +1,3 @@
-import { ArrowLeft, Box as BoxIcon, LockKeyhole } from "lucide-react";
 import type {
   Binding,
   HandlerRef,
@@ -16,9 +15,14 @@ import { NodePropertiesEditor } from "../property-panel/NodePropertiesEditor";
 import type { UpdateNode } from "../property-panel/property-panel-types";
 import { VariantPropertiesEditor } from "../property-panel/VariantPropertiesEditor";
 import { VariantsEditor } from "../property-panel/VariantsEditor";
-import { Button, PanelSection, SectionHeader,
+import {
+  BackIcon,
   Box,
-  Icon,
+  BoxIcon,
+  Button,
+  LockIcon,
+  PanelSection,
+  SectionHeader
 } from "../ui";
 import { createInputControls } from "./component-input-controls";
 import { PublicInputsEditor } from "./PublicInputsEditor";
@@ -94,16 +98,16 @@ export function ComponentDefinitionPanel({
     <Box data-editor-ignore className="h-full flex flex-col">
       <Box className="border-b border-[var(--editor-border)] px-4 py-4">
         <Button variant="ghost" size="xs" onClick={onExit} className="-ml-2">
-          <Icon glyph={ArrowLeft} size={12} /> Designer
+          <BackIcon size={12} /> Designer
         </Button>
         <Box className="mt-3 flex items-start gap-2">
           <Box className="flex size-8 items-center justify-center rounded-md bg-violet-50 text-violet-700">
-            <Icon glyph={BoxIcon} size={15} />
+            <BoxIcon size={15} />
           </Box>
           <Box className="min-w-0 flex-1">
             <Box className="truncate text-sm font-semibold">{definition.name}</Box>
             <Box className="mt-0.5 flex items-center gap-1 text-[10px] text-violet-600">
-              <Icon glyph={LockKeyhole} size={10} /> Encapsulated component definition
+              <LockIcon size={10} /> Encapsulated component definition
             </Box>
           </Box>
         </Box>

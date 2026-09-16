@@ -1,12 +1,16 @@
-import { ImageIcon, Images, Trash2, Upload } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import type { AssetRef } from "../../assets";
 import { useAssetManager, useAssetUrl } from "../../assets";
-import { Button, PanelCard,
+import {
   Box,
-  Icon,
+  Button,
+  DeleteIcon,
+  ImagePlaceholderIcon,
+  ImagesIcon,
   Overlay,
+  PanelCard,
   Pressable,
+  UploadIcon
 } from "../ui";
 import { ImageAssetChooserDialog } from "./ImageAssetChooserDialog";
 
@@ -121,7 +125,7 @@ export function ImageAssetPicker({
               className="flex min-h-28 w-full flex-col items-center justify-center gap-2 px-4 py-5 text-center text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-accent-soft)] hover:text-[var(--editor-accent)]"
               onClick={() => fileInputRef.current?.click()}
             >
-              <Icon glyph={ImageIcon} size={24} strokeWidth={1.5} />
+              <ImagePlaceholderIcon size={24} strokeWidth={1.5} />
               <span className="text-xs font-medium">
                 {assetId && asset.missing ? "Asset unavailable — replace image" : "Drop image or choose a file"}
               </span>
@@ -156,7 +160,7 @@ export function ImageAssetPicker({
           disabled={uploading}
           onClick={openChooser}
         >
-          <Icon glyph={Images} size={13} />
+          <ImagesIcon size={13} />
           Choose asset
         </Button>
         <Button
@@ -166,7 +170,7 @@ export function ImageAssetPicker({
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
-          <Icon glyph={Upload} size={13} />
+          <UploadIcon size={13} />
           {uploading ? "Uploading…" : assetId ? "Replace" : "Upload"}
         </Button>
         {assetId ? (
@@ -181,7 +185,7 @@ export function ImageAssetPicker({
               onChange(undefined);
             }}
           >
-            <Icon glyph={Trash2} size={14} />
+            <DeleteIcon size={14} />
           </Button>
         ) : null}
       </Box>

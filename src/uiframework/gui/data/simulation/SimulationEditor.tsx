@@ -1,4 +1,3 @@
-import { Activity, GitBranch } from "lucide-react";
 import type { ProjectData } from "../../../data/tags/TagDefinition";
 import {
   listPrimitiveTagFieldRefs,
@@ -28,9 +27,13 @@ import type {
   SimulationGeneratorKind,
 } from "../../../data/simulation/SimulationBinding";
 import { useEditorStore } from "../../../editor-store";
-import { Checkbox, FormField, Select,
+import {
+  ActivityIcon,
   Box,
-  Icon,
+  BranchIcon,
+  Checkbox,
+  FormField,
+  Select
 } from "../../ui";
 import { DataValueInput } from "../DataValueInput";
 import {
@@ -89,7 +92,7 @@ export function SimulationEditor({
     <Box className="space-y-3 border-t border-[var(--editor-border)] pt-3">
       <Box className="flex items-center justify-between gap-3">
         <Box className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
-          <Icon glyph={Activity} size={12} className="text-[var(--editor-accent)]" /> Simulation configuration
+          <ActivityIcon size={12} className="text-[var(--editor-accent)]" /> Simulation configuration
         </Box>
         <label className="flex items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
           <Checkbox
@@ -262,7 +265,7 @@ function SimulationActivationEditor({
     <Box className="space-y-3 border-t border-[var(--editor-border)] pt-3">
       <Box className="flex items-center justify-between gap-3">
         <Box className="flex items-center gap-2 text-[11px] font-semibold text-[var(--editor-text)]">
-          <Icon glyph={GitBranch} size={12} className="text-[var(--editor-accent)]" /> Activation
+          <BranchIcon size={12} className="text-[var(--editor-accent)]" /> Activation
         </Box>
         <label className="flex items-center gap-2 text-[11px] text-[var(--editor-text-muted)]">
           <Checkbox

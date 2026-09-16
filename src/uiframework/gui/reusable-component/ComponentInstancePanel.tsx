@@ -1,4 +1,3 @@
-import { Box as BoxIcon, Braces, ExternalLink } from "lucide-react";
 import type { Binding, UiDocument, UiNode } from "../../core/document";
 import type { RenameNodeResult } from "../../editor-store";
 import {
@@ -10,9 +9,12 @@ import { BindingsEditor } from "../property-panel/BindingsEditor";
 import { VariantsEditor } from "../property-panel/VariantsEditor";
 import { PropertyPanelHeader } from "../property-panel/PropertyPanelHeader";
 import type { UpdateNode } from "../property-panel/property-panel-types";
-import { Button,
+import {
   Box,
-  Icon,
+  BoxIcon,
+  BracesIcon,
+  Button,
+  ExternalLinkIcon
 } from "../ui";
 import { createInputControls } from "./component-input-controls";
 
@@ -50,7 +52,7 @@ export function ComponentInstancePanel({
       <Box className="border-b border-[var(--editor-border)] bg-violet-50/40 px-4 py-3">
         <Box className="flex items-center gap-2">
           <Box className="flex size-8 items-center justify-center rounded-md bg-violet-100 text-violet-700">
-            <Icon glyph={BoxIcon} size={15} />
+            <BoxIcon size={15} />
           </Box>
           <Box className="min-w-0 flex-1">
             <Box className="truncate text-xs font-semibold text-violet-800">
@@ -64,7 +66,7 @@ export function ComponentInstancePanel({
             onClick={() => onEditDefinition(definition.id)}
             className="border-violet-200 text-violet-700 hover:bg-violet-50"
           >
-            Edit <Icon glyph={ExternalLink} size={11} />
+            Edit <ExternalLinkIcon size={11} />
           </Button>
         </Box>
       </Box>
@@ -101,7 +103,7 @@ export function ComponentInstancePanel({
 
         <section className="border-t border-[var(--editor-border)] pt-4">
           <Box className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-            <Icon glyph={Braces} size={12} /> Public methods
+            <BracesIcon size={12} /> Public methods
           </Box>
           <Box className="mt-2 space-y-1">
             {Object.entries(definition.methods ?? {})

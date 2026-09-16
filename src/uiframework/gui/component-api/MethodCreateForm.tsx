@@ -1,7 +1,10 @@
-import { X } from "lucide-react";
-import { Button, IconButton, PanelCard, TextInput,
+import {
   Box,
-  Icon,
+  Button,
+  CloseIcon,
+  IconButton,
+  PanelCard,
+  TextInput
 } from "../ui";
 
 type MethodCreateFormProps = {
@@ -37,7 +40,7 @@ export function MethodCreateForm({
           title="Cancel"
           onClick={onCancel}
         >
-          <Icon glyph={X} size={13} />
+          <CloseIcon size={13} />
         </IconButton>
       </Box>
 

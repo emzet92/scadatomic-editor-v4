@@ -1,13 +1,18 @@
-import { Play, Save } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createUdtInstanceApi } from "../../data/runtime/UdtRuntime";
 import { getDesignerTagRuntime } from "../../data/tags/designer-tag-store";
 import { isUdtTag, type ProjectData } from "../../data/tags/TagDefinition";
 import { updateUdtMethod } from "../../data/udt/UdtRegistry";
 import { useEditorStore } from "../../editor-store";
-import { Button, FormField, PanelCard, Select, TextInput,
+import {
   Box,
-  Icon,
+  Button,
+  FormField,
+  PanelCard,
+  PlayIcon,
+  SaveIcon,
+  Select,
+  TextInput
 } from "../ui";
 import { JavaScriptCodeEditor } from "../script-editor/JavaScriptCodeEditor";
 import type { AutocompleteApiNode } from "../script-editor/ctx-completions";
@@ -65,12 +70,12 @@ export function UdtMethodEditor({ data, udtId, methodId }: { data: ProjectData; 
     <Box><Box className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">UDT method</Box><h1 className="mt-1 text-xl font-semibold text-[var(--editor-text)]">{udt.name}.{selectedMethod.name}()</h1><p className="mt-1 text-sm text-[var(--editor-text-muted)]">self is bound to the concrete UDT instance; assignments are routed through the mapped tag driver.</p></Box>
     <PanelCard className="grid gap-3 md:grid-cols-[1fr_auto]">
       <FormField label="Method name"><TextInput mono value={name} onChange={(event) => setName(event.target.value)} /></FormField>
-      <Box className="flex items-end"><Button onClick={renameMethod}><Icon glyph={Save} size={13} /> Rename</Button></Box>
+      <Box className="flex items-end"><Button onClick={renameMethod}><SaveIcon size={13} /> Rename</Button></Box>
     </PanelCard>
     <JavaScriptCodeEditor value={selectedMethod.source} onChange={(source) => updateProjectData((current) => updateUdtMethod(current, udt.id, selectedMethod.id, (currentMethod) => ({ ...currentMethod, source })))} components={[]} projectData={data} extraAutocompleteRoots={autocompleteRoots} autocompleteHint="self · tags · UDT fields · UDT methods" height="460px" />
     <PanelCard className="space-y-3">
       <Box><Box className="text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">Test method</Box><p className="mt-1 text-xs text-[var(--editor-text-soft)]">Runs locally in Designer against the live project runtime TagStore.</p></Box>
-      <Box className="flex flex-wrap items-end gap-2"><FormField label="Instance" compact className="min-w-56"><Select controlSize="sm" value={selectedInstance?.id ?? ""} onChange={(event) => setSelectedTagId(event.target.value)} disabled={instances.length === 0}>{instances.length === 0 ? <option value="">No instances</option> : instances.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</Select></FormField><Button variant="primary" onClick={run} disabled={!selectedInstance}><Icon glyph={Play} size={13} /> Run {selectedMethod.name}()</Button></Box>
+      <Box className="flex flex-wrap items-end gap-2"><FormField label="Instance" compact className="min-w-56"><Select controlSize="sm" value={selectedInstance?.id ?? ""} onChange={(event) => setSelectedTagId(event.target.value)} disabled={instances.length === 0}>{instances.length === 0 ? <option value="">No instances</option> : instances.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</Select></FormField><Button variant="primary" onClick={run} disabled={!selectedInstance}><PlayIcon size={13} /> Run {selectedMethod.name}()</Button></Box>
       {runMessage ? <Box className="rounded-md bg-[var(--editor-surface-muted)] px-3 py-2 text-xs text-[var(--editor-text-muted)]">{runMessage}</Box> : null}
     </PanelCard>
   </Box>;

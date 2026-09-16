@@ -1,18 +1,19 @@
-import { Bell, Database, Plus } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
+  AddIcon,
   Box,
   Center,
+  DatabaseIcon,
   Divider,
   Grid,
   Heading,
-  Icon,
   Inline,
+  NotificationIcon,
   Overlay,
   Pressable,
   Stack,
   Surface,
-  Text,
+  Text
 } from "../../src/uiframework/gui/ui";
 
 const meta = { title: "Atoms/Core", parameters: { controls: { disable: true } } } satisfies Meta;
@@ -34,7 +35,7 @@ export const Layout: Story = {
         <Stack className="h-20 rounded-lg bg-[var(--editor-surface-muted)] p-3" gap="xs"><Text>Stack</Text><Text tone="muted">Vertical rhythm</Text></Stack>
       </Grid>
       <Divider />
-      <Inline><Icon glyph={Database} tone="accent" /><Text variant="label">Icon + Text</Text></Inline>
+      <Inline><DatabaseIcon tone="accent" /><Text variant="label">Icon + Text</Text></Inline>
     </Stack>
   ),
 };
@@ -57,8 +58,8 @@ export const PressableAndIcon: Story = {
   render: () => (
     <Inline gap="md" className="rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-6">
       <Pressable className="rounded-md border border-[var(--editor-border)] px-3 py-2 text-xs">Unstyled pressable</Pressable>
-      <Icon glyph={Plus} tone="accent" />
-      <Icon glyph={Bell} tone="muted" size="lg" />
+      <AddIcon tone="accent" />
+      <NotificationIcon tone="muted" size="lg" />
     </Inline>
   ),
 };

@@ -1,4 +1,3 @@
-import { Braces, FunctionSquare, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { validateDataName } from "../../data/tags/TagRegistry";
 import type { ProjectData } from "../../data/tags/TagDefinition";
@@ -17,17 +16,20 @@ import {
 import type { UdtFieldDefinition } from "../../data/udt/UdtDefinition";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
+  BracesIcon,
   Button,
   ConfirmDialog,
+  DeleteIcon,
   EditorPage,
   FormField,
+  FunctionIcon,
   IconButton,
   PanelCard,
-  SectionHeader,
-  TextInput,
-  Box,
-  Icon,
   Pressable,
+  SectionHeader,
+  TextInput
 } from "../ui";
 import { DataTypeSelect } from "./DataTypeSelect";
 import { DataValueInput } from "./DataValueInput";
@@ -120,11 +122,11 @@ export function UdtEditor({
       size="lg"
       title={udt.name}
       description={`${udt.fields.length} properties · ${udt.methods.length} methods · ${dependents.length} instances`}
-      icon={<Icon glyph={Braces} size="lg" />}
+      icon={<BracesIcon size="lg" />}
       actions={
         <Button
           variant="danger"
-          leadingIcon={<Icon glyph={Trash2} size="sm" />}
+          leadingIcon={<DeleteIcon size="sm" />}
           disabled={dependents.length > 0}
           title={dependents.length > 0 ? "Delete dependent tags first." : "Delete UDT"}
           onClick={() => setDeleteOpen(true)}
@@ -166,7 +168,7 @@ export function UdtEditor({
         <Box className="grid gap-2 border-t border-[var(--editor-border)] pt-4 md:grid-cols-[1fr_160px_auto]">
           <FormField label="New property" error={newFieldError} compact><TextInput controlSize="sm" mono value={newFieldName} onChange={(event) => { setNewFieldName(event.target.value); setNewFieldError(null); }} /></FormField>
           <FormField label="Type" compact><DataTypeSelect data={data} value={newFieldType} allowUdt={false} onChange={(type) => { if (type.kind !== "udt") setNewFieldType(type); }} /></FormField>
-          <Box className="flex items-end"><Button onClick={createField}><Icon glyph={Plus} size={13} /> Property</Button></Box>
+          <Box className="flex items-end"><Button onClick={createField}><AddIcon size={13} /> Property</Button></Box>
         </Box>
       </PanelCard>
 
@@ -175,15 +177,15 @@ export function UdtEditor({
         <Box className="space-y-1">
           {udt.methods.map((method) => (
             <Box key={method.id} className="flex items-center gap-2 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2">
-              <Icon glyph={FunctionSquare} size={13} className="text-[var(--editor-text-soft)]" />
+              <FunctionIcon size={13} className="text-[var(--editor-text-soft)]" />
               <Pressable type="button" className="min-w-0 flex-1 text-left text-xs font-medium text-[var(--editor-text)]" onClick={() => onSelect({ kind: "udt-method", udtId: udt.id, methodId: method.id })}>{method.name}()</Pressable>
-              <IconButton aria-label={`Delete ${method.name}`} title="Delete method" variant="danger" onClick={() => updateProjectData((current) => deleteUdtMethod(current, udt.id, method.id))}><Icon glyph={Trash2} size={12} /></IconButton>
+              <IconButton aria-label={`Delete ${method.name}`} title="Delete method" variant="danger" onClick={() => updateProjectData((current) => deleteUdtMethod(current, udt.id, method.id))}><DeleteIcon size={12} /></IconButton>
             </Box>
           ))}
         </Box>
         <Box className="grid gap-2 border-t border-[var(--editor-border)] pt-4 md:grid-cols-[1fr_auto]">
           <FormField label="New method" compact error={newMethodError}><TextInput controlSize="sm" mono value={newMethodName} onChange={(event) => { setNewMethodName(event.target.value); setNewMethodError(null); }} /></FormField>
-          <Box className="flex items-end"><Button onClick={createMethod}><Icon glyph={Plus} size={13} /> Method</Button></Box>
+          <Box className="flex items-end"><Button onClick={createMethod}><AddIcon size={13} /> Method</Button></Box>
         </Box>
       </PanelCard>
 
@@ -209,7 +211,7 @@ function UdtFieldRow({ data, udtId, field, siblingNames }: { data: ProjectData; 
     <FormField label="Name" compact error={error}><TextInput controlSize="sm" mono value={name} onChange={(event) => setName(event.target.value)} onBlur={commitName} /></FormField>
     <FormField label="Type" compact><DataTypeSelect data={data} value={field.type} allowUdt={false} onChange={(type) => { if (type.kind === "udt") return; updateProjectData((current) => updateUdtField(current, udtId, field.id, (currentField) => ({ ...currentField, type, defaultValue: TypeRegistry.getDefaultValue(type) }))); }} /></FormField>
     <FormField label="Default" compact><DataValueInput compact type={field.type} value={field.defaultValue ?? TypeRegistry.getDefaultValue(field.type)} onChange={(value) => updateProjectData((current) => updateUdtField(current, udtId, field.id, (currentField) => ({ ...currentField, defaultValue: value })))} /></FormField>
-    <Box className="pt-5"><IconButton aria-label={`Delete ${field.name}`} title="Delete property" variant="danger" onClick={() => updateProjectData((current) => deleteUdtField(current, udtId, field.id))}><Icon glyph={Trash2} size={12} /></IconButton></Box>
+    <Box className="pt-5"><IconButton aria-label={`Delete ${field.name}`} title="Delete property" variant="danger" onClick={() => updateProjectData((current) => deleteUdtField(current, udtId, field.id))}><DeleteIcon size={12} /></IconButton></Box>
   </Box>;
 }
 

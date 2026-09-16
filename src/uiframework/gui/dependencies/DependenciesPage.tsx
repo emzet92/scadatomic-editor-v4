@@ -1,4 +1,13 @@
-import { Box, Icon, PageContainer, PageHeader, WorkspaceShell } from "../ui";
+import {
+  Box,
+  BracesIcon,
+  NetworkIcon,
+  PageContainer,
+  PageHeader,
+  PointerClickIcon,
+  WorkflowIcon,
+  WorkspaceShell
+} from "../ui";
 import {
   Background,
   BackgroundVariant,
@@ -8,7 +17,6 @@ import {
   type Edge,
   type Node,
 } from "@xyflow/react";
-import { Braces, MousePointerClick, Network, Workflow } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "../workspace/WorkspaceHeader";
 
@@ -255,14 +263,14 @@ export function DependenciesPage() {
       <PageContainer size="full" className="max-w-[1500px] space-y-5 px-6 py-6">
         <PageHeader
           eyebrow="Project visualization lab"
-          icon={<Icon glyph={Network} size={14} />}
+          icon={<NetworkIcon size={14} />}
           title="Dependency graphs"
           description="Two hard-coded examples for evaluating React Flow inside SCADAtomic. Nothing here reads project state, executes scripts, subscribes to tags, or emits runtime events yet."
           actions={<GraphNodeLegend />}
         />
 
           <GraphCard
-            icon={<Icon glyph={MousePointerClick} size={17} />}
+            icon={<PointerClickIcon size={17} />}
             title="Event execution flow"
             description="Example of an onClick event reaching its handler and script, then branching into an emitted runtime event and a PLC-like tag write path."
             nodes={eventFlowNodes}
@@ -270,7 +278,7 @@ export function DependenciesPage() {
           />
 
           <GraphCard
-            icon={<Icon glyph={Workflow} size={17} />}
+            icon={<WorkflowIcon size={17} />}
             title="Project dependency graph"
             description="Example relationships between PageLayout, Page, Repeat Container, User Component, TagRef, UDT, TagRuntime, driver and a chart binding."
             nodes={projectGraphNodes}
@@ -278,7 +286,7 @@ export function DependenciesPage() {
           />
 
           <Box className="flex items-center gap-2 rounded-xl border border-dashed border-[var(--editor-border-strong)] bg-white/60 px-4 py-3 text-xs text-[var(--editor-text-muted)]">
-            <Icon glyph={Braces} size={15} className="text-[var(--editor-accent)]" />
+            <BracesIcon size={15} className="text-[var(--editor-accent)]" />
             Next step, deliberately not implemented here: generate nodes and edges from the real UiDocument / script metadata.
           </Box>
       </PageContainer>

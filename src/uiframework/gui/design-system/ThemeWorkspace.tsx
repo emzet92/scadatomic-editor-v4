@@ -1,4 +1,3 @@
-import { MonitorCog, Moon, Palette, Sun } from "lucide-react";
 import { useMemo } from "react";
 import {
   createSemanticColorTokenRef,
@@ -8,19 +7,22 @@ import {
 import { ensureProjectAppearance } from "../../design-system/theme-config";
 import { useEditorStore } from "../../editor-store";
 import {
+  Box,
   Callout,
   ChoiceCard,
   DataGrid,
   DataGridHeader,
   DataGridRow,
   FormField,
+  MonitorSettingsIcon,
+  MoonIcon,
   PageContainer,
   PageHeader,
+  PaletteIcon,
   PanelCard,
   SectionHeader,
   Select,
-  Box,
-  Icon,
+  SunIcon
 } from "../ui";
 
 const SEMANTIC_GRID = "grid-cols-[minmax(170px,1.1fr)_72px_minmax(220px,1fr)]";
@@ -58,7 +60,7 @@ export function ThemeWorkspace() {
   return (
     <PageContainer>
       <PageHeader
-        icon={<Icon glyph={Palette} size={14} />}
+        icon={<PaletteIcon size={14} />}
         title="Themes & semantic colors"
         description="Designer preview is independent from runtime state. Configure the runtime source here, then preview any theme without changing the saved runtime session."
       />
@@ -68,7 +70,7 @@ export function ThemeWorkspace() {
           className="mb-4"
           title={
             <span className="flex items-center gap-2">
-              <Icon glyph={MonitorCog} size={14} /> Runtime theme policy
+              <MonitorSettingsIcon size={14} /> Runtime theme policy
             </span>
           }
         />
@@ -137,12 +139,12 @@ export function ThemeWorkspace() {
           {themes.map((theme) => {
             const active = theme.id === editingThemeId;
             const dark = theme.name.toLocaleLowerCase().includes("dark");
-            const ThemeIcon = dark ? Moon : Sun;
+            const ThemeIcon = dark ? MoonIcon : SunIcon;
             return (
               <ChoiceCard
                 key={theme.id}
                 selected={active}
-                icon={<Icon glyph={ThemeIcon} size={16} />}
+                icon={<ThemeIcon size={16} />}
                 title={theme.name}
                 description={active ? "Previewing in Designer" : "Preview without changing runtime state"}
                 onClick={() => setPreviewDesignTheme(theme.id)}

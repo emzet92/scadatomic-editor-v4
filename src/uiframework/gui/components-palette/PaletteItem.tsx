@@ -1,17 +1,20 @@
-import { Box, Icon, Pressable } from "../ui";
-import { useMemo, useState } from "react";
 import {
-  Boxes,
-  ChartLine,
-  LayoutTemplate,
-  PanelTop,
-  Image as ImageIcon,
-  GripVertical,
-  Menu,
-  RectangleHorizontal,
-  Search,
-  Type,
-} from "lucide-react";
+  Box,
+  BoxIcon,
+  BoxesIcon,
+  ChartLineIcon,
+  DragHandleIcon,
+  ImageIcon,
+  MenuIcon,
+  PanelTopIcon,
+  Pressable,
+  RectangleIcon,
+  SearchIcon,
+  TemplateIcon,
+  TypographyIcon,
+  type IconComponent
+} from "../ui";
+import { useMemo, useState } from "react";
 import { useEditorStore } from "../../editor-store";
 import { getPageKind } from "../../core/document";
 import {
@@ -25,16 +28,16 @@ import {
 } from "../../registry/component-definitions";
 
 const icons = {
-  Page: LayoutTemplate,
-  Modal: LayoutTemplate,
-  PageSlot: PanelTop,
-  Container: Box,
-  Text: Type,
-  Button: RectangleHorizontal,
-  Chart: ChartLine,
-  Navigation: Menu,
+  Page: TemplateIcon,
+  Modal: TemplateIcon,
+  PageSlot: PanelTopIcon,
+  Container: BoxIcon,
+  Text: TypographyIcon,
+  Button: RectangleIcon,
+  Chart: ChartLineIcon,
+  Navigation: MenuIcon,
   Image: ImageIcon,
-} satisfies Record<RegisteredComponentType, typeof Box>;
+} satisfies Record<RegisteredComponentType, IconComponent>;
 
 export function ComponentPalette({
   ownerComponentId,
@@ -77,8 +80,7 @@ export function ComponentPalette({
         </Box>
 
         <Box className="relative">
-          <Icon glyph={Search}
-            size={16}
+          <SearchIcon size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--editor-text-soft)] pointer-events-none"
           />
 
@@ -94,7 +96,7 @@ export function ComponentPalette({
 
       <Box className="space-y-2">
         <Box className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-600">
-          <Icon glyph={Boxes} size={12} /> Component library
+          <BoxesIcon size={12} /> Component library
         </Box>
 
         {reusableItems.length > 0 ? (
@@ -115,7 +117,7 @@ export function ComponentPalette({
               title={`Open ${item.name} definition`}
             >
               <Box className="h-10 w-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
-                <Icon glyph={Boxes} size={18} />
+                <BoxesIcon size={18} />
               </Box>
               <Box className="min-w-0 flex-1">
                 <Box className="text-sm font-semibold text-[var(--editor-text)]">
@@ -148,7 +150,7 @@ export function ComponentPalette({
                 title="Drag component to canvas"
                 aria-label={`Drag ${item.name} to canvas`}
               >
-                <Icon glyph={GripVertical} size={16} />
+                <DragHandleIcon size={16} />
               </Pressable>
             </Box>
           ))
@@ -178,7 +180,7 @@ export function ComponentPalette({
               className="w-full p-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] hover:border-[var(--editor-accent-border)] hover:bg-[var(--editor-accent-soft)] transition-all flex items-start gap-3 text-left cursor-grab select-none"
             >
               <Box className="h-10 w-10 rounded-xl bg-[var(--editor-accent-soft)] text-[var(--editor-accent)] flex items-center justify-center shrink-0">
-                <Icon glyph={ItemIcon} size={18} />
+                <ItemIcon size={18} />
               </Box>
 
               <Box className="min-w-0">

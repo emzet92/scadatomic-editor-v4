@@ -1,6 +1,13 @@
-import { Plus, ServerCog } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button, EmptyAction, PanelCard, PanelSection, SectionHeader } from "../../src/uiframework/gui/ui";
+import {
+  AddIcon,
+  Button,
+  EmptyAction,
+  PanelCard,
+  PanelSection,
+  SectionHeader,
+  ServerSettingsIcon
+} from "../../src/uiframework/gui/ui";
 
 const meta = {
   title: "Organisms/Panel",
@@ -17,7 +24,7 @@ export const Gallery: Story = {
         <SectionHeader
           title="Edge runtime"
           description="Reusable section heading with optional action."
-          action={<Button size="xs" variant="secondary"><Plus size={12} />Add</Button>}
+          action={<Button size="xs" variant="secondary"><AddIcon size={12} />Add</Button>}
         />
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <PanelCard>
@@ -37,7 +44,7 @@ export const Gallery: Story = {
       </PanelSection>
 
       <EmptyAction onClick={() => undefined}>
-        <ServerCog size={16} />
+        <ServerSettingsIcon size={16} />
         Add first edge device
       </EmptyAction>
     </div>

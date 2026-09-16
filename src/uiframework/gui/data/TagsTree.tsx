@@ -1,11 +1,16 @@
-import { ChevronRight, Database, Plus, Tag } from "lucide-react";
 import { useState } from "react";
 import { isUdtTag, type ProjectData, type TagDefinition } from "../../data/tags/TagDefinition";
 import { TypeRegistry } from "../../data/types/TypeRegistry";
-import { Callout, IconButton, SidebarSection,
+import {
+  AddIcon,
   Box,
-  Icon,
+  Callout,
+  ChevronRightIcon,
+  DatabaseIcon,
+  IconButton,
   Pressable,
+  SidebarSection,
+  TagIcon
 } from "../ui";
 import type { DataSelection } from "./data-selection";
 
@@ -26,7 +31,7 @@ export function TagsTree({
       title="Tags"
       actions={
         <IconButton aria-label="Create tag" variant="secondary" onClick={onCreate}>
-          <Icon glyph={Plus} size={14} />
+          <AddIcon size={14} />
         </IconButton>
       }
     >
@@ -50,10 +55,10 @@ function TagTreeRow({ tag, data, active, onSelect }: { tag: TagDefinition; data:
     <Box>
       <Box className={`flex h-8 items-center rounded-md pr-2 text-xs ${active ? "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]" : "text-[var(--editor-text)] hover:bg-[var(--editor-surface)]"}`}>
         <Pressable type="button" onClick={() => setExpanded((value) => !value)} className={`inline-flex h-6 w-6 items-center justify-center text-[var(--editor-text-soft)] ${isUdt ? "opacity-100" : "opacity-0"}`} tabIndex={isUdt ? 0 : -1}>
-          <Icon glyph={ChevronRight} size={12} className={expanded ? "rotate-90" : ""} />
+          <ChevronRightIcon size={12} className={expanded ? "rotate-90" : ""} />
         </Pressable>
         <Pressable type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          {isUdt ? <Icon glyph={Database} size={13} /> : <Icon glyph={Tag} size={13} />}
+          {isUdt ? <DatabaseIcon size={13} /> : <TagIcon size={13} />}
           <span className="truncate font-medium">{tag.name}</span>
           <span className="ml-auto truncate text-[10px] text-[var(--editor-text-soft)]">{TypeRegistry.getDisplayName(tag.type, definition?.name)}</span>
         </Pressable>

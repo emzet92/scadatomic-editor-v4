@@ -1,4 +1,3 @@
-import { Database, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deleteTag, renameTag, validateDataName } from "../../data/tags/TagRegistry";
 import { isUdtTag, type ProjectData } from "../../data/tags/TagDefinition";
@@ -8,14 +7,15 @@ import { useEditorStore } from "../../editor-store";
 import {
   Button,
   ConfirmDialog,
+  DatabaseIcon,
+  DeleteIcon,
   EditorPage,
   FormField,
   Grid,
-  Icon,
   Inline,
   PanelCard,
   SectionHeader,
-  TextInput,
+  TextInput
 } from "../ui";
 import { DataTypeSelect } from "./DataTypeSelect";
 import { DataValueInput } from "./DataValueInput";
@@ -48,8 +48,8 @@ export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectD
     <EditorPage
       title={stableTag.name}
       description={definition ? `${definition.name} instance` : `${TypeRegistry.getDisplayName(stableTag.type)} tag`}
-      icon={<Icon glyph={Database} size="lg" />}
-      actions={<Button variant="danger" leadingIcon={<Icon glyph={Trash2} size="sm" />} onClick={() => setDeleteOpen(true)}>Delete</Button>}
+      icon={<DatabaseIcon size="lg" />}
+      actions={<Button variant="danger" leadingIcon={<DeleteIcon size="sm" />} onClick={() => setDeleteOpen(true)}>Delete</Button>}
     >
       <PanelCard>
         <Grid className="md:grid-cols-2" gap="lg">
@@ -127,5 +127,5 @@ function TagFieldValue({ data, target, path, label, type, onChange, projectId }:
 }
 
 function Missing() {
-  return <EditorPage title="Tag unavailable" description="Tag no longer exists." icon={<Icon glyph={Database} size="lg" />}><PanelCard variant="muted">Select another tag from the data tree.</PanelCard></EditorPage>;
+  return <EditorPage title="Tag unavailable" description="Tag no longer exists." icon={<DatabaseIcon size="lg" />}><PanelCard variant="muted">Select another tag from the data tree.</PanelCard></EditorPage>;
 }

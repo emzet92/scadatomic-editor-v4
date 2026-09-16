@@ -1,21 +1,22 @@
-import { Layers, Plus, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { countShadowTokenUsages } from "../../design-system/document-shadows";
 import { shadowStyleToCss } from "../../design-system/shadows";
 import { useEditorStore } from "../../editor-store";
 import {
+  AddIcon,
+  Box,
   Button,
   Callout,
   ColorPickerInput,
+  DeleteIcon,
   EmptyState,
   FormField,
   IconButton,
+  LayersIcon,
   PageContainer,
   PageHeader,
   PanelCard,
-  TextInput,
-  Box,
-  Icon,
+  TextInput
 } from "../ui";
 
 export function ShadowLibraryWorkspace() {
@@ -35,25 +36,25 @@ export function ShadowLibraryWorkspace() {
   return (
     <PageContainer size="xl">
       <PageHeader
-        icon={<Icon glyph={Layers} size={14} />}
+        icon={<LayersIcon size={14} />}
         title="Shadows / Elevation"
         description="Define structural elevation tokens with X/Y offset, blur, spread and color. Components keep stable token references while renderers receive the final shadow value."
         actions={
           <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
-            <Icon glyph={Plus} size={14} /> Add shadow
+            <AddIcon size={14} /> Add shadow
           </Button>
         }
       />
 
       {tokens.length === 0 ? (
         <EmptyState
-          icon={<Icon glyph={Layers} size={20} />}
+          icon={<LayersIcon size={20} />}
           title="No shadow tokens yet"
           description="Create individual shadows or seed a practical Elevation/None through Elevation/4 scale."
           actions={
             <>
               <Button size="sm" variant="primary" onClick={() => addShadowToken()}>
-                <Icon glyph={Plus} size={14} /> Add shadow
+                <AddIcon size={14} /> Add shadow
               </Button>
               <Button size="sm" variant="secondary" onClick={addStarterShadowScale}>
                 Create elevation scale
@@ -110,7 +111,7 @@ export function ShadowLibraryWorkspace() {
                   size="icon"
                   onClick={() => deleteShadowToken(token.id)}
                 >
-                  <Icon glyph={Trash2} size={14} />
+                  <DeleteIcon size={14} />
                 </IconButton>
               </PanelCard>
             );

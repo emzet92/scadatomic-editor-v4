@@ -1,4 +1,3 @@
-import { Activity, Play, Square } from "lucide-react";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { ProjectData } from "../../../data/tags/TagDefinition";
 import { resolveTagFieldRef } from "../../../data/tags/TagFieldRef";
@@ -6,9 +5,13 @@ import { useDesignerTagValue } from "../../../data/tags/designer-tag-store";
 import { listSimulationBindings } from "../../../data/simulation/SimulationRegistry";
 import { simulationGeneratorRegistry } from "../../../data/simulation/SimulationGeneratorRegistry";
 import { sendWsMessage } from "../../../websocket";
-import { Button, PanelCard,
+import {
+  ActivityIcon,
   Box,
-  Icon,
+  Button,
+  PanelCard,
+  PlayIcon,
+  SquareIcon
 } from "../../ui";
 import { designerSimulationSession } from "../../../data/simulation/designer-simulation-session";
 
@@ -55,7 +58,7 @@ export function SimulationStatus({
       <Box className="flex items-center justify-between gap-2">
         <Box className="min-w-0">
           <Box className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
-            <Icon glyph={Activity} size={13} className={snapshot.running ? "text-emerald-600" : "text-[var(--editor-text-soft)]"} />
+            <ActivityIcon size={13} className={snapshot.running ? "text-emerald-600" : "text-[var(--editor-text-soft)]"} />
             Simulation
           </Box>
           <Box className="mt-1 text-[10px] text-[var(--editor-text-soft)]">
@@ -63,9 +66,9 @@ export function SimulationStatus({
           </Box>
         </Box>
         {snapshot.running ? (
-          <Button size="xs" variant="secondary" onClick={stop}><Icon glyph={Square} size={11} /> Stop</Button>
+          <Button size="xs" variant="secondary" onClick={stop}><SquareIcon size={11} /> Stop</Button>
         ) : (
-          <Button size="xs" variant="primary" disabled={activeBindings.length === 0} onClick={start}><Icon glyph={Play} size={11} /> Start</Button>
+          <Button size="xs" variant="primary" disabled={activeBindings.length === 0} onClick={start}><PlayIcon size={11} /> Start</Button>
         )}
       </Box>
 

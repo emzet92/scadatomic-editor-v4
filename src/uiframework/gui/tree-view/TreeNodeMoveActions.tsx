@@ -1,7 +1,10 @@
-import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
-import { IconButton,
+import {
   Box,
-  Icon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  CopyIcon,
+  DeleteIcon,
+  IconButton
 } from "../ui";
 
 export function TreeNodeMoveActions({
@@ -36,7 +39,7 @@ export function TreeNodeMoveActions({
             duplicateNode(nodeId);
           }}
         >
-          <Icon glyph={Copy} size={14} />
+          <CopyIcon size={14} />
         </IconButton>
       ) : null}
 
@@ -50,7 +53,7 @@ export function TreeNodeMoveActions({
             deleteNode(nodeId);
           }}
         >
-          <Icon glyph={Trash2} size={14} />
+          <DeleteIcon size={14} />
         </IconButton>
       ) : null}
 
@@ -62,7 +65,7 @@ export function TreeNodeMoveActions({
           moveNodeUp(nodeId);
         }}
       >
-        <Icon glyph={ChevronUp} size={14} />
+        <ChevronUpIcon size={14} />
       </IconButton>
 
       <IconButton
@@ -73,7 +76,7 @@ export function TreeNodeMoveActions({
           moveNodeDown(nodeId);
         }}
       >
-        <Icon glyph={ChevronDown} size={14} />
+        <ChevronDownIcon size={14} />
       </IconButton>
     </Box>
   );

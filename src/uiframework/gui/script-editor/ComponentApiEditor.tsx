@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { Code2, Plus, Trash2 } from "lucide-react";
 import {
   validateComponentMethodName,
   type ComponentApiDescription,
 } from "../../component-api";
 import type { UiDocument } from "../../core/document";
 import { MethodCreateForm } from "../component-api/MethodCreateForm";
-import { Button, EmptyAction, IconButton,
+import {
+  AddIcon,
   Box,
-  Icon,
-  Pressable,
+  Button,
+  CodeIcon,
+  DeleteIcon,
+  EmptyAction,
+  IconButton,
+  Pressable
 } from "../ui";
 
 type Props = {
@@ -119,7 +123,7 @@ export function ComponentApiEditor({
                         setFormError(null);
                       }}
                     >
-                      <Icon glyph={Plus} size={13} />
+                      <AddIcon size={13} />
                       Method
                     </Button>
                   ) : (
@@ -195,7 +199,7 @@ export function ComponentApiEditor({
                                   : "bg-white text-zinc-400"
                               }`}
                             >
-                              <Icon glyph={Code2} size={13} />
+                              <CodeIcon size={13} />
                             </span>
 
                             <Pressable
@@ -217,7 +221,7 @@ export function ComponentApiEditor({
                                 }}
                                 className="opacity-60 group-hover:opacity-100"
                               >
-                                <Icon glyph={Trash2} size={13} />
+                                <DeleteIcon size={13} />
                               </IconButton>
                             ) : null}
                           </Box>
@@ -233,7 +237,7 @@ export function ComponentApiEditor({
                       }}
                       className="mt-2 py-2"
                     >
-                      <Icon glyph={Plus} size={13} />
+                      <AddIcon size={13} />
                       Add first method
                     </EmptyAction>
                   ) : null}

@@ -1,4 +1,3 @@
-import { Plus, Trash2 } from "lucide-react";
 import type { Binding, ComponentInputDefinition, UiNode } from "../../core/document";
 import {
   CHART_SERIES_COLORS,
@@ -8,9 +7,14 @@ import {
   type ChartSeriesDefinition,
 } from "../../chart-series";
 import { useEditorStore } from "../../editor-store";
-import { Button, FormField, IconButton, TextInput,
+import {
+  AddIcon,
   Box,
-  Icon,
+  Button,
+  DeleteIcon,
+  FormField,
+  IconButton,
+  TextInput
 } from "../ui";
 import type { UpdateNode } from "./property-panel-types";
 import {
@@ -135,7 +139,7 @@ export function ChartSeriesInput({
                 size="icon-xs"
                 onClick={() => removeSeries(series.id)}
               >
-                <Icon glyph={Trash2} size={12} />
+                <DeleteIcon size={12} />
               </IconButton>
             </Box>
 
@@ -180,7 +184,7 @@ export function ChartSeriesInput({
       })}
 
       <Button size="xs" onClick={addSeries}>
-        <Icon glyph={Plus} size={12} /> Add data point
+        <AddIcon size={12} /> Add data point
       </Button>
     </Box>
   );

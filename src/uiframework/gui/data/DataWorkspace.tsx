@@ -1,6 +1,14 @@
-import { Braces, Database, RadioTower, Tags } from "lucide-react";
 import type { ProjectData } from "../../data/tags/TagDefinition";
-import { Callout, EditorPage, Grid, Icon, MetricCard } from "../ui";
+import {
+  BracesIcon,
+  Callout,
+  DatabaseIcon,
+  EditorPage,
+  Grid,
+  MetricCard,
+  RadioTowerIcon,
+  TagsIcon
+} from "../ui";
 import { CreateTagEditor } from "./CreateTagEditor";
 import { CreateUdtEditor } from "./CreateUdtEditor";
 import { TagEditor } from "./TagEditor";
@@ -21,12 +29,12 @@ export function DataWorkspace({ data, selection, onSelect, projectId }: { data: 
     <EditorPage
       title="Project Data"
       description="Local typed data runtime for data-driven UI. No PLC or device layer is involved."
-      icon={<Icon glyph={Database} size="lg" />}
+      icon={<DatabaseIcon size="lg" />}
     >
       <Grid className="md:grid-cols-3" gap="lg">
-        <MetricCard icon={<Icon glyph={Tags} size="lg" tone="accent" />} value={Object.keys(data.tags).length} label="Tags" />
-        <MetricCard icon={<Icon glyph={Braces} size="lg" tone="accent" />} value={Object.keys(data.udts).length} label="UDT definitions" />
-        <MetricCard icon={<Icon glyph={RadioTower} size="lg" tone="accent" />} value="Event driven" label="Tag runtime" description="TagStore subscriptions, no polling." />
+        <MetricCard icon={<TagsIcon size="lg" tone="accent" />} value={Object.keys(data.tags).length} label="Tags" />
+        <MetricCard icon={<BracesIcon size="lg" tone="accent" />} value={Object.keys(data.udts).length} label="UDT definitions" />
+        <MetricCard icon={<RadioTowerIcon size="lg" tone="accent" />} value="Event driven" label="Tag runtime" description="TagStore subscriptions, no polling." />
       </Grid>
       <Callout>
         <strong className="text-[var(--editor-text)]">Runtime rule:</strong> all value mutations pass through TagStore. A real change emits <code className="font-mono text-[var(--editor-accent)]">tag.changed</code> with path, oldValue and newValue.

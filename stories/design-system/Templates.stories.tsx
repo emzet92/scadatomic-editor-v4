@@ -1,13 +1,13 @@
-import { Database, Plus } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
+  AddIcon,
   Button,
+  DatabaseIcon,
   EditorPage,
-  Icon,
-  MetricCard,
   Grid,
+  MetricCard,
   PanelCard,
-  WorkspaceShell,
+  WorkspaceShell
 } from "../../src/uiframework/gui/ui";
 
 const meta = { title: "Templates/Screens", parameters: { controls: { disable: true }, layout: "fullscreen" } } satisfies Meta;
@@ -20,8 +20,8 @@ export const EditorPageTemplate: Story = {
       <EditorPage
         title="Project Data"
         description="Whole-screen content template composed from organisms and atoms."
-        icon={<Icon glyph={Database} size="lg" />}
-        actions={<Button variant="primary" leadingIcon={<Icon glyph={Plus} size="sm" />}>Create tag</Button>}
+        icon={<DatabaseIcon size="lg" />}
+        actions={<Button variant="primary" leadingIcon={<AddIcon size="sm" />}>Create tag</Button>}
       >
         <Grid className="md:grid-cols-3">
           <MetricCard value="24" label="Tags" />

@@ -1,6 +1,17 @@
-import { Layers, MoveHorizontal, Palette, Radius, Square, SunMoon, Type } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
-import { Box, Callout, Icon, SidebarNavItem, SidebarSection } from "../ui";
+import {
+  Box,
+  Callout,
+  HorizontalResizeIcon,
+  LayersIcon,
+  PaletteIcon,
+  RadiusIcon,
+  SidebarNavItem,
+  SidebarSection,
+  SquareIcon,
+  ThemeIcon,
+  TypographyIcon
+} from "../ui";
 
 export type DesignSystemSection = "themes" | "colors" | "typography" | "spacing" | "radius" | "shadows" | "borders";
 
@@ -34,13 +45,13 @@ export function DesignSystemPanel({
   );
 
   const sections = [
-    ["themes", "Themes & Semantic", SunMoon, themeCount],
-    ["colors", "Colors", Palette, colorCount],
-    ["typography", "Typography", Type, typographyCount],
-    ["spacing", "Spacing", MoveHorizontal, spacingCount],
-    ["radius", "Radius", Radius, radiusCount],
-    ["shadows", "Shadows / Elevation", Layers, shadowCount],
-    ["borders", "Borders / Strokes", Square, borderCount],
+    ["themes", "Themes & Semantic", ThemeIcon, themeCount],
+    ["colors", "Colors", PaletteIcon, colorCount],
+    ["typography", "Typography", TypographyIcon, typographyCount],
+    ["spacing", "Spacing", HorizontalResizeIcon, spacingCount],
+    ["radius", "Radius", RadiusIcon, radiusCount],
+    ["shadows", "Shadows / Elevation", LayersIcon, shadowCount],
+    ["borders", "Borders / Strokes", SquareIcon, borderCount],
   ] as const;
 
   return (
@@ -53,7 +64,7 @@ export function DesignSystemPanel({
           <SidebarNavItem
             key={id}
             active={activeSection === id}
-            icon={<Icon glyph={SectionIcon} size={15} />}
+            icon={<SectionIcon size={15} />}
             title={title}
             meta={`${count}`}
             description={`${count} ${count === 1 ? "token" : "tokens"}`}

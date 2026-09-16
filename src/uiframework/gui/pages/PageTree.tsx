@@ -1,11 +1,3 @@
-import {
-  ChevronRight,
-  FileText,
-  Home,
-  LayoutTemplate,
-  Plus,
-  Trash2,
-} from "lucide-react";
 import { useMemo, useState } from "react";
 import { getPageKind, type UiDocument } from "../../core/document";
 import { collectPageSubtreeIds } from "../../core/pages";
@@ -14,10 +6,20 @@ import {
   buildNavigationTree,
   type NavigationTreeNode,
 } from "../../navigation/navigation";
-import { Badge, Callout, ConfirmDialog, IconButton, SidebarSection,
+import {
+  AddIcon,
+  Badge,
   Box,
-  Icon,
+  Callout,
+  ChevronRightIcon,
+  ConfirmDialog,
+  DeleteIcon,
+  FileTextIcon,
+  HomeIcon,
+  IconButton,
   Pressable,
+  SidebarSection,
+  TemplateIcon
 } from "../ui";
 
 export function PageTree() {
@@ -63,7 +65,7 @@ export function PageTree() {
         title="Pages"
         actions={
           <IconButton aria-label="Add top-level page" variant="secondary" onClick={() => addPage()}>
-            <Icon glyph={Plus} size={14} />
+            <AddIcon size={14} />
           </IconButton>
         }
       >
@@ -91,7 +93,7 @@ export function PageTree() {
         className="border-t border-[var(--editor-border)] pt-3"
         actions={
           <IconButton aria-label="Add page layout" variant="secondary" onClick={() => addPageLayout()}>
-            <Icon glyph={Plus} size={14} />
+            <AddIcon size={14} />
           </IconButton>
         }
       >
@@ -119,7 +121,7 @@ export function PageTree() {
         className="border-t border-[var(--editor-border)] pt-3"
         actions={
           <IconButton aria-label="Add modal" variant="secondary" onClick={() => addModal()}>
-            <Icon glyph={Plus} size={14} />
+            <AddIcon size={14} />
           </IconButton>
         }
       >
@@ -190,7 +192,7 @@ function LayoutRow({
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
       >
-        <Icon glyph={LayoutTemplate} size={12} className="shrink-0 opacity-70" />
+        <TemplateIcon size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
       </Pressable>
       <Box className="hidden shrink-0 group-hover:block">
@@ -201,7 +203,7 @@ function LayoutRow({
           size="icon-xs"
           onClick={onDelete}
         >
-          <Icon glyph={Trash2} size={12} />
+          <DeleteIcon size={12} />
         </IconButton>
       </Box>
     </Box>
@@ -232,7 +234,7 @@ function ModalRow({
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center gap-2 px-1.5 py-1 text-left"
       >
-        <Icon glyph={FileText} size={12} className="shrink-0 opacity-70" />
+        <FileTextIcon size={12} className="shrink-0 opacity-70" />
         <span className="truncate font-medium">{name}</span>
         <Badge className="ml-auto group-hover:hidden">modal</Badge>
       </Pressable>
@@ -244,7 +246,7 @@ function ModalRow({
           size="icon-xs"
           onClick={onDelete}
         >
-          <Icon glyph={Trash2} size={12} />
+          <DeleteIcon size={12} />
         </IconButton>
       </Box>
     </Box>
@@ -300,8 +302,7 @@ function PageTreeRow({
           }`}
           tabIndex={hasChildren ? 0 : -1}
         >
-          <Icon glyph={ChevronRight}
-            size={12}
+          <ChevronRightIcon size={12}
             className={`transition-transform ${expanded ? "rotate-90" : ""}`}
           />
         </Pressable>
@@ -312,9 +313,9 @@ function PageTreeRow({
           className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left"
         >
           {isStartPage ? (
-            <Icon glyph={Home} size={12} className="shrink-0" />
+            <HomeIcon size={12} className="shrink-0" />
           ) : (
-            <Icon glyph={FileText} size={12} className="shrink-0 opacity-60" />
+            <FileTextIcon size={12} className="shrink-0 opacity-60" />
           )}
           <span className="truncate font-medium">{node.name}</span>
           {isStartPage ? (
@@ -332,7 +333,7 @@ function PageTreeRow({
               size="icon-xs"
               onClick={() => onSetStartPage(node.pageId)}
             >
-              <Icon glyph={Home} size={12} />
+              <HomeIcon size={12} />
             </IconButton>
           ) : null}
           <IconButton
@@ -341,7 +342,7 @@ function PageTreeRow({
             size="icon-xs"
             onClick={() => onAddChild(node.pageId)}
           >
-            <Icon glyph={Plus} size={12} />
+            <AddIcon size={12} />
           </IconButton>
           <IconButton
             aria-label={`Delete ${node.name}`}
@@ -355,7 +356,7 @@ function PageTreeRow({
             disabled={!canDelete}
             onClick={() => onDelete(node.pageId)}
           >
-            <Icon glyph={Trash2} size={12} />
+            <DeleteIcon size={12} />
           </IconButton>
         </Box>
       </Box>

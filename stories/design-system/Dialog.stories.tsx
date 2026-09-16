@@ -1,7 +1,13 @@
-import { KeyRound } from "lucide-react";
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button, ConfirmDialog, Dialog, FormField, TextInput } from "../../src/uiframework/gui/ui";
+import {
+  Button,
+  ConfirmDialog,
+  Dialog,
+  FormField,
+  KeyIcon,
+  TextInput
+} from "../../src/uiframework/gui/ui";
 
 const meta = {
   title: "Organisms/Dialog",
@@ -23,7 +29,7 @@ function DialogDemo() {
         open={open}
         title="Create registration key"
         description="Generate a short-lived key for onboarding a new edge agent."
-        icon={<div className="flex size-8 items-center justify-center rounded-full bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"><KeyRound size={15} /></div>}
+        icon={<div className="flex size-8 items-center justify-center rounded-full bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"><KeyIcon size={15} /></div>}
         onClose={() => setOpen(false)}
         footer={
           <>

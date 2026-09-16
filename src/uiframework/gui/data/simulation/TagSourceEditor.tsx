@@ -1,4 +1,3 @@
-import { Cable } from "lucide-react";
 import { defaultTagDriverRegistry } from "../../../data/simulation/default-driver-registry";
 import type { ProjectData } from "../../../data/tags/TagDefinition";
 import type { TagFieldRef } from "../../../data/tags/TagFieldRef";
@@ -7,9 +6,11 @@ import {
   setTagSourceDriver,
 } from "../../../data/drivers/TagSourceMapping";
 import { useEditorStore } from "../../../editor-store";
-import { FormField, Select,
+import {
   Box,
-  Icon,
+  CableIcon,
+  FormField,
+  Select
 } from "../../ui";
 
 export function TagSourceEditor({
@@ -31,7 +32,7 @@ export function TagSourceEditor({
   return (
     <Box className="space-y-3 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] p-3">
       <Box className="flex items-center gap-2 text-xs font-semibold text-[var(--editor-text)]">
-        <Icon glyph={Cable} size={13} className="text-[var(--editor-accent)]" /> Source
+        <CableIcon size={13} className="text-[var(--editor-accent)]" /> Source
       </Box>
 
       <FormField

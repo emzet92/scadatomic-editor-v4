@@ -1,5 +1,7 @@
-import { Box, Icon } from "../ui";
-import { Layers3 } from "lucide-react";
+import {
+  Box,
+  LayerStackIcon
+} from "../ui";
 import type { UiComponentDefinition } from "../../core/document";
 import { NodeTree } from "../tree-view/NodeTree";
 
@@ -18,7 +20,7 @@ export function ComponentStructureTree({
     <Box data-editor-ignore className="max-h-[42vh] overflow-auto bg-[var(--editor-surface)]">
       <Box className="border-b border-[var(--editor-border)] px-4 py-3">
         <Box className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-          <Icon glyph={Layers3} size={13} /> Component structure
+          <LayerStackIcon size={13} /> Component structure
         </Box>
         <Box className="mt-1 truncate text-sm font-medium text-[var(--editor-text)]">
           {definition.name}

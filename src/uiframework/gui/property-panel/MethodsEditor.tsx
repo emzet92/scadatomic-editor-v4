@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import {
-  Braces,
-  ChevronDown,
-  Code2,
-  ExternalLink,
-  Plus,
-  Trash2,
-} from "lucide-react";
 import { validateComponentMethodName } from "../../component-api";
 import type { MethodRef, UiNode } from "../../core/document";
 import { MethodCreateForm } from "../component-api/MethodCreateForm";
-import { Button, EmptyAction, IconButton,
+import {
+  AddIcon,
   Box,
-  Icon,
-  Pressable,
+  BracesIcon,
+  Button,
+  ChevronDownIcon,
+  CodeIcon,
+  DeleteIcon,
+  EmptyAction,
+  ExternalLinkIcon,
+  IconButton,
+  Pressable
 } from "../ui";
 
 export function MethodsEditor({
@@ -69,7 +69,7 @@ export function MethodsEditor({
           className="flex min-w-0 flex-1 items-center gap-2 py-3 text-left"
         >
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]">
-            <Icon glyph={Braces} size={15} strokeWidth={1.8} />
+            <BracesIcon size={15} strokeWidth={1.8} />
           </span>
 
           <span className="min-w-0 flex-1">
@@ -86,8 +86,7 @@ export function MethodsEditor({
             </span>
           </span>
 
-          <Icon glyph={ChevronDown}
-            size={15}
+          <ChevronDownIcon size={15}
             className={`shrink-0 text-[var(--editor-text-muted)] transition-transform ${
               expanded ? "rotate-0" : "-rotate-90"
             }`}
@@ -105,7 +104,7 @@ export function MethodsEditor({
             setError(null);
           }}
         >
-          <Icon glyph={Plus} size={16} />
+          <AddIcon size={16} />
         </IconButton>
       </Box>
 
@@ -124,7 +123,7 @@ export function MethodsEditor({
                   setError(null);
                 }}
               >
-                <Icon glyph={Plus} size={12} />
+                <AddIcon size={12} />
                 Add method
               </Button>
             ) : null}
@@ -158,7 +157,7 @@ export function MethodsEditor({
                     className="group flex min-h-10 items-center gap-2 rounded-lg px-2 py-1.5 transition hover:bg-[var(--editor-background)]"
                   >
                     <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] text-[var(--editor-text-muted)]">
-                      <Icon glyph={Code2} size={14} strokeWidth={1.8} />
+                      <CodeIcon size={14} strokeWidth={1.8} />
                     </span>
 
                     <Box className="min-w-0 flex-1">
@@ -179,7 +178,7 @@ export function MethodsEditor({
                           title="Open script"
                           className="flex size-7 items-center justify-center rounded-md text-[var(--editor-text-muted)] transition hover:bg-[var(--editor-surface)] hover:text-[var(--editor-accent)]"
                         >
-                          <Icon glyph={ExternalLink} size={13} />
+                          <ExternalLinkIcon size={13} />
                         </Link>
                       ) : null}
 
@@ -189,7 +188,7 @@ export function MethodsEditor({
                         title="Remove method"
                         onClick={() => setMethod(node.id, methodName, null)}
                       >
-                        <Icon glyph={Trash2} size={13} />
+                        <DeleteIcon size={13} />
                       </IconButton>
                     </Box>
                   </Box>
@@ -199,7 +198,7 @@ export function MethodsEditor({
           ) : !adding ? (
             <EmptyAction onClick={() => setAdding(true)}>
               <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-[var(--editor-background)] text-[var(--editor-text-muted)]">
-                <Icon glyph={Plus} size={14} />
+                <AddIcon size={14} />
               </span>
               <span>
                 <span className="block text-xs font-medium text-[var(--editor-text)]">

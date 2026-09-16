@@ -1,4 +1,3 @@
-import { ArrowLeft, Box as BoxIcon, Palette, Star } from "lucide-react";
 import { useEditorStore } from "../../editor-store";
 import { getPageByRootId, type UiDocument } from "../../core/document";
 import type {
@@ -24,9 +23,15 @@ import { NodePropertiesEditor } from "./NodePropertiesEditor";
 import { VariantsEditor } from "./VariantsEditor";
 import { VariantPropertiesEditor } from "./VariantPropertiesEditor";
 import { RepeatBehaviorEditor } from "../repeat/RepeatBehaviorEditor";
-import { Badge, Button, PanelSection,
+import {
+  BackIcon,
+  Badge,
   Box,
-  Icon,
+  BoxIcon,
+  Button,
+  PaletteIcon,
+  PanelSection,
+  StarIcon
 } from "../ui";
 
 type Props = {
@@ -113,12 +118,12 @@ export function PropertyPanel({
       <Box data-editor-ignore className="h-full flex flex-col">
         <Box className="border-b border-[var(--editor-border)] bg-[var(--editor-surface)] px-4 py-4">
           <Button variant="ghost" size="xs" onClick={onExitComponentMode} className="-ml-2">
-            <Icon glyph={ArrowLeft} size={13} /> Designer
+            <BackIcon size={13} /> Designer
           </Button>
 
           <Box className="mt-3 flex items-start gap-2">
             <Box className="flex size-8 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-700">
-              <Icon glyph={Palette} size={15} />
+              <PaletteIcon size={15} />
             </Box>
             <Box className="min-w-0 flex-1">
               <Box className="truncate text-sm font-semibold text-[var(--editor-text)]">
@@ -129,7 +134,7 @@ export function PropertyPanel({
               </Box>
             </Box>
             {node.defaultVariant === componentMode.variantName ? (
-              <Badge variant="warning" icon={<Icon glyph={Star} size={8} fill="currentColor" />}>
+              <Badge variant="warning" icon={<StarIcon size={8} fill="currentColor" />}>
                 default
               </Badge>
             ) : null}
@@ -249,7 +254,7 @@ export function PropertyPanel({
             <Box className="flex items-start justify-between gap-3">
               <Box>
                 <Box className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--editor-text-muted)]">
-                  <Icon glyph={BoxIcon} size={12} /> Component
+                  <BoxIcon size={12} /> Component
                 </Box>
                 <Box className="mt-1 text-[10px] text-[var(--editor-text-muted)]">
                   Encapsulate this subtree behind a public API.

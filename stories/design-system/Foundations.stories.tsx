@@ -4,7 +4,11 @@ import {
   editorBorders,
   editorColorTokens,
   editorFontSizes,
+  DatabaseIcon,
   editorFontWeights,
+  editorIconSizes,
+  editorIconStrokeWidths,
+  editorIconTones,
   editorRadii,
   editorShadows,
   editorSpacing,
@@ -86,6 +90,49 @@ export const TypographyAndBorders: Story = {
         <h2 className="text-sm font-semibold">Borders</h2>
         <div className="mt-5 space-y-4">
           {Object.entries(editorBorders).map(([name, value]) => <div key={name} className="rounded-lg p-4 text-xs" style={{ border: value }}><strong>{name}</strong><code className="ml-2 text-[10px] text-[var(--editor-text-muted)]">{value}</code></div>)}
+        </div>
+      </section>
+    </div>
+  ),
+};
+
+
+export const IconTokens: Story = {
+  render: () => (
+    <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-3">
+      <section className="space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-5">
+        <h2 className="text-sm font-semibold">Icon sizes</h2>
+        <div className="flex flex-wrap items-end gap-5">
+          {Object.entries(editorIconSizes).map(([name, value]) => (
+            <div key={name} className="flex flex-col items-center gap-2">
+              <DatabaseIcon size={name as keyof typeof editorIconSizes} tone="accent" />
+              <code className="text-[10px] text-[var(--editor-text-muted)]">{name} · {value}px</code>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-5">
+        <h2 className="text-sm font-semibold">Icon stroke</h2>
+        <div className="flex flex-wrap items-end gap-5">
+          {Object.entries(editorIconStrokeWidths).map(([name, value]) => (
+            <div key={name} className="flex flex-col items-center gap-2">
+              <DatabaseIcon size="xl" weight={name as keyof typeof editorIconStrokeWidths} />
+              <code className="text-[10px] text-[var(--editor-text-muted)]">{name} · {value}</code>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] p-5">
+        <h2 className="text-sm font-semibold">Icon tones</h2>
+        <div className="flex flex-wrap items-end gap-5">
+          {Object.keys(editorIconTones).map((name) => (
+            <div key={name} className="flex flex-col items-center gap-2">
+              <DatabaseIcon size="lg" tone={name as keyof typeof editorIconTones} />
+              <code className="text-[10px] text-[var(--editor-text-muted)]">{name}</code>
+            </div>
+          ))}
         </div>
       </section>
     </div>

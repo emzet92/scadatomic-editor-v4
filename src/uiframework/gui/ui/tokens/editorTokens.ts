@@ -87,6 +87,42 @@ export const editorShadows = {
   md: "0 12px 32px rgb(15 23 42 / 0.14)",
 } as const;
 
+export const editorIconSizes = {
+  xs: 11,
+  sm: 13,
+  md: 16,
+  lg: 20,
+  xl: 24,
+} as const;
+
+export type EditorIconSize = keyof typeof editorIconSizes;
+
+export const editorIconStrokeWidths = {
+  subtle: 1.5,
+  regular: 2,
+  strong: 2.25,
+} as const;
+
+export type EditorIconWeight = keyof typeof editorIconStrokeWidths;
+
+export const editorIconTones = {
+  default: `var(${editorColorTokens.text})`,
+  muted: `var(${editorColorTokens.textMuted})`,
+  soft: `var(${editorColorTokens.textSoft})`,
+  accent: `var(${editorColorTokens.accent})`,
+  success: `var(${editorColorTokens.success})`,
+  danger: `var(${editorColorTokens.danger})`,
+  inherit: "currentColor",
+} as const;
+
+export type EditorIconTone = keyof typeof editorIconTones;
+
+export const editorIconTokens = {
+  sizes: editorIconSizes,
+  strokeWidths: editorIconStrokeWidths,
+  tones: editorIconTones,
+} as const;
+
 export const editorZIndex = {
   base: 0,
   dropdown: 40,

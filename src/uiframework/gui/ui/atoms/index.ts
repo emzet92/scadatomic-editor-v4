@@ -2,7 +2,7 @@ export * from "./Badge";
 export * from "./Button";
 export * from "./Divider";
 export * from "./FormControls";
-export * from "./Icon";
+export * from "./icons";
 export * from "./Layout";
 export * from "./Overlay";
 export * from "./Pressable";
