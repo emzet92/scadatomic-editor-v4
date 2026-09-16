@@ -95,6 +95,9 @@ function validateIntents(intents: readonly Intent[]): void {
       case "navigate":
         if (!intent.path) throw new ExecutionPlanningError("navigate requires a path.");
         break;
+      case "theme-set":
+        if (!intent.themeId) throw new ExecutionPlanningError("theme-set requires a resolved theme id.");
+        break;
       case "state-set":
       case "state-delete":
         if (!intent.key) throw new ExecutionPlanningError(`${intent.type} requires a key.`);

@@ -92,6 +92,12 @@ export type NavigateIntent = BaseIntent & {
   path: string;
 };
 
+export type ThemeSetIntent = BaseIntent & {
+  type: "theme-set";
+  themeId: string;
+  themeName?: string | undefined;
+};
+
 export type StateSetIntent = BaseIntent & {
   type: "state-set";
   key: string;
@@ -133,6 +139,7 @@ export type Intent =
   | ModalOpenIntent
   | ModalCloseIntent
   | NavigateIntent
+  | ThemeSetIntent
   | StateSetIntent
   | StateDeleteIntent
   | StateClearIntent

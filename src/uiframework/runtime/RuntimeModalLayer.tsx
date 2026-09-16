@@ -22,10 +22,12 @@ export function RuntimeModalLayer({
   projectId,
   document,
   pageId,
+  themeId,
 }: {
   projectId: string;
   document: UiDocument;
   pageId: string;
+  themeId?: string | undefined;
 }) {
   useProjectModalRevision(projectId);
   const snapshot = getProjectModalSnapshot(projectId);
@@ -99,6 +101,7 @@ export function RuntimeModalLayer({
                 id={modal.rootId}
                 document={{ ...document, rootId: modal.rootId }}
                 registry={runtimeRegistry}
+                themeId={themeId}
                 decorateComponentInternals
                 resolveNode={(node, context) =>
                   resolveRuntimeNode(projectId, node, context.componentInstanceId)

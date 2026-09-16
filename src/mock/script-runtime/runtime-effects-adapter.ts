@@ -40,6 +40,9 @@ export function createMockRuntimeEffects(
     navigate(path) {
       host.navigateTo(path);
     },
+    setTheme(themeId) {
+      host.setTheme(themeId);
+    },
     setState(key, value) {
       setMockSessionValue(event.projectId, key, value);
     },
@@ -58,6 +61,16 @@ export function createMockRuntimeEffects(
 }
 
 export function validateMockRuntimeIntent(intent: Intent, host: MockScriptHost): void {
+  if (intent.type === "theme-set") {
+    const document = host.getDocument();
+    if (!document?.designSystem?.themes?.[intent.themeId]) {
+      throw new TypeError(`Unknown theme id: ${intent.themeId}`);
+    }
+    if (document.appearance?.themeMode !== "runtime") {
+      throw new TypeError("theme-set requires Runtime controlled theme mode.");
+    }
+    return;
+  }
   if (intent.type !== "set-value") return;
   const tagRuntime = host.getTagRuntime();
   if (!tagRuntime) throw new TypeError(`Tag runtime is unavailable for ${intent.target.path}.`);

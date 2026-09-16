@@ -84,6 +84,7 @@ export function intentTitle(intent: Intent): string {
     case "modal-open": return `Open ${intent.target.name}`;
     case "modal-close": return `Close ${intent.target.name}`;
     case "navigate": return `Navigate`;
+    case "theme-set": return `Set theme ${intent.themeName ?? intent.themeId}`;
     case "state-set": return `State set ${intent.key}`;
     case "state-delete": return `State delete ${intent.key}`;
     case "state-clear": return "State clear";
@@ -100,6 +101,7 @@ export function intentDetail(intent: Intent): string {
     case "modal-open": return intent.payload ? formatValue(intent.payload) : "open modal";
     case "modal-close": return intent.payload ? formatValue(intent.payload) : "close modal";
     case "navigate": return intent.path;
+    case "theme-set": return intent.themeId;
     case "state-set": return formatValue(intent.value);
     case "state-delete": return "delete";
     case "state-clear": return "clear all session state";

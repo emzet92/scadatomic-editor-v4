@@ -25,6 +25,15 @@ export function createCtxAutocompleteExtension(
 ): Extension {
   const roots: AutocompleteApiNode[] = [
     buildCtxApiTree(components, navigation, selfComponent, extraCtxChildren),
+    {
+      label: "App",
+      completionType: "namespace",
+      detail: "application runtime API",
+      children: [
+        { label: "theme", completionType: "property", detail: 'string · read/write in Runtime controlled mode' },
+        { label: "themeId", completionType: "property", detail: "string · read only" },
+      ],
+    },
     ...extraRoots,
   ];
 

@@ -3,9 +3,12 @@ import { getNavigationPathForPage } from "./navigation/navigation";
 import { WorkspaceHeader } from "./gui/workspace/WorkspaceHeader";
 import { useEditorStore } from "./editor-store";
 import { sendWsMessage } from "./websocket";
+import { Select } from "./gui/ui";
 
 export function Toolbar({ projectId }: { projectId?: string | undefined }) {
   const document = useEditorStore((state) => state.document);
+  const previewThemeId = useEditorStore((state) => state.previewThemeId);
+  const setPreviewDesignTheme = useEditorStore((state) => state.setPreviewDesignTheme);
   const activePageId = useEditorStore((state) => state.activePageId);
   const activePagePath = getNavigationPathForPage(document, activePageId);
   const scriptId = getFirstScriptId(document);
@@ -32,6 +35,22 @@ export function Toolbar({ projectId }: { projectId?: string | undefined }) {
       subtitle="Visual UI editor"
       actions={
         <>
+          {Object.keys(document.designSystem?.themes ?? {}).length > 0 ? (
+            <label className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)] px-2.5 text-xs text-[var(--editor-text-muted)]">
+              <span>Preview theme</span>
+              <Select
+                aria-label="Designer preview theme"
+                value={previewThemeId ?? document.appearance?.defaultThemeId ?? ""}
+                onChange={(event) => setPreviewDesignTheme(event.target.value)}
+                className="h-7 min-w-28 border-0 bg-transparent py-0 text-xs shadow-none focus:ring-0"
+              >
+                {Object.values(document.designSystem?.themes ?? {}).map((theme) => (
+                  <option key={theme.id} value={theme.id}>{theme.name}</option>
+                ))}
+              </Select>
+            </label>
+          ) : null}
+
           {projectId ? (
             <a
               data-editor-ignore

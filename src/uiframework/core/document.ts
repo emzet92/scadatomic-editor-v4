@@ -6,6 +6,12 @@ import type { ReactivePropertyBinding, ReactiveEventHandlerBinding } from "../..
 import { isReactivePropertyBinding, isReactiveEventHandlerBinding } from "../../reactivity";
 import { isDesignSystem, type DesignSystem } from "../design-system/colors";
 import { createDefaultDesignSystem, ensureDefaultDesignSystem, getDefaultDesignSystemPropsForType } from "../design-system/default-design-system";
+import {
+  createDefaultProjectAppearance,
+  ensureProjectAppearance,
+  isProjectAppearance,
+  type ProjectAppearance,
+} from "../design-system/theme-config";
 export type NodeId = string;
 export type PageId = string;
 export type ModalId = string;
@@ -130,6 +136,8 @@ export type UiDocument = {
   data?: ProjectData | undefined;
   /** Project-local design tokens shared by pages and reusable components. */
   designSystem?: DesignSystem | undefined;
+  /** Project runtime theme selection policy. Active runtime theme itself is session state. */
+  appearance?: ProjectAppearance | undefined;
   /** Runtime-triggered reactive handlers (tag change/rising/falling edge). */
   reactiveEvents?: Record<string, ReactiveEventHandlerBinding> | undefined;
 };
@@ -140,6 +148,7 @@ export function createUiDocument(
 ): UiDocument {
   const rootNode = nodes[rootId];
   const pageId = crypto.randomUUID();
+  const designSystem = createDefaultDesignSystem();
 
   return {
     schemaVersion: 4,
@@ -155,7 +164,8 @@ export function createUiDocument(
     },
     nodes,
     data: createEmptyProjectData(),
-    designSystem: createDefaultDesignSystem(),
+    designSystem,
+    appearance: createDefaultProjectAppearance(designSystem),
   };
 }
 
@@ -340,6 +350,13 @@ export function isUiDocument(value: unknown): value is UiDocument {
     return false;
   }
 
+  if (
+    candidate.appearance !== undefined &&
+    !isProjectAppearance(candidate.appearance, candidate.designSystem as DesignSystem | undefined)
+  ) {
+    return false;
+  }
+
   if (candidate.reactiveEvents !== undefined) {
     if (
       !isRecord(candidate.reactiveEvents) ||
@@ -360,9 +377,12 @@ export function parseUiDocument(value: unknown): UiDocument {
     throw new Error("Invalid UiDocument v4");
   }
 
+  const designSystem = ensureDefaultDesignSystem(value.designSystem);
+
   return {
     ...value,
-    designSystem: ensureDefaultDesignSystem(value.designSystem),
+    designSystem,
+    appearance: ensureProjectAppearance(value.appearance, designSystem),
   };
 }
 

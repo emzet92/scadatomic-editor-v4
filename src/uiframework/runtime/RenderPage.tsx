@@ -28,6 +28,11 @@ import {
   getReactiveNodeVariant,
   useProjectReactiveUiRevision,
 } from "../reactive-ui-state";
+import { resolveConfiguredThemeId, type SystemColorScheme } from "../design-system/theme-config";
+import {
+  getProjectRuntimeThemeSnapshot,
+  useProjectRuntimeThemeRevision,
+} from "./theme-runtime-state";
 
 export function RenderPage() {
   const { projectId, "*": routePath = "" } = useParams();
@@ -42,6 +47,8 @@ export function RenderPage() {
   // Derived UI changes live outside the persisted document. This subscription
   // repaints the renderer without mutating document props.
   useProjectReactiveUiRevision(projectId);
+  useProjectRuntimeThemeRevision(projectId);
+  const systemColorScheme = useSystemColorScheme();
 
   const showUpdateToast = useCallback(() => {
     setUpdateToastVisible(true);
@@ -115,6 +122,15 @@ export function RenderPage() {
     [document]
   );
 
+  const activeThemeId = resolveConfiguredThemeId({
+    appearance: document.appearance,
+    designSystem: document.designSystem,
+    runtimeThemeId: projectId
+      ? getProjectRuntimeThemeSnapshot(projectId).themeId
+      : undefined,
+    systemColorScheme,
+  });
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">
@@ -167,6 +183,7 @@ export function RenderPage() {
             id={renderDocument.rootId}
             document={renderDocument}
             registry={runtimeRegistry}
+            themeId={activeThemeId}
             decorateComponentInternals
             resolveNode={(node, context) => {
               if (!projectId) return node;
@@ -246,6 +263,7 @@ export function RenderPage() {
           projectId={projectId}
           document={document}
           pageId={currentPage.id}
+          themeId={activeThemeId}
         />
       ) : null}
 
@@ -256,6 +274,24 @@ export function RenderPage() {
       )}
     </div>
   );
+}
+
+function useSystemColorScheme(): SystemColorScheme {
+  const [scheme, setScheme] = useState<SystemColorScheme>(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setScheme(media.matches ? "dark" : "light");
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  return scheme;
 }
 
 function normalizeReactiveProps(

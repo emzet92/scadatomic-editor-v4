@@ -74,12 +74,14 @@ export function RendererRoot({
   projectId?: string | undefined;
 }) {
   useProjectReactiveUiRevision(projectId);
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
 
   return (
     <RenderNode
       id={document.rootId}
       document={document}
       registry={registry}
+      themeId={previewThemeId}
       decorateComponentInternals
       decorateProps={(node, context) => {
         const runtimeNodeId = context.internal && context.componentInstanceId
@@ -126,11 +128,13 @@ function ComponentModeRenderer({
   document: UiDocument;
   mode: ComponentEditorMode;
 }) {
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
   return (
     <RenderNode
       id={mode.nodeId}
       document={document}
       registry={editorRegistry}
+      themeId={previewThemeId}
       decorateProps={(node) => ({
         ...(node.id === mode.nodeId
           ? getComponentVariantProps(node, mode.variantName)
@@ -148,6 +152,7 @@ function ComponentDefinitionRenderer({
   document: UiDocument;
   mode: ComponentDefinitionEditorMode;
 }) {
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
   const definition = document.components?.[mode.componentId];
   if (!definition) return null;
   const componentDocument = createComponentDefinitionDocument(document, definition);
@@ -157,6 +162,7 @@ function ComponentDefinitionRenderer({
       id={definition.rootId}
       document={componentDocument}
       registry={editorRegistry}
+      themeId={previewThemeId}
       decorateProps={(node) => ({
         ...(node.id === mode.selectedInternalNodeId && mode.variantName
           ? getComponentVariantProps(node, mode.variantName)

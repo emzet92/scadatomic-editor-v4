@@ -36,6 +36,7 @@ export type RenderNodeProps = {
   decorateComponentInternals?: boolean | undefined;
   visited?: ReadonlySet<NodeId>;
   context?: RenderNodeContext;
+  themeId?: string | undefined;
 };
 
 export function RenderNode({
@@ -47,6 +48,7 @@ export function RenderNode({
   decorateComponentInternals = false,
   visited = new Set<NodeId>(),
   context = {},
+  themeId,
 }: RenderNodeProps): ReactNode {
   const sourceNode = document.nodes[id];
 
@@ -85,7 +87,8 @@ export function RenderNode({
 
     const instanceEnvironmentProps = resolveDesignTokenReferences(
       decorateProps?.(node, context) ?? {},
-      document.designSystem
+      document.designSystem,
+      themeId
     ) as Record<string, unknown>;
 
     return (
@@ -99,6 +102,7 @@ export function RenderNode({
           decorateComponentInternals={decorateComponentInternals}
           visited={new Set<NodeId>()}
           context={instanceContext}
+          themeId={themeId}
         />
       </div>
     );
@@ -111,11 +115,13 @@ export function RenderNode({
   nextVisited.add(id);
   const resolvedNodeProps = resolveDesignTokenReferences(
     node.props ?? {},
-    document.designSystem
+    document.designSystem,
+    themeId
   ) as Record<string, unknown>;
   const environmentProps = resolveDesignTokenReferences(
     decorateProps?.(node, context) ?? {},
-    document.designSystem
+    document.designSystem,
+    themeId
   ) as Record<string, unknown>;
 
   const repeatedChildren =
@@ -128,6 +134,7 @@ export function RenderNode({
           resolveNode,
           decorateComponentInternals,
           context,
+          themeId,
         })
       : undefined;
 
@@ -144,6 +151,7 @@ export function RenderNode({
           decorateComponentInternals={decorateComponentInternals}
           visited={nextVisited}
           context={context}
+          themeId={themeId}
         />
       ))}
     </Component>
@@ -158,6 +166,7 @@ function renderRepeatedChildren({
   resolveNode,
   decorateComponentInternals,
   context,
+  themeId,
 }: {
   node: UiNode;
   document: UiDocument;
@@ -166,6 +175,7 @@ function renderRepeatedChildren({
   resolveNode?: RenderNodeResolver | undefined;
   decorateComponentInternals: boolean;
   context: RenderNodeContext;
+  themeId?: string | undefined;
 }) {
   const behavior = node.contentBehavior;
   if (behavior?.kind !== "repeat") return undefined;
@@ -209,6 +219,7 @@ function renderRepeatedChildren({
         decorateComponentInternals={decorateComponentInternals}
         visited={new Set<NodeId>()}
         context={context}
+        themeId={themeId}
       />
     );
   });

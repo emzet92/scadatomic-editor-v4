@@ -12,23 +12,24 @@ import { isRecord } from "./tokens";
  */
 export function resolveDesignTokenReferences(
   value: unknown,
-  designSystem: DesignSystem | undefined
+  designSystem: DesignSystem | undefined,
+  themeId?: string | undefined
 ): unknown {
-  if (isColorTokenRef(value) || isSemanticColorTokenRef(value)) return resolveColorValue(value, designSystem);
+  if (isColorTokenRef(value) || isSemanticColorTokenRef(value)) return resolveColorValue(value, designSystem, undefined, themeId);
   if (isTypographyTokenRef(value)) return resolveTypographyValue(value, designSystem);
   if (isSpacingTokenRef(value)) return resolveSpacingValue(value, designSystem);
   if (isRadiusTokenRef(value)) return resolveRadiusValue(value, designSystem);
   if (isShadowTokenRef(value) || isShadowStyle(value)) return resolveShadowValue(value, designSystem);
   if (isBorderTokenRef(value) || isBorderStyle(value)) return resolveBorderValue(value, designSystem);
   if (Array.isArray(value)) {
-    return value.map((item) => resolveDesignTokenReferences(item, designSystem));
+    return value.map((item) => resolveDesignTokenReferences(item, designSystem, themeId));
   }
   if (!isRecord(value)) return value;
 
   return Object.fromEntries(
     Object.entries(value).map(([key, nested]) => [
       key,
-      resolveDesignTokenReferences(nested, designSystem),
+      resolveDesignTokenReferences(nested, designSystem, themeId),
     ])
   );
 }

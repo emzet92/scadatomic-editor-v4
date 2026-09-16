@@ -111,6 +111,8 @@ async function executeNode(node: ExecutionNode, effects: RuntimeEffects) {
       return effects.closeModal(intent.target, intent.payload);
     case "navigate":
       return effects.navigate(intent.path);
+    case "theme-set":
+      return effects.setTheme(intent.themeId);
     case "state-set":
       return effects.setState(intent.key, intent.value);
     case "state-delete":

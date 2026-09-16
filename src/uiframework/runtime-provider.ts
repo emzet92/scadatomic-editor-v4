@@ -10,6 +10,7 @@ import {
 } from "../mock/mock-runtime-ui-state";
 import { getComponentVariantProps } from "./component-variants";
 import { hydrateRuntimeTagState } from "./runtime-tag-bridge";
+import { setProjectRuntimeTheme } from "./runtime/theme-runtime-state";
 
 type RuntimeProviderProps = {
   projectId?: string | undefined;
@@ -81,6 +82,13 @@ export function RuntimeProvider({
         if (payload.type === "runtime.navigate") {
           if (typeof payload.path === "string") {
             onNavigateRef.current?.(payload.path);
+          }
+          return;
+        }
+
+        if (payload.type === "runtime.theme") {
+          if (projectId && typeof payload.themeId === "string") {
+            setProjectRuntimeTheme(projectId, payload.themeId);
           }
           return;
         }

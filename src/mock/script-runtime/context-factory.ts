@@ -4,6 +4,7 @@ import { getMockSessionValue } from "../mock-session-state";
 import { createUiApi } from "./component-api";
 import { createNavigationApi } from "./navigation-api";
 import { createModalApi } from "./modal-api";
+import { createAppApi } from "./app-api";
 import { createTagRuntimeContext } from "./tag-api";
 import type {
   MockScriptContext,
@@ -22,6 +23,7 @@ export function createScriptContext(
   const ui = createUiApi(host, event.projectId, () => ctx, environment);
   const nav = createNavigationApi(host, environment);
   const modals = createModalApi(host.getModals(), environment);
+  const app = createAppApi(host, environment);
   const tagRuntime = host.getTagRuntime();
   const contextRef: { current?: MockScriptContext } = {};
   const stateWrites = new Map<string, { deleted: boolean; value?: unknown }>();
@@ -81,6 +83,7 @@ export function createScriptContext(
     ui,
     nav,
     modals,
+    app,
     ...(tags ? { tags } : {}),
     navigateTo(path: string) {
       environment.collector.push({

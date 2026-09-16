@@ -31,6 +31,7 @@ export type {
   MockScriptContext,
   MockScriptEvent,
   MockScriptHost,
+  MockScriptAppApi,
   MockScriptInputsApi,
   MockScriptInternalApi,
   MockScriptNavigationApi,

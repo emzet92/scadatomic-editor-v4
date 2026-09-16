@@ -22,7 +22,7 @@ export function executeJavaScriptSource({
   globals?: Record<string, unknown> | undefined;
   sourceUrl: string;
 }) {
-  const reserved = new Set(["ctx", "self", "internal", "args"]);
+  const reserved = new Set(["ctx", "self", "internal", "args", "App"]);
   const globalEntries = Object.entries(globals).filter(
     ([name]) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) && !reserved.has(name)
   );
@@ -35,18 +35,20 @@ export function executeJavaScriptSource({
       "self",
       "internal",
       "args",
+      "App",
       ...globalNames,
       `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
     ) as (...values: unknown[]) => unknown;
-    return execute(ctx, self, internal, args, ...globalValues);
+    return execute(ctx, self, internal, args, ctx.app, ...globalValues);
   }
 
   const execute = new Function(
     "ctx",
     "self",
     "args",
+    "App",
     ...globalNames,
     `"use strict";\n${code}\n//# sourceURL=${sourceUrl}`
   ) as (...values: unknown[]) => unknown;
-  return execute(ctx, self, args, ...globalValues);
+  return execute(ctx, self, args, ctx.app, ...globalValues);
 }

@@ -468,6 +468,7 @@ function BorderSizeControl({ control, value, updateProp }: PropertyControlRender
 
 function ColorControl({ control, propName, value, updateProp }: PropertyControlRendererProps) {
   const designSystem = useEditorStore((state) => state.document.designSystem);
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
   if (control.kind !== "color") return null;
 
   const semanticColors = Object.values(designSystem?.semanticColors ?? {}).sort((a, b) =>
@@ -479,7 +480,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
   const primitiveRef = isColorTokenRef(value) ? value : undefined;
   const semanticRef = isSemanticColorTokenRef(value) ? value : undefined;
   const tokenRef = primitiveRef ?? semanticRef;
-  const resolved = resolveColorValue(value, designSystem);
+  const resolved = resolveColorValue(value, designSystem, undefined, previewThemeId);
   const literalValue = typeof value === "string" && value ? value : resolved;
   const mode = tokenRef ? "token" : "local";
   const selectedValue = semanticRef
@@ -557,7 +558,7 @@ function ColorControl({ control, propName, value, updateProp }: PropertyControlR
                   <optgroup label="Semantic">
                     {semanticColors.map((token) => (
                       <option key={token.id} value={`semantic:${token.id}`}>
-                        {token.name} — {resolveColorValue(createSemanticColorTokenRef(token.id), designSystem)}
+                        {token.name} — {resolveColorValue(createSemanticColorTokenRef(token.id), designSystem, undefined, previewThemeId)}
                       </option>
                     ))}
                   </optgroup>

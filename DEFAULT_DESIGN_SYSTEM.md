@@ -50,3 +50,7 @@ fallbacks. Project node defaults are the tokenized layer.
 `Design System -> Themes & Semantic` switches the active project theme and
 edits the semantic-to-foundation color mapping for that theme. Color property
 pickers show Semantic tokens before Foundation colors.
+
+## Runtime theme activation
+
+Theme definitions are no longer used as mutable runtime state. Runtime activation is configured through `UiDocument.appearance`, while Designer preview and runtime session overrides are separate. See `THEME_RUNTIME.md`.

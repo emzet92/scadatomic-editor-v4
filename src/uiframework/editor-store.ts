@@ -91,6 +91,10 @@ import {
 } from "./design-system/borders";
 import { detachBorderTokenFromDocument } from "./design-system/document-borders";
 import { createUniqueTokenName } from "./design-system/tokens";
+import {
+  ensureProjectAppearance,
+  type ThemeRuntimeMode,
+} from "./design-system/theme-config";
 
 export type DragPreview = {
   type: string;
@@ -114,6 +118,8 @@ type NodeDragCandidate = {
 type EditorState = {
   activePageId: PageId;
   activeModalId: ModalId | null;
+  /** Designer-only preview. Never persisted as runtime state. */
+  previewThemeId: DesignThemeId | null;
   selectedNodeId: NodeId | null;
   selectedNodeIds: NodeId[];
   document: UiDocument;
@@ -123,7 +129,10 @@ type EditorState = {
   addStarterColorPalette: () => void;
   updateColorToken: (tokenId: ColorTokenId, patch: Partial<Pick<ColorToken, "name" | "value" | "description">>) => void;
   deleteColorToken: (tokenId: ColorTokenId) => void;
-  setActiveDesignTheme: (themeId: DesignThemeId) => void;
+  setPreviewDesignTheme: (themeId: DesignThemeId) => void;
+  setThemeRuntimeMode: (mode: ThemeRuntimeMode) => void;
+  setDefaultDesignTheme: (themeId: DesignThemeId) => void;
+  setSystemDesignTheme: (scheme: "light" | "dark", themeId: DesignThemeId) => void;
   setSemanticColorThemeValue: (tokenId: SemanticColorTokenId, themeId: DesignThemeId, colorTokenId: ColorTokenId) => void;
   addTypographyToken: (draft?: Partial<Omit<TypographyToken, "id">>) => TypographyTokenId;
   addStarterTypographyPalette: () => void;
@@ -338,6 +347,10 @@ function createUniquePageName(
 export const useEditorStore = create<EditorState>((set) => ({
   activePageId: initialEditorDocument.startPageId,
   activeModalId: null,
+  previewThemeId:
+    initialEditorDocument.appearance?.defaultThemeId ??
+    initialEditorDocument.designSystem?.activeThemeId ??
+    null,
   selectedNodeId: null,
   selectedNodeIds: [],
   document: initialEditorDocument,
@@ -448,14 +461,56 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
   },
 
-  setActiveDesignTheme: (themeId) => {
+  setPreviewDesignTheme: (themeId) => {
     set((state) => {
       const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
-      if (!designSystem.themes?.[themeId] || designSystem.activeThemeId === themeId) return state;
+      if (!designSystem.themes?.[themeId] || state.previewThemeId === themeId) return state;
+      return { previewThemeId: themeId };
+    });
+  },
+
+  setThemeRuntimeMode: (mode) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      const appearance = ensureProjectAppearance(state.document.appearance, designSystem);
+      if (appearance.themeMode === mode) return state;
       return {
         document: {
           ...state.document,
+          appearance: { ...appearance, themeMode: mode },
+        },
+      };
+    });
+  },
+
+  setDefaultDesignTheme: (themeId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      if (!designSystem.themes?.[themeId]) return state;
+      const appearance = ensureProjectAppearance(state.document.appearance, designSystem);
+      if (appearance.defaultThemeId === themeId) return state;
+      return {
+        document: {
+          ...state.document,
+          appearance: { ...appearance, defaultThemeId: themeId },
+          // Keep the legacy field aligned for code paths that do not pass an explicit theme yet.
           designSystem: { ...designSystem, activeThemeId: themeId },
+        },
+      };
+    });
+  },
+
+  setSystemDesignTheme: (scheme, themeId) => {
+    set((state) => {
+      const designSystem = state.document.designSystem ?? createEmptyDesignSystem();
+      if (!designSystem.themes?.[themeId]) return state;
+      const appearance = ensureProjectAppearance(state.document.appearance, designSystem);
+      const key = scheme === "dark" ? "systemDarkThemeId" : "systemLightThemeId";
+      if (appearance[key] === themeId) return state;
+      return {
+        document: {
+          ...state.document,
+          appearance: { ...appearance, [key]: themeId },
         },
       };
     });
@@ -1308,6 +1363,11 @@ export const useEditorStore = create<EditorState>((set) => ({
       document,
       activePageId: startPage.id,
       activeModalId: null,
+      previewThemeId:
+        document.appearance?.defaultThemeId ??
+        document.designSystem?.activeThemeId ??
+        Object.keys(document.designSystem?.themes ?? {})[0] ??
+        null,
       selectedNodeIds: [startPage.rootId],
       selectedNodeId: startPage.rootId,
       draggedNodeId: null,

@@ -15,6 +15,7 @@ export interface RuntimeEffects {
   openModal(target: ModalReference, payload?: Record<string, unknown>): void | Promise<void>;
   closeModal(target: ModalReference, payload?: Record<string, unknown>): void | Promise<void>;
   navigate(path: string): void | Promise<void>;
+  setTheme(themeId: string): void | Promise<void>;
   setState(key: string, value: unknown): void | Promise<void>;
   deleteState(key: string): void | Promise<void>;
   clearState(): void | Promise<void>;

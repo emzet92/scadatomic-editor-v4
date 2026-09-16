@@ -1,6 +1,6 @@
 import type { TagRuntime } from "../../uiframework/data/runtime/TagRuntime";
 import type { TagRuntimeApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
-import type { UiComponentDefinition, UiModal, UiNode } from "../../uiframework/core/document";
+import type { UiComponentDefinition, UiDocument, UiModal, UiNode } from "../../uiframework/core/document";
 import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
 import type { IntentCollector, IntentSource } from "../../execution";
 
@@ -35,6 +35,9 @@ export type MockScriptHost = {
   getTagRuntime(): TagRuntime | undefined;
   getNavigationTree(): NavigationTreeNode[];
   getModals(): UiModal[];
+  getDocument(): UiDocument | undefined;
+  getActiveThemeId(): string | undefined;
+  setTheme(themeId: string): void;
   navigateTo(path: string): void;
   emit(eventName: string, payload?: Record<string, unknown>): void;
 };
@@ -84,6 +87,11 @@ export type MockScriptModalApi = {
 
 export type MockScriptModalsApi = Record<string, MockScriptModalApi>;
 
+export type MockScriptAppApi = {
+  theme: string;
+  readonly themeId: string;
+};
+
 export type MockScriptContext = {
   projectId: string;
   handlerId: string;
@@ -99,6 +107,7 @@ export type MockScriptContext = {
   ui: MockScriptUiApi;
   nav: MockScriptNavigationApi;
   modals: MockScriptModalsApi;
+  app: MockScriptAppApi;
   inputs?: MockScriptInputsApi | undefined;
   tags?: TagRuntimeApi | undefined;
   navigateTo(path: string): void;

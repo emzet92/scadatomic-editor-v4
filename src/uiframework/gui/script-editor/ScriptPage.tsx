@@ -420,6 +420,8 @@ function ScriptEditor({
                     ctx API
                   </div>
                   <div className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
+                    <code>App.theme = "dark"</code>
+                    <code>App.theme / App.themeId</code>
                     <code>ctx.sourceNodeId</code>
                     <code>ctx.eventName</code>
                     <code>ctx.state.get(key, fallback?)</code>

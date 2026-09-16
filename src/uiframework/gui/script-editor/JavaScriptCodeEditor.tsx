@@ -38,7 +38,7 @@ export function JavaScriptCodeEditor({
   modals = [],
   projectData,
   extraAutocompleteRoots = [],
-  autocompleteHint = "ctx · self · internal · tags autocomplete",
+  autocompleteHint = "ctx · App · self · internal · tags autocomplete",
   height = "420px",
 }: JavaScriptCodeEditorProps) {
   const tagRoots = useMemo(

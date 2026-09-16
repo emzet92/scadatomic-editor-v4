@@ -180,16 +180,18 @@ export function normalizeColorForNativeInput(value: string, fallback = "#18181b"
 export function resolveColorValue(
   value: unknown,
   designSystem: DesignSystem | undefined,
-  fallback = DEFAULT_COLOR_LITERAL
+  fallback = DEFAULT_COLOR_LITERAL,
+  themeId?: DesignThemeId | undefined
 ): string {
-  return resolveColorValueInternal(value, designSystem, fallback, new Set());
+  return resolveColorValueInternal(value, designSystem, fallback, new Set(), themeId);
 }
 
 function resolveColorValueInternal(
   value: unknown,
   designSystem: DesignSystem | undefined,
   fallback: string,
-  visitedSemanticIds: Set<string>
+  visitedSemanticIds: Set<string>,
+  themeId?: DesignThemeId | undefined
 ): string {
   if (typeof value === "string" && value.trim()) return value;
   if (isColorTokenRef(value)) {
@@ -200,7 +202,7 @@ function resolveColorValueInternal(
     const token = designSystem?.semanticColors?.[value.tokenId];
     if (!token) return fallback;
 
-    const activeThemeId = designSystem?.activeThemeId;
+    const activeThemeId = themeId ?? designSystem?.activeThemeId;
     const source =
       (activeThemeId ? token.values[activeThemeId] : undefined) ??
       Object.values(token.values)[0];
@@ -208,7 +210,7 @@ function resolveColorValueInternal(
 
     const nextVisited = new Set(visitedSemanticIds);
     nextVisited.add(value.tokenId);
-    return resolveColorValueInternal(source, designSystem, fallback, nextVisited);
+    return resolveColorValueInternal(source, designSystem, fallback, nextVisited, themeId);
   }
   return fallback;
 }

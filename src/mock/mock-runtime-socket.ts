@@ -36,6 +36,11 @@ import {
   isMockRuntimeAuthority,
   subscribeMockRuntimeAuthority,
 } from "./mock-runtime-authority";
+import { resolveConfiguredThemeId } from "../uiframework/design-system/theme-config";
+import {
+  getProjectRuntimeThemeSnapshot,
+  setProjectRuntimeTheme,
+} from "../uiframework/runtime/theme-runtime-state";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -279,6 +284,31 @@ class MockRuntimeSocket extends EventTarget {
         getModals: () => {
           const document = this.getProjectDocument(projectId);
           return Object.values(document?.modals ?? {});
+        },
+        getDocument: () => this.getProjectDocument(projectId),
+        getActiveThemeId: () => {
+          const document = this.getProjectDocument(projectId);
+          if (!document) return undefined;
+          return resolveConfiguredThemeId({
+            appearance: document.appearance,
+            designSystem: document.designSystem,
+            runtimeThemeId: getProjectRuntimeThemeSnapshot(projectId).themeId,
+            systemColorScheme:
+              typeof window !== "undefined" &&
+              typeof window.matchMedia === "function" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light",
+          });
+        },
+        setTheme: (themeId) => {
+          setProjectRuntimeTheme(projectId, themeId);
+          this.emitMockResponse({
+            type: "runtime.theme",
+            projectId,
+            themeId,
+            timestamp: Date.now(),
+          });
         },
         navigateTo: (path) => {
           this.emitMockResponse({
