@@ -3,6 +3,7 @@ import {
   CloudIcon,
   CodeIcon,
   DashboardIcon,
+  FileTextIcon,
   Inline,
   NavTab,
   NavTabs,
@@ -14,7 +15,7 @@ import {
 } from "../ui";
 import { useNavigate } from "react-router-dom";
 
-export type WorkspaceId = "editor" | "scripts" | "dependencies" | "cloud";
+export type WorkspaceId = "editor" | "scripts" | "dependencies" | "reports" | "cloud";
 
 type WorkspaceRouteContext = {
   projectId?: string | undefined;
@@ -32,6 +33,7 @@ const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
   { id: "editor", label: "Editor", icon: DashboardIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}` : "/" },
   { id: "scripts", label: "Scripts", icon: CodeIcon, href: ({ projectId, scriptId }) => projectId ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}` : null },
   { id: "dependencies", label: "Dependencies", icon: NetworkIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/dependencies` : null },
+  { id: "reports", label: "Reports", icon: FileTextIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/reports` : null },
   { id: "cloud", label: "Cloud", icon: CloudIcon, href: () => "/cloud/fleet" },
 ];
 
