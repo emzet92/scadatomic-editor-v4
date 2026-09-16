@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { WorkspaceHeader } from "../../uiframework/gui/workspace/WorkspaceHeader";
-import { Badge, FileTextIcon, WorkspaceShell } from "../../uiframework/gui/ui";
+import {
+  Badge,
+  FileTextIcon,
+  Inline,
+  PlayIcon,
+  SegmentedControl,
+  SegmentedControlItem,
+  Text,
+  WorkspaceShell,
+} from "../../uiframework/gui/ui";
 import {
   addReportLayout,
   addReportPage,
@@ -16,6 +25,7 @@ import {
 } from "../core";
 import { ReportCanvas } from "./ReportCanvas";
 import { ReportInspector } from "./ReportInspector";
+import { ReportPreview } from "./ReportPreview";
 import { ReportSidebar, type ReportSidebarMode } from "./ReportSidebar";
 
 export function ReportDesignerPage() {
@@ -28,6 +38,7 @@ function ReportDesigner({ projectId }: { projectId: string }) {
   const [document, setDocument] = useState(() => createReportDocument(projectId));
   const initialPageId = document.pageOrder[0]!;
   const [sidebarMode, setSidebarMode] = useState<ReportSidebarMode>("components");
+  const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [selection, setSelection] = useState<ReportSelection>(() => ({
     kind: "surface",
     target: { kind: "page", id: initialPageId },
@@ -73,17 +84,55 @@ function ReportDesigner({ projectId }: { projectId: string }) {
     })));
   }
 
+  const header = (
+    <WorkspaceHeader
+      active="reports"
+      projectId={projectId}
+      title="Report Designer"
+      subtitle={mode === "preview" ? "Report preview" : "Page-based report authoring"}
+      actions={
+        <Inline gap="sm">
+          <SegmentedControl variant="soft">
+            <SegmentedControlItem
+              variant="soft"
+              active={mode === "edit"}
+              aria-label="Edit report"
+              onClick={() => setMode("edit")}
+            >
+              <Inline gap="xs">
+                <PlayIcon size="xs" />
+                <Text variant="caption" tone="inherit">Edit</Text>
+              </Inline>
+            </SegmentedControlItem>
+            <SegmentedControlItem
+              variant="soft"
+              active={mode === "preview"}
+              aria-label="Preview report"
+              onClick={() => setMode("preview")}
+            >
+              <Inline gap="xs">
+                <PlayIcon size="xs" />
+                <Text variant="caption" tone="inherit">Preview</Text>
+              </Inline>
+            </SegmentedControlItem>
+          </SegmentedControl>
+          <Badge variant="warning" icon={<FileTextIcon size="xs" />}>Placeholder</Badge>
+        </Inline>
+      }
+    />
+  );
+
+  if (mode === "preview") {
+    return (
+      <WorkspaceShell header={header}>
+        <ReportPreview document={document} />
+      </WorkspaceShell>
+    );
+  }
+
   return (
     <WorkspaceShell
-      header={
-        <WorkspaceHeader
-          active="reports"
-          projectId={projectId}
-          title="Report Designer"
-          subtitle="Page-based report authoring"
-          actions={<Badge variant="warning" icon={<FileTextIcon size="xs" />}>Placeholder</Badge>}
-        />
-      }
+      header={header}
       sidebar={
         <ReportSidebar
           document={document}

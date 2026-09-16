@@ -19,6 +19,7 @@ import type {
   ReportSelection,
   ReportSurfaceTarget,
 } from "../core";
+import { ReportComponentContent } from "./ReportRender";
 
 export function ReportCanvas({
   document,
@@ -199,28 +200,7 @@ function ReportComponentPreview({
         onClick();
       }}
     >
-      <Text
-        as="div"
-        tone="inherit"
-        style={{
-          color: component.props.color,
-          fontSize: `${component.props.fontSize}px`,
-          fontWeight: weightToCss(component.props.fontWeight),
-          textAlign: component.props.align,
-          lineHeight: 1.45,
-        }}
-      >
-        {component.props.text || "Empty text"}
-      </Text>
+      <ReportComponentContent component={component} />
     </Pressable>
   );
-}
-
-function weightToCss(weight: ReportComponent["props"]["fontWeight"]): number {
-  switch (weight) {
-    case "medium": return 500;
-    case "semibold": return 600;
-    case "bold": return 700;
-    default: return 400;
-  }
 }
