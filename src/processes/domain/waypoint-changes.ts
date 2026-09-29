@@ -1,4 +1,4 @@
-import type { AnimationPath, AnimationWaypointChanges } from "./animation-path";
+import type { AnimationPath, AnimationWaypointChanges } from "./process-path";
 
 /**
  * Resolves cumulative discrete state after reaching a waypoint.

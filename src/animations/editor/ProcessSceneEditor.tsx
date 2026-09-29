@@ -1,4 +1,4 @@
-import type { ProcessScene, ProcessSensor, ProcessZone } from "../model/process-scene";
+import type { ProcessScene, ProcessSensor, ProcessZone } from "../../processes";
 import {
   AddIcon,
   Box,

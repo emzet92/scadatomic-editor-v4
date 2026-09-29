@@ -52,7 +52,7 @@ export function PageHeader({
             </Text>
           </Inline>
         ) : null}
-        <Heading level={1} size="xl" className={cx(eyebrow && "mt-2")}>{title}</Heading>
+        <Heading level={1} size="xl" className={cx(Boolean(eyebrow) && "mt-2")}>{title}</Heading>
         {description ? (
           <Text as="div" variant="body" tone="muted" className="mt-1 max-w-2xl">
             {description}

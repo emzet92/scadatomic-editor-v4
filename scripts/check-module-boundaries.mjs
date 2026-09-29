@@ -7,12 +7,12 @@ const codeExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
 // Hard architectural rules. These are intentionally conservative: they protect
 // domain/core modules from drifting back toward the Designer application layer.
 const forbidden = {
-  shared: new Set(["animations", "assets", "design-system", "designer", "fleet", "mock", "project", "reactivity", "reporting", "runtime", "scripting", "tags", "visualization"]),
-  "design-system": new Set(["animations", "designer", "mock", "project", "runtime", "tags", "visualization"]),
-  tags: new Set(["animations", "designer", "mock", "project", "runtime", "visualization"]),
-  reactivity: new Set(["animations", "designer", "mock", "project", "runtime", "visualization"]),
+  shared: new Set(["animations", "assets", "processes", "design-system", "designer", "fleet", "mock", "project", "reactivity", "reporting", "runtime", "scripting", "tags", "visualization"]),
+  "design-system": new Set(["animations", "designer", "mock", "processes", "project", "runtime", "tags", "visualization"]),
+  tags: new Set(["animations", "designer", "mock", "processes", "project", "runtime", "visualization"]),
+  reactivity: new Set(["animations", "designer", "mock", "processes", "project", "runtime", "visualization"]),
   visualization: new Set(["designer", "mock"]),
-  fleet: new Set(["animations", "designer", "mock", "project", "reactivity", "runtime", "scripting", "tags", "visualization"]),
+  fleet: new Set(["animations", "designer", "mock", "processes", "project", "reactivity", "runtime", "scripting", "tags", "visualization"]),
 };
 
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;
@@ -44,6 +44,22 @@ for (const file of walk(srcRoot)) {
     const target = path.resolve(path.dirname(file), specifier);
     if (!target.startsWith(srcRoot + path.sep)) continue;
     const targetModule = topModule(target);
+
+    if (sourceModule === "processes") {
+      const sourceRel = path.relative(path.join(srcRoot, "processes"), file);
+      const sourceLayer = sourceRel.split(path.sep)[0];
+      const allowedLayers = processLayerRules[sourceLayer];
+      if (allowedLayers) {
+        const targetRel = path.relative(path.join(srcRoot, "processes"), target);
+        const targetInsideProcesses = !targetRel.startsWith(`..${path.sep}`) && targetRel !== "..";
+        const targetLayer = targetInsideProcesses ? targetRel.split(path.sep)[0] : null;
+        if (!targetLayer || !allowedLayers.has(targetLayer)) {
+          violations.push(
+            `${path.relative(process.cwd(), file)} crosses process layer ${sourceLayer} -> ${targetModule}/${targetLayer ?? "external"} via ${specifier}`,
+          );
+        }
+      }
+    }
 
     if (blocked.has(targetModule)) {
       violations.push(

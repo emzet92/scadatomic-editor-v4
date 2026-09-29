@@ -12,9 +12,11 @@ import {
   SearchIcon,
   TemplateIcon,
   TypographyIcon,
+  WorkflowIcon,
   type IconComponent
 } from "../../shared/ui";
 import { useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useEditorStore } from "../state/editor-store";
 import { getPageKind } from "../../project/model/document";
 import {
@@ -26,6 +28,7 @@ import {
   getDefaultPropsForType,
   type RegisteredComponentType,
 } from "../../visualization/components/registry/component-definitions";
+import { useProcesses } from "../../processes";
 
 const icons = {
   Page: TemplateIcon,
@@ -35,6 +38,7 @@ const icons = {
   Text: TypographyIcon,
   Button: RectangleIcon,
   Chart: ChartLineIcon,
+  Process: WorkflowIcon,
   Navigation: MenuIcon,
   Image: ImageIcon,
 } satisfies Record<RegisteredComponentType, IconComponent>;
@@ -47,6 +51,8 @@ export function ComponentPalette({
   onEditComponentDefinition?: ((componentId: string) => void) | undefined;
 } = {}) {
   const [search, setSearch] = useState("");
+  const { projectId } = useParams();
+  const processList = useProcesses(projectId);
   const startComponentDrag = useEditorStore((s) => s.startComponentDrag);
   const document = useEditorStore((s) => s.document);
   const activePageId = useEditorStore((s) => s.activePageId);
@@ -63,8 +69,12 @@ export function ComponentPalette({
     (item) =>
       item.type !== "Page" &&
       item.type !== "Modal" &&
+      item.type !== "Process" &&
       (item.type !== "PageSlot" || (editingLayout && !ownerComponentId)) &&
       item.label.toLowerCase().includes(normalizedSearch)
+  );
+  const processItems = processList.items.filter((item) =>
+    item.name.toLowerCase().includes(normalizedSearch)
   );
   const reusableItems = reusableComponents.filter((item) =>
     item.name.toLowerCase().includes(normalizedSearch) &&
@@ -92,6 +102,56 @@ export function ComponentPalette({
             className="w-full h-10 pl-10 pr-3 rounded-xl border border-[var(--editor-border)] bg-[var(--editor-surface)] text-sm text-[var(--editor-text)] outline-none placeholder:text-[var(--editor-text-soft)] focus:border-[var(--editor-accent-border)] focus:ring-2 focus:ring-[var(--editor-accent-soft)]"
           />
         </Box>
+      </Box>
+
+      <Box className="space-y-2">
+        <Box className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-600">
+          <WorkflowIcon size={12} /> Process library
+        </Box>
+
+        {processItems.length > 0 ? (
+          processItems.map((process) => (
+            <Pressable
+              key={process.id}
+              data-editor-ignore
+              onPointerDown={(event) => {
+                event.preventDefault();
+                startComponentDrag({
+                  type: "Process",
+                  label: process.name,
+                  props: {
+                    processId: process.id,
+                    width: "100%",
+                    height: 320,
+                    showGrid: true,
+                  },
+                });
+              }}
+              className="w-full p-3 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 transition-all flex items-start gap-3 text-left cursor-grab select-none"
+            >
+              <Box className="h-10 w-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                <WorkflowIcon size={18} />
+              </Box>
+              <Box className="min-w-0 flex-1">
+                <Box className="truncate text-sm font-semibold text-[var(--editor-text)]">
+                  {process.name}
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)]">
+                  Saved process · drag to canvas
+                </Box>
+              </Box>
+              <DragHandleIcon size={16} className="mt-3 shrink-0 text-indigo-400" />
+            </Pressable>
+          ))
+        ) : (
+          <Box className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 px-3 py-3 text-[10px] leading-4 text-indigo-700/80">
+            {processList.loading
+              ? "Loading saved processes…"
+              : projectId
+                ? "Save a process in Animations and it will appear here."
+                : "Open a saved project to use the process library."}
+          </Box>
+        )}
       </Box>
 
       <Box className="space-y-2">
@@ -196,7 +256,7 @@ export function ComponentPalette({
         })}
       </Box>
 
-      {items.length === 0 && reusableItems.length === 0 ? (
+      {items.length === 0 && reusableItems.length === 0 && processItems.length === 0 ? (
         <Box className="py-8 text-center text-sm text-[var(--editor-text-muted)]">
           No components found
         </Box>

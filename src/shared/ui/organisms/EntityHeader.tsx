@@ -29,7 +29,7 @@ export function EntityHeader({
         {icon ? <IconTile size={compact ? "md" : "lg"}>{icon}</IconTile> : null}
         <Stack gap="none" className="min-w-0">
           {eyebrow ? <Text as="div" variant="eyebrow" tone="muted">{eyebrow}</Text> : null}
-          <Heading level={1} size={compact ? "md" : "lg"} className={cx(eyebrow && "mt-1")}>{title}</Heading>
+          <Heading level={1} size={compact ? "md" : "lg"} className={cx(Boolean(eyebrow) && "mt-1")}>{title}</Heading>
           {description ? <Text as="p" variant="body" tone="muted" className="mt-1">{description}</Text> : null}
         </Stack>
       </Inline>

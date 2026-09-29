@@ -1,4 +1,4 @@
-import type { AnimationPath, AnimationWaypoint } from "../model/animation-path";
+import type { AnimationPath, AnimationWaypoint } from "../domain/process-path";
 
 export type SampledPathPosition = {
   x: number;

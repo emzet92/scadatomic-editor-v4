@@ -1,4 +1,4 @@
-import type { ProcessObjectState } from "./animation-path";
+import type { ProcessObjectState } from "./process-path";
 
 export type ProcessStateAppearance = {
   label: string;

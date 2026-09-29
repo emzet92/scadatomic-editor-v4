@@ -36,7 +36,7 @@ export function ChoiceCard({
       {...props}
     >
       {preview}
-      <Inline align="start" gap="md" className={cx("min-w-0", preview && "mt-2")}>
+      <Inline align="start" gap="md" className={cx("min-w-0", Boolean(preview) && "mt-2")}>
         {icon ? (
           <Box className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--editor-surface-muted)] text-[var(--editor-text-muted)]">
             {icon}

@@ -1,14 +1,10 @@
-import type {
-  AnimationPath,
-  AnimationWaypoint,
-  ProcessObjectState,
-} from "../model/animation-path";
-import { resolveWaypointChanges } from "../model/waypoint-changes";
+import type { AnimationPath, AnimationWaypoint, ProcessObjectState } from "../../processes";
 import {
   DEFAULT_PROCESS_OBJECT_STATE,
   getProcessStateAppearance,
   processStateAppearances,
-} from "../model/process-state";
+  resolveWaypointChanges,
+} from "../../processes";
 import {
   AddIcon,
   Box,

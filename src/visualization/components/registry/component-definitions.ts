@@ -8,6 +8,7 @@ import { navigationDefinition } from "./components/navigation";
 import { modalDefinition } from "./components/modal";
 import { pageDefinition } from "./components/page";
 import { pageSlotDefinition } from "./components/page-slot";
+import { processDefinition } from "./components/process";
 import { textDefinition } from "./components/text";
 
 export type { ComponentDefinition, InspectorControl } from "./component-definition-types";
@@ -22,6 +23,7 @@ export const componentDefinitions = {
   Button: buttonDefinition,
   Image: imageDefinition,
   Chart: chartDefinition,
+  Process: processDefinition,
 } satisfies Record<string, ComponentDefinition>;
 
 export type RegisteredComponentType = keyof typeof componentDefinitions;
