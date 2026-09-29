@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import {
+  ActivityIcon,
   CloudIcon,
   CodeIcon,
   DashboardIcon,
@@ -15,7 +16,7 @@ import {
 } from "..";
 import { useNavigate } from "react-router-dom";
 
-export type WorkspaceId = "editor" | "scripts" | "dependencies" | "reports" | "cloud";
+export type WorkspaceId = "editor" | "scripts" | "dependencies" | "reports" | "animations" | "cloud";
 
 type WorkspaceRouteContext = {
   projectId?: string | undefined;
@@ -34,6 +35,7 @@ const DEFAULT_WORKSPACES: readonly WorkspaceItem[] = [
   { id: "scripts", label: "Scripts", icon: CodeIcon, href: ({ projectId, scriptId }) => projectId ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(scriptId ?? "default")}` : null },
   { id: "dependencies", label: "Dependencies", icon: NetworkIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/dependencies` : null },
   { id: "reports", label: "Reports", icon: FileTextIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/reports` : null },
+  { id: "animations", label: "Animations", icon: ActivityIcon, href: ({ projectId }) => projectId ? `/project/${encodeURIComponent(projectId)}/animations` : "/animations" },
   { id: "cloud", label: "Cloud", icon: CloudIcon, href: () => "/cloud/fleet" },
 ];
 

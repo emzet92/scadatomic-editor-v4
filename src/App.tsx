@@ -5,6 +5,7 @@ import { RenderPage } from "./runtime/pages/RenderPage";
 import { DependenciesPage } from "./designer/features/dependencies/DependenciesPage";
 import { FleetManagementPage } from "./fleet/pages/FleetManagementPage";
 import { ReportDesignerPage } from "./reporting";
+import { AnimationLabPage } from "./animations";
 
 function App() {
   return (
@@ -15,6 +16,8 @@ function App() {
       <Route path="/cloud/fleet" element={<FleetManagementPage />} />
       <Route path="/render/:projectId/*" element={<RenderPage />} />
       <Route path="/project/:projectId/reports" element={<ReportDesignerPage />} />
+      <Route path="/animations" element={<AnimationLabPage />} />
+      <Route path="/project/:projectId/animations" element={<AnimationLabPage />} />
       <Route
         path="/project/:projectId/dependencies"
         element={<DependenciesPage />}

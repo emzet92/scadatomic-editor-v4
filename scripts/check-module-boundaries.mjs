@@ -7,12 +7,12 @@ const codeExtensions = new Set([".ts", ".tsx", ".js", ".jsx"]);
 // Hard architectural rules. These are intentionally conservative: they protect
 // domain/core modules from drifting back toward the Designer application layer.
 const forbidden = {
-  shared: new Set(["assets", "design-system", "designer", "fleet", "mock", "project", "reactivity", "reporting", "runtime", "scripting", "tags", "visualization"]),
-  "design-system": new Set(["designer", "mock", "project", "runtime", "tags", "visualization"]),
-  tags: new Set(["designer", "mock", "project", "runtime", "visualization"]),
-  reactivity: new Set(["designer", "mock", "project", "runtime", "visualization"]),
+  shared: new Set(["animations", "assets", "design-system", "designer", "fleet", "mock", "project", "reactivity", "reporting", "runtime", "scripting", "tags", "visualization"]),
+  "design-system": new Set(["animations", "designer", "mock", "project", "runtime", "tags", "visualization"]),
+  tags: new Set(["animations", "designer", "mock", "project", "runtime", "visualization"]),
+  reactivity: new Set(["animations", "designer", "mock", "project", "runtime", "visualization"]),
   visualization: new Set(["designer", "mock"]),
-  fleet: new Set(["designer", "mock", "project", "reactivity", "runtime", "scripting", "tags", "visualization"]),
+  fleet: new Set(["animations", "designer", "mock", "project", "reactivity", "runtime", "scripting", "tags", "visualization"]),
 };
 
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;
