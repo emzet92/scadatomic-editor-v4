@@ -259,7 +259,7 @@ function AnimationStage({
         ))}
 
         <g
-          transform={`translate(${position.x} ${position.y})`}
+          transform={`translate(${position.x} ${position.y}) rotate(${position.angleDegrees})`}
           filter="url(#animation-lab-shadow)"
           data-progress={progress.toFixed(4)}
         >

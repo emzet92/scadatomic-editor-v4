@@ -92,7 +92,7 @@ function findSegmentIndex(metrics: PathMetrics, distance: number): number {
     const segment = metrics.segments[index];
     if (!segment) continue;
 
-    if (distance <= segment.startDistance + segment.length || index === lastIndex) {
+    if (distance < segment.startDistance + segment.length || index === lastIndex) {
       return index;
     }
   }
