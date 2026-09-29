@@ -1,10 +1,10 @@
 import type { AnimationPath, AnimationWaypointChanges } from "./animation-path";
 
 /**
- * Resolves the cumulative discrete state after reaching a waypoint.
+ * Resolves cumulative discrete state after reaching a waypoint.
  *
  * A waypoint only overrides properties it defines. This gives us keyframe-like
- * semantics without interpolating state that should change instantly.
+ * semantics without interpolating process state that should change instantly.
  */
 export function resolveWaypointChanges(
   path: AnimationPath,

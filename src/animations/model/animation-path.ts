@@ -1,5 +1,14 @@
+export type ProcessObjectState =
+  | "raw"
+  | "processing"
+  | "inspection"
+  | "passed"
+  | "rejected";
+
 export type AnimationWaypointChanges = {
-  /** Box fill applied from this waypoint until another waypoint overrides it. */
+  /** Semantic product/process state applied from this waypoint onward. */
+  objectState?: ProcessObjectState;
+  /** Optional visual override. Prefer objectState for process logic. */
   boxColor?: string;
 };
 
@@ -21,20 +30,20 @@ export type AnimationPath = {
 /**
  * Development path used by the animation lab.
  *
- * Keeping both geometry and waypoint changes as plain domain data is deliberate:
- * later the same structure can come from the designer document, a reusable
- * component or a runtime/tag binding without changing the playback code.
+ * Geometry and discrete process state are plain domain data. The renderer maps
+ * semantic state (inspection, passed, rejected...) to presentation, while the
+ * optional boxColor remains available as an explicit visual override.
  */
 export const conveyorDemoPath: AnimationPath = {
   id: "conveyor-demo",
   name: "Conveyor demo",
   points: [
-    { id: "load", x: 90, y: 370, changes: { boxColor: "#4f46e5" } },
-    { id: "transfer-a", x: 250, y: 370 },
-    { id: "inspection", x: 250, y: 165, changes: { boxColor: "#f59e0b" } },
+    { id: "load", x: 90, y: 370, changes: { objectState: "raw" } },
+    { id: "transfer-a", x: 250, y: 370, changes: { objectState: "processing" } },
+    { id: "inspection", x: 250, y: 165, changes: { objectState: "inspection" } },
     { id: "transfer-b", x: 510, y: 165 },
-    { id: "accepted", x: 510, y: 315, changes: { boxColor: "#10b981" } },
+    { id: "accepted", x: 510, y: 315, changes: { objectState: "passed" } },
     { id: "outfeed", x: 790, y: 315 },
-    { id: "finish", x: 790, y: 105, changes: { boxColor: "#ec4899" } },
+    { id: "finish", x: 790, y: 105 },
   ],
 };
