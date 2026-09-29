@@ -1,5 +1,5 @@
-import { createTagRuntimeProxy } from "../../uiframework/data/runtime/TagRuntimeProxy";
-import { createIntentId, shadowKey } from "../../execution";
+import { createTagRuntimeProxy } from "../../tags/runtime/TagRuntimeProxy";
+import { createIntentId, shadowKey } from "../../scripting/execution";
 import { getMockSessionValue } from "../mock-session-state";
 import { createUiApi } from "./component-api";
 import { createNavigationApi } from "./navigation-api";

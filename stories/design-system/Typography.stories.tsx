@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Heading, Stack, Surface, Text } from "../../src/uiframework/gui/ui";
+import { Heading, Stack, Surface, Text } from "../../src/shared/ui";
 
 const meta = {
   title: "Atoms/Typography",

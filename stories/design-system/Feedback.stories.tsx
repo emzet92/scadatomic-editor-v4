@@ -10,7 +10,7 @@ import {
   EmptyState,
   InboxIcon,
   InfoIcon
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Molecules/Feedback",

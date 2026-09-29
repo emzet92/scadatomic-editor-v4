@@ -7,7 +7,7 @@ import {
   FormField,
   KeyIcon,
   TextInput
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Organisms/Dialog",

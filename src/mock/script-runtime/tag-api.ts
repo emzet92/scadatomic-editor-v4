@@ -1,5 +1,5 @@
-import { createTagRuntimeGlobals } from "../../uiframework/data/runtime/TagRuntimeProxy";
-import { createIntentId, shadowKey } from "../../execution";
+import { createTagRuntimeGlobals } from "../../tags/runtime/TagRuntimeProxy";
+import { createIntentId, shadowKey } from "../../scripting/execution";
 import type {
   MockScriptContext,
   MockScriptExecutionEnvironment,

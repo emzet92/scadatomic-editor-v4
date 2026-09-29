@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Box, Inline, Stack, Surface, Text } from "../../src/uiframework/gui/ui";
+import { Box, Inline, Stack, Surface, Text } from "../../src/shared/ui";
 
 type LayoutStoryArgs = {
   direction: "stack" | "inline";

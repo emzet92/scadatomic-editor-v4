@@ -1,11 +1,11 @@
-import { TypeRegistry } from "../uiframework/data/types/TypeRegistry";
+import { TypeRegistry } from "../tags/types/TypeRegistry";
 import {
   resolveTagFieldRef,
   tagFieldRefKey,
   type TagFieldRef,
-} from "../uiframework/data/tags/TagFieldRef";
-import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
-import { TagStore } from "../uiframework/data/tags/TagStore";
+} from "../tags/model/TagFieldRef";
+import type { ProjectData } from "../tags/model/TagDefinition";
+import { TagStore } from "../tags/model/TagStore";
 
 const STORAGE_PREFIX = "scadatomic.mock.tag-session.v1.";
 

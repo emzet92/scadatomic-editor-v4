@@ -1,9 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { EditorPage } from "./uiframework/EditorPage";
-import { ScriptPage } from "./uiframework/gui/script-editor/ScriptPage";
-import { RenderPage } from "./uiframework/runtime/RenderPage";
-import { DependenciesPage } from "./uiframework/gui/dependencies/DependenciesPage";
-import { FleetManagementPage } from "./cloud/pages/FleetManagementPage";
+import { EditorPage } from "./designer/EditorPage";
+import { ScriptPage } from "./designer/features/scripting/ScriptPage";
+import { RenderPage } from "./runtime/pages/RenderPage";
+import { DependenciesPage } from "./designer/features/dependencies/DependenciesPage";
+import { FleetManagementPage } from "./fleet/pages/FleetManagementPage";
 import { ReportDesignerPage } from "./reporting";
 
 function App() {

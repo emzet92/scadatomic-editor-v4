@@ -1,0 +1,798 @@
+import { Boxes, Database, LayoutTemplate, Palette } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useParams } from "react-router-dom";
+import { getProjectById, updateProject } from "../project/api/projects-api";
+import { getPage, type UiDocument } from "../project/model/document";
+import { createPageRenderDocument } from "../project/model/page-layouts";
+import { createComponentDefinitionDocument } from "../visualization/reusable-components";
+import { PageDesignerSurface } from "./surfaces/PageDesignerSurface";
+import { ModalDesignerSurface } from "./surfaces/ModalDesignerSurface";
+import {
+  Canvas,
+  LeftSidebar,
+  RightSidebar,
+  StatusBar,
+  Toolbar,
+} from "./EditorLayout";
+import { RenderNode } from "../runtime/Renderer";
+import {
+  getComponentVariantProps,
+  getDefaultComponentVariantProps,
+} from "../visualization/components/component-variants";
+import { useEditorStore } from "./state/editor-store";
+import { ComponentPalette } from "./palette/PaletteItem";
+import { PageTree } from "./pages/PageTree";
+import { PageViewportFrame } from "./pages/PageViewportFrame";
+import { NavigationRuntimeProvider } from "../runtime/navigation/NavigationRuntimeProvider";
+import { buildNavigationTree, resolveNavigationPath } from "../runtime/navigation/navigation";
+import { PropertyPanel } from "./inspector/PropertyPanel";
+import {
+  resolveComponentDefinitionEditorMode,
+  resolveComponentEditorMode,
+  scopeMode,
+  type ComponentDefinitionEditorMode,
+  type ComponentEditorMode,
+  type PageScopedMode,
+} from "./editor/component-mode";
+import { ComponentStructureTree } from "./features/reusable-components/ComponentStructureTree";
+import { ComponentDesignerSurface } from "./surfaces/ComponentDesignerSurface";
+import { TreeView } from "./tree/TreeView";
+import {
+  editorRegistry,
+  type ComponentRegistry,
+} from "../visualization/components/registry/editor-registry";
+import { initialDocument } from "../visualization/components/registry/initial-values";
+import { DataPanel } from "./features/tags/DataPanel";
+import { DataWorkspace } from "./features/tags/DataWorkspace";
+import { DesignSystemPanel, type DesignSystemSection } from "./features/design-system/DesignSystemPanel";
+import { ColorLibraryWorkspace } from "./features/design-system/ColorLibraryWorkspace";
+import { TypographyLibraryWorkspace } from "./features/design-system/TypographyLibraryWorkspace";
+import { SpacingLibraryWorkspace } from "./features/design-system/SpacingLibraryWorkspace";
+import { RadiusLibraryWorkspace } from "./features/design-system/RadiusLibraryWorkspace";
+import { ShadowLibraryWorkspace } from "./features/design-system/ShadowLibraryWorkspace";
+import { BorderLibraryWorkspace } from "./features/design-system/BorderLibraryWorkspace";
+import { ThemeWorkspace } from "./features/design-system/ThemeWorkspace";
+import type { DataSelection } from "./features/tags/data-selection";
+import { SegmentedControl, SegmentedControlItem } from "../shared/ui";
+import { designerSimulationSession } from "../tags/simulation/designer-simulation-session";
+import { sendWsMessage } from "../runtime/transport/websocket";
+import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
+import { configureProjectReactiveRuntime } from "../runtime/reactive-runtime-session";
+import {
+  getReactiveNodeProps,
+  getReactiveNodeVariant,
+  useProjectReactiveUiRevision,
+} from "../runtime/reactive-ui-state";
+
+export function RendererRoot({
+  document,
+  registry,
+  projectId,
+}: {
+  document: UiDocument;
+  registry: ComponentRegistry;
+  projectId?: string | undefined;
+}) {
+  useProjectReactiveUiRevision(projectId);
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
+
+  return (
+    <RenderNode
+      id={document.rootId}
+      document={document}
+      registry={registry}
+      themeId={previewThemeId}
+      decorateComponentInternals
+      decorateProps={(node, context) => {
+        const runtimeNodeId = context.internal && context.componentInstanceId
+          ? `${context.componentInstanceId}::${node.id}`
+          : node.id;
+        const reactiveVariant = projectId
+          ? getReactiveNodeVariant(projectId, runtimeNodeId)
+          : undefined;
+        const reactiveProps = projectId
+          ? getReactiveNodeProps(projectId, runtimeNodeId)
+          : {};
+        const variantProps = reactiveVariant
+          ? getComponentVariantProps(node, reactiveVariant)
+          : getDefaultComponentVariantProps(node);
+
+        return {
+          ...variantProps,
+          ...reactiveProps,
+          ...(node.type === "Page" && !node.props?.embeddedInLayout
+            ? {
+                style: {
+                  ...(typeof variantProps.style === "object" && variantProps.style
+                    ? variantProps.style as Record<string, unknown>
+                    : {}),
+                  ...(typeof reactiveProps.style === "object" && reactiveProps.style
+                    ? reactiveProps.style as Record<string, unknown>
+                    : {}),
+                  boxShadow: "0 1px 3px rgba(15,23,42,.08), 0 0 0 1px rgba(148,163,184,.35)",
+                },
+              }
+            : {}),
+          ...(!context.internal ? { "data-node-id": node.id } : {}),
+          "data-scadatomic-type": node.type,
+        };
+      }}
+    />
+  );
+}
+
+function ComponentModeRenderer({
+  document,
+  mode,
+}: {
+  document: UiDocument;
+  mode: ComponentEditorMode;
+}) {
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
+  return (
+    <RenderNode
+      id={mode.nodeId}
+      document={document}
+      registry={editorRegistry}
+      themeId={previewThemeId}
+      decorateProps={(node) => ({
+        ...(node.id === mode.nodeId
+          ? getComponentVariantProps(node, mode.variantName)
+          : getDefaultComponentVariantProps(node)),
+        "data-scadatomic-type": node.type,
+      })}
+    />
+  );
+}
+
+function ComponentDefinitionRenderer({
+  document,
+  mode,
+}: {
+  document: UiDocument;
+  mode: ComponentDefinitionEditorMode;
+}) {
+  const previewThemeId = useEditorStore((state) => state.previewThemeId ?? undefined);
+  const definition = document.components?.[mode.componentId];
+  if (!definition) return null;
+  const componentDocument = createComponentDefinitionDocument(document, definition);
+
+  return (
+    <RenderNode
+      id={definition.rootId}
+      document={componentDocument}
+      registry={editorRegistry}
+      themeId={previewThemeId}
+      decorateProps={(node) => ({
+        ...(node.id === mode.selectedInternalNodeId && mode.variantName
+          ? getComponentVariantProps(node, mode.variantName)
+          : getDefaultComponentVariantProps(node)),
+        "data-component-node-id": node.id,
+        "data-scadatomic-type": node.type,
+      })}
+    />
+  );
+}
+
+function ComponentPreviewFrame({
+  interactive = false,
+  children,
+}: {
+  interactive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      {...(interactive ? { "data-editor-component-canvas": true } : {})}
+      className={`w-full min-w-0 max-w-[960px] rounded-xl border border-dashed border-violet-300 bg-white/90 p-6 shadow-sm ${
+        interactive ? "" : "pointer-events-none"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function EditorPage() {
+  const { projectId } = useParams();
+  const document = useEditorStore((state) => state.document);
+  const activePageId = useEditorStore((state) => state.activePageId);
+  const activeModalId = useEditorStore((state) => state.activeModalId);
+  const setActivePageId = useEditorStore((state) => state.setActivePageId);
+  const setDocument = useEditorStore((state) => state.setDocument);
+  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
+
+  const [projectName, setProjectName] = useState("Untitled Project");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scopedComponentMode, setScopedComponentMode] =
+    useState<PageScopedMode<ComponentEditorMode> | null>(null);
+  const [scopedComponentDefinitionMode, setScopedComponentDefinitionMode] =
+    useState<PageScopedMode<ComponentDefinitionEditorMode> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
+  const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("themes");
+  const [dataSelection, setDataSelection] = useState<DataSelection>(null);
+
+  const loadedRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
+  const lastSavedSnapshotRef = useRef<string | null>(null);
+  const revisionRef = useRef<number | undefined>(undefined);
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingSaveRef = useRef<{
+    projectId: string;
+    projectName: string;
+    document: UiDocument;
+    snapshot: string;
+  } | null>(null);
+
+  const flushPendingSave = useCallback((updateUi: boolean) => {
+    const pending = pendingSaveRef.current;
+    if (!pending || pending.snapshot === lastSavedSnapshotRef.current) {
+      pendingSaveRef.current = null;
+      return;
+    }
+
+    pendingSaveRef.current = null;
+    if (updateUi) {
+      setSaveStatus("saving");
+    }
+
+    saveChainRef.current = saveChainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const savedProject = await updateProject(
+          pending.projectId,
+          {
+            name: pending.projectName,
+            tree: pending.document,
+          },
+          revisionRef.current
+        );
+
+        revisionRef.current = savedProject.revision ?? revisionRef.current;
+        lastSavedSnapshotRef.current = pending.snapshot;
+      })
+      .then(() => {
+        if (updateUi) {
+          setSaveStatus("saved");
+        }
+      })
+      .catch((error) => {
+        console.error("Autosave failed", error);
+        if (!pendingSaveRef.current) {
+          pendingSaveRef.current = pending;
+        }
+        if (updateUi) {
+          setSaveStatus("error");
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProject() {
+      try {
+        setLoading(true);
+        setError(null);
+        setSaveStatus("idle");
+        setScopedComponentMode(null);
+        setScopedComponentDefinitionMode(null);
+        setEditorArea("design");
+        setDataSelection(null);
+        loadedRef.current = false;
+        lastSavedSnapshotRef.current = null;
+        revisionRef.current = undefined;
+        pendingSaveRef.current = null;
+
+        if (!projectId) {
+          setProjectName("Untitled Project");
+          setDocument(initialDocument);
+          lastSavedSnapshotRef.current = JSON.stringify({
+            name: "Untitled Project",
+            tree: initialDocument,
+          });
+          loadedRef.current = true;
+          return;
+        }
+
+        const project = await getProjectById(projectId);
+        if (cancelled) {
+          return;
+        }
+
+        const loadedName = project.name;
+        const loadedDocument = project.tree;
+
+        setProjectName(loadedName);
+        setDocument(loadedDocument);
+        revisionRef.current = project.revision;
+        lastSavedSnapshotRef.current = JSON.stringify({
+          name: loadedName,
+          tree: loadedDocument,
+        });
+        loadedRef.current = true;
+      } catch (error) {
+        if (!cancelled) {
+          setError(
+            error instanceof Error ? error.message : "Failed to load project"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProject();
+
+    return () => {
+      cancelled = true;
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+      flushPendingSave(false);
+    };
+  }, [projectId, setDocument, flushPendingSave]);
+
+
+  useEffect(() => {
+    if (
+      !projectId ||
+      !loadedRef.current ||
+      loading ||
+      !document.nodes[document.rootId]
+    ) {
+      return;
+    }
+
+    const snapshot = JSON.stringify({
+      name: projectName,
+      tree: document,
+    });
+
+    if (snapshot === lastSavedSnapshotRef.current) {
+      return;
+    }
+
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+
+    pendingSaveRef.current = {
+      projectId,
+      projectName,
+      document,
+      snapshot,
+    };
+
+    saveTimerRef.current = window.setTimeout(() => {
+      flushPendingSave(true);
+    }, 500);
+
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [projectId, projectName, document, loading, flushPendingSave]);
+
+  useEffect(() => {
+    if (!projectId || loading) return;
+    connectMockDesignerRuntimeSession(
+      projectId,
+      document.data ?? { udts: {}, tags: {} }
+    );
+  }, [document.data, loading, projectId]);
+
+  useEffect(() => {
+    if (!projectId || loading) return;
+    return configureProjectReactiveRuntime(projectId, document);
+  }, [document, loading, projectId]);
+
+  useEffect(() => {
+    designerSimulationSession.configure(document.data ?? { udts: {}, tags: {} });
+  }, [document.data]);
+
+  useEffect(() => {
+    return () => {
+      designerSimulationSession.stop();
+      if (projectId) sendWsMessage({ type: "driver.stop", driver: "simulation", projectId });
+    };
+  }, [projectId]);
+
+  function setComponentMode(mode: ComponentEditorMode | null) {
+    setScopedComponentMode(mode ? scopeMode(activeModalId ?? activePageId, mode) : null);
+  }
+
+  function setComponentDefinitionMode(
+    mode: ComponentDefinitionEditorMode | null
+  ) {
+    setScopedComponentDefinitionMode(
+      mode ? scopeMode(activeModalId ?? activePageId, mode) : null
+    );
+  }
+
+  function editVariant(nodeId: string, variantName: string) {
+    setSelectedNodeId(nodeId);
+    setComponentDefinitionMode(null);
+    setComponentMode({ nodeId, variantName });
+  }
+
+  function editComponentDefinition(componentId: string) {
+    const definition = document.components?.[componentId];
+    if (!definition) return;
+    setComponentMode(null);
+    setComponentDefinitionMode({
+      componentId,
+      selectedInternalNodeId: definition.rootId,
+    });
+  }
+
+  function editComponentDefinitionVariant(
+    componentId: string,
+    nodeId: string,
+    variantName: string
+  ) {
+    const definition = document.components?.[componentId];
+    if (!definition?.nodes[nodeId]?.variants?.[variantName]) return;
+    setComponentMode(null);
+    setComponentDefinitionMode({
+      componentId,
+      selectedInternalNodeId: nodeId,
+      variantName,
+    });
+  }
+
+  function exitComponentMode() {
+    setComponentMode(null);
+    setComponentDefinitionMode(null);
+  }
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center text-sm text-zinc-500">
+        Loading project...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center text-sm text-red-600">
+        {error}
+      </div>
+    );
+  }
+
+  if (!document.nodes[document.rootId]) {
+    return null;
+  }
+
+  const activePage = getPage(document, activePageId);
+  const activeModal = activeModalId ? document.modals?.[activeModalId] : undefined;
+  const activeSurfaceId = activeModal?.id ?? activePageId;
+  const componentMode = resolveComponentEditorMode(
+    document,
+    activeSurfaceId,
+    scopedComponentMode
+  );
+  const componentDefinitionMode = resolveComponentDefinitionEditorMode(
+    document,
+    activeSurfaceId,
+    scopedComponentDefinitionMode
+  );
+  const activeRootId = activeModal?.rootId ?? activePage.rootId;
+  const activeDocument: UiDocument = { ...document, rootId: activeRootId };
+  const activeRenderDocument = activeModal
+    ? { ...document, rootId: activeModal.rootId }
+    : createPageRenderDocument(document, activePage.id);
+  const focusedNode = componentMode
+    ? document.nodes[componentMode.nodeId]
+    : undefined;
+  const focusedDefinition = componentDefinitionMode
+    ? document.components?.[componentDefinitionMode.componentId]
+    : undefined;
+  const inComponentMode = !!componentMode || !!componentDefinitionMode;
+  const rootPage = activeRenderDocument.nodes[activeRenderDocument.rootId];
+  const navigationTree = buildNavigationTree(document);
+  const pageWidth = Math.max(1, Number(rootPage?.props?.width ?? 1440) || 1440);
+  const pageHeight = Math.max(1, Number(rootPage?.props?.height ?? 900) || 900);
+  const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
+  const projectData = document.data ?? { udts: {}, tags: {} };
+
+  function switchEditorArea(area: "design" | "data" | "designSystem") {
+    if (area !== "design") exitComponentMode();
+    setEditorArea(area);
+  }
+
+  return (
+    <div className="h-screen flex flex-col bg-[var(--editor-app-bg)]">
+      <Toolbar projectId={projectId} />
+
+      <div className="flex-1 flex">
+        <LeftSidebar>
+          <SegmentedControl className="w-full">
+            <SegmentedControlItem
+              active={editorArea === "design"}
+              className="flex-1 gap-1.5 text-xs"
+              onClick={() => switchEditorArea("design")}
+            >
+              <LayoutTemplate size={13} /> Design
+            </SegmentedControlItem>
+            <SegmentedControlItem
+              active={editorArea === "data"}
+              className="flex-1 gap-1.5 text-xs"
+              onClick={() => switchEditorArea("data")}
+            >
+              <Database size={13} /> Data
+            </SegmentedControlItem>
+            <SegmentedControlItem
+              active={editorArea === "designSystem"}
+              className="flex-1 gap-1.5 text-xs"
+              onClick={() => switchEditorArea("designSystem")}
+            >
+              <Palette size={13} /> System
+            </SegmentedControlItem>
+          </SegmentedControl>
+
+          {editorArea === "data" ? (
+            <DataPanel
+              data={projectData}
+              selection={dataSelection}
+              onSelect={setDataSelection}
+              projectId={projectId}
+            />
+          ) : editorArea === "designSystem" ? (
+            <DesignSystemPanel
+              activeSection={designSystemSection}
+              onSelectSection={setDesignSystemSection}
+            />
+          ) : componentDefinitionMode && focusedDefinition ? (
+            <>
+              <ComponentStructureTree
+                definition={focusedDefinition}
+                selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                onSelect={(nodeId) =>
+                  setComponentDefinitionMode({
+                    componentId: componentDefinitionMode.componentId,
+                    selectedInternalNodeId: nodeId,
+                  })
+                }
+                onDelete={(nodeId) => {
+                  if (nodeId === focusedDefinition.rootId) return;
+                  const parentId =
+                    Object.values(focusedDefinition.nodes).find((candidate) =>
+                      candidate.children?.includes(nodeId)
+                    )?.id ?? focusedDefinition.rootId;
+                  useEditorStore
+                    .getState()
+                    .deleteComponentDefinitionNode(
+                      componentDefinitionMode.componentId,
+                      nodeId
+                    );
+                  setComponentDefinitionMode({
+                    componentId: componentDefinitionMode.componentId,
+                    selectedInternalNodeId: parentId,
+                  });
+                }}
+              />
+              <div className="border-t border-zinc-200" />
+              <ComponentPalette
+                ownerComponentId={focusedDefinition.id}
+                onEditComponentDefinition={editComponentDefinition}
+              />
+            </>
+          ) : (
+            <>
+              <PageTree />
+              <div className="border-t border-zinc-200" />
+              <ComponentPalette onEditComponentDefinition={editComponentDefinition} />
+              <div className="border-t border-zinc-200" />
+              <TreeView />
+            </>
+          )}
+        </LeftSidebar>
+
+        <Canvas>
+          {editorArea === "data" ? (
+            <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+              <DataWorkspace
+                data={projectData}
+                selection={dataSelection}
+                onSelect={setDataSelection}
+                projectId={projectId}
+              />
+            </div>
+          ) : editorArea === "designSystem" ? (
+            <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+              {designSystemSection === "themes" ? (
+                <ThemeWorkspace />
+              ) : designSystemSection === "colors" ? (
+                <ColorLibraryWorkspace />
+              ) : designSystemSection === "typography" ? (
+                <TypographyLibraryWorkspace />
+              ) : designSystemSection === "spacing" ? (
+                <SpacingLibraryWorkspace />
+              ) : designSystemSection === "radius" ? (
+                <RadiusLibraryWorkspace />
+              ) : designSystemSection === "shadows" ? (
+                <ShadowLibraryWorkspace />
+              ) : (
+                <BorderLibraryWorkspace />
+              )}
+            </div>
+          ) : (
+            <div className="min-h-full bg-[var(--editor-canvas-bg)] p-8">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div
+                  data-editor-ignore
+                  className="inline-flex h-9 overflow-hidden rounded-md border border-[var(--editor-border)] bg-[var(--editor-surface)]"
+                >
+                  <button
+                    type="button"
+                    onClick={exitComponentMode}
+                    className={`inline-flex items-center gap-1.5 px-3 text-xs font-medium transition ${
+                      inComponentMode
+                        ? "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
+                        : "bg-[var(--editor-accent-soft)] text-[var(--editor-accent)]"
+                    }`}
+                  >
+                    <LayoutTemplate size={13} /> Designer
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!inComponentMode}
+                    className={`inline-flex items-center gap-1.5 border-l border-[var(--editor-border)] px-3 text-xs font-medium transition ${
+                      inComponentMode
+                        ? "bg-violet-50 text-violet-700"
+                        : "cursor-default text-[var(--editor-text-muted)] opacity-40"
+                    }`}
+                  >
+                    <Boxes size={13} /> Component
+                  </button>
+                </div>
+
+                {componentDefinitionMode && focusedDefinition ? (
+                  <div
+                    data-editor-ignore
+                    className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
+                  >
+                    <Boxes size={13} />
+                    <span className="font-medium">{focusedDefinition.name}</span>
+                    <span className="opacity-50">/</span>
+                    {componentDefinitionMode.variantName ? (
+                      <span className="font-mono">
+                        {focusedDefinition.nodes[componentDefinitionMode.selectedInternalNodeId]?.name}.
+                        {componentDefinitionMode.variantName}()
+                      </span>
+                    ) : (
+                      <span>private implementation</span>
+                    )}
+                  </div>
+                ) : componentMode && focusedNode ? (
+                  <div
+                    data-editor-ignore
+                    className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
+                  >
+                    <Palette size={13} />
+                    <span className="font-medium">{focusedNode.name}</span>
+                    <span className="opacity-50">/</span>
+                    <span className="font-mono">{componentMode.variantName}()</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-[var(--editor-text-muted)]">
+                    {activeModal ? `Modal · ${activeModal.name}` : "Designer mode"}
+                  </div>
+                )}
+              </div>
+
+              <div
+                data-editor-canvas
+                className={`min-h-[520px] bg-[var(--editor-surface)] bg-[radial-gradient(circle,var(--editor-grid-dot)_1px,transparent_1px)] bg-[size:20px_20px] ${
+                  inComponentMode
+                    ? "flex items-center justify-center p-16"
+                    : "min-h-full"
+                }`}
+              >
+                <NavigationRuntimeProvider
+                  value={{
+                    items: navigationTree,
+                    currentPageId: activePageId,
+                    navigateTo: (path) => {
+                      const target = resolveNavigationPath(document, path);
+                      if (target) setActivePageId(target.pageId);
+                    },
+                  }}
+                >
+                {componentDefinitionMode && focusedDefinition ? (
+                  <>
+                    <ComponentPreviewFrame interactive>
+                      <ComponentDefinitionRenderer
+                        document={document}
+                        mode={componentDefinitionMode}
+                      />
+                    </ComponentPreviewFrame>
+                    <ComponentDesignerSurface
+                      componentId={focusedDefinition.id}
+                      registry={editorRegistry}
+                      selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                      onSelectNode={(nodeId) =>
+                        setComponentDefinitionMode({
+                          componentId: componentDefinitionMode.componentId,
+                          selectedInternalNodeId: nodeId,
+                        })
+                      }
+                    />
+                  </>
+                ) : componentMode ? (
+                  <ComponentPreviewFrame>
+                    <ComponentModeRenderer
+                      document={document}
+                      mode={componentMode}
+                    />
+                  </ComponentPreviewFrame>
+                ) : activeModal ? (
+                  <>
+                    <div className="flex min-h-[620px] w-full items-center justify-center rounded-xl bg-black/35 p-16">
+                      <RendererRoot
+                        document={activeRenderDocument}
+                        registry={editorRegistry}
+                        projectId={projectId}
+                      />
+                    </div>
+                    <ModalDesignerSurface registry={editorRegistry} />
+                  </>
+                ) : (
+                  <>
+                    <PageViewportFrame
+                      width={pageWidth}
+                      height={pageHeight}
+                      deviceMode={pageDeviceMode}
+                    >
+                      <RendererRoot document={activeRenderDocument} registry={editorRegistry} projectId={projectId} />
+                    </PageViewportFrame>
+                    <PageDesignerSurface registry={editorRegistry} />
+                  </>
+                )}
+                </NavigationRuntimeProvider>
+              </div>
+            </div>
+          )}
+        </Canvas>
+
+        {editorArea === "design" ? (
+          <RightSidebar>
+            <PropertyPanel
+              document={activeDocument}
+              componentMode={componentMode}
+              componentDefinitionMode={componentDefinitionMode}
+              onEditVariant={editVariant}
+              onEditComponentDefinition={editComponentDefinition}
+              onEditComponentDefinitionVariant={editComponentDefinitionVariant}
+              onExitComponentMode={exitComponentMode}
+            />
+          </RightSidebar>
+        ) : null}
+      </div>
+      <StatusBar />
+
+      <div className="fixed bottom-3 right-4 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs shadow-sm text-zinc-500">
+        {saveStatus === "idle" && projectName}
+        {saveStatus === "saving" && "Saving..."}
+        {saveStatus === "saved" && "Saved"}
+        {saveStatus === "error" && "Save error"}
+      </div>
+    </div>
+  );
+}
+
+function getPageDeviceMode(value: unknown): "desktop" | "tablet" | "mobile" {
+  return value === "tablet" || value === "mobile" ? value : "desktop";
+}
+
+export default EditorPage;

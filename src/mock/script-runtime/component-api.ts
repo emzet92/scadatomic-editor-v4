@@ -1,17 +1,17 @@
-import { createUdtInstanceApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
-import { isTagRef } from "../../uiframework/data/collections/TagRef";
-import type { UiComponentDefinition, UiNode } from "../../uiframework/core/document";
+import { createUdtInstanceApi } from "../../tags/runtime/TagRuntimeProxy";
+import { isTagRef } from "../../tags/collections/TagRef";
+import type { UiComponentDefinition, UiNode } from "../../project/model/document";
 import {
   getComponentApiMethodNames,
   getComponentApiPropertyNames,
   getComponentColorProperty,
   getResolvedComponentProps,
-} from "../../uiframework/component-api";
+} from "../../visualization/components/component-api";
 import {
   getComponentVariantNames,
   getComponentVariantProps,
-} from "../../uiframework/component-variants";
-import { createIntentId, shadowKey } from "../../execution";
+} from "../../visualization/components/component-variants";
+import { createIntentId, shadowKey } from "../../scripting/execution";
 import { getMockScript } from "../mock-script-store";
 import { executeJavaScriptSource } from "./javascript-executor";
 import { createTagGlobals, createTagRuntimeContext } from "./tag-api";

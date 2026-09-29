@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Text } from "../../uiframework/gui/ui";
+import { Text } from "../../shared/ui";
 import type { ReportComponent, ReportPage } from "../core";
 
 export function ReportComponentContent({ component }: { component: ReportComponent }) {

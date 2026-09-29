@@ -1,5 +1,5 @@
-import { getDesignerTagStore } from "../uiframework/data/tags/designer-tag-store";
-import type { TagWriteSource } from "../uiframework/data/tags/TagEvents";
+import { getDesignerTagStore } from "../tags/model/designer-tag-store";
+import type { TagWriteSource } from "../tags/model/TagEvents";
 import { getMockRuntimeSocket } from "./mock-runtime-socket";
 
 type RuntimeTagChangedPayload = {

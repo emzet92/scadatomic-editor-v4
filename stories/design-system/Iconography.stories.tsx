@@ -11,7 +11,7 @@ import {
   editorIconSizes,
   editorIconStrokeWidths,
   editorIconTones,
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 type IconPlaygroundArgs = {
   icon: string;

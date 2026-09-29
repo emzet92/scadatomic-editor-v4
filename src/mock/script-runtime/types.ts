@@ -1,8 +1,8 @@
-import type { TagRuntime } from "../../uiframework/data/runtime/TagRuntime";
-import type { TagRuntimeApi } from "../../uiframework/data/runtime/TagRuntimeProxy";
-import type { UiComponentDefinition, UiDocument, UiModal, UiNode } from "../../uiframework/core/document";
-import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
-import type { IntentCollector, IntentSource } from "../../execution";
+import type { TagRuntime } from "../../tags/runtime/TagRuntime";
+import type { TagRuntimeApi } from "../../tags/runtime/TagRuntimeProxy";
+import type { UiComponentDefinition, UiDocument, UiModal, UiNode } from "../../project/model/document";
+import type { NavigationTreeNode } from "../../runtime/navigation/navigation";
+import type { IntentCollector, IntentSource } from "../../scripting/execution";
 
 export type MockScriptEvent = {
   projectId: string;

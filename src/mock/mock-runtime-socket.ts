@@ -3,10 +3,10 @@ import {
   type UiComponentDefinition,
   type UiDocument,
   type UiNode,
-} from "../uiframework/core/document";
-import { buildNavigationTree } from "../uiframework/navigation/navigation";
-import { getPageLayout } from "../uiframework/core/page-layouts";
-import { collectModalNodeIds } from "../uiframework/core/modals";
+} from "../project/model/document";
+import { buildNavigationTree } from "../runtime/navigation/navigation";
+import { getPageLayout } from "../project/model/page-layouts";
+import { collectModalNodeIds } from "../project/model/modals";
 import { getMockProjectSnapshot } from "./mock-project-store";
 import {
   applyMockRuntimeUiState,
@@ -25,22 +25,22 @@ import {
   replaceMockTagStoreData,
 } from "./mock-tag-runtime";
 import { MockDriverRuntime } from "./mock-driver-runtime";
-import { findTagFieldRefByPath } from "../uiframework/data/tags/TagFieldRef";
-import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
-import type { TagWriteSource } from "../uiframework/data/tags/TagEvents";
-import { TagRuntime } from "../uiframework/data/runtime/TagRuntime";
-import { parseRepeatInstanceId } from "../uiframework/repeat/RepeatRuntime";
-import { createTagRef } from "../uiframework/data/collections/TagRef";
+import { findTagFieldRefByPath } from "../tags/model/TagFieldRef";
+import type { ProjectData } from "../tags/model/TagDefinition";
+import type { TagWriteSource } from "../tags/model/TagEvents";
+import { TagRuntime } from "../tags/runtime/TagRuntime";
+import { parseRepeatInstanceId } from "../visualization/repeat/RepeatRuntime";
+import { createTagRef } from "../tags/collections/TagRef";
 import { persistTagValueToSession } from "./mock-tag-session-state";
 import {
   isMockRuntimeAuthority,
   subscribeMockRuntimeAuthority,
 } from "./mock-runtime-authority";
-import { resolveConfiguredThemeId } from "../uiframework/design-system/theme-config";
+import { resolveConfiguredThemeId } from "../design-system/model/theme-config";
 import {
   getProjectRuntimeThemeSnapshot,
   setProjectRuntimeTheme,
-} from "../uiframework/runtime/theme-runtime-state";
+} from "../runtime/pages/theme-runtime-state";
 
 type MockWsPayload = Record<string, unknown>;
 
@@ -679,14 +679,14 @@ export function getMockRuntimeSocket() {
 
 export function getMockTransportTagRuntime(
   projectId: string,
-  data?: import("../uiframework/data/tags/TagDefinition").ProjectData
+  data?: import("../tags/model/TagDefinition").ProjectData
 ) {
   return getMockRuntimeSocket().getTagRuntime(projectId, data);
 }
 
 export function ensureMockTagRuntimeBridge(
   projectId: string,
-  data?: import("../uiframework/data/tags/TagDefinition").ProjectData
+  data?: import("../tags/model/TagDefinition").ProjectData
 ) {
   const runtimeSocket = getMockRuntimeSocket();
   const tagStore = getMockTagStore(projectId, data);

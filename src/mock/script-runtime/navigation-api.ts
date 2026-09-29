@@ -1,5 +1,5 @@
-import type { NavigationTreeNode } from "../../uiframework/navigation/navigation";
-import { createIntentId } from "../../execution";
+import type { NavigationTreeNode } from "../../runtime/navigation/navigation";
+import { createIntentId } from "../../scripting/execution";
 import { hasOwn } from "./object-utils";
 import type {
   MockScriptExecutionEnvironment,

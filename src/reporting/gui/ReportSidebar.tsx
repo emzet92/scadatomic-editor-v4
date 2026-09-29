@@ -13,7 +13,7 @@ import {
   TemplateIcon,
   Text,
   TypographyIcon,
-} from "../../uiframework/gui/ui";
+} from "../../shared/ui";
 import type {
   ReportDocument,
   ReportSelection,

@@ -8,7 +8,7 @@ import {
   Surface,
   Text,
   Toolbar,
-} from "../../uiframework/gui/ui";
+} from "../../shared/ui";
 import type { ReportDocument } from "../core";
 import { getReportPreviewPageStyle, ReportComponentContent } from "./ReportRender";
 

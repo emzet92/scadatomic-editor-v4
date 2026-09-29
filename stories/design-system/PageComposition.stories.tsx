@@ -10,7 +10,7 @@ import {
   PanelCard,
   Stack,
   Text,
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 type CompositionArgs = {
   title: string;

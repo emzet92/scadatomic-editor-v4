@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { SegmentedControl, SegmentedControlItem, Surface, Text } from "../../src/uiframework/gui/ui";
+import { SegmentedControl, SegmentedControlItem, Surface, Text } from "../../src/shared/ui";
 
 type SegmentedStoryArgs = {
   variant: "outline" | "soft";

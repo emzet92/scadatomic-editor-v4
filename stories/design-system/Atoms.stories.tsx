@@ -14,7 +14,7 @@ import {
   Stack,
   Surface,
   Text
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = { title: "Atoms/Core", parameters: { controls: { disable: true } } } satisfies Meta;
 export default meta;

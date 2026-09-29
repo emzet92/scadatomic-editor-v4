@@ -1,9 +1,9 @@
 import {
   createEmptyProjectData,
   type ProjectData,
-} from "../uiframework/data/tags/TagDefinition";
-import { ProjectRuntimeSession } from "../uiframework/data/runtime/ProjectRuntimeSession";
-import { createDefaultTagDriverRegistry } from "../uiframework/data/simulation/default-driver-registry";
+} from "../tags/model/TagDefinition";
+import { ProjectRuntimeSession } from "../tags/runtime/ProjectRuntimeSession";
+import { createDefaultTagDriverRegistry } from "../tags/simulation/default-driver-registry";
 import { hydrateProjectDataFromTagSession } from "./mock-tag-session-state";
 
 const sessions = new Map<string, ProjectRuntimeSession>();

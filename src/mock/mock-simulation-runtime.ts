@@ -1,7 +1,7 @@
-import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
-import { createEmptyProjectData } from "../uiframework/data/tags/TagDefinition";
-import type { TagDriver } from "../uiframework/data/drivers/TagDriver";
-import { createDefaultTagDriverRegistry } from "../uiframework/data/simulation/default-driver-registry";
+import type { ProjectData } from "../tags/model/TagDefinition";
+import { createEmptyProjectData } from "../tags/model/TagDefinition";
+import type { TagDriver } from "../tags/drivers/TagDriver";
+import { createDefaultTagDriverRegistry } from "../tags/simulation/default-driver-registry";
 import { getMockTagStore, replaceMockTagStoreData } from "./mock-tag-runtime";
 
 type MockSimulationEntry = {

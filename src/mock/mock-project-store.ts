@@ -1,8 +1,8 @@
 import {
   parseUiDocument,
   type UiDocument,
-} from "../uiframework/core/document";
-import { initialDocument } from "../uiframework/registry/initial-values";
+} from "../project/model/document";
+import { initialDocument } from "../visualization/components/registry/initial-values";
 import { ensureMockScript } from "./mock-script-store";
 
 export type MockProjectId = string;

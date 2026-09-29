@@ -1,12 +1,12 @@
-import type { Intent, RuntimeEffects } from "../../execution";
-import { TypeRegistry } from "../../uiframework/data/types/TypeRegistry";
+import type { Intent, RuntimeEffects } from "../../scripting/execution";
+import { TypeRegistry } from "../../tags/types/TypeRegistry";
 import {
   clearMockSessionState,
   deleteMockSessionValue,
   setMockSessionValue,
 } from "../mock-session-state";
 import type { MockScriptEvent, MockScriptHost } from "./types";
-import { closeProjectModal, openProjectModal } from "../../uiframework/modal-runtime-state";
+import { closeProjectModal, openProjectModal } from "../../runtime/modal-runtime-state";
 
 /** Compatibility adapter: Executor is the only caller of these legacy effects. */
 export function createMockRuntimeEffects(

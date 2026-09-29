@@ -1,0 +1,139 @@
+import { useMemo } from "react";
+import type { NodeId } from "../../project/model/document";
+import { buildDocumentIndex } from "../../project/model/document-index";
+import { canAcceptManualChildren } from "../../project/model/repeat-behavior";
+import { useEditorStore } from "../state/editor-store";
+import type { ComponentRegistry } from "../../visualization/components/registry/editor-registry";
+import { createComponentDefinitionDocument } from "../../visualization/reusable-components";
+import { DesignerSurface } from "./DesignerSurface";
+import type { DesignerAdapter } from "./designer-adapter";
+
+export function ComponentDesignerSurface({
+  componentId,
+  selectedNodeId,
+  onSelectNode,
+  registry,
+}: {
+  componentId: string;
+  selectedNodeId: NodeId;
+  onSelectNode: (nodeId: NodeId) => void;
+  registry: ComponentRegistry;
+}) {
+  const projectDocument = useEditorStore((state) => state.document);
+  const definition = projectDocument.components?.[componentId];
+
+  const componentDocument = useMemo(
+    () =>
+      definition
+        ? createComponentDefinitionDocument(projectDocument, definition)
+        : null,
+    [projectDocument, definition]
+  );
+
+  const adapter = useMemo<DesignerAdapter | null>(() => {
+    if (!definition || !componentDocument) return null;
+
+    const rootId = definition.rootId;
+    const componentIndex = buildDocumentIndex(componentDocument, rootId);
+    return {
+      key: `component:${componentId}`,
+      canvasSelector: "[data-editor-component-canvas]",
+      nodeIdAttribute: "data-component-node-id",
+      snapshot: {
+        document: componentDocument,
+        rootId,
+        selectedNodeId,
+        selectedNodeIds: [selectedNodeId],
+      },
+      read: () => {
+        const state = useEditorStore.getState();
+        const currentDefinition = state.document.components?.[componentId];
+        if (!currentDefinition) {
+          return {
+            document: componentDocument,
+            rootId,
+            selectedNodeId,
+            selectedNodeIds: [selectedNodeId],
+          };
+        }
+
+        return {
+          document: createComponentDefinitionDocument(
+            state.document,
+            currentDefinition
+          ),
+          rootId: currentDefinition.rootId,
+          selectedNodeId,
+          selectedNodeIds: [selectedNodeId],
+        };
+      },
+      selectNode: (nodeId) => {
+        if (nodeId) onSelectNode(nodeId);
+      },
+      insertNode: (parentId, insertIndex, node) => {
+        const insertedId = useEditorStore
+          .getState()
+          .insertComponentDefinitionNode(
+            componentId,
+            parentId,
+            insertIndex,
+            node
+          );
+        if (insertedId) onSelectNode(insertedId);
+        return insertedId;
+      },
+      moveNode: (nodeId, targetParentId, targetIndex) => {
+        useEditorStore
+          .getState()
+          .moveComponentDefinitionNode(
+            componentId,
+            nodeId,
+            targetParentId,
+            targetIndex
+          );
+        onSelectNode(nodeId);
+      },
+      deleteNode: (nodeId) => {
+        if (nodeId === rootId) return;
+        useEditorStore
+          .getState()
+          .deleteComponentDefinitionNode(componentId, nodeId);
+        onSelectNode(rootId);
+      },
+      duplicateNode: (nodeId) => {
+        if (nodeId === rootId) return null;
+        const duplicatedNodeId = useEditorStore
+          .getState()
+          .duplicateComponentDefinitionNode(componentId, nodeId);
+        if (duplicatedNodeId) onSelectNode(duplicatedNodeId);
+        return duplicatedNodeId;
+      },
+      updateNodeProps: (nodeId, patch) => {
+        useEditorStore.getState().updateComponentDefinitionNode(
+          componentId,
+          nodeId,
+          (current) => ({
+            ...current,
+            props: { ...(current.props ?? {}), ...patch },
+          })
+        );
+      },
+      canMoveNode: (nodeId) => nodeId !== rootId,
+      canDeleteNode: (nodeId) => nodeId !== rootId,
+      canDuplicateNode: (nodeId) => {
+        if (nodeId === rootId) return false;
+        const parentId = componentIndex.parentById.get(nodeId);
+        const parent = parentId ? componentDocument.nodes[parentId] : undefined;
+        return !!parent && canAcceptManualChildren(parent);
+      },
+    };
+  }, [
+    componentDocument,
+    componentId,
+    definition,
+    onSelectNode,
+    selectedNodeId,
+  ]);
+
+  return adapter ? <DesignerSurface adapter={adapter} registry={registry} /> : null;
+}

@@ -8,7 +8,7 @@ import {
   Surface,
   Text,
   TextInput,
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 type FormControlStoryArgs = {
   label: string;

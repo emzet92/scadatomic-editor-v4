@@ -1,5 +1,5 @@
-import type { UiDocument } from "../uiframework/core/document";
-import { getComponentVariantProps } from "../uiframework/component-variants";
+import type { UiDocument } from "../project/model/document";
+import { getComponentVariantProps } from "../visualization/components/component-variants";
 
 type NodePropsOverrides = Record<string, Record<string, unknown>>;
 type NodeVariantOverrides = Record<string, string>;

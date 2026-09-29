@@ -1,9 +1,9 @@
-import { createIntentId } from "../../execution";
+import { createIntentId } from "../../scripting/execution";
 import {
   ensureProjectAppearance,
   getThemeDisplayName,
   resolveThemeSelection,
-} from "../../uiframework/design-system/theme-config";
+} from "../../design-system/model/theme-config";
 import type {
   MockScriptAppApi,
   MockScriptExecutionEnvironment,

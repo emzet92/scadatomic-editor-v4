@@ -1,0 +1,82 @@
+import { Box } from "../../shared/ui";
+import { getComponentVariantProps } from "../../visualization/components/component-variants";
+import type { UiNode } from "../../project/model/document";
+import { getComponentDefinition } from "../../visualization/components/registry/component-definitions";
+import { PropsEditor } from "./PropsEditor";
+import type { UpdateNode } from "./property-panel-types";
+import { VariantsEditor } from "./VariantsEditor";
+
+export function VariantPropertiesEditor({
+  node,
+  variantName,
+  updateNode,
+  onEditVariant,
+}: {
+  node: UiNode;
+  variantName: string;
+  updateNode: UpdateNode;
+  onEditVariant: (nodeId: string, variantName: string) => void;
+}) {
+  const variant = node.variants?.[variantName];
+  const definition = getComponentDefinition(node.type);
+
+  if (!variant) {
+    return (
+      <Box className="text-xs text-amber-700">
+        Variant “{variantName}” no longer exists.
+      </Box>
+    );
+  }
+
+  const variantValues = {
+    ...(definition?.defaults ?? {}),
+    ...getComponentVariantProps(node, variantName),
+  };
+
+  const updateVariantNode: UpdateNode = (nodeId, updater) => {
+    updateNode(nodeId, (currentNode) => {
+      const currentVariant = currentNode.variants?.[variantName];
+      if (!currentVariant) return currentNode;
+
+      const syntheticNode: UiNode = {
+        ...currentNode,
+        props: { ...currentVariant.props },
+        defaultVariant: undefined,
+      };
+      const updated = updater(syntheticNode);
+
+      return {
+        ...currentNode,
+        variants: {
+          ...(currentNode.variants ?? {}),
+          [variantName]: {
+            props: { ...(updated.props ?? {}) },
+          },
+        },
+      };
+    });
+  };
+
+  return (
+    <>
+      {definition ? (
+        <PropsEditor
+          nodeId={node.id}
+          values={variantValues}
+          controls={definition.inspector}
+          updateNode={updateVariantNode}
+        />
+      ) : (
+        <Box className="text-xs text-amber-700">
+          No component definition for {node.type}.
+        </Box>
+      )}
+
+      <VariantsEditor
+        node={node}
+        updateNode={updateNode}
+        onEditVariant={onEditVariant}
+      />
+    </>
+  );
+}

@@ -5,7 +5,7 @@ import {
   DeleteIcon,
   IconButton,
   SettingsIcon
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Atoms/Button",

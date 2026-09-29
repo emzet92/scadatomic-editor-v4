@@ -11,7 +11,7 @@ import {
   PanelCard,
   PanelSection,
   SectionHeader
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Templates/Page Layout",

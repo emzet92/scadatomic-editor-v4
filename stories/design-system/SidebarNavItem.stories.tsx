@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Badge, DatabaseIcon, SidebarNavItem, Surface } from "../../src/uiframework/gui/ui";
+import { Badge, DatabaseIcon, SidebarNavItem, Surface } from "../../src/shared/ui";
 
 const meta = {
   title: "Organisms/Sidebar Nav Item",

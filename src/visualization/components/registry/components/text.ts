@@ -1,0 +1,29 @@
+import { Text } from "../../renderers/Text";
+import { RuntimeText } from "../../renderers/RuntimeText";
+import { defaultTextProps } from "../../component-props";
+import type { ComponentDefinition } from "../component-definition-types";
+
+export const textDefinition = {
+  type: "Text",
+  label: "Text",
+  description: "Static or bound text",
+  editor: Text,
+  runtime: RuntimeText,
+  defaults: defaultTextProps,
+  inspector: {
+    value: { kind: "text" },
+    color: { kind: "color" },
+    textStyle: { kind: "typography" },
+    formatting: { kind: "text-format" },
+    align: { kind: "text-align" },
+    variant: { kind: "select", options: ["body", "label", "title", "caption"] },
+    uppercase: { kind: "toggle" },
+    border: { kind: "border" },
+    borderRadius: { kind: "radius", min: 0, max: 999 },
+    shadow: { kind: "shadow" },
+  },
+  bindings: {
+    value: { label: "Value", valueType: "string" },
+    visible: { label: "Visible", valueType: "boolean" },
+  },
+} satisfies ComponentDefinition;

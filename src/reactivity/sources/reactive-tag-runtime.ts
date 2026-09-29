@@ -1,6 +1,6 @@
-import type { TagWriteSource } from "../../uiframework/data/tags/TagEvents";
-import type { TagFieldRef } from "../../uiframework/data/tags/TagFieldRef";
-import type { TagStore } from "../../uiframework/data/tags/TagStore";
+import type { TagWriteSource } from "../../tags/model/TagEvents";
+import type { TagFieldRef } from "../../tags/model/TagFieldRef";
+import type { TagStore } from "../../tags/model/TagStore";
 import type { TagReactiveRef } from "../model/reactive-ref";
 import { ReactiveStore } from "../runtime/reactive-store";
 import { TagReactiveSource } from "./tag-reactive-source";

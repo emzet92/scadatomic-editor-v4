@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Inline, Stepper, Surface, Text } from "../../src/uiframework/gui/ui";
+import { Inline, Stepper, Surface, Text } from "../../src/shared/ui";
 
 type StepperStoryArgs = {
   initialValue: number;

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ChoiceCard, GridIcon, Surface } from "../../src/uiframework/gui/ui";
+import { ChoiceCard, GridIcon, Surface } from "../../src/shared/ui";
 
 const meta = {
   title: "Molecules/Choice Card",

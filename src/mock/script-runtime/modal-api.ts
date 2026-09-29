@@ -1,5 +1,5 @@
-import { createIntentId } from "../../execution";
-import type { UiModal } from "../../uiframework/core/document";
+import { createIntentId } from "../../scripting/execution";
+import type { UiModal } from "../../project/model/document";
 import type {
   MockScriptExecutionEnvironment,
   MockScriptModalApi,

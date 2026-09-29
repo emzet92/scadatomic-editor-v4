@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Badge, CheckIcon, Inline, Surface } from "../../src/uiframework/gui/ui";
+import { Badge, CheckIcon, Inline, Surface } from "../../src/shared/ui";
 
 const meta = {
   title: "Atoms/Badge",

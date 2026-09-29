@@ -9,7 +9,7 @@ import {
   PanelCard,
   Stack,
   Toolbar
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = { title: "Organisms/Core", parameters: { controls: { disable: true } } } satisfies Meta;
 export default meta;

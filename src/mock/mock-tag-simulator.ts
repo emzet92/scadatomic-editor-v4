@@ -1,4 +1,4 @@
-import type { TagStore } from "../uiframework/data/tags/TagStore";
+import type { TagStore } from "../tags/model/TagStore";
 
 type NumericSimulationState = {
   baseline: number;

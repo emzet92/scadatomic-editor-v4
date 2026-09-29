@@ -5,7 +5,7 @@ import {
   publishExecutionPlan,
   publishExecutionTrace,
   type IntentSource,
-} from "../execution";
+} from "../scripting/execution";
 import { getMockScript } from "./mock-script-store";
 import {
   createComponentApi,

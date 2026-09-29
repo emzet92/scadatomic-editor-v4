@@ -1,5 +1,5 @@
-import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
-import { createEmptyProjectData } from "../uiframework/data/tags/TagDefinition";
+import type { ProjectData } from "../tags/model/TagDefinition";
+import { createEmptyProjectData } from "../tags/model/TagDefinition";
 import {
   configureMockRuntimeProjectData,
   getMockRuntimeSession,

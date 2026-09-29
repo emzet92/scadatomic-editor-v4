@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Callout, InfoIcon, Stack } from "../../src/uiframework/gui/ui";
+import { Callout, InfoIcon, Stack } from "../../src/shared/ui";
 
 const meta = {
   title: "Molecules/Callout",

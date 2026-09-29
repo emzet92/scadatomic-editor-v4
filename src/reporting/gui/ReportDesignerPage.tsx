@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { WorkspaceHeader } from "../../uiframework/gui/workspace/WorkspaceHeader";
+import { WorkspaceHeader } from "../../shared/ui/organisms/WorkspaceHeader";
 import {
   Badge,
   FileTextIcon,
@@ -10,7 +10,7 @@ import {
   SegmentedControlItem,
   Text,
   WorkspaceShell,
-} from "../../uiframework/gui/ui";
+} from "../../shared/ui";
 import {
   addReportLayout,
   addReportPage,

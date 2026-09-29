@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Stack, Surface, Text } from "../../src/uiframework/gui/ui";
+import { Stack, Surface, Text } from "../../src/shared/ui";
 
 const meta = {
   title: "Atoms/Surface",

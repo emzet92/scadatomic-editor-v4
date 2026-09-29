@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button, DatabaseIcon, DeleteIcon, EntityHeader, Surface } from "../../src/uiframework/gui/ui";
+import { Button, DatabaseIcon, DeleteIcon, EntityHeader, Surface } from "../../src/shared/ui";
 
 const meta = {
   title: "Organisms/Entity Header",

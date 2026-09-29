@@ -8,7 +8,7 @@ import {
   MetricCard,
   PanelCard,
   WorkspaceShell
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = { title: "Templates/Screens", parameters: { controls: { disable: true }, layout: "fullscreen" } } satisfies Meta;
 export default meta;

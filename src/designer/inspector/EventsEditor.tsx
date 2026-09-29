@@ -1,0 +1,107 @@
+import { Link, useParams } from "react-router-dom";
+import type { HandlerRef } from "../../project/model/document";
+import { Checkbox, SectionHeader,
+  Box,
+} from "../../shared/ui";
+
+export function EventsEditor({
+  nodeId,
+  nodeName,
+  definitions,
+  events,
+  setEvent,
+  handlerIdPrefix,
+}: {
+  nodeId: string;
+  nodeName: string;
+  definitions: Record<string, { label: string; defaultSuffix: string }>;
+  events: Record<string, HandlerRef> | undefined;
+  setEvent: (
+    nodeId: string,
+    event: string,
+    handler: HandlerRef | null
+  ) => void;
+  handlerIdPrefix?: string;
+}) {
+  const { projectId } = useParams();
+
+  return (
+    <Box className="pt-4 border-t border-[var(--editor-border)] space-y-3">
+      <SectionHeader
+        title="Events"
+        description="Runtime handlers emitted by this component."
+      />
+
+      <Box className="space-y-3">
+        {Object.entries(definitions).map(([eventName, definition]) => {
+          const generatedHandlerId = handlerIdPrefix
+            ? `${handlerIdPrefix}.${nodeName}.${definition.defaultSuffix}`
+            : `${nodeName}.${definition.defaultSuffix}`;
+          const handler = events?.[eventName];
+          const checked = !!handler;
+          const handlerId = handler?.handlerId ?? generatedHandlerId;
+          const scriptPath = projectId
+            ? `/project/${encodeURIComponent(projectId)}/scripts/${encodeURIComponent(handlerId)}`
+            : null;
+
+          return (
+            <Box
+              key={eventName}
+              className="flex items-center gap-3 rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface)] px-3 py-3 transition hover:bg-[var(--editor-accent-soft)] hover:border-[var(--editor-accent-border)]"
+            >
+              <Checkbox
+                checked={checked}
+                onChange={(event) => {
+                  setEvent(
+                    nodeId,
+                    eventName,
+                    event.target.checked
+                      ? { handlerId: generatedHandlerId }
+                      : null
+                  );
+                }}
+              />
+
+              <Box className="min-w-0 flex-1">
+                <Box className="flex items-center gap-2">
+                  <Box className="text-sm font-medium text-[var(--editor-text)]">
+                    {definition.label}
+                  </Box>
+                  <code className="rounded bg-[var(--editor-surface-muted)] px-1.5 py-0.5 text-[10px] text-[var(--editor-text-muted)]">
+                    {toReactEventName(eventName)}
+                  </code>
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)] truncate">
+                  {handlerId}
+                </Box>
+              </Box>
+
+              {scriptPath ? (
+                <Link
+                  data-editor-ignore
+                  to={scriptPath}
+                  className="shrink-0 text-xs font-medium text-[var(--editor-accent)] hover:underline"
+                >
+                  Open script
+                </Link>
+              ) : (
+                <span
+                  data-editor-ignore
+                  className="shrink-0 text-xs text-[var(--editor-text-soft)]"
+                  title="Open the editor through /project/:projectId to edit scripts"
+                >
+                  Save project first
+                </span>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+}
+
+function toReactEventName(eventName: string) {
+  if (eventName.startsWith("on")) return eventName;
+  return `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
+}

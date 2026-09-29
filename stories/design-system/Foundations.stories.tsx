@@ -12,7 +12,7 @@ import {
   editorRadii,
   editorShadows,
   editorSpacing,
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Foundations/Tokens",

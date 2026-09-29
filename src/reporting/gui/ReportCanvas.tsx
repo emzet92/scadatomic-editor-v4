@@ -12,7 +12,7 @@ import {
   TemplateIcon,
   Text,
   Toolbar,
-} from "../../uiframework/gui/ui";
+} from "../../shared/ui";
 import type {
   ReportComponent,
   ReportDocument,

@@ -6,8 +6,8 @@ import {
   Button,
   IconButton,
   NotificationIcon,
-} from "../../src/uiframework/gui/ui";
-import { WorkspaceHeader } from "../../src/uiframework/gui/workspace/WorkspaceHeader";
+} from "../../src/shared/ui";
+import { WorkspaceHeader } from "../../src/shared/ui/organisms/WorkspaceHeader";
 
 const meta = {
   title: "Organisms/Workspace Header",

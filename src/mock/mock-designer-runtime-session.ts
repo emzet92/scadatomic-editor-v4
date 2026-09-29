@@ -1,5 +1,5 @@
-import type { ProjectData } from "../uiframework/data/tags/TagDefinition";
-import { attachDesignerTagRuntime } from "../uiframework/data/tags/designer-tag-store";
+import type { ProjectData } from "../tags/model/TagDefinition";
+import { attachDesignerTagRuntime } from "../tags/model/designer-tag-store";
 import {
   configureMockRuntimeProjectData,
 } from "./mock-tag-runtime";

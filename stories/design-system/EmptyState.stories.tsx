@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { AddIcon, Button, EmptyState, InboxIcon } from "../../src/uiframework/gui/ui";
+import { AddIcon, Button, EmptyState, InboxIcon } from "../../src/shared/ui";
 
 const meta = {
   title: "Molecules/Empty State",

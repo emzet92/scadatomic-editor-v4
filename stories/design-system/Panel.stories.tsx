@@ -9,7 +9,7 @@ import {
   ServerSettingsIcon,
   Stack,
   Text,
-} from "../../src/uiframework/gui/ui";
+} from "../../src/shared/ui";
 
 const meta = {
   title: "Organisms/Panel",

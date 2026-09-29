@@ -1,5 +1,5 @@
-import type { TagFieldRef } from "../../uiframework/data/tags/TagFieldRef";
-import { tagFieldRefKey } from "../../uiframework/data/tags/TagFieldRef";
+import type { TagFieldRef } from "../../tags/model/TagFieldRef";
+import { tagFieldRefKey } from "../../tags/model/TagFieldRef";
 
 export type TagReactiveRef = {
   kind: "tag";
