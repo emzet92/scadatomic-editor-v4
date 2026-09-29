@@ -147,8 +147,9 @@ export function AnimationLabPage() {
         bindings,
         ...(createdAt ? { createdAt } : {}),
       });
-      await library.save(definition);
-      setCreatedAt(definition.createdAt);
+      const saved = await library.save(definition);
+      setProcessId(saved.id);
+      setCreatedAt(saved.createdAt);
       setSaveStatus("Saved to IndexedDB");
       window.setTimeout(() => setSaveStatus(null), 1800);
     } catch (error) {
@@ -213,6 +214,29 @@ export function AnimationLabPage() {
       setSimulationRunning(true);
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void library.getLatest(persistenceProjectId)
+      .then((definition) => {
+        if (cancelled) return;
+        if (definition) {
+          applyDefinition(definition);
+        } else {
+          createNewProcess();
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSaveStatus(error instanceof Error ? error.message : String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [library, persistenceProjectId]);
 
   return (
     <WorkspaceShell

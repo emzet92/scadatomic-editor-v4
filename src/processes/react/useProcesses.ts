@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProcessDefinition, ProcessSummary } from "../domain/process-definition";
 import { useProcessLibrary } from "./ProcessLibraryProvider";
 
@@ -6,6 +6,15 @@ export type ProcessListState = {
   items: ProcessSummary[];
   loading: boolean;
   error: string | null;
+};
+
+export type ProcessDefinitionOptions = {
+  projectId?: string | undefined;
+  /**
+   * Runtime-friendly fallback. If the referenced process is missing (or no id
+   * was configured), resolve the most recently saved process in this project.
+   */
+  fallbackToLatestProjectProcess?: boolean | undefined;
 };
 
 export function useProcesses(projectId: string | undefined): ProcessListState {
@@ -41,38 +50,59 @@ export function useProcesses(projectId: string | undefined): ProcessListState {
   return state;
 }
 
-export function useProcessDefinition(processId: string | undefined) {
+export function useProcessDefinition(
+  processId: string | undefined,
+  options: ProcessDefinitionOptions = {},
+) {
   const library = useProcessLibrary();
+  const projectId = options.projectId;
+  const fallbackToLatest = options.fallbackToLatestProjectProcess === true;
   const [definition, setDefinition] = useState<ProcessDefinition | null>(null);
-  const [loading, setLoading] = useState(Boolean(processId));
+  const [loading, setLoading] = useState(Boolean(processId || (fallbackToLatest && projectId)));
   const [error, setError] = useState<string | null>(null);
+  const reloadVersion = useRef(0);
 
   const reload = useCallback(async () => {
-    if (!processId) {
-      setDefinition(null);
-      setLoading(false);
-      setError(null);
+    const version = ++reloadVersion.current;
+    if (!processId && !(fallbackToLatest && projectId)) {
+      if (version === reloadVersion.current) {
+        setDefinition(null);
+        setLoading(false);
+        setError(null);
+      }
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      setDefinition(await library.get(processId));
+      const exact = processId ? await library.get(processId) : null;
+      const resolved = exact ?? (
+        fallbackToLatest && projectId
+          ? await library.getLatest(projectId)
+          : null
+      );
+      if (version === reloadVersion.current) setDefinition(resolved);
     } catch (cause) {
-      setDefinition(null);
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (version === reloadVersion.current) {
+        setDefinition(null);
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
     } finally {
-      setLoading(false);
+      if (version === reloadVersion.current) setLoading(false);
     }
-  }, [library, processId]);
+  }, [fallbackToLatest, library, processId, projectId]);
 
   useEffect(() => {
     void reload();
     return library.subscribe((event) => {
-      if (event.processId === processId) void reload();
+      if (event.processId === processId) {
+        void reload();
+        return;
+      }
+      if (fallbackToLatest && event.projectId === projectId) void reload();
     });
-  }, [library, processId, reload]);
+  }, [fallbackToLatest, library, processId, projectId, reload]);
 
   return { definition, loading, error, reload };
 }

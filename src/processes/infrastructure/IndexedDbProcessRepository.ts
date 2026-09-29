@@ -52,22 +52,16 @@ export class IndexedDbProcessRepository implements ProcessRepository {
 
   async put(definition: ProcessDefinition): Promise<void> {
     const database = await this.getDatabase();
-    await runRequest(
-      database
-        .transaction(PROCESS_STORE_NAME, "readwrite")
-        .objectStore(PROCESS_STORE_NAME)
-        .put(structuredClone(definition)),
-    );
+    const transaction = database.transaction(PROCESS_STORE_NAME, "readwrite");
+    transaction.objectStore(PROCESS_STORE_NAME).put(structuredClone(definition));
+    await waitForTransaction(transaction);
   }
 
   async delete(processId: string): Promise<void> {
     const database = await this.getDatabase();
-    await runRequest(
-      database
-        .transaction(PROCESS_STORE_NAME, "readwrite")
-        .objectStore(PROCESS_STORE_NAME)
-        .delete(processId),
-    );
+    const transaction = database.transaction(PROCESS_STORE_NAME, "readwrite");
+    transaction.objectStore(PROCESS_STORE_NAME).delete(processId);
+    await waitForTransaction(transaction);
   }
 
   private getDatabase(): Promise<IDBDatabase> {
@@ -116,4 +110,12 @@ function isSupportedProcessDefinition(value: unknown): value is ProcessDefinitio
     typeof record.id === "string" &&
     typeof record.projectId === "string" &&
     typeof record.name === "string";
+}
+
+function waitForTransaction(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error ?? new Error("Process storage transaction failed."));
+    transaction.onabort = () => reject(transaction.error ?? new Error("Process storage transaction was aborted."));
+  });
 }

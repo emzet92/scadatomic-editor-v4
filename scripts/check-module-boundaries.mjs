@@ -15,6 +15,28 @@ const forbidden = {
   fleet: new Set(["animations", "designer", "mock", "processes", "project", "reactivity", "runtime", "scripting", "tags", "visualization"]),
 };
 
+const processLayerRules = {
+  domain: new Set(["domain"]),
+  application: new Set(["application", "domain"]),
+  infrastructure: new Set(["infrastructure", "application", "domain"]),
+  runtime: new Set(["runtime", "domain"]),
+  react: new Set(["react", "application", "domain"]),
+  components: new Set(["components", "react", "runtime", "application", "domain"]),
+  simulation: new Set(["simulation", "application", "domain"]),
+};
+
+// Adapter layers may integrate with selected top-level modules. Core process
+// layers stay independent from Designer/runtime/project implementations.
+const processExternalRules = {
+  domain: new Set(),
+  application: new Set(),
+  infrastructure: new Set(),
+  runtime: new Set(),
+  react: new Set(),
+  components: new Set(),
+  simulation: new Set(["tags"]),
+};
+
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;
 const violations = [];
 
@@ -34,7 +56,8 @@ for (const file of walk(srcRoot)) {
   if (!codeExtensions.has(path.extname(file))) continue;
   const sourceModule = topModule(file);
   const blocked = forbidden[sourceModule];
-  if (!blocked) continue;
+  const isProcessModule = sourceModule === "processes";
+  if (!blocked && !isProcessModule) continue;
 
   const source = fs.readFileSync(file, "utf8");
   for (const match of source.matchAll(importPattern)) {
@@ -45,23 +68,33 @@ for (const file of walk(srcRoot)) {
     if (!target.startsWith(srcRoot + path.sep)) continue;
     const targetModule = topModule(target);
 
-    if (sourceModule === "processes") {
+    if (isProcessModule) {
       const sourceRel = path.relative(path.join(srcRoot, "processes"), file);
       const sourceLayer = sourceRel.split(path.sep)[0];
       const allowedLayers = processLayerRules[sourceLayer];
-      if (allowedLayers) {
+      const allowedExternalModules = processExternalRules[sourceLayer];
+
+      // Public barrel (src/processes/index.ts) is the composition/export surface
+      // and intentionally exposes all process layers.
+      if (!allowedLayers || !allowedExternalModules) continue;
+
+      if (targetModule === "processes") {
         const targetRel = path.relative(path.join(srcRoot, "processes"), target);
-        const targetInsideProcesses = !targetRel.startsWith(`..${path.sep}`) && targetRel !== "..";
-        const targetLayer = targetInsideProcesses ? targetRel.split(path.sep)[0] : null;
-        if (!targetLayer || !allowedLayers.has(targetLayer)) {
+        const targetLayer = targetRel.split(path.sep)[0];
+        if (!allowedLayers.has(targetLayer)) {
           violations.push(
-            `${path.relative(process.cwd(), file)} crosses process layer ${sourceLayer} -> ${targetModule}/${targetLayer ?? "external"} via ${specifier}`,
+            `${path.relative(process.cwd(), file)} crosses process layer ${sourceLayer} -> ${targetLayer} via ${specifier}`,
           );
         }
+      } else if (!allowedExternalModules.has(targetModule)) {
+        violations.push(
+          `${path.relative(process.cwd(), file)} imports external module ${targetModule} from process layer ${sourceLayer} via ${specifier}`,
+        );
       }
+      continue;
     }
 
-    if (blocked.has(targetModule)) {
+    if (blocked?.has(targetModule)) {
       violations.push(
         `${path.relative(process.cwd(), file)} imports ${targetModule} via ${specifier}`,
       );

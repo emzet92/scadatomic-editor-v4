@@ -20,6 +20,8 @@ import { NavigationRuntimeProvider } from "../navigation/NavigationRuntimeProvid
 import { runtimeRegistry } from "../../visualization/components/registry/runtime-registry";
 import { RuntimeProvider } from "../runtime-provider";
 import { RuntimeModalLayer } from "./RuntimeModalLayer";
+import { ProcessRuntimeProvider } from "../../processes";
+import { runtimeProcessTagSource } from "../process-tag-source";
 import { getComponentVariantProps } from "../../visualization/components/component-variants";
 import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
 import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
@@ -147,6 +149,14 @@ export function RenderPage() {
     );
   }
 
+  if (!projectId) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-zinc-950 text-red-400 text-sm">
+        Missing project id
+      </div>
+    );
+  }
+
   const routeTarget = resolveNavigationPath(document, routePath);
   const currentPage = getPage(
     document,
@@ -171,101 +181,101 @@ export function RenderPage() {
         onNodeUpdated={showUpdateToast}
       />
 
-      <NavigationRuntimeProvider
-        value={{
-          items: navigationItems,
-          currentPageId: currentPage.id,
-          navigateTo,
-        }}
+      <ProcessRuntimeProvider
+        value={{ projectId, tagSource: runtimeProcessTagSource }}
       >
-        <div className="mx-auto w-fit">
-          <RenderNode
-            id={renderDocument.rootId}
-            document={renderDocument}
-            registry={runtimeRegistry}
-            themeId={activeThemeId}
-            decorateComponentInternals
-            resolveNode={(node, context) => {
-              if (!projectId) return node;
+        <NavigationRuntimeProvider
+          value={{
+            items: navigationItems,
+            currentPageId: currentPage.id,
+            navigateTo,
+          }}
+        >
+          <div className="mx-auto w-fit">
+            <RenderNode
+              id={renderDocument.rootId}
+              document={renderDocument}
+              registry={runtimeRegistry}
+              themeId={activeThemeId}
+              decorateComponentInternals
+              resolveNode={(node, context) => {
+                const runtimeNodeId = context.componentInstanceId
+                  ? `${context.componentInstanceId}::${node.id}`
+                  : node.id;
+                const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
+                const reactiveProps = getReactiveNodeProps(projectId, runtimeNodeId);
+                const reactiveVariantName = getReactiveNodeVariant(projectId, runtimeNodeId);
+                const runtimeVariantName = getMockRuntimeNodeVariant(
+                  projectId,
+                  runtimeNodeId
+                );
+                const requestedVariant = reactiveVariantName ?? runtimeVariantName;
+                const variantName =
+                  requestedVariant && node.variants?.[requestedVariant]
+                    ? requestedVariant
+                    : node.defaultVariant;
+                const variantProps = getComponentVariantProps(node, variantName);
+                const effectiveReactiveProps = normalizeReactiveProps(
+                  { ...(node.props ?? {}), ...variantProps, ...runtimeProps },
+                  reactiveProps
+                );
 
-              const runtimeNodeId = context.componentInstanceId
-                ? `${context.componentInstanceId}::${node.id}`
-                : node.id;
-              const runtimeProps = getMockRuntimeNodeProps(projectId, runtimeNodeId);
-              const reactiveProps = getReactiveNodeProps(projectId, runtimeNodeId);
-              const reactiveVariantName = getReactiveNodeVariant(projectId, runtimeNodeId);
-              const runtimeVariantName = getMockRuntimeNodeVariant(
-                projectId,
-                runtimeNodeId
-              );
-              const requestedVariant = reactiveVariantName ?? runtimeVariantName;
-              const variantName =
-                requestedVariant && node.variants?.[requestedVariant]
-                  ? requestedVariant
-                  : node.defaultVariant;
-              const variantProps = getComponentVariantProps(node, variantName);
-              const effectiveReactiveProps = normalizeReactiveProps(
-                { ...(node.props ?? {}), ...variantProps, ...runtimeProps },
-                reactiveProps
-              );
+                if (
+                  Object.keys(runtimeProps).length === 0 &&
+                  Object.keys(reactiveProps).length === 0 &&
+                  Object.keys(variantProps).length === 0
+                ) {
+                  return node;
+                }
 
-              if (
-                Object.keys(runtimeProps).length === 0 &&
-                Object.keys(reactiveProps).length === 0 &&
-                Object.keys(variantProps).length === 0
-              ) {
-                return node;
-              }
-
-              return {
-                ...node,
-                props: {
-                  ...(node.props ?? {}),
-                  ...variantProps,
-                  ...runtimeProps,
-                  ...effectiveReactiveProps,
-                },
-              };
-            }}
-            decorateProps={(node, context) => {
-              const runtimeNodeId = context.componentInstanceId
-                ? `${context.componentInstanceId}::${node.id}`
-                : node.id;
-              const baseProps = {
-                "data-node-id": runtimeNodeId,
-                "data-scadatomic-type": node.type,
-              };
-
-              if (node.type === "Text" || node.type === "Chart") {
                 return {
-                  ...baseProps,
-                  runtimeBindings: node.bindings,
+                  ...node,
+                  props: {
+                    ...(node.props ?? {}),
+                    ...variantProps,
+                    ...runtimeProps,
+                    ...effectiveReactiveProps,
+                  },
                 };
-              }
-
-              if (node.type === "Button") {
-                return {
-                  ...baseProps,
-                  runtimeEvents: node.events,
-                  runtimeProjectId: projectId,
-                  runtimePageId: currentPage.id,
+              }}
+              decorateProps={(node, context) => {
+                const runtimeNodeId = context.componentInstanceId
+                  ? `${context.componentInstanceId}::${node.id}`
+                  : node.id;
+                const baseProps = {
+                  "data-node-id": runtimeNodeId,
+                  "data-scadatomic-type": node.type,
                 };
-              }
 
-              return baseProps;
-            }}
-          />
-        </div>
-      </NavigationRuntimeProvider>
+                if (node.type === "Text" || node.type === "Chart") {
+                  return {
+                    ...baseProps,
+                    runtimeBindings: node.bindings,
+                  };
+                }
 
-      {projectId ? (
+                if (node.type === "Button") {
+                  return {
+                    ...baseProps,
+                    runtimeEvents: node.events,
+                    runtimeProjectId: projectId,
+                    runtimePageId: currentPage.id,
+                  };
+                }
+
+                return baseProps;
+              }}
+            />
+          </div>
+        </NavigationRuntimeProvider>
+
         <RuntimeModalLayer
           projectId={projectId}
           document={document}
           pageId={currentPage.id}
           themeId={activeThemeId}
         />
-      ) : null}
+      </ProcessRuntimeProvider>
 
       {updateToastVisible && (
         <div className="fixed right-5 bottom-5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">

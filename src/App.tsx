@@ -6,9 +6,21 @@ import { DependenciesPage } from "./designer/features/dependencies/DependenciesP
 import { FleetManagementPage } from "./fleet/pages/FleetManagementPage";
 import { ReportDesignerPage } from "./reporting";
 import { AnimationLabPage } from "./animations";
-import { IndexedDbProcessRepository, ProcessLibrary, ProcessLibraryProvider } from "./processes";
+import {
+  BrowserProcessChangeBus,
+  IndexedDbProcessRepository,
+  ProcessLibrary,
+  ProcessLibraryProvider,
+} from "./processes";
 
-const processLibrary = new ProcessLibrary(new IndexedDbProcessRepository());
+const processLibrary = new ProcessLibrary(
+  new IndexedDbProcessRepository(),
+  new BrowserProcessChangeBus(),
+);
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => processLibrary.dispose());
+}
 
 function App() {
   return (

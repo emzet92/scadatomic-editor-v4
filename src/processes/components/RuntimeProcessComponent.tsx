@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useReducer } from "react";
-import { runtimeProcessTagSource } from "../../runtime/process-tag-source";
 import type { ProcessDefinition } from "../domain/process-definition";
-import { listProcessBindingPaths, resolveProcessBindingValues } from "../application/ProcessTagSource";
+import {
+  listProcessBindingPaths,
+  resolveProcessBindingValues,
+  type ProcessTagSource,
+} from "../application/ProcessTagSource";
+import { useProcessRuntime } from "../react/ProcessRuntimeProvider";
 import { useProcessDefinition } from "../react/useProcesses";
 import { resolveProcessFrame } from "../runtime/process-frame";
 import { ProcessCanvas } from "./ProcessCanvas";
@@ -15,14 +19,27 @@ export function RuntimeProcessComponent({
   style,
   className,
 }: ProcessComponentProps) {
-  const { definition, loading, error } = useProcessDefinition(processId);
-  useProcessSignalSubscriptions(definition);
+  const runtime = useProcessRuntime();
+  const { definition, loading, error } = useProcessDefinition(processId, {
+    projectId: runtime.projectId,
+    fallbackToLatestProjectProcess: true,
+  });
+  useProcessSignalSubscriptions(definition, runtime.tagSource);
 
   if (loading) return <ProcessPlaceholder width={width} height={height} label="Loading process…" />;
   if (error) return <ProcessPlaceholder width={width} height={height} label={error} tone="error" />;
-  if (!definition) return <ProcessPlaceholder width={width} height={height} label="Missing saved process" tone="error" />;
+  if (!definition) {
+    return (
+      <ProcessPlaceholder
+        width={width}
+        height={height}
+        label="No saved process for this project"
+        tone="error"
+      />
+    );
+  }
 
-  const bindingValues = resolveProcessBindingValues(definition.bindings, runtimeProcessTagSource);
+  const bindingValues = resolveProcessBindingValues(definition.bindings, runtime.tagSource);
   const frame = resolveProcessFrame(
     definition.path,
     definition.scene,
@@ -46,7 +63,10 @@ export function RuntimeProcessComponent({
   );
 }
 
-function useProcessSignalSubscriptions(definition: ProcessDefinition | null) {
+function useProcessSignalSubscriptions(
+  definition: ProcessDefinition | null,
+  tagSource: ProcessTagSource,
+) {
   const [, forceRender] = useReducer((version: number) => version + 1, 0);
   const tags = useMemo(
     () => definition ? listProcessBindingPaths(definition.bindings) : [],
@@ -57,8 +77,8 @@ function useProcessSignalSubscriptions(definition: ProcessDefinition | null) {
   useEffect(() => {
     if (tags.length === 0) return undefined;
     const unsubscribes = [...new Set(tags)].map((tag) =>
-      runtimeProcessTagSource.subscribe(tag, forceRender),
+      tagSource.subscribe(tag, forceRender),
     );
     return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-  }, [subscriptionKey]);
+  }, [subscriptionKey, tagSource]);
 }
