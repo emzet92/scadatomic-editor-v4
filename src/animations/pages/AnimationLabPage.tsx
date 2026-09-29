@@ -18,7 +18,10 @@ import {
   WorkspaceShell,
 } from "../../shared/ui";
 import { WorkspaceHeader } from "../../shared/ui/organisms/WorkspaceHeader";
+import type { AnimationPath } from "../model/animation-path";
 import { conveyorDemoPath } from "../model/animation-path";
+import { resolveWaypointChanges } from "../model/waypoint-changes";
+import { WaypointEditor } from "../editor/WaypointEditor";
 import { buildPathMetrics, samplePath } from "../runtime/path-sampler";
 import { usePlaybackClock } from "../runtime/use-playback-clock";
 
@@ -26,19 +29,28 @@ const STAGE_WIDTH = 880;
 const STAGE_HEIGHT = 460;
 const RECT_WIDTH = 62;
 const RECT_HEIGHT = 42;
+const DEFAULT_BOX_COLOR = "#4f46e5";
 
 export function AnimationLabPage() {
   const { projectId } = useParams();
   const [durationSeconds, setDurationSeconds] = useState(6);
   const [loopMode, setLoopMode] = useState<"loop" | "once">("loop");
+  const [path, setPath] = useState<AnimationPath>(() => cloneAnimationPath(conveyorDemoPath));
+  const [selectedWaypointId, setSelectedWaypointId] = useState<string | null>(
+    conveyorDemoPath.points[0]?.id ?? null,
+  );
 
-  const path = conveyorDemoPath;
   const metrics = useMemo(() => buildPathMetrics(path), [path]);
   const playback = usePlaybackClock(durationSeconds * 1000, loopMode === "loop");
   const position = useMemo(
     () => samplePath(path, playback.progress, metrics),
     [metrics, path, playback.progress],
   );
+  const waypointChanges = useMemo(
+    () => resolveWaypointChanges(path, position.waypointIndex),
+    [path, position.waypointIndex],
+  );
+  const boxColor = waypointChanges.boxColor ?? DEFAULT_BOX_COLOR;
 
   return (
     <WorkspaceShell
@@ -59,7 +71,7 @@ export function AnimationLabPage() {
           description="Prototype przyszłego modułu animacji: prostokąt porusza się ze stałą prędkością po deklaratywnej ścieżce. Geometria ścieżki i zegar odtwarzania są od siebie niezależne, więc później progress może pochodzić z taga lub runtime."
         />
 
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_370px]">
           <PanelCard className="overflow-hidden rounded-xl p-0 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--editor-border)] px-4 py-3">
               <div>
@@ -75,7 +87,14 @@ export function AnimationLabPage() {
             </div>
 
             <div className="bg-[#f7f8fc] p-4 sm:p-6">
-              <AnimationStage progress={playback.progress} position={position} />
+              <AnimationStage
+                path={path}
+                progress={playback.progress}
+                position={position}
+                boxColor={boxColor}
+                selectedWaypointId={selectedWaypointId}
+                onSelectWaypoint={setSelectedWaypointId}
+              />
             </div>
 
             <div className="border-t border-[var(--editor-border)] bg-white px-4 py-4">
@@ -156,37 +175,21 @@ export function AnimationLabPage() {
                 <Metric label="y" value={position.y.toFixed(1)} />
                 <Metric label="segment" value={`${position.segmentIndex + 1}/${metrics.segments.length}`} />
                 <Metric label="angle" value={`${position.angleDegrees.toFixed(0)}°`} />
+                <Metric label="waypoint" value={`${position.waypointIndex + 1}/${path.points.length}`} />
+                <Metric label="box color" value={boxColor} />
               </dl>
             </PanelCard>
 
-            <PanelCard className="rounded-xl p-4 shadow-sm">
-              <SectionHeader
-                title="Path definition"
-                description="Ścieżka jest zwykłym modelem danych, nie CSS-em ani SVG path API."
-              />
-              <ol className="mt-4 space-y-2">
-                {path.points.map((point, index) => (
-                  <li
-                    key={`${point.x}-${point.y}-${index}`}
-                    className="flex items-center justify-between rounded-lg border border-[var(--editor-border)] bg-[var(--editor-surface-muted)] px-3 py-2 text-[11px]"
-                  >
-                    <span className="flex items-center gap-2 font-medium text-[var(--editor-text)]">
-                      <span className="flex size-5 items-center justify-center rounded-full bg-[var(--editor-accent-soft)] text-[9px] font-semibold text-[var(--editor-accent)]">
-                        {index + 1}
-                      </span>
-                      waypoint
-                    </span>
-                    <code className="text-[10px] text-[var(--editor-text-muted)]">
-                      {point.x}, {point.y}
-                    </code>
-                  </li>
-                ))}
-              </ol>
-            </PanelCard>
+            <WaypointEditor
+              path={path}
+              selectedWaypointId={selectedWaypointId}
+              onSelectedWaypointIdChange={setSelectedWaypointId}
+              onChange={setPath}
+            />
 
             <Box className="flex gap-2 rounded-xl border border-dashed border-[var(--editor-border-strong)] bg-white/60 px-4 py-3 text-[11px] leading-5 text-[var(--editor-text-muted)]">
               <WorkflowIcon size={15} className="mt-0.5 shrink-0 text-[var(--editor-accent)]" />
-              Następny krok: źródło progressu jako binding/tag oraz edytowalne waypointy w designerze.
+              Waypoint changes są już częścią modelu ścieżki. Następny krok: binding progressu do taga i przeciąganie waypointów bezpośrednio na canvasie.
             </Box>
           </div>
         </div>
@@ -196,13 +199,21 @@ export function AnimationLabPage() {
 }
 
 function AnimationStage({
+  path,
   progress,
   position,
+  boxColor,
+  selectedWaypointId,
+  onSelectWaypoint,
 }: {
+  path: AnimationPath;
   progress: number;
   position: ReturnType<typeof samplePath>;
+  boxColor: string;
+  selectedWaypointId: string | null;
+  onSelectWaypoint: (waypointId: string) => void;
 }) {
-  const points = conveyorDemoPath.points.map((point) => `${point.x},${point.y}`).join(" ");
+  const points = path.points.map((point) => `${point.x},${point.y}`).join(" ");
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--editor-border)] bg-white shadow-inner">
@@ -242,9 +253,31 @@ function AnimationStage({
           strokeDasharray="8 9"
         />
 
-        {conveyorDemoPath.points.map((point, index) => (
-          <g key={`${point.x}-${point.y}-${index}`}>
-            <circle cx={point.x} cy={point.y} r="7" fill="#ffffff" stroke="#6366f1" strokeWidth="2" />
+        {path.points.map((point, index) => (
+          <g
+            key={point.id}
+            onClick={() => onSelectWaypoint(point.id)}
+            className="cursor-pointer"
+          >
+            {point.id === selectedWaypointId ? (
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r="12"
+                fill="none"
+                stroke="#818cf8"
+                strokeWidth="2"
+                strokeOpacity="0.45"
+              />
+            ) : null}
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r="7"
+              fill={point.changes?.boxColor ?? "#ffffff"}
+              stroke="#6366f1"
+              strokeWidth="2"
+            />
             <text
               x={point.x}
               y={point.y - 15}
@@ -262,6 +295,7 @@ function AnimationStage({
           transform={`translate(${position.x} ${position.y}) rotate(${position.angleDegrees})`}
           filter="url(#animation-lab-shadow)"
           data-progress={progress.toFixed(4)}
+          data-waypoint-index={position.waypointIndex}
         >
           <rect
             x={-RECT_WIDTH / 2}
@@ -269,7 +303,7 @@ function AnimationStage({
             width={RECT_WIDTH}
             height={RECT_HEIGHT}
             rx="8"
-            fill="#4f46e5"
+            fill={boxColor}
           />
           <rect
             x={-RECT_WIDTH / 2 + 5}
@@ -278,7 +312,8 @@ function AnimationStage({
             height={RECT_HEIGHT - 10}
             rx="5"
             fill="none"
-            stroke="#a5b4fc"
+            stroke="#ffffff"
+            strokeOpacity="0.55"
             strokeWidth="1.5"
           />
         </g>
@@ -304,6 +339,15 @@ function StatusDot({ state }: { state: string }) {
       }`}
     />
   );
+}
+
+function cloneAnimationPath(path: AnimationPath): AnimationPath {
+  return {
+    ...path,
+    points: path.points.map((point) =>
+      point.changes ? { ...point, changes: { ...point.changes } } : { ...point },
+    ),
+  };
 }
 
 function clamp(value: number, min: number, max: number): number {

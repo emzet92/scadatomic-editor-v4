@@ -1,17 +1,23 @@
-import type { AnimationPath, AnimationPoint } from "../model/animation-path";
+import type { AnimationPath, AnimationWaypoint } from "../model/animation-path";
 
-export type SampledPathPosition = AnimationPoint & {
+export type SampledPathPosition = {
+  x: number;
+  y: number;
   /** Zero-based line segment currently being traversed. */
   segmentIndex: number;
   /** Progress inside the active segment, normalized to 0..1. */
   segmentProgress: number;
-  /** Direction of travel. Useful later for rotation/orientation bindings. */
+  /** Last waypoint reached. Discrete waypoint changes are resolved from this index. */
+  waypointIndex: number;
+  /** Direction of travel. Useful for rotation/orientation bindings. */
   angleDegrees: number;
 };
 
 type PathSegment = {
-  from: AnimationPoint;
-  to: AnimationPoint;
+  from: AnimationWaypoint;
+  to: AnimationWaypoint;
+  fromIndex: number;
+  toIndex: number;
   length: number;
   startDistance: number;
 };
@@ -36,6 +42,8 @@ export function buildPathMetrics(path: AnimationPath): PathMetrics {
     segments.push({
       from,
       to,
+      fromIndex: index,
+      toIndex: index + 1,
       length,
       startDistance: totalLength,
     });
@@ -55,13 +63,15 @@ export function samplePath(
   progress: number,
   metrics: PathMetrics = buildPathMetrics(path),
 ): SampledPathPosition {
-  const firstPoint = path.points[0] ?? { x: 0, y: 0 };
+  const firstPoint = path.points[0] ?? { id: "empty", x: 0, y: 0 };
 
   if (metrics.segments.length === 0 || metrics.totalLength <= 0) {
     return {
-      ...firstPoint,
+      x: firstPoint.x,
+      y: firstPoint.y,
       segmentIndex: 0,
       segmentProgress: 0,
+      waypointIndex: 0,
       angleDegrees: 0,
     };
   }
@@ -73,12 +83,14 @@ export function samplePath(
   const segment = metrics.segments[segmentIndex] ?? metrics.segments[0]!;
   const localDistance = clamp(targetDistance - segment.startDistance, 0, segment.length);
   const segmentProgress = segment.length === 0 ? 0 : localDistance / segment.length;
+  const waypointIndex = normalizedProgress >= 1 ? segment.toIndex : segment.fromIndex;
 
   return {
     x: lerp(segment.from.x, segment.to.x, segmentProgress),
     y: lerp(segment.from.y, segment.to.y, segmentProgress),
     segmentIndex,
     segmentProgress,
+    waypointIndex,
     angleDegrees:
       (Math.atan2(segment.to.y - segment.from.y, segment.to.x - segment.from.x) * 180) /
       Math.PI,
@@ -92,6 +104,8 @@ function findSegmentIndex(metrics: PathMetrics, distance: number): number {
     const segment = metrics.segments[index];
     if (!segment) continue;
 
+    // Strict boundary is intentional: exactly on a waypoint we switch to the
+    // next segment so orientation and discrete waypoint changes update at once.
     if (distance < segment.startDistance + segment.length || index === lastIndex) {
       return index;
     }
