@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import type { AssetRef } from "..";
-import { useAssetUrl } from "..";
+import type { AssetRef } from "../../../assets";
+import { useAssetUrl } from "../../../assets";
 import {
   Box,
   Button,

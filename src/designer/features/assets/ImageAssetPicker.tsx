@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
-import type { AssetRef } from "..";
-import { useAssetManager, useAssetUrl } from "..";
+import type { AssetRef } from "../../../assets";
+import { useAssetManager, useAssetUrl } from "../../../assets";
 import {
   Box,
   Button,
