@@ -9,6 +9,7 @@ import {
   DeleteIcon,
   PaletteIcon,
   Pressable,
+  SearchIcon,
   StarIcon,
   ZapIcon
 } from "../../../shared/ui";
@@ -55,10 +56,29 @@ export function HandlerTree({
     () => (document ? countApiEntries(document) : 0),
     [document]
   );
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const definitions = useMemo(() => {
+    const values = Object.values(document?.components ?? {});
+    if (!normalizedQuery) return values;
+    return values.filter((definition) =>
+      [
+        definition.name,
+        ...Object.keys(definition.methods ?? {}),
+        ...Object.values(definition.nodes).map((node) => node.name),
+      ].some((value) => value.toLowerCase().includes(normalizedQuery))
+    );
+  }, [document, normalizedQuery]);
+  const pages = useMemo(() => {
+    const values = document ? buildNavigationTree(document) : [];
+    return normalizedQuery
+      ? filterNavigationTree(values, normalizedQuery)
+      : values;
+  }, [document, normalizedQuery]);
 
   return (
-    <aside className="w-80 shrink-0 border-r border-zinc-200 bg-white overflow-y-auto">
-      <Box className="sticky top-0 z-10 border-b border-zinc-200 bg-white px-4 py-4">
+    <aside className="flex w-80 shrink-0 flex-col border-r border-zinc-200 bg-white">
+      <Box className="shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
         <Box className="flex items-center justify-between gap-3">
           <Box>
             <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
@@ -72,16 +92,28 @@ export function HandlerTree({
             {apiEntryCount}
           </span>
         </Box>
+        <Box className="relative mt-3">
+          <SearchIcon
+            size={13}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400"
+          />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search scripts, components…"
+            className="h-8 w-full rounded-md border border-zinc-200 bg-zinc-50 pl-8 pr-2 text-xs text-zinc-700 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+          />
+        </Box>
       </Box>
 
-      <Box className="p-2">
+      <Box className="min-h-0 flex-1 overflow-y-auto p-2">
         {!document ? (
           <Box className="px-2 py-3 text-sm text-zinc-400">Loading API…</Box>
         ) : (
           <>
-            {Object.keys(document.components ?? {}).length > 0 ? (
+            {definitions.length > 0 ? (
               <ComponentDefinitionsSection
-                definitions={Object.values(document.components ?? {})}
+                definitions={definitions}
                 currentScriptId={currentScriptId}
                 onSelect={onSelect}
                 onAddMethod={onAddDefinitionMethod}
@@ -91,7 +123,7 @@ export function HandlerTree({
 
             <PagesApiSection
               document={document}
-              pages={buildNavigationTree(document)}
+              pages={pages}
               currentScriptId={currentScriptId}
               onSelect={onSelect}
               onAddMethod={onAddMethod}
@@ -101,6 +133,7 @@ export function HandlerTree({
             {Object.keys(document.modals ?? {}).length > 0 ? (
               <ModalsApiSection
                 document={document}
+                query={normalizedQuery}
                 currentScriptId={currentScriptId}
                 onSelect={onSelect}
                 onAddMethod={onAddMethod}
@@ -209,20 +242,22 @@ function PageApiRow({
 
 function ModalsApiSection({
   document,
+  query,
   currentScriptId,
   onSelect,
   onAddMethod,
   onRemoveMethod,
 }: {
   document: UiDocument;
+  query: string;
   currentScriptId: string;
   onSelect: (scriptId: string) => void;
   onAddMethod: (nodeId: string, methodName: string) => Promise<string>;
   onRemoveMethod: (nodeId: string, methodName: string) => Promise<void>;
 }) {
-  const modals = Object.values(document.modals ?? {}).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+  const modals = Object.values(document.modals ?? {})
+    .filter((modal) => !query || modal.name.toLowerCase().includes(query))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <details open className="mt-2 rounded-lg border border-sky-100 bg-sky-50/30">
@@ -1037,6 +1072,19 @@ function getEventLabel(node: UiNode, eventName: string) {
   return getComponentDefinition(node.type)?.events?.[eventName]?.label ?? eventName;
 }
 
+
+function filterNavigationTree(
+  nodes: NavigationTreeNode[],
+  query: string
+): NavigationTreeNode[] {
+  return nodes.flatMap((node) => {
+    const children = filterNavigationTree(node.children, query);
+    if (node.name.toLowerCase().includes(query) || node.path.toLowerCase().includes(query) || children.length > 0) {
+      return [{ ...node, children }];
+    }
+    return [];
+  });
+}
 function countApiEntries(document: UiDocument) {
   const nodeEntries = Object.values(document.nodes).reduce(
     (total, node) =>

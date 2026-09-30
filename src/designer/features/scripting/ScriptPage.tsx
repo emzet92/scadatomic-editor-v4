@@ -1,5 +1,13 @@
-import { Box, Pressable } from "../../../shared/ui";
-import { useEffect, useState } from "react";
+import {
+  Box,
+  ChevronDownIcon,
+  MenuIcon,
+  PlayIcon,
+  Pressable,
+  SearchIcon,
+  SettingsIcon,
+} from "../../../shared/ui";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   getProjectById,
@@ -29,7 +37,18 @@ import type {
 } from "../../../project/model/document";
 import { WorkspaceHeader } from "../../../shared/ui/organisms/WorkspaceHeader";
 import { HandlerTree } from "./HandlerTree";
-import { JavaScriptCodeEditor } from "./JavaScriptCodeEditor";
+import {
+  JavaScriptCodeEditor,
+  type JavaScriptCodeEditorHandle,
+} from "./JavaScriptCodeEditor";
+import {
+  ScriptConsolePanel,
+  type ScriptConsoleEntry,
+} from "./ScriptConsolePanel";
+import {
+  ScriptInspectorPanel,
+  type ScriptInspectorModel,
+} from "./ScriptInspectorPanel";
 import { CodeGraphView } from "../../../scripting/execution/visualization/CodeGraphView";
 import { ExecutionGraphView } from "../../../scripting/execution/visualization/ExecutionGraphView";
 import { ExecutionPlanView } from "../../../scripting/execution/visualization/ExecutionPlanView";
@@ -64,6 +83,17 @@ function ScriptEditor({
   const [projectRevision, setProjectRevision] = useState<number | undefined>();
   const [apiError, setApiError] = useState<string | null>(null);
   const [view, setView] = useState<"code" | "ast" | "plan" | "execution">("code");
+  const editorRef = useRef<JavaScriptCodeEditorHandle>(null);
+  const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const [problems, setProblems] = useState<string[]>([]);
+  const [consoleEntries, setConsoleEntries] = useState<ScriptConsoleEntry[]>(() => [
+    {
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      level: "info",
+      message: `Script loaded: ${scriptId}`,
+    },
+  ]);
 
   const dirty = code !== savedCode;
   const allComponentApi = document
@@ -136,9 +166,48 @@ function ScriptEditor({
     };
   }, [projectId]);
 
+  function appendConsole(
+    level: ScriptConsoleEntry["level"],
+    message: string
+  ) {
+    setConsoleEntries((entries) => [
+      ...entries.slice(-199),
+      {
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        level,
+        message,
+      },
+    ]);
+  }
+
   function save() {
     saveMockScript(projectId, scriptId, code);
     setSavedCode(code);
+    appendConsole("success", `Saved script: ${scriptId}`);
+  }
+
+  function validateScript() {
+    try {
+      // Compile only. The real handler still executes through the runtime adapter.
+      // eslint-disable-next-line no-new-func
+      new Function(`"use strict";\n${code}`);
+      setProblems([]);
+      appendConsole("success", "Syntax check passed. Script is ready for runtime execution.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setProblems([message]);
+      appendConsole("error", `Syntax error: ${message}`);
+    }
+  }
+
+  function formatScript() {
+    editorRef.current?.format();
+    appendConsole("info", "Applied JavaScript indentation from the CodeMirror language service.");
+  }
+
+  function findInScript() {
+    editorRef.current?.find();
   }
 
   function preserveDirtyScript() {
@@ -303,8 +372,25 @@ function ScriptEditor({
     await persistDefinitionMethod(componentId, methodName, null);
   }
 
+  const scriptTitle = getScriptTitle(scriptSelection);
+  const scriptDescription = getScriptDescription(scriptSelection);
+  const inspectorModel: ScriptInspectorModel = {
+    scriptId,
+    title: scriptTitle,
+    typeLabel: getScriptTypeLabel(scriptSelection),
+    description: scriptDescription,
+    componentName: getScriptComponentName(scriptSelection),
+    sourceNodeId: getScriptSourceNodeId(scriptSelection),
+    eventName:
+      scriptSelection?.kind === "handler" ||
+      scriptSelection?.kind === "componentHandler"
+        ? scriptSelection.memberName
+        : undefined,
+    projectId,
+  };
+
   return (
-    <Box className="h-screen bg-slate-50 text-zinc-900 flex flex-col">
+    <Box className="flex h-screen flex-col bg-zinc-100 text-zinc-900">
       <WorkspaceHeader
         active="scripts"
         projectId={projectId}
@@ -314,12 +400,17 @@ function ScriptEditor({
         onBeforeNavigate={() => preserveDirtyScript()}
         actions={
           <>
-            <span className="text-xs text-[var(--editor-text-muted)]">
+            <span className="flex items-center gap-1.5 text-xs text-[var(--editor-text-muted)]">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  dirty ? "bg-amber-400" : "bg-emerald-500"
+                }`}
+              />
               {dirty ? "Unsaved changes" : "Saved locally"}
             </span>
 
             <Pressable
-              className="h-9 px-4 rounded-md bg-[var(--editor-accent)] hover:bg-[var(--editor-accent-hover)] text-sm font-medium text-white transition"
+              className="h-9 rounded-md bg-[var(--editor-accent)] px-4 text-sm font-medium text-white transition hover:bg-[var(--editor-accent-hover)]"
               onClick={save}
             >
               Save Script
@@ -328,7 +419,7 @@ function ScriptEditor({
         }
       />
 
-      <Box className="min-h-0 flex-1 flex">
+      <Box className="flex min-h-0 flex-1 overflow-hidden">
         <HandlerTree
           document={document}
           currentScriptId={scriptId}
@@ -339,46 +430,79 @@ function ScriptEditor({
           onRemoveDefinitionMethod={removeDefinitionMethod}
         />
 
-        <main className="min-w-0 flex-1 overflow-auto p-6">
-          <Box className="max-w-6xl mx-auto space-y-4">
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+          <Box className="shrink-0 border-b border-zinc-200 bg-white px-4 py-3">
             {apiError ? (
-              <Box className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <Box className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 {apiError}
               </Box>
             ) : null}
 
-            <Box>
-              <Box className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-                {scriptSelection?.kind === "handler" ||
-                scriptSelection?.kind === "componentHandler"
-                  ? "Handler ID"
-                  : "Method Script ID"}
-              </Box>
-              <Box className="mt-1 text-sm font-mono text-zinc-600">
-                {scriptId}
+            <Box className="flex items-start justify-between gap-4">
+              <Box className="min-w-0">
+                <Box className="mb-1 flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400">
+                  <span>Component Scripts</span>
+                  <span>›</span>
+                  <span className="truncate">{getScriptComponentName(scriptSelection) ?? "Global"}</span>
+                  <span>›</span>
+                  <span className="truncate font-mono text-zinc-600">{scriptId}</span>
+                </Box>
+                <Box className="flex items-center gap-2">
+                  <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-950">
+                    {scriptTitle}
+                  </h1>
+                  <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-indigo-600">
+                    JS
+                  </span>
+                </Box>
+                <p className="mt-1 max-w-3xl truncate text-xs text-zinc-500">
+                  {scriptDescription}
+                </p>
               </Box>
 
-              <h1 className="mt-4 text-xl font-semibold text-zinc-900">
-                {scriptSelection?.kind === "method"
-                  ? `${scriptSelection.component.name}.${scriptSelection.memberName}()`
-                  : scriptSelection?.kind === "componentMethod"
-                    ? `${scriptSelection.definition.name}.${scriptSelection.memberName}()`
-                    : scriptSelection?.kind === "componentHandler"
-                      ? `${scriptSelection.definition.name}.${scriptSelection.node.name}.${scriptSelection.memberName}`
-                      : "Runtime Handler"}
-              </h1>
-              <p className="mt-1 text-sm text-zinc-500">
-                {scriptSelection?.kind === "componentMethod"
-                  ? "Encapsulated component method. self sees this component, internal sees its private tree, and ctx.ui sees only scene-public APIs."
-                  : scriptSelection?.kind === "componentHandler"
-                    ? "Private handler owned by the reusable component definition. self + internal are instance-scoped; ctx.ui stays scene-public."
-                    : scriptSelection?.kind === "method"
-                      ? "Component method executed synchronously inside the current handler context."
-                      : "Prototype-only JavaScript executed locally with a SCADAtomic context API."}
-              </p>
+              <Box className="flex shrink-0 items-center gap-2">
+                <Pressable
+                  type="button"
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
+                >
+                  {scriptId}
+                  <ChevronDownIcon size={12} className="text-zinc-400" />
+                </Pressable>
+                <Pressable
+                  type="button"
+                  onClick={validateScript}
+                  className="flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
+                >
+                  <PlayIcon size={13} />
+                  Run / Test
+                </Pressable>
+                <Pressable
+                  type="button"
+                  onClick={formatScript}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
+                >
+                  <SettingsIcon size={13} />
+                  Format
+                </Pressable>
+                <Pressable
+                  type="button"
+                  onClick={findInScript}
+                  className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-200 bg-white px-2.5 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
+                >
+                  <SearchIcon size={13} />
+                  Find
+                </Pressable>
+                <Pressable
+                  type="button"
+                  aria-label="More script actions"
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-500 shadow-sm hover:bg-zinc-50 hover:text-zinc-800"
+                >
+                  <MenuIcon size={14} />
+                </Pressable>
+              </Box>
             </Box>
 
-            <Box className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
+            <Box className="mt-3 flex items-center gap-1">
               <ScriptViewTab active={view === "code"} onClick={() => setView("code")}>
                 Code
               </ScriptViewTab>
@@ -387,10 +511,7 @@ function ScriptEditor({
               </ScriptViewTab>
               {supportsExecutionGraph ? (
                 <>
-                  <ScriptViewTab
-                    active={view === "plan"}
-                    onClick={() => setView("plan")}
-                  >
+                  <ScriptViewTab active={view === "plan"} onClick={() => setView("plan")}>
                     Execution Plan
                   </ScriptViewTab>
                   <ScriptViewTab
@@ -402,10 +523,13 @@ function ScriptEditor({
                 </>
               ) : null}
             </Box>
+          </Box>
 
-            {view === "code" ? (
-              <>
+          {view === "code" ? (
+            <>
+              <Box className="min-h-0 flex-1 bg-zinc-950">
                 <JavaScriptCodeEditor
+                  ref={editorRef}
                   value={code}
                   onChange={setCode}
                   components={componentApi}
@@ -414,70 +538,50 @@ function ScriptEditor({
                   navigation={navigationTree}
                   modals={Object.values(document?.modals ?? {})}
                   projectData={document?.data}
+                  height="100%"
+                  onCursorChange={(line, column) => setCursor({ line, column })}
                 />
+              </Box>
 
-                <Box className="rounded-xl border border-zinc-200 bg-white p-4">
-                  <Box className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    ctx API
-                  </Box>
-                  <Box className="mt-3 grid gap-2 text-sm font-mono text-zinc-700 sm:grid-cols-2">
-                    <code>App.theme = "dark"</code>
-                    <code>App.theme / App.themeId</code>
-                    <code>ctx.sourceNodeId</code>
-                    <code>ctx.eventName</code>
-                    <code>ctx.state.get(key, fallback?)</code>
-                    <code>ctx.state.set(key, value)</code>
-                    <code>ctx.ui.ComponentName</code>
-                    <code>ctx.ui.ComponentName.prop = value</code>
-                    <code>ctx.ui.ComponentName.variant.enabled()</code>
-                    <code>ctx.ui.ComponentName.variant.current</code>
-                    <code>ctx.navigateTo("Page/SubPage")</code>
-                    <code>ctx.nav.Page1.go()</code>
-                    <code>ctx.modals.ConfirmDelete.open(payload?)</code>
-                    <code>ctx.modals.ConfirmDelete.close(result?)</code>
-                    <code>tags.LineSpeed</code>
-                    <code>tags.LineSpeed = 1200</code>
-                    <code>tags.Pump1.speed = 1450</code>
-                    <code>tags.Pump1.start()</code>
-                    <code>ctx.tags.Pump1.running</code>
-                    {scriptSelection?.kind === "method" ||
-                    scriptSelection?.kind === "componentMethod" ||
-                    scriptSelection?.kind === "componentHandler" ? (
-                      <>
-                        <code>self.prop = value</code>
-                        <code>self.otherMethod()</code>
-                        {componentScriptDefinition ? (
-                          <>
-                            <code>internal.Button1.disabled = true</code>
-                            <code>internal.NestedComponent.publicMethod()</code>
-                            <code>ctx.ui.OtherComponent.publicMethod()</code>
-                          </>
-                        ) : null}
-                        <code>args[0], args[1], ...</code>
-                      </>
-                    ) : null}
-                    <code>ctx.emit(name, payload?)</code>
-                    <code>ctx.random.color()</code>
-                    <code>ctx.random.number(min, max)</code>
-                    <code>ctx.log(...args)</code>
-                  </Box>
-                  <p className="mt-3 text-xs text-amber-700">
-                    Prototype only: handlers run with new Function and are not sandboxed.
-                  </p>
+              <ScriptConsolePanel
+                entries={consoleEntries}
+                problems={problems}
+                eventName={inspectorModel.eventName}
+                onClear={() => setConsoleEntries([])}
+              />
+
+              <Box className="flex h-7 shrink-0 items-center border-t border-zinc-200 bg-white px-3 text-[10px] text-zinc-500">
+                <Box className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Ready
                 </Box>
-              </>
-            ) : view === "ast" ? (
-              <CodeGraphView source={code} />
-            ) : view === "plan" && supportsExecutionGraph ? (
-              <ExecutionPlanView projectId={projectId} handlerId={scriptId} />
-            ) : supportsExecutionGraph ? (
-              <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
-            ) : null}
-          </Box>
+                <Box className="ml-auto flex items-center gap-4 font-mono">
+                  <span>JavaScript</span>
+                  <span>UTF-8</span>
+                  <span>LF</span>
+                  <span>Spaces: 2</span>
+                  <span>Ln {cursor.line}, Col {cursor.column}</span>
+                </Box>
+              </Box>
+            </>
+          ) : (
+            <Box className="min-h-0 flex-1 overflow-auto bg-zinc-50 p-4">
+              {view === "ast" ? (
+                <CodeGraphView source={code} />
+              ) : view === "plan" && supportsExecutionGraph ? (
+                <ExecutionPlanView projectId={projectId} handlerId={scriptId} />
+              ) : supportsExecutionGraph ? (
+                <ExecutionGraphView projectId={projectId} handlerId={scriptId} />
+              ) : null}
+            </Box>
+          )}
         </main>
+
+        <ScriptInspectorPanel model={inspectorModel} />
       </Box>
     </Box>
   );
+
 }
 
 function ScriptViewTab({
@@ -527,6 +631,62 @@ type ScriptSelection =
       memberName: string;
     };
 
+
+function getScriptTitle(selection: ScriptSelection | null) {
+  if (!selection) return "Runtime Handler";
+
+  switch (selection.kind) {
+    case "method":
+      return `${selection.component.name}.${selection.memberName}()`;
+    case "componentMethod":
+      return `${selection.definition.name}.${selection.memberName}()`;
+    case "componentHandler":
+      return `${selection.definition.name}.${selection.node.name}.${selection.memberName}`;
+    case "handler":
+      return `${selection.component.name}.${selection.memberName}`;
+  }
+}
+
+function getScriptDescription(selection: ScriptSelection | null) {
+  if (!selection) {
+    return "Prototype-only JavaScript executed locally with the SCADAtomic context API.";
+  }
+
+  switch (selection.kind) {
+    case "componentMethod":
+      return "Encapsulated component method. self sees this component, internal sees its private tree, and ctx.ui sees scene-public APIs.";
+    case "componentHandler":
+      return "Private handler owned by the reusable component definition. self + internal are instance-scoped.";
+    case "method":
+      return "Component method executed synchronously inside the current handler context.";
+    case "handler":
+      return "Runtime event handler with generated component, navigation, modal, and tag APIs.";
+  }
+}
+
+function getScriptTypeLabel(selection: ScriptSelection | null) {
+  if (!selection) return "Runtime Handler";
+  if (selection.kind === "method") return "Component Method";
+  if (selection.kind === "componentMethod") return "Reusable Component Method";
+  if (selection.kind === "componentHandler") return "Reusable Component Handler";
+  return "Runtime Handler";
+}
+
+function getScriptComponentName(selection: ScriptSelection | null) {
+  if (!selection) return undefined;
+  if (selection.kind === "componentMethod") return selection.definition.name;
+  if (selection.kind === "componentHandler") {
+    return `${selection.definition.name} / ${selection.node.name}`;
+  }
+  return selection.component.name;
+}
+
+function getScriptSourceNodeId(selection: ScriptSelection | null) {
+  if (!selection) return undefined;
+  if (selection.kind === "componentMethod") return selection.definition.rootId;
+  if (selection.kind === "componentHandler") return selection.node.id;
+  return selection.component.nodeId;
+}
 function findScriptSelection(
   document: UiDocument,
   scriptId: string,
