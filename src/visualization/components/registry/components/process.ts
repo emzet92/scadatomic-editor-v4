@@ -9,11 +9,13 @@ export const processDefinition = {
   runtime: RuntimeProcessComponent,
   defaults: {
     processId: "",
+    processSourceMode: "project-default",
     width: "100%",
     height: 320,
     showGrid: true,
   },
   inspector: {
+    processSourceMode: { kind: "select", options: ["project-default", "exact"] },
     width: { kind: "text" },
     height: { kind: "text" },
     showGrid: { kind: "toggle" },

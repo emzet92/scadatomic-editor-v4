@@ -87,7 +87,9 @@ export function DesignerSurface({
     }
 
     function getCanvasTarget(target: EventTarget | null) {
-      if (!(target instanceof HTMLElement)) return null;
+      // SVG graphics are Elements, but not HTMLElements. Process/Chart nodes may
+      // therefore originate click/pointer events from <svg>, <rect>, <path>, etc.
+      if (!(target instanceof Element)) return null;
       if (target.closest("[data-editor-ignore]")) return null;
 
       const canvas = getCanvasElement();
@@ -100,10 +102,12 @@ export function DesignerSurface({
       const canvasTarget = getCanvasTarget(target);
       if (!canvasTarget) return null;
 
-      const element = canvasTarget.target.closest<HTMLElement>(
+      const element = canvasTarget.target.closest(
         `[${adapterRef.current.nodeIdAttribute}]`
       );
-      return element && canvasTarget.canvas.contains(element) ? element : null;
+      return element instanceof HTMLElement && canvasTarget.canvas.contains(element)
+        ? element
+        : null;
     }
 
     function readNodeId(element: HTMLElement | null) {

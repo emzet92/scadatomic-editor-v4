@@ -121,6 +121,7 @@ export function ComponentPalette({
                   label: process.name,
                   props: {
                     processId: process.id,
+                    processSourceMode: "exact",
                     width: "100%",
                     height: 320,
                     showGrid: true,

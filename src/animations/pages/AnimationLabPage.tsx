@@ -38,6 +38,7 @@ import {
   type ProcessScene,
   type ProcessTagBindings,
 } from "../../processes";
+import { AnimatorSimulatorControls } from "../components/AnimatorSimulatorControls";
 import { TagEngineAnimatorSimulationSession } from "../infrastructure/TagEngineAnimatorSimulationSession";
 import { ProcessBindingsEditor } from "../editor/ProcessBindingsEditor";
 import { ProcessSceneEditor } from "../editor/ProcessSceneEditor";
@@ -188,15 +189,33 @@ export function AnimationLabPage() {
     playback.reset();
   }
 
-  function toggleSimulation() {
+  function startSimulation() {
     if (!simulationSession) return;
-    if (simulationRunning) {
-      simulationSession.stop();
-      setSimulationRunning(false);
-    } else {
-      simulationSession.start();
-      setSimulationRunning(true);
-    }
+    simulationSession.start();
+    setSimulationRunning(true);
+  }
+
+  function stopSimulation() {
+    if (!simulationSession) return;
+    simulationSession.stop();
+    setSimulationRunning(false);
+  }
+
+  function resetSimulation() {
+    if (!simulationSession) return;
+    simulationSession.resetValues();
+    setSimulationRunning(false);
+  }
+
+  function restartSimulation() {
+    if (!simulationSession) return;
+    simulationSession.restart();
+    setSimulationRunning(true);
+  }
+
+  function toggleSimulation() {
+    if (simulationRunning) stopSimulation();
+    else startSimulation();
   }
 
   useEffect(() => {
@@ -339,6 +358,17 @@ export function AnimationLabPage() {
             </PanelCard>
 
             <ProcessBindingsEditor data={projectData} scene={scene} bindings={bindings} onChange={setBindings} />
+
+            <AnimatorSimulatorControls
+              session={simulationSession}
+              running={simulationRunning}
+              bindings={bindings}
+              scene={scene}
+              onStart={startSimulation}
+              onStop={stopSimulation}
+              onReset={resetSimulation}
+              onRestart={restartSimulation}
+            />
 
             <PanelCard className="rounded-xl p-4 shadow-sm">
               <SectionHeader title="Runtime sample" description="Resolved through the same process API used by the component runtime." />

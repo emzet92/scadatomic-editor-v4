@@ -13,33 +13,44 @@ import { ProcessPlaceholder, type ProcessComponentProps } from "./ProcessCompone
 
 export function RuntimeProcessComponent({
   processId,
+  processSourceMode,
   width = "100%",
   height,
   showGrid = false,
   style,
   className,
+  ...rootProps
 }: ProcessComponentProps) {
   const runtime = useProcessRuntime();
-  const source = useMemo<ProcessSource>(
-    () => processId
-      ? exactProcessSource(processId)
+  const effectiveSourceMode = processSourceMode ?? "project-default";
+  const source = useMemo<ProcessSource | null>(
+    () => effectiveSourceMode === "exact"
+      ? (processId ? exactProcessSource(processId) : null)
       : projectDefaultProcessSource(runtime.projectId),
-    [processId, runtime.projectId],
+    [effectiveSourceMode, processId, runtime.projectId],
   );
   const { definition, loading, error } = useProcessDefinition(source);
   const bindingValues = useResolvedProcessBindings(
     definition?.bindings ?? EMPTY_BINDINGS,
     definition ? runtime.tagSource : null,
   );
+  const rootStyle = { ...style, width, ...(height === undefined ? {} : { height }) };
 
-  if (loading) return <ProcessPlaceholder width={width} height={height} label="Loading process…" />;
-  if (error) return <ProcessPlaceholder width={width} height={height} label={error} tone="error" />;
+  if (loading) {
+    return <ProcessPlaceholder {...rootProps} className={className} style={rootStyle} width={width} height={height} label="Loading process…" />;
+  }
+  if (error) {
+    return <ProcessPlaceholder {...rootProps} className={className} style={rootStyle} width={width} height={height} label={error} tone="error" />;
+  }
   if (!definition) {
     return (
       <ProcessPlaceholder
+        {...rootProps}
+        className={className}
+        style={rootStyle}
         width={width}
         height={height}
-        label={processId ? "Saved process not found" : "No saved process for this project"}
+        label={effectiveSourceMode === "exact" ? "Saved process not found" : "No saved process for this project"}
         tone="error"
       />
     );
@@ -56,7 +67,7 @@ export function RuntimeProcessComponent({
   );
 
   return (
-    <div className={className} style={{ ...style, width, ...(height === undefined ? {} : { height }) }}>
+    <div {...rootProps} className={className} style={rootStyle}>
       <ProcessCanvas
         path={definition.path}
         scene={definition.scene}
