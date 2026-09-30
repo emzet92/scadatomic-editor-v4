@@ -62,6 +62,7 @@ import { designerSimulationSession } from "../tags/simulation/designer-simulatio
 import { sendWsMessage } from "../runtime/transport/websocket";
 import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
 import { configureProjectReactiveRuntime } from "../runtime/reactive-runtime-session";
+import { useRuntimeHistorianRecorder } from "../runtime/integrations/historian";
 import {
   getReactiveNodeProps,
   getReactiveNodeVariant,
@@ -199,6 +200,7 @@ function ComponentPreviewFrame({
 
 export function EditorPage() {
   const { projectId } = useParams();
+  useRuntimeHistorianRecorder(projectId);
   const document = useEditorStore((state) => state.document);
   const activePageId = useEditorStore((state) => state.activePageId);
   const activeModalId = useEditorStore((state) => state.activeModalId);
