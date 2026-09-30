@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "outDir": ".alarm-test-dist",
+    "noEmit": false,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "src/alarms/domain/**/*.ts",
+    "src/alarms/engine/**/*.ts",
+    "src/alarms/application/**/*.ts",
+    "tests/alarms/**/*.ts"
+  ]
+}

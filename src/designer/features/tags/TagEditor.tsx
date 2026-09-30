@@ -24,8 +24,9 @@ import type { PrimitiveDataType } from "../../../tags/types/DataType";
 import type { TagFieldRef } from "../../../tags/model/TagFieldRef";
 import { TagSourceEditor } from "./simulation/TagSourceEditor";
 import { ReactiveTagEventsEditor } from "./ReactiveTagEventsEditor";
+import { TagAlarmsEditor } from "../alarms/TagAlarmsEditor";
 
-export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void; projectId?: string | undefined }) {
+export function TagEditor({ data, tagId, onSelect, projectId, onOpenAlarm }: { data: ProjectData; tagId: string; onSelect(selection: DataSelection): void; projectId?: string | undefined; onOpenAlarm?: ((alarmId: string) => void) | undefined }) {
   const tag = data.tags[tagId];
   const updateProjectData = useEditorStore((state) => state.updateProjectData);
   const setTagValue = useEditorStore((state) => state.setTagValue);
@@ -73,6 +74,7 @@ export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectD
                 label={field.name}
                 type={field.type}
                 projectId={projectId}
+                onOpenAlarm={onOpenAlarm}
                 onChange={(value) => {
                   const result = setTagValue(`${stableTag.name}.${field.name}`, value);
                   if (!result.ok) setError(result.error);
@@ -90,6 +92,7 @@ export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectD
             label="Value"
             type={stableTag.type}
             projectId={projectId}
+            onOpenAlarm={onOpenAlarm}
             onChange={(value) => {
               const result = setTagValue(stableTag.name, value);
               if (!result.ok) setError(result.error);
@@ -115,13 +118,14 @@ export function TagEditor({ data, tagId, onSelect, projectId }: { data: ProjectD
   );
 }
 
-function TagFieldValue({ data, target, path, label, type, onChange, projectId }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void; projectId?: string | undefined }) {
+function TagFieldValue({ data, target, path, label, type, onChange, projectId, onOpenAlarm }: { data: ProjectData; target: TagFieldRef; path: string; label: string; type: PrimitiveDataType; onChange(value: string | number | boolean): void; projectId?: string | undefined; onOpenAlarm?: ((alarmId: string) => void) | undefined }) {
   const value = useDesignerTagValue(path);
   return (
     <PanelCard variant="muted" className="space-y-3">
       <FormField label={label} description={path}><DataValueInput type={type} value={value} onChange={onChange} /></FormField>
       <TagSourceEditor data={data} target={target} />
       <ReactiveTagEventsEditor target={target} path={path} projectId={projectId} />
+      <TagAlarmsEditor projectId={projectId} path={path} type={type} {...(onOpenAlarm ? { onOpenAlarm } : {})} />
     </PanelCard>
   );
 }

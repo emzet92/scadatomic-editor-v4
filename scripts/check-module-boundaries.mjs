@@ -35,6 +35,27 @@ const processExternalRules = {
   components: new Set(),
 };
 
+
+const alarmLayerRules = {
+  domain: new Set(["domain"]),
+  engine: new Set(["engine", "domain"]),
+  application: new Set(["application", "engine", "domain"]),
+  infrastructure: new Set(["infrastructure", "application", "domain"]),
+  react: new Set(["react", "application", "domain"]),
+  components: new Set(["components", "react", "application", "domain"]),
+  testing: new Set(["testing", "engine", "domain"]),
+};
+
+const alarmExternalRules = {
+  domain: new Set(),
+  engine: new Set(),
+  application: new Set(),
+  infrastructure: new Set(),
+  react: new Set(),
+  components: new Set(),
+  testing: new Set(),
+};
+
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;
 const violations = [];
 
@@ -55,7 +76,8 @@ for (const file of walk(srcRoot)) {
   const sourceModule = topModule(file);
   const blocked = forbidden[sourceModule];
   const isProcessModule = sourceModule === "processes";
-  if (!blocked && !isProcessModule) continue;
+  const isAlarmModule = sourceModule === "alarms";
+  if (!blocked && !isProcessModule && !isAlarmModule) continue;
 
   const source = fs.readFileSync(file, "utf8");
   for (const match of source.matchAll(importPattern)) {
@@ -65,6 +87,25 @@ for (const file of walk(srcRoot)) {
     const target = path.resolve(path.dirname(file), specifier);
     if (!target.startsWith(srcRoot + path.sep)) continue;
     const targetModule = topModule(target);
+
+    if (isAlarmModule) {
+      const sourceRel = path.relative(path.join(srcRoot, "alarms"), file);
+      const sourceLayer = sourceRel.split(path.sep)[0];
+      const allowedLayers = alarmLayerRules[sourceLayer];
+      const allowedExternalModules = alarmExternalRules[sourceLayer];
+      if (!allowedLayers || !allowedExternalModules) continue;
+
+      if (targetModule === "alarms") {
+        const targetRel = path.relative(path.join(srcRoot, "alarms"), target);
+        const targetLayer = targetRel.split(path.sep)[0];
+        if (!allowedLayers.has(targetLayer)) {
+          violations.push(`${path.relative(process.cwd(), file)} crosses alarm layer ${sourceLayer} -> ${targetLayer} via ${specifier}`);
+        }
+      } else if (!allowedExternalModules.has(targetModule)) {
+        violations.push(`${path.relative(process.cwd(), file)} imports external module ${targetModule} from alarm layer ${sourceLayer} via ${specifier}`);
+      }
+      continue;
+    }
 
     if (isProcessModule) {
       const sourceRel = path.relative(path.join(srcRoot, "processes"), file);

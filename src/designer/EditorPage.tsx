@@ -1,4 +1,4 @@
-import { Boxes, Database, LayoutTemplate, Palette } from "lucide-react";
+import { Boxes, Database, LayoutTemplate, Palette, BellRing } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, updateProject } from "../project/api/projects-api";
@@ -53,6 +53,8 @@ import { ShadowLibraryWorkspace } from "./features/design-system/ShadowLibraryWo
 import { BorderLibraryWorkspace } from "./features/design-system/BorderLibraryWorkspace";
 import { ThemeWorkspace } from "./features/design-system/ThemeWorkspace";
 import type { DataSelection } from "./features/tags/data-selection";
+import { AlarmPanel } from "./features/alarms/AlarmPanel";
+import { AlarmWorkspace } from "./features/alarms/AlarmWorkspace";
 import { SegmentedControl, SegmentedControlItem } from "../shared/ui";
 import { designerSimulationSession } from "../tags/simulation/designer-simulation-session";
 import { sendWsMessage } from "../runtime/transport/websocket";
@@ -212,9 +214,10 @@ export function EditorPage() {
   const [saveStatus, setSaveStatus] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
-  const [editorArea, setEditorArea] = useState<"design" | "data" | "designSystem">("design");
+  const [editorArea, setEditorArea] = useState<"design" | "data" | "alarms" | "designSystem">("design");
   const [designSystemSection, setDesignSystemSection] = useState<DesignSystemSection>("themes");
   const [dataSelection, setDataSelection] = useState<DataSelection>(null);
+  const [selectedAlarmId, setSelectedAlarmId] = useState<string | null>(null);
 
   const loadedRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
@@ -505,7 +508,7 @@ export function EditorPage() {
   const pageDeviceMode = getPageDeviceMode(rootPage?.props?.deviceMode);
   const projectData = document.data ?? { udts: {}, tags: {} };
 
-  function switchEditorArea(area: "design" | "data" | "designSystem") {
+  function switchEditorArea(area: "design" | "data" | "alarms" | "designSystem") {
     if (area !== "design") exitComponentMode();
     setEditorArea(area);
   }
@@ -532,6 +535,13 @@ export function EditorPage() {
               <Database size={13} /> Data
             </SegmentedControlItem>
             <SegmentedControlItem
+              active={editorArea === "alarms"}
+              className="flex-1 gap-1.5 text-xs"
+              onClick={() => switchEditorArea("alarms")}
+            >
+              <BellRing size={13} /> Alarms
+            </SegmentedControlItem>
+            <SegmentedControlItem
               active={editorArea === "designSystem"}
               className="flex-1 gap-1.5 text-xs"
               onClick={() => switchEditorArea("designSystem")}
@@ -546,6 +556,13 @@ export function EditorPage() {
               selection={dataSelection}
               onSelect={setDataSelection}
               projectId={projectId}
+            />
+          ) : editorArea === "alarms" ? (
+            <AlarmPanel
+              projectId={projectId}
+              data={projectData}
+              selectedAlarmId={selectedAlarmId}
+              onSelect={setSelectedAlarmId}
             />
           ) : editorArea === "designSystem" ? (
             <DesignSystemPanel
@@ -606,6 +623,19 @@ export function EditorPage() {
                 selection={dataSelection}
                 onSelect={setDataSelection}
                 projectId={projectId}
+                onOpenAlarm={(alarmId) => {
+                  setSelectedAlarmId(alarmId);
+                  switchEditorArea("alarms");
+                }}
+              />
+            </div>
+          ) : editorArea === "alarms" ? (
+            <div className="min-h-full bg-[var(--editor-canvas-bg)]">
+              <AlarmWorkspace
+                projectId={projectId}
+                data={projectData}
+                selectedAlarmId={selectedAlarmId}
+                onSelect={setSelectedAlarmId}
               />
             </div>
           ) : editorArea === "designSystem" ? (

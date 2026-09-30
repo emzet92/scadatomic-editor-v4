@@ -22,6 +22,8 @@ import { RuntimeProvider } from "../runtime-provider";
 import { RuntimeModalLayer } from "./RuntimeModalLayer";
 import { ProcessRuntimeProvider } from "../../processes";
 import { runtimeProcessTagSource } from "../process-tag-source";
+import { AlarmBanner, AlarmRuntimeProvider, RuntimeAlarmConsole, browserAlarmScheduler, systemClock } from "../../alarms";
+import { runtimeAlarmValueSource } from "../alarm-value-source";
 import { getComponentVariantProps } from "../../visualization/components/component-variants";
 import { hydrateRuntimeTagState } from "../runtime-tag-bridge";
 import { configureProjectReactiveRuntime } from "../reactive-runtime-session";
@@ -45,6 +47,7 @@ export function RenderPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updateToastVisible, setUpdateToastVisible] = useState(false);
+  const [alarmConsoleOpen, setAlarmConsoleOpen] = useState(false);
 
   // Derived UI changes live outside the persisted document. This subscription
   // repaints the renderer without mutating document props.
@@ -181,6 +184,12 @@ export function RenderPage() {
         onNodeUpdated={showUpdateToast}
       />
 
+      <AlarmRuntimeProvider
+        projectId={projectId}
+        valueSource={runtimeAlarmValueSource}
+        clock={systemClock}
+        scheduler={browserAlarmScheduler}
+      >
       <ProcessRuntimeProvider
         value={{ projectId, tagSource: runtimeProcessTagSource }}
       >
@@ -276,6 +285,10 @@ export function RenderPage() {
           themeId={activeThemeId}
         />
       </ProcessRuntimeProvider>
+
+      <AlarmBanner onOpen={() => setAlarmConsoleOpen(true)} />
+      {alarmConsoleOpen ? <RuntimeAlarmConsole projectId={projectId} onClose={() => setAlarmConsoleOpen(false)} /> : null}
+      </AlarmRuntimeProvider>
 
       {updateToastVisible && (
         <div className="fixed right-5 bottom-5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-700 shadow-lg">
