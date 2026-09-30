@@ -6,6 +6,7 @@ import { DependenciesPage } from "./designer/features/dependencies/DependenciesP
 import { FleetManagementPage } from "./fleet/pages/FleetManagementPage";
 import { ReportDesignerPage } from "./reporting";
 import { AnimationLabPage } from "./animations";
+import { StateMachineLabPage } from "./state-machines";
 import {
   BrowserProcessChangeBus,
   IndexedDbProcessRepository,
@@ -41,6 +42,10 @@ function App() {
         <Route
           path="/project/:projectId/scripts/:scriptId"
           element={<ScriptPage />}
+        />
+        <Route
+          path="/project/:projectId/state-machines"
+          element={<StateMachineLabPage />}
         />
       </Routes>
     </ProcessLibraryProvider>
