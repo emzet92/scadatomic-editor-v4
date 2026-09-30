@@ -5,6 +5,7 @@ import {
   ChartLineIcon,
   DragHandleIcon,
   ImageIcon,
+  GridIcon,
   MenuIcon,
   PanelTopIcon,
   Pressable,
@@ -29,6 +30,7 @@ import {
   type RegisteredComponentType,
 } from "../../visualization/components/registry/component-definitions";
 import { useProcesses } from "../../processes";
+import { isTableDefinition } from "../../visualization/tables/table-definition";
 
 const icons = {
   Page: TemplateIcon,
@@ -41,6 +43,8 @@ const icons = {
   Process: WorkflowIcon,
   Navigation: MenuIcon,
   Image: ImageIcon,
+  Table: GridIcon,
+  TableCell: GridIcon,
 } satisfies Record<RegisteredComponentType, IconComponent>;
 
 export function ComponentPalette({
@@ -70,13 +74,22 @@ export function ComponentPalette({
       item.type !== "Page" &&
       item.type !== "Modal" &&
       item.type !== "Process" &&
+      item.type !== "Table" &&
+      item.type !== "TableCell" &&
       (item.type !== "PageSlot" || (editingLayout && !ownerComponentId)) &&
       item.label.toLowerCase().includes(normalizedSearch)
   );
   const processItems = processList.items.filter((item) =>
     item.name.toLowerCase().includes(normalizedSearch)
   );
+  const tableItems = reusableComponents.filter((item) =>
+    isTableDefinition(item) &&
+    item.name.toLowerCase().includes(normalizedSearch) &&
+    (!ownerComponentId ||
+      !wouldCreateComponentCycle(document, ownerComponentId, item.id))
+  );
   const reusableItems = reusableComponents.filter((item) =>
+    !isTableDefinition(item) &&
     item.name.toLowerCase().includes(normalizedSearch) &&
     (!ownerComponentId ||
       !wouldCreateComponentCycle(document, ownerComponentId, item.id))
@@ -151,6 +164,68 @@ export function ComponentPalette({
               : projectId
                 ? "Save a process in Animations and it will appear here."
                 : "Open a saved project to use the process library."}
+          </Box>
+        )}
+      </Box>
+
+      <Box className="space-y-2">
+        <Box className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+          <GridIcon size={12} /> Table library
+        </Box>
+
+        {tableItems.length > 0 ? (
+          tableItems.map((item) => (
+            <Box
+              key={item.id}
+              data-editor-ignore
+              role="button"
+              tabIndex={0}
+              onClick={() => onEditComponentDefinition?.(item.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onEditComponentDefinition?.(item.id);
+                }
+              }}
+              className="group flex w-full cursor-pointer select-none items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-left transition hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200"
+              title={`Open ${item.name} table editor`}
+            >
+              <Box className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                <GridIcon size={18} />
+              </Box>
+              <Box className="min-w-0 flex-1">
+                <Box className="truncate text-sm font-semibold text-[var(--editor-text)]">
+                  {item.name}
+                </Box>
+                <Box className="text-xs text-[var(--editor-text-muted)]">
+                  Static table · drag to canvas
+                </Box>
+              </Box>
+              <Pressable
+                type="button"
+                data-editor-ignore
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  startComponentDrag({
+                    type: "ComponentInstance",
+                    componentDefinitionId: item.id,
+                    label: item.name,
+                    props: {},
+                  });
+                }}
+                className="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-sky-500 opacity-75 transition hover:bg-white hover:text-sky-700 group-hover:opacity-100 active:cursor-grabbing"
+                title="Drag table to canvas"
+                aria-label={`Drag ${item.name} table to canvas`}
+              >
+                <DragHandleIcon size={16} />
+              </Pressable>
+            </Box>
+          ))
+        ) : (
+          <Box className="rounded-xl border border-dashed border-sky-200 bg-sky-50/30 px-3 py-3 text-[10px] leading-4 text-sky-800/80">
+            Create a table in the Tables section and it will appear here.
           </Box>
         )}
       </Box>
@@ -257,7 +332,7 @@ export function ComponentPalette({
         })}
       </Box>
 
-      {items.length === 0 && reusableItems.length === 0 && processItems.length === 0 ? (
+      {items.length === 0 && reusableItems.length === 0 && tableItems.length === 0 && processItems.length === 0 ? (
         <Box className="py-8 text-center text-sm text-[var(--editor-text-muted)]">
           No components found
         </Box>

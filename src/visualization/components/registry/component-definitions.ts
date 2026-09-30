@@ -10,6 +10,8 @@ import { pageDefinition } from "./components/page";
 import { pageSlotDefinition } from "./components/page-slot";
 import { processDefinition } from "./components/process";
 import { textDefinition } from "./components/text";
+import { tableDefinition } from "./components/table";
+import { tableCellDefinition } from "./components/table-cell";
 
 export type { ComponentDefinition, InspectorControl } from "./component-definition-types";
 
@@ -24,6 +26,8 @@ export const componentDefinitions = {
   Image: imageDefinition,
   Chart: chartDefinition,
   Process: processDefinition,
+  Table: tableDefinition,
+  TableCell: tableCellDefinition,
 } satisfies Record<string, ComponentDefinition>;
 
 export type RegisteredComponentType = keyof typeof componentDefinitions;

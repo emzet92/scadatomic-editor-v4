@@ -5,6 +5,7 @@ import { canAcceptManualChildren } from "../../project/model/repeat-behavior";
 import { useEditorStore } from "../state/editor-store";
 import type { ComponentRegistry } from "../../visualization/components/registry/editor-registry";
 import { createComponentDefinitionDocument } from "../../visualization/reusable-components";
+import { isTableDefinition } from "../../visualization/tables/table-definition";
 import { DesignerSurface } from "./DesignerSurface";
 import type { DesignerAdapter } from "./designer-adapter";
 
@@ -35,6 +36,10 @@ export function ComponentDesignerSurface({
 
     const rootId = definition.rootId;
     const componentIndex = buildDocumentIndex(componentDocument, rootId);
+    const isLockedStructureNode = (nodeId: NodeId) =>
+      isTableDefinition(definition) &&
+      definition.nodes[nodeId]?.type === "TableCell" &&
+      definition.nodes[rootId]?.children?.includes(nodeId) === true;
     return {
       key: `component:${componentId}`,
       canvasSelector: "[data-editor-component-canvas]",
@@ -83,6 +88,7 @@ export function ComponentDesignerSurface({
         return insertedId;
       },
       moveNode: (nodeId, targetParentId, targetIndex) => {
+        if (isLockedStructureNode(nodeId)) return;
         useEditorStore
           .getState()
           .moveComponentDefinitionNode(
@@ -94,14 +100,14 @@ export function ComponentDesignerSurface({
         onSelectNode(nodeId);
       },
       deleteNode: (nodeId) => {
-        if (nodeId === rootId) return;
+        if (nodeId === rootId || isLockedStructureNode(nodeId)) return;
         useEditorStore
           .getState()
           .deleteComponentDefinitionNode(componentId, nodeId);
         onSelectNode(rootId);
       },
       duplicateNode: (nodeId) => {
-        if (nodeId === rootId) return null;
+        if (nodeId === rootId || isLockedStructureNode(nodeId)) return null;
         const duplicatedNodeId = useEditorStore
           .getState()
           .duplicateComponentDefinitionNode(componentId, nodeId);
@@ -118,10 +124,10 @@ export function ComponentDesignerSurface({
           })
         );
       },
-      canMoveNode: (nodeId) => nodeId !== rootId,
-      canDeleteNode: (nodeId) => nodeId !== rootId,
+      canMoveNode: (nodeId) => nodeId !== rootId && !isLockedStructureNode(nodeId),
+      canDeleteNode: (nodeId) => nodeId !== rootId && !isLockedStructureNode(nodeId),
       canDuplicateNode: (nodeId) => {
-        if (nodeId === rootId) return false;
+        if (nodeId === rootId || isLockedStructureNode(nodeId)) return false;
         const parentId = componentIndex.parentById.get(nodeId);
         const parent = parentId ? componentDocument.nodes[parentId] : undefined;
         return !!parent && canAcceptManualChildren(parent);

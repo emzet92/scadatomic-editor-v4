@@ -75,6 +75,8 @@ export type ComponentInputDefinition =
 
 export type UiComponentDefinition = {
   id: ComponentDefinitionId;
+  /** Specialized project component editors may mark their definition kind. */
+  kind?: "component" | "table" | undefined;
   name: string;
   rootId: NodeId;
   nodes: Record<NodeId, UiNode>;
@@ -455,6 +457,7 @@ function isUiModal(
   if (!isRecord(value)) return false;
   if (
     value.id !== expectedId ||
+    (value.kind !== undefined && value.kind !== "component" && value.kind !== "table") ||
     typeof value.name !== "string" ||
     !isJsIdentifier(value.name) ||
     typeof value.rootId !== "string" ||
@@ -572,6 +575,7 @@ function isComponentDefinition(
 
   if (
     value.id !== expectedId ||
+    (value.kind !== undefined && value.kind !== "component" && value.kind !== "table") ||
     typeof value.name !== "string" ||
     !isJsIdentifier(value.name) ||
     typeof value.rootId !== "string" ||

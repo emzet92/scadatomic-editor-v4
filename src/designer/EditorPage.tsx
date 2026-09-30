@@ -55,7 +55,9 @@ import { ThemeWorkspace } from "./features/design-system/ThemeWorkspace";
 import type { DataSelection } from "./features/tags/data-selection";
 import { AlarmPanel } from "./features/alarms/AlarmPanel";
 import { AlarmWorkspace } from "./features/alarms/AlarmWorkspace";
-import { SegmentedControl, SegmentedControlItem } from "../shared/ui";
+import { TableDefinitionPanel } from "./features/tables/TableDefinitionPanel";
+import { isTableDefinition } from "../visualization/tables/table-definition";
+import { GridIcon, SegmentedControl, SegmentedControlItem } from "../shared/ui";
 import { designerSimulationSession } from "../tags/simulation/designer-simulation-session";
 import { sendWsMessage } from "../runtime/transport/websocket";
 import { connectMockDesignerRuntimeSession } from "../mock/mock-designer-runtime-session";
@@ -571,33 +573,46 @@ export function EditorPage() {
             />
           ) : componentDefinitionMode && focusedDefinition ? (
             <>
-              <ComponentStructureTree
-                definition={focusedDefinition}
-                selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
-                onSelect={(nodeId) =>
-                  setComponentDefinitionMode({
-                    componentId: componentDefinitionMode.componentId,
-                    selectedInternalNodeId: nodeId,
-                  })
-                }
-                onDelete={(nodeId) => {
-                  if (nodeId === focusedDefinition.rootId) return;
-                  const parentId =
-                    Object.values(focusedDefinition.nodes).find((candidate) =>
-                      candidate.children?.includes(nodeId)
-                    )?.id ?? focusedDefinition.rootId;
-                  useEditorStore
-                    .getState()
-                    .deleteComponentDefinitionNode(
-                      componentDefinitionMode.componentId,
-                      nodeId
-                    );
-                  setComponentDefinitionMode({
-                    componentId: componentDefinitionMode.componentId,
-                    selectedInternalNodeId: parentId,
-                  });
-                }}
-              />
+              {isTableDefinition(focusedDefinition) ? (
+                <TableDefinitionPanel
+                  definition={focusedDefinition}
+                  selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                  onSelect={(nodeId) =>
+                    setComponentDefinitionMode({
+                      componentId: componentDefinitionMode.componentId,
+                      selectedInternalNodeId: nodeId,
+                    })
+                  }
+                />
+              ) : (
+                <ComponentStructureTree
+                  definition={focusedDefinition}
+                  selectedNodeId={componentDefinitionMode.selectedInternalNodeId}
+                  onSelect={(nodeId) =>
+                    setComponentDefinitionMode({
+                      componentId: componentDefinitionMode.componentId,
+                      selectedInternalNodeId: nodeId,
+                    })
+                  }
+                  onDelete={(nodeId) => {
+                    if (nodeId === focusedDefinition.rootId) return;
+                    const parentId =
+                      Object.values(focusedDefinition.nodes).find((candidate) =>
+                        candidate.children?.includes(nodeId)
+                      )?.id ?? focusedDefinition.rootId;
+                    useEditorStore
+                      .getState()
+                      .deleteComponentDefinitionNode(
+                        componentDefinitionMode.componentId,
+                        nodeId
+                      );
+                    setComponentDefinitionMode({
+                      componentId: componentDefinitionMode.componentId,
+                      selectedInternalNodeId: parentId,
+                    });
+                  }}
+                />
+              )}
               <div className="border-t border-zinc-200" />
               <ComponentPalette
                 ownerComponentId={focusedDefinition.id}
@@ -606,7 +621,7 @@ export function EditorPage() {
             </>
           ) : (
             <>
-              <PageTree />
+              <PageTree onEditTable={editComponentDefinition} />
               <div className="border-t border-zinc-200" />
               <ComponentPalette onEditComponentDefinition={editComponentDefinition} />
               <div className="border-t border-zinc-200" />
@@ -683,7 +698,11 @@ export function EditorPage() {
                         : "cursor-default text-[var(--editor-text-muted)] opacity-40"
                     }`}
                   >
-                    <Boxes size={13} /> Component
+                    {componentDefinitionMode && focusedDefinition && isTableDefinition(focusedDefinition) ? (
+                      <><GridIcon size={13} /> Table</>
+                    ) : (
+                      <><Boxes size={13} /> Component</>
+                    )}
                   </button>
                 </div>
 
@@ -692,7 +711,7 @@ export function EditorPage() {
                     data-editor-ignore
                     className="inline-flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-violet-700"
                   >
-                    <Boxes size={13} />
+                    {isTableDefinition(focusedDefinition) ? <GridIcon size={13} /> : <Boxes size={13} />}
                     <span className="font-medium">{focusedDefinition.name}</span>
                     <span className="opacity-50">/</span>
                     {componentDefinitionMode.variantName ? (
@@ -701,7 +720,7 @@ export function EditorPage() {
                         {componentDefinitionMode.variantName}()
                       </span>
                     ) : (
-                      <span>private implementation</span>
+                      <span>{isTableDefinition(focusedDefinition) ? "table editor" : "private implementation"}</span>
                     )}
                   </div>
                 ) : componentMode && focusedNode ? (

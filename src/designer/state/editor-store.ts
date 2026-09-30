@@ -210,6 +210,8 @@ type EditorState = {
 
   createReusableComponent: (nodeId: NodeId) => string | null;
   createReusableComponentFromSelection: (nodeIds?: NodeId[]) => string | null;
+  upsertComponentDefinition: (definition: UiComponentDefinition) => void;
+  removeComponentDefinition: (componentId: string) => void;
   updateComponentDefinition: (
     componentId: string,
     updater: (definition: UiComponentDefinition) => UiComponentDefinition
@@ -1598,6 +1600,18 @@ export const useEditorStore = create<EditorState>((set) => ({
     });
 
     return componentId;
+  },
+
+  upsertComponentDefinition: (definition) => {
+    set((state) => ({
+      document: createProjectComponentRepository(state.document).upsert(definition),
+    }));
+  },
+
+  removeComponentDefinition: (componentId) => {
+    set((state) => ({
+      document: createProjectComponentRepository(state.document).remove(componentId),
+    }));
   },
 
   updateComponentDefinition: (componentId, updater) => {
