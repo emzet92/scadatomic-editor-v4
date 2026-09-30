@@ -13,6 +13,7 @@ import {
   ProcessLibrary,
   ProcessLibraryProvider,
 } from "./processes";
+import { LoginPage } from "./auth";
 
 const processLibrary = new ProcessLibrary(
   new IndexedDbProcessRepository(),
@@ -47,6 +48,7 @@ function App() {
           path="/project/:projectId/state-machines"
           element={<StateMachineLabPage />}
         />
+        <Route path="/login" element={<LoginPage />} />
       </Routes>
     </ProcessLibraryProvider>
   );
