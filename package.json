@@ -12,7 +12,8 @@
     "build-storybook": "storybook build",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "test:processes": "node scripts/run-process-tests.mjs",
-    "test:alarms": "node scripts/run-alarm-tests.mjs"
+    "test:alarms": "node scripts/run-alarm-tests.mjs",
+    "test:state-machines": "node scripts/run-state-machine-tests.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

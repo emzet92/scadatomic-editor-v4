@@ -56,6 +56,28 @@ const alarmExternalRules = {
   testing: new Set(),
 };
 
+const stateMachineLayerRules = {
+  domain: new Set(["domain"]),
+  engine: new Set(["engine", "domain"]),
+  application: new Set(["application", "engine", "domain"]),
+  infrastructure: new Set(["infrastructure", "application", "domain"]),
+  simulation: new Set(["simulation", "engine", "domain"]),
+  react: new Set(["react", "application", "domain"]),
+  components: new Set(["components", "simulation", "application", "engine", "domain"]),
+  pages: new Set(["pages", "components", "react", "application", "domain"]),
+};
+
+const stateMachineExternalRules = {
+  domain: new Set(),
+  engine: new Set(),
+  application: new Set(),
+  infrastructure: new Set(),
+  simulation: new Set(),
+  react: new Set(),
+  components: new Set(["shared"]),
+  pages: new Set(["shared", "project", "tags"]),
+};
+
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;
 const violations = [];
 
@@ -77,7 +99,8 @@ for (const file of walk(srcRoot)) {
   const blocked = forbidden[sourceModule];
   const isProcessModule = sourceModule === "processes";
   const isAlarmModule = sourceModule === "alarms";
-  if (!blocked && !isProcessModule && !isAlarmModule) continue;
+  const isStateMachineModule = sourceModule === "state-machines";
+  if (!blocked && !isProcessModule && !isAlarmModule && !isStateMachineModule) continue;
 
   const source = fs.readFileSync(file, "utf8");
   for (const match of source.matchAll(importPattern)) {
@@ -87,6 +110,25 @@ for (const file of walk(srcRoot)) {
     const target = path.resolve(path.dirname(file), specifier);
     if (!target.startsWith(srcRoot + path.sep)) continue;
     const targetModule = topModule(target);
+
+    if (isStateMachineModule) {
+      const sourceRel = path.relative(path.join(srcRoot, "state-machines"), file);
+      const sourceLayer = sourceRel.split(path.sep)[0];
+      const allowedLayers = stateMachineLayerRules[sourceLayer];
+      const allowedExternalModules = stateMachineExternalRules[sourceLayer];
+      if (!allowedLayers || !allowedExternalModules) continue;
+
+      if (targetModule === "state-machines") {
+        const targetRel = path.relative(path.join(srcRoot, "state-machines"), target);
+        const targetLayer = targetRel.split(path.sep)[0];
+        if (!allowedLayers.has(targetLayer)) {
+          violations.push(`${path.relative(process.cwd(), file)} crosses state-machine layer ${sourceLayer} -> ${targetLayer} via ${specifier}`);
+        }
+      } else if (!allowedExternalModules.has(targetModule)) {
+        violations.push(`${path.relative(process.cwd(), file)} imports external module ${targetModule} from state-machine layer ${sourceLayer} via ${specifier}`);
+      }
+      continue;
+    }
 
     if (isAlarmModule) {
       const sourceRel = path.relative(path.join(srcRoot, "alarms"), file);

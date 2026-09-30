@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "outDir": ".state-machine-test-dist",
+    "noEmit": false,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "src/state-machines/domain/**/*.ts",
+    "src/state-machines/engine/**/*.ts",
+    "src/state-machines/application/**/*.ts",
+    "src/state-machines/simulation/**/*.ts",
+    "tests/state-machines/**/*.ts"
+  ]
+}
