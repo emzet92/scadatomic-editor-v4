@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
+import { exactProcessSource, type ProcessSource } from "../application/ProcessSource";
 import { useProcessDefinition } from "../react/useProcesses";
 import { resolveProcessFrame } from "../runtime/process-frame";
 import { ProcessCanvas } from "./ProcessCanvas";
@@ -21,7 +22,11 @@ export function ProcessComponent({
   style,
   className,
 }: ProcessComponentProps) {
-  const { definition, loading, error } = useProcessDefinition(processId);
+  const source = useMemo<ProcessSource | null>(
+    () => processId ? exactProcessSource(processId) : null,
+    [processId],
+  );
+  const { definition, loading, error } = useProcessDefinition(source);
 
   if (loading) return <ProcessPlaceholder width={width} height={height} label="Loading process…" />;
   if (error) return <ProcessPlaceholder width={width} height={height} label={error} tone="error" />;

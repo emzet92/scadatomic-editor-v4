@@ -1,5 +1,5 @@
 import { Pause } from "lucide-react";
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getProjectById, subscribeProject } from "../../project/api/projects-api";
 import type { ProjectData } from "../../tags/model/TagDefinition";
@@ -23,7 +23,6 @@ import {
 } from "../../shared/ui";
 import { WorkspaceHeader } from "../../shared/ui/organisms/WorkspaceHeader";
 import {
-  AnimatorSimulationSession,
   ProcessCanvas,
   buildPathMetrics,
   conveyorDemoPath,
@@ -33,13 +32,13 @@ import {
   resolveProcessFrame,
   useProcessLibrary,
   useProcesses,
-  listProcessBindingPaths,
-  resolveProcessBindingValues,
+  useResolvedProcessBindings,
   type AnimationPath,
   type ProcessDefinition,
   type ProcessScene,
   type ProcessTagBindings,
 } from "../../processes";
+import { TagEngineAnimatorSimulationSession } from "../infrastructure/TagEngineAnimatorSimulationSession";
 import { ProcessBindingsEditor } from "../editor/ProcessBindingsEditor";
 import { ProcessSceneEditor } from "../editor/ProcessSceneEditor";
 import { WaypointEditor } from "../editor/WaypointEditor";
@@ -65,9 +64,8 @@ export function AnimationLabPage() {
     conveyorDemoPath.points[0]?.id ?? null,
   );
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
-  const [simulationSession, setSimulationSession] = useState<AnimatorSimulationSession | null>(null);
+  const [simulationSession, setSimulationSession] = useState<TagEngineAnimatorSimulationSession | null>(null);
   const [simulationRunning, setSimulationRunning] = useState(false);
-  const [, forceTagRender] = useReducer((version: number) => version + 1, 0);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -102,30 +100,16 @@ export function AnimationLabPage() {
       return;
     }
 
-    const session = new AnimatorSimulationSession(projectId, projectData);
+    const session = new TagEngineAnimatorSimulationSession(projectId, projectData);
     setSimulationSession(session);
     setSimulationRunning(false);
     return () => session.dispose();
   }, [projectId, projectData]);
 
-  const subscribedTags = useMemo(
-    () => listProcessBindingPaths(bindings),
-    [bindings],
-  );
-  const subscribedTagKey = subscribedTags.join("\u0000");
-
-  useEffect(() => {
-    if (!simulationSession || subscribedTags.length === 0) return undefined;
-    const unsubscribes = [...new Set(subscribedTags)].map((tagPath) =>
-      simulationSession.subscribe(tagPath, forceTagRender),
-    );
-    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-  }, [simulationSession, subscribedTagKey]);
-
   const metrics = useMemo(() => buildPathMetrics(path), [path]);
   const playback = usePlaybackClock(durationSeconds * 1000, loopMode === "loop");
 
-  const bindingValues = resolveProcessBindingValues(bindings, simulationSession);
+  const bindingValues = useResolvedProcessBindings(bindings, simulationSession);
   const progress = bindingValues.progress ?? playback.progress;
   const tagObjectState = bindingValues.objectState;
   const sensorStates = bindingValues.sensorStates;

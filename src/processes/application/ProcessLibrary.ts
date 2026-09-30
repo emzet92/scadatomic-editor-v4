@@ -34,6 +34,16 @@ export class ProcessLibrary {
     return latest ? this.get(latest.id) : null;
   }
 
+  /**
+   * Project-level selection policy used by `project-default` process sources.
+   * Today the default is the most recently saved definition. Keeping this
+   * policy behind the library allows a future explicit defaultProcessId without
+   * changing renderer/component contracts.
+   */
+  getDefault(projectId: string): Promise<ProcessDefinition | null> {
+    return this.getLatest(projectId);
+  }
+
   async save(definition: ProcessDefinition): Promise<ProcessDefinition> {
     const next: ProcessDefinition = {
       ...cloneProcessDefinition(definition),

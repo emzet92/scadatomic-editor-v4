@@ -22,7 +22,6 @@ const processLayerRules = {
   runtime: new Set(["runtime", "domain"]),
   react: new Set(["react", "application", "domain"]),
   components: new Set(["components", "react", "runtime", "application", "domain"]),
-  simulation: new Set(["simulation", "application", "domain"]),
 };
 
 // Adapter layers may integrate with selected top-level modules. Core process
@@ -34,7 +33,6 @@ const processExternalRules = {
   runtime: new Set(),
   react: new Set(),
   components: new Set(),
-  simulation: new Set(["tags"]),
 };
 
 const importPattern = /(?:from\s+|import\s*\(\s*|import\s+)["']([^"']+)["']/g;

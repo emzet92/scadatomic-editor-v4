@@ -1,20 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProcessDefinition, ProcessSummary } from "../domain/process-definition";
+import {
+  exactProcessSource,
+  processSourceMatchesChange,
+  projectDefaultProcessSource,
+  resolveProcessSource,
+  type ProcessSource,
+} from "../application/ProcessSource";
 import { useProcessLibrary } from "./ProcessLibraryProvider";
 
 export type ProcessListState = {
   items: ProcessSummary[];
   loading: boolean;
   error: string | null;
-};
-
-export type ProcessDefinitionOptions = {
-  projectId?: string | undefined;
-  /**
-   * Runtime-friendly fallback. If the referenced process is missing (or no id
-   * was configured), resolve the most recently saved process in this project.
-   */
-  fallbackToLatestProjectProcess?: boolean | undefined;
 };
 
 export function useProcesses(projectId: string | undefined): ProcessListState {
@@ -50,21 +48,25 @@ export function useProcesses(projectId: string | undefined): ProcessListState {
   return state;
 }
 
-export function useProcessDefinition(
-  processId: string | undefined,
-  options: ProcessDefinitionOptions = {},
-) {
+export function useProcessDefinition(source: ProcessSource | null | undefined) {
   const library = useProcessLibrary();
-  const projectId = options.projectId;
-  const fallbackToLatest = options.fallbackToLatestProjectProcess === true;
+  const sourceKind = source?.kind ?? null;
+  const exactProcessId = source?.kind === "exact" ? source.processId : null;
+  const defaultProjectId = source?.kind === "project-default" ? source.projectId : null;
   const [definition, setDefinition] = useState<ProcessDefinition | null>(null);
-  const [loading, setLoading] = useState(Boolean(processId || (fallbackToLatest && projectId)));
+  const [loading, setLoading] = useState(Boolean(source));
   const [error, setError] = useState<string | null>(null);
   const reloadVersion = useRef(0);
 
   const reload = useCallback(async () => {
     const version = ++reloadVersion.current;
-    if (!processId && !(fallbackToLatest && projectId)) {
+    const currentSource = sourceKind === "exact" && exactProcessId
+      ? exactProcessSource(exactProcessId)
+      : sourceKind === "project-default" && defaultProjectId
+        ? projectDefaultProcessSource(defaultProjectId)
+        : null;
+
+    if (!currentSource) {
       if (version === reloadVersion.current) {
         setDefinition(null);
         setLoading(false);
@@ -76,12 +78,7 @@ export function useProcessDefinition(
     setLoading(true);
     setError(null);
     try {
-      const exact = processId ? await library.get(processId) : null;
-      const resolved = exact ?? (
-        fallbackToLatest && projectId
-          ? await library.getLatest(projectId)
-          : null
-      );
+      const resolved = await resolveProcessSource(library, currentSource);
       if (version === reloadVersion.current) setDefinition(resolved);
     } catch (cause) {
       if (version === reloadVersion.current) {
@@ -91,18 +88,19 @@ export function useProcessDefinition(
     } finally {
       if (version === reloadVersion.current) setLoading(false);
     }
-  }, [fallbackToLatest, library, processId, projectId]);
+  }, [defaultProjectId, exactProcessId, library, sourceKind]);
 
   useEffect(() => {
     void reload();
     return library.subscribe((event) => {
-      if (event.processId === processId) {
-        void reload();
-        return;
-      }
-      if (fallbackToLatest && event.projectId === projectId) void reload();
+      const currentSource = sourceKind === "exact" && exactProcessId
+        ? exactProcessSource(exactProcessId)
+        : sourceKind === "project-default" && defaultProjectId
+          ? projectDefaultProcessSource(defaultProjectId)
+          : null;
+      if (currentSource && processSourceMatchesChange(currentSource, event)) void reload();
     });
-  }, [fallbackToLatest, library, processId, projectId, reload]);
+  }, [defaultProjectId, exactProcessId, library, reload, sourceKind]);
 
   return { definition, loading, error, reload };
 }

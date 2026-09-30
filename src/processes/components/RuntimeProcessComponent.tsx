@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useReducer } from "react";
-import type { ProcessDefinition } from "../domain/process-definition";
+import { useMemo } from "react";
 import {
-  listProcessBindingPaths,
-  resolveProcessBindingValues,
-  type ProcessTagSource,
-} from "../application/ProcessTagSource";
+  exactProcessSource,
+  projectDefaultProcessSource,
+  type ProcessSource,
+} from "../application/ProcessSource";
+import { useResolvedProcessBindings } from "../react/useProcessBindings";
 import { useProcessRuntime } from "../react/ProcessRuntimeProvider";
 import { useProcessDefinition } from "../react/useProcesses";
 import { resolveProcessFrame } from "../runtime/process-frame";
@@ -20,11 +20,17 @@ export function RuntimeProcessComponent({
   className,
 }: ProcessComponentProps) {
   const runtime = useProcessRuntime();
-  const { definition, loading, error } = useProcessDefinition(processId, {
-    projectId: runtime.projectId,
-    fallbackToLatestProjectProcess: true,
-  });
-  useProcessSignalSubscriptions(definition, runtime.tagSource);
+  const source = useMemo<ProcessSource>(
+    () => processId
+      ? exactProcessSource(processId)
+      : projectDefaultProcessSource(runtime.projectId),
+    [processId, runtime.projectId],
+  );
+  const { definition, loading, error } = useProcessDefinition(source);
+  const bindingValues = useResolvedProcessBindings(
+    definition?.bindings ?? EMPTY_BINDINGS,
+    definition ? runtime.tagSource : null,
+  );
 
   if (loading) return <ProcessPlaceholder width={width} height={height} label="Loading process…" />;
   if (error) return <ProcessPlaceholder width={width} height={height} label={error} tone="error" />;
@@ -33,13 +39,12 @@ export function RuntimeProcessComponent({
       <ProcessPlaceholder
         width={width}
         height={height}
-        label="No saved process for this project"
+        label={processId ? "Saved process not found" : "No saved process for this project"}
         tone="error"
       />
     );
   }
 
-  const bindingValues = resolveProcessBindingValues(definition.bindings, runtime.tagSource);
   const frame = resolveProcessFrame(
     definition.path,
     definition.scene,
@@ -63,22 +68,4 @@ export function RuntimeProcessComponent({
   );
 }
 
-function useProcessSignalSubscriptions(
-  definition: ProcessDefinition | null,
-  tagSource: ProcessTagSource,
-) {
-  const [, forceRender] = useReducer((version: number) => version + 1, 0);
-  const tags = useMemo(
-    () => definition ? listProcessBindingPaths(definition.bindings) : [],
-    [definition],
-  );
-  const subscriptionKey = tags.join("\u0000");
-
-  useEffect(() => {
-    if (tags.length === 0) return undefined;
-    const unsubscribes = [...new Set(tags)].map((tag) =>
-      tagSource.subscribe(tag, forceRender),
-    );
-    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
-  }, [subscriptionKey, tagSource]);
-}
+const EMPTY_BINDINGS = {} as const;

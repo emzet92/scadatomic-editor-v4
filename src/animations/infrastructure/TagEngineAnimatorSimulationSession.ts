@@ -1,16 +1,16 @@
+import type { ProcessTagSource } from "../../processes";
 import type { ProjectData } from "../../tags/model/TagDefinition";
 import { ProjectRuntimeSession } from "../../tags/runtime/ProjectRuntimeSession";
 import { createDefaultTagDriverRegistry } from "../../tags/simulation/default-driver-registry";
-import type { ProcessTagSource } from "../application/ProcessTagSource";
 
 /**
- * Dedicated simulation boundary for the process animator.
+ * Animation-workspace adapter around the tag engine.
  *
- * Every instance owns its own ProjectRuntimeSession/TagStore/SimulationDriver.
- * It never reaches the designer runtime singleton or the rendered runtime
- * session, so testing an animation cannot mutate live runtime values.
+ * The generic process bounded context knows only ProcessTagSource. This concrete
+ * adapter deliberately lives in `animations`, because it integrates process
+ * preview with the editor's tag/simulator implementation.
  */
-export class AnimatorSimulationSession implements ProcessTagSource {
+export class TagEngineAnimatorSimulationSession implements ProcessTagSource {
   readonly id: string;
   private readonly runtime: ProjectRuntimeSession;
   private running = false;
@@ -24,19 +24,19 @@ export class AnimatorSimulationSession implements ProcessTagSource {
     );
   }
 
-  start() {
+  start(): void {
     if (this.running) return;
     this.runtime.drivers.start("simulation");
     this.running = true;
   }
 
-  stop() {
+  stop(): void {
     if (!this.running) return;
     this.runtime.drivers.stop("simulation");
     this.running = false;
   }
 
-  isRunning() {
+  isRunning(): boolean {
     return this.running;
   }
 
@@ -48,7 +48,7 @@ export class AnimatorSimulationSession implements ProcessTagSource {
     return this.runtime.tagStore.subscribe(path, listener);
   }
 
-  dispose() {
+  dispose(): void {
     this.running = false;
     this.runtime.dispose();
   }
